@@ -1,0 +1,22 @@
+# ZoZo (web) — configuração do Cloudflare (Python Workers + D1)
+name = "zozo"
+main = "src/entry.py"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["python_workers"]
+
+# Interface (pasta gerada por: python montar_interface.py)
+# Os arquivos são servidos direto pelo Cloudflare; só /api/* chega ao Python.
+[assets]
+directory = "./public"
+not_found_handling = "none"
+
+# Banco SQL (crie com: npx wrangler d1 create zozo  e cole o id abaixo)
+[[d1_databases]]
+binding = "DB"
+database_name = "zozo"
+database_id = "7964c186-da78-4c07-942c-79d583691f75"
+
+[vars]
+ACCESS_TEAM_DOMAIN = "zozo-finance-app.cloudflareaccess.com"
+ACCESS_AUD = "73171f59b9f70ccf6b80906dd384b5baaaa98c60e99fb4ff6211759e7d0fcf3f"
+ALLOWED_EMAILS = "lukas.delpiero@outlook.com.br,lk-cat2@hotmail.com,cibelecamargospp@gmail.com"

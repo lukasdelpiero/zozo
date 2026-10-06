@@ -1,0 +1,60 @@
+/* =============================================================
+   ZoZo — Impressão do boleto (seção 46.10)
+   Layout próprio para A4: sem sidebar, navegação, botões ou
+   controles. Vale para a impressão do navegador ("Salvar como
+   PDF"). Fora do boleto, a impressão sai em branco: nenhum dado
+   financeiro vaza por um Ctrl+P acidental.
+   ============================================================= */
+@page {
+  size: A4;
+  margin: 14mm 15mm;
+}
+
+@media print {
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Somente o documento do boleto é impresso */
+  #app > :not(#boleto-root),
+  #toast-root, #modal-root, .menu, .selbar { display: none !important; }
+  body:not(.has-boleto) #app { display: none !important; }
+
+  #app { height: auto !important; }
+  .boleto {
+    position: static !important;
+    display: block !important;
+    opacity: 1 !important;
+    background: #fff !important;
+  }
+  .boleto__header,
+  .boleto__editor { display: none !important; }
+  .boleto__body { display: block !important; }
+  .boleto__preview {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+  .paper-scaler { zoom: 1 !important; width: auto !important; margin: 0 !important; }
+  .paper {
+    width: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .doc { gap: 22px; }
+  .doc__table thead { display: table-header-group; }   /* repete o cabeçalho em várias páginas */
+  .doc__table tr,
+  .boleto-summary--doc,
+  .doc__block-title { break-inside: avoid; page-break-inside: avoid; }
+  .doc__block-title { break-after: avoid; }
+}

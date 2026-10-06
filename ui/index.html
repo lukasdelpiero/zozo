@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>ZoZo</title>
+  <link rel="icon" type="image/png" href="assets/img/favicon.png">
+
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/tipografia.css">
+  <link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+  <div id="app" data-auth="loading">
+    <div id="auth-root"></div>
+    <div class="app-shell" id="shell"></div>
+    <div id="boleto-root"></div>
+    <div id="modal-root"></div>
+    <div id="toast-root" aria-live="polite"></div>
+  </div>
+
+  <!-- Núcleo -->
+  <script src="js/core/dom.js"></script>
+  <script src="js/core/icons.js"></script>
+  <script src="js/core/format.js"></script>
+  <script src="js/core/state.js"></script>
+  <script src="js/config/regras.js"></script>
+
+  <!-- Bridge: contrato de mensagens -->
+  <script src="js/bridge/messages.js"></script>
+
+  <!-- MOCK (somente desenvolvimento): usado ao abrir este arquivo direto do disco ou com ?mock=1.
+       Removido automaticamente na publicação (api/montar_interface.py). -->
+  <script src="mock/mock-data.js"></script>
+  <script src="mock/mock-host.js"></script>
+
+  <!-- Host web: criptografia no navegador + API Python no Cloudflare -->
+  <script src="js/bridge/host-web.js"></script>
+
+  <!-- Serviço de dados (regras e gravação do documento do usuário) -->
+  <script src="js/data/servico.js"></script>
+
+  <!-- Bridge: transporte -->
+  <script src="js/bridge/transporte.js"></script>
+
+  <!-- Componentes -->
+  <script src="js/components/ui.js"></script>
+  <script src="js/components/feedback.js"></script>
+  <script src="js/components/menu.js"></script>
+  <script src="js/data/emojis.js"></script>
+  <script src="js/components/emoji-picker.js"></script>
+  <script src="js/components/modais.js"></script>
+  <script src="js/components/inline.js"></script>
+  <script src="js/components/dividir.js"></script>
+  <script src="js/components/forms.js"></script>
+  <script src="js/components/charts.js"></script>
+  <script src="js/components/list.js"></script>
+  <script src="js/components/sidebar.js"></script>
+  <script src="js/components/topbar.js"></script>
+  <script src="js/components/detail-panel.js"></script>
+  <script src="js/components/auth.js"></script>
+
+  <!-- Páginas -->
+  <script src="js/router.js"></script>
+  <script src="js/pages/comum.js"></script>
+  <script src="js/pages/contas.js"></script>
+  <script src="js/pages/investimentos.js"></script>
+  <script src="js/pages/categorias.js"></script>
+  <script src="js/pages/recorrencias.js"></script>
+  <script src="js/pages/lancamentos.js"></script>
+  <script src="js/pages/dashboard.js"></script>
+  <script src="js/pages/perfil.js"></script>
+  <script src="js/pages/lancamento-painel.js"></script>
+  <script src="js/pages/boleto.js"></script>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

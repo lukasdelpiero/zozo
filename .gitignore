@@ -1,0 +1,9 @@
+# gerados
+api/public/
+api/dev/*.db
+api/dev/*.db-*
+__pycache__/
+.venv/
+.venv-workers/
+python_modules/
+.wrangler/
