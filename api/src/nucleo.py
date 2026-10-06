@@ -175,8 +175,18 @@ async def _conferir_prova(banco, email, pedido, agora):
     conta = await banco.primeiro("SELECT nome, verificador FROM contas WHERE email = ?", email)
     if not conta:
         raise Falha(404, "NOT_FOUND")
-    t = await banco.primeiro("SELECT falhas, ultima FROM tentativas WHERE email = ?", email)
-    if t and t["falhas"] >= MAX_FALHAS and agora - t["ultima"] < BLOQUEIO_S:
+    # A tentativa é contada ANTES de conferir a prova, num único comando atômico:
+    # pedidos em paralelo não conseguem ler o contador antigo e escapar do limite.
+    # Durante o bloqueio o contador sobe, mas "ultima" não muda (o bloqueio não é prolongado).
+    t = await banco.primeiro(
+        "INSERT INTO tentativas (email, falhas, ultima) VALUES (?, 1, ?) "
+        "ON CONFLICT(email) DO UPDATE SET "
+        "falhas = CASE WHEN excluded.ultima - tentativas.ultima >= ? THEN 1 ELSE tentativas.falhas + 1 END, "
+        "ultima = CASE WHEN tentativas.falhas >= ? AND excluded.ultima - tentativas.ultima < ? "
+        "THEN tentativas.ultima ELSE excluded.ultima END "
+        "RETURNING falhas",
+        email, int(agora), BLOQUEIO_S, MAX_FALHAS, BLOQUEIO_S)
+    if not t or t["falhas"] > MAX_FALHAS:
         raise Falha(429, "TOO_MANY_ATTEMPTS")
     try:
         prova = _prova(pedido.cab("x-zozo-prova"))
@@ -184,15 +194,8 @@ async def _conferir_prova(banco, email, pedido, agora):
     except Falha:
         ok = False
     if not ok:
-        await banco.executar(
-            "INSERT INTO tentativas (email, falhas, ultima) VALUES (?, 1, ?) "
-            "ON CONFLICT(email) DO UPDATE SET "
-            "falhas = CASE WHEN excluded.ultima - tentativas.ultima >= ? THEN 1 ELSE tentativas.falhas + 1 END, "
-            "ultima = excluded.ultima",
-            email, int(agora), BLOQUEIO_S)
         raise Falha(403, "WRONG_PASSWORD")
-    if t:
-        await banco.executar("DELETE FROM tentativas WHERE email = ?", email)
+    await banco.executar("DELETE FROM tentativas WHERE email = ?", email)
     return conta
 
 

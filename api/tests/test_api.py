@@ -267,6 +267,39 @@ class TesteApi(unittest.TestCase):
         self.assertEqual(self.api("POST", "/api/conta/verificar", prova=self.prova)[0], 204)
         self.assertIsNone(self.con.execute("SELECT 1 FROM tentativas").fetchone())
 
+    def test_bloqueio_vale_para_pedidos_em_paralelo(self):
+        class Intercalado(BancoSqlite):
+            """Cede a vez antes de cada comando, como o D1 (pedidos simultâneos se intercalam)."""
+            async def primeiro(self, sql, *params):
+                await asyncio.sleep(0)
+                return await super().primeiro(sql, *params)
+
+            async def executar(self, sql, *params):
+                await asyncio.sleep(0)
+                return await super().executar(sql, *params)
+
+        banco = Intercalado(self.con)
+
+        async def ident(_):
+            return EMAIL
+
+        async def varios():
+            pedidos = [nucleo.Pedido("POST", "https://zozo.exemplo.com/api/conta/verificar",
+                                     {"Host": "zozo.exemplo.com", "X-ZoZo-Prova": prova()}) for _ in range(12)]
+            return await asyncio.gather(*(nucleo.atender(p, banco, FakeHttp(), ident, log=lambda *_: None) for p in pedidos))
+
+        status = [r.status for r in rodar(varios())]
+        self.assertEqual(status.count(403), nucleo.MAX_FALHAS)          # só 5 provas chegam a ser conferidas
+        self.assertEqual(status.count(429), 12 - nucleo.MAX_FALHAS)
+
+    def test_tentativas_no_bloqueio_nao_prolongam(self):
+        for _ in range(5):
+            self.api("POST", "/api/conta/verificar", prova=prova())
+        ultima = self.con.execute("SELECT ultima FROM tentativas").fetchone()[0]
+        self.con.execute("UPDATE tentativas SET ultima = ?", (ultima - 30,))
+        self.assertEqual(self.api("POST", "/api/conta/verificar", prova=prova())[0], 429)
+        self.assertEqual(self.con.execute("SELECT ultima FROM tentativas").fetchone()[0], ultima - 30)
+
     def test_isolamento_entre_contas(self):
         self.gravar(0)
         outro = Cliente(self.banco, email=OUTRO)

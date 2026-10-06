@@ -79,6 +79,7 @@
   const FRIENDLY = Object.freeze({
     LOAD_FAILED: "Não foi possível carregar os dados.",
     SESSION_EXPIRED: "Sua sessão terminou. Entre novamente.",
+    ACCESS_DENIED: "O servidor não autorizou este e-mail. Confira se você entrou no Cloudflare Access com um e-mail da lista ALLOWED_EMAILS e se abriu o endereço oficial do ZoZo.",
     NOT_IMPLEMENTED: "Essa ação não está disponível nesta versão.",
     PASSWORD_BREACHED: "Essa senha já apareceu em vazamentos de dados na internet. Escolha outra senha.",
     SPLIT_INVALID: "A divisão não é válida. Confira valores, data, categorias e perfis.",

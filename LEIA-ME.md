@@ -29,7 +29,7 @@ Aplicativo web com design baseado no Copilot Money.
 ZoZo/
 ├── ui/                       ← front-end (HTML/CSS/JS)
 │   ├── index.html
-│   ├── css/                  tokens · base · layout · components · pages · print
+│   ├── css/                  tokens · base · layout · components · pages · tipografia · print
 │   ├── js/
 │   │   ├── core/             dom (sem innerHTML) · icons · format (pt-BR) · state
 │   │   ├── config/regras.js  regras configuráveis
@@ -45,7 +45,7 @@ ZoZo/
     ├── wrangler.toml         configuração do Cloudflare
     ├── montar_interface.py   gera api/public a partir de ui/
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/test_api.py     42 testes automáticos da API
+    └── tests/test_api.py     44 testes automáticos da API
 ```
 
 ## Publicar (uma vez)
@@ -63,7 +63,7 @@ ZoZo/
 6. Publique: `uv run pywrangler deploy`.
 7. Domínio: aponte para o Worker em **Workers → Settings → Domains**.
 
-**Atualizar:** rode `python montar_interface.py` e `uv run pywrangler deploy` de novo. O `schema.sql` pode ser executado de novo sem perder dados.
+**Atualizar:** rode `python montar_interface.py` e `uv run pywrangler deploy` de novo. **Toda mudança no `wrangler.toml` (inclusive `ALLOWED_EMAILS`) só vale depois do deploy.** O `schema.sql` pode ser executado de novo sem perder dados.
 
 > Se você chegou a publicar a versão web anterior (API em JavaScript), o formato dos dados mudou: apague e recrie o banco (`npx wrangler d1 delete zozo` e repita os passos 2–3). Como ela ainda tinha os campos de exemplo no `wrangler.toml`, provavelmente nunca foi publicada.
 
@@ -80,7 +80,7 @@ ZoZo/
 | Portão | Cloudflare Access na frente do site; a API valida de novo o token (assinatura RS256, validade, emissor, audiência) e a lista `ALLOWED_EMAILS`. Configuração incompleta = tudo negado |
 | Senha | Nunca sai do navegador. PBKDF2-SHA256 com 600.000 iterações (OWASP) e sal aleatório → HKDF → chave dos dados + prova da senha. O navegador recusa parâmetros mais fracos vindos do servidor |
 | Prova da senha | Enviada em cada acesso aos dados; o servidor guarda só o SHA-256. Sessão do Access roubada não lê, altera nem apaga nada |
-| Login | Bloqueio de 1 minuto após 5 erros (no servidor); e-mail digitado precisa ser o do Access; senhas vazadas recusadas no cadastro e na troca |
+| Login | Bloqueio de 1 minuto após 5 erros (no servidor, contado de forma atômica: pedidos em paralelo não escapam do limite); e-mail digitado precisa ser o do Access; senhas vazadas recusadas no cadastro e na troca. E-mail fora de `ALLOWED_EMAILS` → aviso na tela de login (não recarrega a página) |
 | Dados | JSON → gzip → AES-256-GCM no navegador. E-mail e número da versão entram como dados autenticados: bloco adulterado, trocado entre contas ou de outra versão é recusado |
 | Integridade | Gravação com versão (outro dispositivo gravou antes → recusa e recarrega, nada é sobrescrito); documento danificado → recuperado do histórico com aviso; versão mais antiga que a já vista neste navegador → aviso |
 | Operações atômicas | Troca de senha e "apagar dados" acontecem numa única transação: ou tudo muda, ou nada muda (nunca fica documento cifrado com uma senha e conta com outra) |

@@ -87,14 +87,14 @@
         authEmail = cred.email;
         bridge.request(A.login, cred).then(entrar).catch((e) => {
           if (e.code === "SESSION_EXPIRED") { recarregarParaEntrar(); return; }
-          authErro = ["STORAGE_UNAVAILABLE", "TOO_MANY_ATTEMPTS", "EMAIL_MISMATCH"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
+          authErro = ["STORAGE_UNAVAILABLE", "TOO_MANY_ATTEMPTS", "EMAIL_MISMATCH", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
           renderAuth();
         });
       },
       onCadastro: (dados) => {
         bridge.request(A.registerUser, dados).then(entrar).catch((e) => {
           if (e.code === "SESSION_EXPIRED") { recarregarParaEntrar(); return; }
-          authErro = ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "EMAIL_MISMATCH"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
+          authErro = ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "EMAIL_MISMATCH", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
           renderAuth();
         });
       },
@@ -210,8 +210,9 @@
   });
 
   // Sessão do Cloudflare Access vencida (ou senha trocada em outro dispositivo): volta ao login
-  window.addEventListener("zozo:sessao-expirada", () => {
-    if (store.get().session.authenticated) ctx.logout(FR.SESSION_EXPIRED);
+  window.addEventListener("zozo:sessao-expirada", (e) => {
+    const codigo = e.detail && e.detail.codigo;
+    if (store.get().session.authenticated) ctx.logout(FR[codigo] || FR.SESSION_EXPIRED);
   });
 
   // Inatividade: depois de 30 minutos sem uso, a chave sai da memória e a senha é pedida de novo
@@ -243,10 +244,12 @@
     document.getElementById("app").dataset.auth = "loading";
     renderAuth();
     Promise.all([
-      bridge.request(A.getArmazenamento).then((d) => !!(d && d.available)).catch(() => false),
+      bridge.request(A.getArmazenamento).catch(() => null),
       bridge.request(A.getSession).catch(() => ({ authenticated: false })),
-    ]).then(([disponivel, sessao]) => {
-      store.set({ session: { storageAvailable: disponivel } });
+    ]).then(([armazenamento, sessao]) => {
+      // Identidade recusada pelo servidor: avisa já na tela de login (tentar entrar não adiantaria)
+      if (armazenamento && armazenamento.acessoNegado) authErro = FR.ACCESS_DENIED;
+      store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
       if (sessao && sessao.authenticated) entrar(sessao);
       else store.set({ session: { status: "login" } });
     });

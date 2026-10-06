@@ -48,9 +48,12 @@
   const limparNome = (n) => String(n || "").replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, "").trim().slice(0, 80);
   function validarSenha(s) { if (typeof s !== "string" || s.length < 8 || s.length > 256) throw erro("WEAK_PASSWORD"); }
 
-  function sessaoExpirada() {
-    window.dispatchEvent(new CustomEvent("zozo:sessao-expirada"));
-    return erro("SESSION_EXPIRED");
+  /** Encerra a sessão na interface. SESSION_EXPIRED: recarregar leva ao login do Access.
+      ACCESS_DENIED: o servidor recusou a identidade do Access — recarregar não resolve. */
+  function sessaoExpirada(codigo) {
+    const c = codigo || "SESSION_EXPIRED";
+    window.dispatchEvent(new CustomEvent("zozo:sessao-expirada", { detail: { codigo: c } }));
+    return erro(c);
   }
 
   /* ---------------- API ---------------- */
@@ -66,7 +69,9 @@
         headers, body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
       });
     } catch (e) { throw erro("STORAGE_UNAVAILABLE"); }
-    if (r.type === "opaqueredirect" || r.status === 401) throw sessaoExpirada();
+    if (r.type === "opaqueredirect") throw sessaoExpirada();
+    // 401: token do Access ausente/recusado ou e-mail fora de ALLOWED_EMAILS (configuração, não validade)
+    if (r.status === 401) throw sessaoExpirada("ACCESS_DENIED");
     let dados = null;
     if (r.status !== 204) { try { dados = await r.json(); } catch (e) { dados = null; } }
     if (r.ok) return dados || {};
@@ -77,7 +82,7 @@
     }
     if (r.status === 409) throw erro(codigo === "EMAIL_IN_USE" ? "EMAIL_IN_USE" : "DATA_CHANGED");
     if (r.status === 403 && codigo === "WRONG_PASSWORD") throw erro("WRONG_PASSWORD");
-    if (r.status === 403) throw sessaoExpirada();
+    if (r.status === 403) throw sessaoExpirada("ACCESS_DENIED");      // pedido recusado pela checagem de origem
     if (r.status === 429) throw erro("TOO_MANY_ATTEMPTS");
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
     throw erro("STORAGE_UNAVAILABLE");
@@ -180,7 +185,8 @@
 
   const ACOES = {
     async getArmazenamento() {
-      try { await api("GET", "/eu"); return { available: true }; } catch (e) { return { available: e.code === "SESSION_EXPIRED" }; }
+      try { await api("GET", "/eu"); return { available: true }; }
+      catch (e) { return { available: e.code === "SESSION_EXPIRED" || e.code === "ACCESS_DENIED", acessoNegado: e.code === "ACCESS_DENIED" }; }
     },
     async getSession() { return sessaoData(); },
 

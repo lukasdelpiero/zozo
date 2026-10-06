@@ -31,6 +31,7 @@ UI = (AQUI.parent.parent / "ui").resolve()
 BANCO = AQUI / "zozo-local.db"
 EMAIL = os.environ.get("ZOZO_DEV_EMAIL", "dev@zozo.local").strip().lower()
 PORTA = int(os.environ.get("ZOZO_DEV_PORTA", "8787"))
+HOSTS_LOCAIS = {f"127.0.0.1:{PORTA}", f"localhost:{PORTA}"}
 
 # Mesmos cabeçalhos que o Cloudflare envia com a interface (arquivo _headers)
 CABECALHOS_UI = dict(montar_interface.CABECALHOS_UI, **{"Cache-Control": "no-store"})
@@ -60,8 +61,18 @@ class Manipulador(http.server.BaseHTTPRequestHandler):
     server_version = "ZoZo-dev"
     sys_version = ""
 
+    def _host_local(self):
+        """Só aceita Host local: impede que um site malicioso use DNS rebinding para falar com este servidor."""
+        host = (self.headers.get("Host") or "").lower()
+        return host in HOSTS_LOCAIS
+
     def _api(self):
-        tamanho = int(self.headers.get("Content-Length") or 0)
+        try:
+            tamanho = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            tamanho = -1
+        if tamanho < 0:
+            return self._enviar(400, nucleo.CABECALHOS, b'{"erro":"INVALID_REQUEST"}')
         if tamanho > nucleo.LIMITE_CORPO:
             return self._enviar(413, nucleo.CABECALHOS, b'{"erro":"DOCUMENT_TOO_LARGE"}')
         corpo = self.rfile.read(tamanho).decode("utf-8", "replace") if tamanho else ""
@@ -90,9 +101,13 @@ class Manipulador(http.server.BaseHTTPRequestHandler):
             self.wfile.write(corpo)
 
     def do_GET(self):
+        if not self._host_local():
+            return self._enviar(421, {"Content-Type": "text/plain; charset=utf-8"}, b"host invalido")
         self._api() if self.path.startswith("/api/") else self._arquivo()
 
     def do_POST(self):
+        if not self._host_local():
+            return self._enviar(421, {"Content-Type": "text/plain; charset=utf-8"}, b"host invalido")
         self._api()
 
     do_PUT = do_DELETE = do_POST

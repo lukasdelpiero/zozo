@@ -4,6 +4,12 @@ main = "src/entry.py"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["python_workers"]
 
+# Endereço oficial: https://zozo.zozo-finance-app.workers.dev (protegido pelo Cloudflare Access).
+# As URLs de pré-visualização de cada versão ficam desligadas: cada uma seria mais
+# um endereço que precisaria estar coberto pelo Access.
+workers_dev = true
+preview_urls = false
+
 # Interface (pasta gerada por: python montar_interface.py)
 # Os arquivos são servidos direto pelo Cloudflare; só /api/* chega ao Python.
 [assets]

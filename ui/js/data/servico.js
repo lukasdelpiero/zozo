@@ -760,7 +760,8 @@
       if (!c) throw erro("OPERATION_FAILED");
       if (d.conta) {
         const e = lerConta(d.conta);
-        Object.assign(c, { nome: e.nome, tipo: e.tipo, ultimos4Digitos: e.ultimos4Digitos, cor: e.cor, tipoInvestimento: e.tipoInvestimento });
+        Object.assign(c, { nome: e.nome, tipo: e.tipo, ultimos4Digitos: e.ultimos4Digitos, cor: e.cor, tipoInvestimento: e.tipoInvestimento,
+          instituicao: e.instituicao, limite: e.limite, fechamento: e.fechamento, vencimento: e.vencimento });
         registrarSaldo(c, e.saldo);
       } else if (d.cor) c.cor = cor(d.cor, c.cor);
       if (typeof d.oculta === "boolean") c.oculta = d.oculta;
@@ -915,7 +916,7 @@
     return Promise.reject(erro("OPERATION_FAILED"));
   }
 
-  /** Promessa que resolve quando todas as gravações pendentes terminarem (usado ao fechar o programa) */
+  /** Promessa que resolve quando todas as gravações pendentes terminarem (antes de sair, trocar senha ou apagar dados) */
   const aguardarGravacoes = () => fila.catch(() => null);
 
   ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando };

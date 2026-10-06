@@ -21,8 +21,9 @@ class BancoSqlite:
         self.con = con
 
     async def primeiro(self, sql, *params):
-        linha = self.con.execute(sql, params).fetchone()
-        return dict(linha) if linha else None
+        # fetchall: com INSERT ... RETURNING o comando só termina (e grava) depois de ler tudo
+        linhas = self.con.execute(sql, params).fetchall()
+        return dict(linhas[0]) if linhas else None
 
     async def todos(self, sql, *params):
         return [dict(x) for x in self.con.execute(sql, params).fetchall()]
