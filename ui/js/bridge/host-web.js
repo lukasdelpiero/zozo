@@ -185,7 +185,8 @@
 
   const ACOES = {
     async getArmazenamento() {
-      try { await api("GET", "/eu"); return { available: true }; }
+      // email: identidade do Cloudflare Access (a tela de login mostra e já preenche)
+      try { const eu = await api("GET", "/eu"); return { available: true, email: eu.email || "" }; }
       catch (e) { return { available: e.code === "SESSION_EXPIRED" || e.code === "ACCESS_DENIED", acessoNegado: e.code === "ACCESS_DENIED" }; }
     },
     async getSession() { return sessaoData(); },

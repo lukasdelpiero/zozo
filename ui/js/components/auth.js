@@ -40,6 +40,10 @@
   const erroAbaixo = (msg) => (msg ? h("p", { class: "auth__error", role: "alert" }, msg) : null);
   const rodape = (pergunta, acao, onClick) => h("p", { class: "auth__switch" },
     h("span", null, pergunta + " "), h("button", { type: "button", class: "auth__link", onClick }, acao));
+  /** E-mail do Cloudflare Access (o único aceito) + saída do Access para entrar com outro */
+  const conectadoComo = (email) => (email ? h("p", { class: "auth__switch" },
+    h("span", null, "Conectado ao site como " + email + " ·"),
+    h("a", { class: "auth__link", href: "/cdn-cgi/access/logout" }, "Trocar de conta")) : null);
 
   function render(root, cfg) {
     const st = ZoZo.store.get().session;
@@ -69,7 +73,7 @@
         if (!EMAIL_OK.test(email.value.trim())) { aviso.textContent = "Insira um e-mail válido."; email.focus(); return; }
         estado.email = email.value.trim(); estado.etapa = 2;
         render(root, Object.assign({}, cfg, { erro: null }));
-      } }, h("div", { class: "auth__fields" }, email), botao("Continuar"), aviso, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro));
+      } }, h("div", { class: "auth__fields" }, email), botao("Continuar"), aviso, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro), conectadoComo(cfg.emailAccess));
     } else if (modo === "login") {
       titulo = "Entrar com senha";
       const senha = campoSenha("current-password");
@@ -84,7 +88,7 @@
         // e-mail escondido ajuda o gerenciador de senhas do navegador
         h("div", { class: "auth__fields" },
           h("input", { type: "email", name: "email", autocomplete: "username", value: estado.email, class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" }),
-          senha.wrap), enviar, erroAbaixo(erro), rodape(estado.email, "Usar outro e-mail", voltar));
+          senha.wrap), enviar, erroAbaixo(erro), rodape(estado.email, "Usar outro e-mail", voltar), erro ? conectadoComo(cfg.emailAccess) : null);
     } else if (estado.etapa === 1) {
       titulo = "Vamos começar";
       const nome = campo({ name: "nomeUsuario", autocomplete: "given-name", placeholder: "Insira seu primeiro nome", rotulo: "Primeiro nome", value: estado.nome });
@@ -98,7 +102,7 @@
         if (!EMAIL_OK.test(email.value.trim())) { aviso.textContent = "Insira um e-mail válido."; email.focus(); return; }
         estado.nome = nome.value.trim(); estado.email = email.value.trim(); estado.etapa = 2;
         render(root, Object.assign({}, cfg, { erro: null }));
-      } }, h("div", { class: "auth__fields auth__stack" }, nome, email), botao("Continuar"), aviso, rodape("Já tem uma conta?", "Entrar", cfg.onVoltar));
+      } }, h("div", { class: "auth__fields auth__stack" }, nome, email), botao("Continuar"), aviso, rodape("Já tem uma conta?", "Entrar", cfg.onVoltar), conectadoComo(cfg.emailAccess));
     } else {
       titulo = "Crie sua senha";
       const senha = campoSenha("new-password");
@@ -113,7 +117,7 @@
       } },
         h("div", { class: "auth__fields" },
           h("input", { type: "email", name: "email", autocomplete: "username", value: estado.email, class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" }),
-          senha.wrap), enviar, aviso, rodape(estado.email, "Voltar", voltar));
+          senha.wrap), enviar, aviso, rodape(estado.email, "Voltar", voltar), erro ? conectadoComo(cfg.emailAccess) : null);
     }
 
     const demo = modo === "login" && estado.etapa === 1 && ZoZo.bridge.isDemo && ZoZo.mock && ZoZo.mock.host

@@ -76,10 +76,12 @@
 
   /* ---------------- Autenticação ---------------- */
   let authErro = null, authEmail = "";
+  let emailAccess = "";   // e-mail com que o Cloudflare Access identificou este navegador
   function renderAuth() {
     ZoZo.auth.render(authRoot, {
       erro: authErro,
       emailInicial: authEmail,
+      emailAccess,
       onIrCadastro: () => { authErro = null; store.set({ session: { status: "register" } }); },
       onVoltar: () => { authErro = null; store.set({ session: { status: "login" } }); },
       onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
@@ -87,19 +89,24 @@
         authEmail = cred.email;
         bridge.request(A.login, cred).then(entrar).catch((e) => {
           if (e.code === "SESSION_EXPIRED") { recarregarParaEntrar(); return; }
-          authErro = ["STORAGE_UNAVAILABLE", "TOO_MANY_ATTEMPTS", "EMAIL_MISMATCH", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
+          authErro = e.code === "EMAIL_MISMATCH" ? erroEmail()
+            : ["STORAGE_UNAVAILABLE", "TOO_MANY_ATTEMPTS", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
           renderAuth();
         });
       },
       onCadastro: (dados) => {
         bridge.request(A.registerUser, dados).then(entrar).catch((e) => {
           if (e.code === "SESSION_EXPIRED") { recarregarParaEntrar(); return; }
-          authErro = ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "EMAIL_MISMATCH", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
+          authErro = e.code === "EMAIL_MISMATCH" ? erroEmail()
+            : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
           renderAuth();
         });
       },
     });
   }
+
+  /** E-mail digitado ≠ e-mail do Access: diz qual é o certo (o usuário não tem como adivinhar) */
+  const erroEmail = () => (emailAccess ? "Você entrou no site como " + emailAccess + ". Use esse e-mail no ZoZo ou clique em \"Trocar de conta\"." : FR.EMAIL_MISMATCH);
 
   /** O login do Cloudflare Access venceu: recarregar leva à tela de login do Access */
   function recarregarParaEntrar() { location.reload(); }
@@ -116,7 +123,7 @@
     if (ctx.detail) ctx.detail.close({ silencioso: true });
     if (ZoZo.boleto) ZoZo.boleto.close();
     if (ZoZo.servico) ZoZo.servico.reset();
-    authErro = null; authEmail = "";
+    authErro = null; authEmail = emailAccess;
     store.reset();
   };
 
@@ -127,7 +134,7 @@
       if (ctx.detail) ctx.detail.close({ silencioso: true });
       if (ZoZo.boleto) ZoZo.boleto.close();
       if (ZoZo.servico) ZoZo.servico.reset();
-      authErro = mensagem || null; authEmail = "";
+      authErro = mensagem || null; authEmail = emailAccess;
       store.reset();                 // limpa todo o estado da sessão (dados não são apagados)
     });
   };
@@ -249,6 +256,7 @@
     ]).then(([armazenamento, sessao]) => {
       // Identidade recusada pelo servidor: avisa já na tela de login (tentar entrar não adiantaria)
       if (armazenamento && armazenamento.acessoNegado) authErro = FR.ACCESS_DENIED;
+      if (armazenamento && armazenamento.email) { emailAccess = armazenamento.email; authEmail = emailAccess; }
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
       if (sessao && sessao.authenticated) entrar(sessao);
       else store.set({ session: { status: "login" } });
