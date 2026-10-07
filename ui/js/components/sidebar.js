@@ -1,6 +1,6 @@
 /* =============================================================
    ZoZo — Painel lateral (seções 5, 7, 8)
-   Superior: navegação · Central: resumo de contas · Inferior: Configurações
+   Superior: navegação · Central: resumo de contas · Inferior: foto + nome (esquerda) e Configurações (ícone, direita)
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -53,7 +53,9 @@
     let assinatura = null;
     function render(state) {
       const contas = state.data.contas && state.data.contas.contas;
-      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, state.loading._refresh].map((x) => (typeof x === "object" ? x : String(x)));
+      const usuario = state.session.user || {};
+      const foto = state.data.config && state.data.config.foto;
+      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, state.loading._refresh, usuario, foto].map((x) => (typeof x === "object" ? x : String(x)));
       if (assinatura && sig.every((v, i) => v === assinatura[i])) return;
       assinatura = sig;
 
@@ -71,8 +73,11 @@
           : h("p", { class: "sidebar__note" }, "Nenhuma conta cadastrada."));
       }
 
-      mount(footerEl, h("button", { type: "button", class: "nav-item", "aria-haspopup": "dialog", onClick: () => ctx.abrirConfiguracoes() },
-        icon("configuracoes", { size: 16 }), h("span", null, "Configurações")));
+      mount(footerEl,
+        h("button", { type: "button", class: "sidebar__user", title: "Minha conta", "aria-haspopup": "dialog", onClick: () => ctx.abrirConfiguracoes("conta") },
+          ZoZo.usuario.Avatar(foto, usuario.nomeUsuario, 28), h("span", { class: "sidebar__user-name" }, usuario.nomeUsuario || "")),
+        h("button", { type: "button", class: "sidebar__config", title: "Configurações", "aria-label": "Configurações", "aria-haspopup": "dialog",
+          onClick: () => ctx.abrirConfiguracoes() }, icon("configuracoes", { size: 18 })));
     }
 
     return { render };

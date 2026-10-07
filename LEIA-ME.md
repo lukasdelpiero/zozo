@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.1.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.2.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,16 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional). O Cloudflare Access protege só o **ambiente de prévia** |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.2.0
+
+- **Nova tela de login:** "Continuar com e-mail", "Continuar com Google" e "Inscreva-se". O Google confirma o e-mail; a senha do ZoZo continua sendo a chave dos dados (como ligar: [docs/AMBIENTE-DE-TESTES.md](docs/AMBIENTE-DE-TESTES.md)).
+- **Pix no boleto:** QR code válido pelo padrão do Banco Central (BR Code), com o valor do boleto e um identificador novo a cada geração. A chave fica cifrada em Configurações › Geral › Pix.
+- **Senha:** oculta por padrão, com "mostrar", e **sem copiar/recortar**; campos prontos para o preenchimento automático de navegadores e gerenciadores de senha.
+- **Saudação** "Bom dia/Boa tarde/Boa noite, Nome!"; foto e nome no rodapé do menu, com o botão de Configurações ao lado.
+- **Mais leve:** na publicação, os ~50 arquivos viram 1 script + 1 folha de estilo com cache longo (56 → 11 requisições).
+- **Publicar pelo VS Code:** Terminal › Executar Tarefa… › "ZoZo: publicar na prévia" / "ZoZo: publicar em produção".
+- Telas de 375 px a 1920 px verificadas; boleto, perfis e gráficos corrigidos em telas pequenas.
 
 ## Novidades da versão 2.1.0
 
@@ -28,6 +38,7 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 ZoZo/
 ├── CLAUDE.md                 ← instruções para o Claude Code (inclui docs/SEGURANCA.md)
 ├── docs/SEGURANCA.md         ← padrão de segurança
+├── docs/AMBIENTE-DE-TESTES.md ← configurar, publicar e acessar a prévia (passo a passo)
 ├── ui/                       ← front-end (HTML/CSS/JS)
 │   ├── index.html
 │   ├── css/                  tokens · base · layout · components · pages · tipografia · print
@@ -35,6 +46,7 @@ ZoZo/
 │   │   ├── core/             dom (sem innerHTML) · icons · format (pt-BR) · state
 │   │   ├── config/regras.js  regras configuráveis (inclui limiteNome = 50)
 │   │   ├── data/servico.js   regras de dados (lançamentos, parcelas, recorrências…)
+│   │   ├── data/pix.js       Pix copia e cola / QR (BR Code do BACEN)
 │   │   ├── bridge/           messages.js (contrato) · host-web.js (criptografia + API) · transporte.js
 │   │   ├── components/       … · verificacao.js (CAPTCHA, código de 6 dígitos, QR code)
 │   │   ├── vendor/           qrcode-generator.js (MIT, versão e integridade no cabeçalho)
@@ -44,13 +56,14 @@ ZoZo/
     ├── src/entry.py          ponto de entrada no Cloudflare (D1, fetch, cookies)
     ├── src/nucleo.py         rotas, sessões, bloqueio progressivo, prova de senha
     ├── src/totp.py           2FA (TOTP RFC 6238) e cifra do segredo do 2FA
+    ├── src/google.py         "Continuar com Google" (OpenID Connect + PKCE)
     ├── src/acesso.py         Cloudflare Access (só no ambiente de prévia)
     ├── migracoes/            tabelas do banco (aplicadas em ordem, uma vez)
     ├── wrangler.toml         produção + prévia
     ├── publicar.ps1          testes → interface → migrações → publicação
     ├── montar_interface.py   gera api/public a partir de ui/
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/test_api.py     54 testes automáticos da API
+    └── tests/test_api.py     59 testes automáticos da API
 ```
 
 ## Ambientes e publicação

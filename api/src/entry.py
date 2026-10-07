@@ -7,8 +7,8 @@ Só traduz entre o Cloudflare e o núcleo (nucleo.py):
   • Request   → Pedido;  Resposta → Response
 A interface (pasta public) é servida pelo próprio Cloudflare (assets);
 este código só recebe os caminhos /api/*.
-Variáveis (wrangler.toml): ALLOWED_EMAILS, TURNSTILE_SITE_KEY, EXIGIR_ACCESS, ACCESS_*
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET
+Variáveis (wrangler.toml): ALLOWED_EMAILS, TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID, EXIGIR_ACCESS, ACCESS_*
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET
 """
 from urllib.parse import urlencode
 
@@ -24,7 +24,7 @@ except ImportError:                   # pragma: no cover
     _JSNULL = None
 
 _CONFIG = ("SEGREDO", "ALLOWED_EMAILS", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "EXIGIR_ACCESS",
-           "ACCESS_TEAM_DOMAIN", "ACCESS_AUD", "ACCESS_EMAILS")
+           "ACCESS_TEAM_DOMAIN", "ACCESS_AUD", "ACCESS_EMAILS", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")
 _CABECALHOS = ("cf-access-jwt-assertion", "cf-connecting-ip", "content-type", "content-length", "cookie",
                "origin", "sec-fetch-site", "x-zozo-prova")
 

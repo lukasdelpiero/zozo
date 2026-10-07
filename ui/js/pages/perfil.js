@@ -318,6 +318,34 @@
       .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
+  /* ---------------- Pix dos boletos (fica no documento cifrado) ---------------- */
+  const mascarar = (c) => (/^\d{11}$/.test(c) ? "***." + c.slice(3, 6) + "." + c.slice(6, 9) + "-**"
+    : /^\d{14}$/.test(c) ? c.slice(0, 2) + ".***.***/" + c.slice(8, 12) + "-**" : c.replace(/^(.{3}).*(@.*)$/, "$1***$2"));
+
+  function SecaoPix(ctx, cfg, u) {
+    const pix = cfg.pix || null;
+    const entrada = (ph, valor, max, rotulo) => { const i = h("input", { class: "input input--sm", placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo }); return i; };
+    const chave = entrada("Chave Pix (CPF, CNPJ, e-mail, celular…)", "", 77, "Chave Pix");
+    const nome = entrada("Nome do recebedor", pix ? pix.nome : (u.nomeUsuario || ""), 25, "Nome do recebedor");
+    const cidade = entrada("Cidade", pix ? pix.cidade : "", 15, "Cidade do recebedor");
+    const salvar = (btn) => {
+      btn.disabled = true;
+      ctx.bridge.request(A.updateConfig, { pix: { chave: chave.value || (pix && pix.chave), nome: nome.value, cidade: cidade.value } })
+        .then(() => { chave.value = ""; ctx.toast("Chave Pix salva. O QR code aparece nos boletos."); return ctx.loadData("config", A.getConfig, null, { force: true }); })
+        .catch((e) => ctx.toast(e.friendly, { tone: "error" }))
+        .finally(() => { btn.disabled = false; });
+    };
+    return h("div", { class: "cfg-row cfg-row--bloco" },
+      h("div", { class: "cfg-row__text" },
+        h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
+        h("span", { class: "cfg-row__sub" }, "Usada no QR code Pix dos boletos. Fica criptografada com seus dados.")),
+      h("div", { class: "cfg-pix" }, chave, nome, cidade),
+      h("div", { class: "cfg-pix__acoes" },
+        pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
+          .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => ctx.toast(e.friendly, { tone: "error" })) }) : null,
+        UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) })));
+  }
+
   /* ---------------- Configurações: Geral | Conta ---------------- */
   let abaConfig = "geral";
 
@@ -357,6 +385,8 @@
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
               .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })))),
+          h("h3", { class: "cfg-section" }, "Pix dos boletos"),
+          SecaoPix(ctx, cfg, u),
           h("h3", { class: "cfg-section" }, "Armazenamento"),
           linhaConfig(
             ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador." : disponivel ? "Seus dados são criptografados neste navegador e guardados na nuvem do ZoZo. Ninguém lê seus dados sem a sua senha." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
@@ -375,8 +405,10 @@
             .catch((e) => ctx.toast(e && e.friendly ? e.friendly : "Não foi possível usar essa imagem. Escolha um arquivo PNG ou JPG.", { tone: "error" }));
         });
         // Alterar senha (senha atual + nova)
-        const senhaAtual = h("input", { type: "password", class: "input input--sm", placeholder: "Senha atual", autocomplete: "current-password", "aria-label": "Senha atual" });
-        const novaSenha = h("input", { type: "password", class: "input input--sm", placeholder: "Nova senha", autocomplete: "new-password", "aria-label": "Nova senha" });
+        const senhaAtual = h("input", { type: "password", class: "input input--sm", name: "current-password", placeholder: "Senha atual", autocomplete: "current-password", "aria-label": "Senha atual" });
+        const novaSenha = h("input", { type: "password", class: "input input--sm", name: "new-password", placeholder: "Nova senha", autocomplete: "new-password", "aria-label": "Nova senha", minlength: "8" });
+        const senhaAtualCampo = ZoZo.verificacao.ComRevelar(senhaAtual, "input-with-action--sm");   // ocultas, com "mostrar" e sem copiar
+        const novaSenhaCampo = ZoZo.verificacao.ComRevelar(novaSenha, "input-with-action--sm");
         const alterarSenha = (btn) => {
           if (!senhaAtual.value) { senhaAtual.focus(); return; }
           if (novaSenha.value.length < 8) { ctx.toast("Use uma nova senha com pelo menos 8 caracteres.", { tone: "error" }); novaSenha.focus(); return; }
@@ -416,7 +448,7 @@
               }).then((sessao) => { store.set({ session: { user: sessao.user } }); ctx.toast("Nome alterado."); }) })),
           linhaConfig("E-mail", null, h("span", { class: "cfg-readonly" }, u.email || "")),
           linhaConfig("Alterar senha", null,
-            h("div", { class: "cfg-password" }, senhaAtual, novaSenha, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
+            h("div", { class: "cfg-password" }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
           linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
@@ -444,7 +476,7 @@
      Os formulários (nome, senha, apagar dados…) abrem dentro da
      própria janela, com "Voltar" para a tela principal.
      ============================================================= */
-  function abrirConfiguracoes(ctx) {
+  function abrirConfiguracoes(ctx, aba) {
     const area = h("div", { class: "settings-modal" });
     let cancelar = null;
     const ctxModal = Object.assign({}, ctx);
@@ -466,7 +498,7 @@
       // não redesenha enquanto o usuário digita (ex.: senha)
       if (!area.contains(document.activeElement) || document.activeElement.tagName !== "INPUT") principal();
     });
-    abaConfig = "geral";
+    abaConfig = aba === "conta" || aba === "sobre" ? aba : "geral";
     principal();
     ctx.loadData("config", A.getConfig, null, { force: true }).catch(() => null);
   }

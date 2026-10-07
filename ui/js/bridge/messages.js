@@ -15,6 +15,7 @@
     verificar2FA: "verificar2FA",
     logout: "logout",
     getArmazenamento: "getArmazenamento",
+    getGoogle: "getGoogle",
 
     // Dados
     getDashboard: "getDashboard",
@@ -97,6 +98,7 @@
     TIMEOUT: "Não foi possível concluir a operação.",
     PROFILE_ARCHIVED: "Esse perfil está arquivado. Desarquive para usá-lo em novos lançamentos.",
     NAME_IN_USE: "Já existe um item com esse nome.",
+    PIX_INVALID: "Confira a chave Pix (CPF, CNPJ, e-mail, celular com DDD ou chave aleatória), o nome e a cidade.",
     WRONG_PASSWORD: "Senha incorreta.",
     WEAK_PASSWORD: "Use uma senha com pelo menos 8 caracteres.",
     TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",

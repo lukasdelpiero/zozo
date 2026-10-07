@@ -20,6 +20,7 @@ Camadas de proteção:
   9. operações de várias etapas (troca de senha, apagar dados) são atômicas;
  10. CSRF: escritas só da própria origem e só com JSON (além do SameSite=Strict).
 O ambiente de prévia pode exigir também o Cloudflare Access (EXIGIR_ACCESS=1).
+"Continuar com Google" (google.py) só confirma o e-mail: a senha continua sendo a chave dos dados.
 
 O servidor nunca recebe a senha nem os dados legíveis: o documento chega
 cifrado (AES-256-GCM) do navegador.
@@ -28,7 +29,8 @@ O núcleo recebe:
   banco    — primeiro(sql, *p) -> dict|None · todos -> list · executar -> int · lote([(sql, p)]) -> list
   servicos — http_get(url, cab) -> (status, texto) · http_post(url, campos) -> (status, texto)
              · access(pedido) -> e-mail|None (só se EXIGIR_ACCESS=1)
-  config   — SEGREDO, ALLOWED_EMAILS, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO, EXIGIR_ACCESS
+  config   — SEGREDO, ALLOWED_EMAILS, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO, EXIGIR_ACCESS,
+             GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 """
 import base64
 import binascii
@@ -41,6 +43,7 @@ import time
 import unicodedata
 from urllib.parse import parse_qs, urlsplit
 
+import google
 import totp
 
 LIMITE_CORPO = 2_100_000        # bytes do pedido
@@ -57,6 +60,8 @@ SESSAO_2FA_S = 600              # 10 min para digitar o código do 2FA
 TOQUE_SESSAO_S = 300            # "último uso" é gravado no máximo a cada 5 min
 COOKIE_SEGURO = "__Host-zozo"   # HTTPS: prefixo __Host- (só este site, Path=/, Secure)
 COOKIE_DEV = "zozo_dev"         # servidor local em http://127.0.0.1
+COOKIE_OAUTH = "zozo_oauth"     # state/nonce/PKCE do Google (10 min)
+COOKIE_GOOGLE = "zozo_google"   # e-mail confirmado pelo Google, até digitar a senha (10 min)
 
 # Bloqueio progressivo (login e prova da senha, por e-mail + IP)
 LOGIN_SEM_CAPTCHA = 3           # 1ª a 3ª tentativa: normal; da 4ª em diante: CAPTCHA
@@ -439,9 +444,9 @@ async def _cadastrar(ctx):
     if await _contar(ctx, f"cadastro|{ctx.h(ctx.pedido.ip)}", CADASTROS_POR_IP, CADASTRO_JANELA_S):
         ctx.evento("cadastro_limitado")
         raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CADASTRO_JANELA_S})
-    if not await _captcha_ok(ctx, b.get("turnstile")):
-        raise Falha(428, "CAPTCHA_REQUIRED")
     email = _email(b.get("email"))
+    if not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile")):
+        raise Falha(428, "CAPTCHA_REQUIRED")
     sal, it, prova = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _prova(b.get("prova"))
     nome = _nome(b.get("nome"))
     if not nome:
@@ -469,7 +474,8 @@ async def _entrar(ctx):
         ctx.evento("login_bloqueado", email)
         raise bloqueio
     suspeita = bool(conta_lim) and ctx.agora - conta_lim["ultima"] < CONTA_JANELA_S and conta_lim["falhas"] >= CONTA_CAPTCHA
-    if (_proxima(ctx, linha) > LOGIN_SEM_CAPTCHA or suspeita) and not await _captcha_ok(ctx, b.get("turnstile")):
+    precisa = _proxima(ctx, linha) > LOGIN_SEM_CAPTCHA or suspeita
+    if precisa and not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile")):
         raise Falha(428, "CAPTCHA_REQUIRED")
     r = await _reservar(ctx, chave)
     if not r:                                         # bloqueado por um pedido simultâneo
@@ -545,6 +551,83 @@ async def _senha_vazada(ctx):
     return Resposta(200, {"lista": texto})
 
 
+
+# ---------------- Continuar com Google ----------------
+def _google_config(ctx):
+    cid, seg = str(ctx.config.get("GOOGLE_CLIENT_ID") or ""), str(ctx.config.get("GOOGLE_CLIENT_SECRET") or "")
+    return (cid, seg) if cid and seg else None
+
+
+def _origem(ctx):
+    return ("http" if str(ctx.config.get("COOKIE_SEGURO", "1")) == "0" else "https") + "://" + ctx.pedido.host
+
+
+def _cookie_curto(ctx, nome, valor, samesite):
+    seguro = str(ctx.config.get("COOKIE_SEGURO", "1")) != "0"
+    nome = ("__Host-" + nome) if seguro else nome
+    ctx.cabecalhos["Set-Cookie"] = (f"{nome}={valor}; Path=/; HttpOnly; SameSite={samesite}; Max-Age={google.VALIDADE_S}"
+                                    + ("; Secure" if seguro else ""))
+
+
+def _ler_cookie_curto(ctx, nome):
+    seguro = str(ctx.config.get("COOKIE_SEGURO", "1")) != "0"
+    return google.ler_assinado(ctx.segredo, ctx.pedido.cookie(("__Host-" + nome) if seguro else nome), ctx.agora)
+
+
+def _google_confirmado(ctx, email):
+    """True se o Google confirmou ESTE e-mail há menos de 10 min (dispensa o CAPTCHA)."""
+    c = _ler_cookie_curto(ctx, COOKIE_GOOGLE)
+    return bool(c) and c.get("m") == email
+
+
+def _redirecionar(destino):
+    return Resposta(302, None, {"Location": destino})
+
+
+async def _google_inicio(ctx):
+    cfg = _google_config(ctx)
+    if not cfg:
+        return _redirecionar("/?google=indisponivel")
+    if await _contar(ctx, f"consulta|{ctx.h(ctx.pedido.ip)}", CONSULTAS_POR_IP, CONSULTA_JANELA_S):
+        return _redirecionar("/?google=erro")
+    url, cookie = google.inicio(ctx.segredo, cfg[0], _origem(ctx) + "/api/google/retorno", ctx.agora)
+    _cookie_curto(ctx, COOKIE_OAUTH, cookie, "Lax")          # Lax: volta do Google é navegação de outro site
+    return _redirecionar(url)
+
+
+async def _google_retorno(ctx):
+    cfg = _google_config(ctx)
+    c = _ler_cookie_curto(ctx, COOKIE_OAUTH)
+    q = ctx.pedido.query
+    if not cfg or not c or not isinstance(q.get("state"), str) or not hmac.compare_digest(q["state"], str(c.get("s"))):
+        ctx.evento("google_recusado", motivo="state")
+        return _redirecionar("/?google=erro")
+    if q.get("error"):
+        return _redirecionar("/?google=cancelado")
+    try:
+        ident = await google.trocar_codigo(ctx.servicos, cfg[0], cfg[1], _origem(ctx) + "/api/google/retorno",
+                                           q.get("code"), str(c.get("v")), str(c.get("n")), ctx.agora)
+    except Exception:  # noqa: BLE001 — Google indisponível
+        ident = None
+    if not ident:
+        ctx.evento("google_recusado", motivo="token")
+        return _redirecionar("/?google=erro")
+    try:
+        email = _email(ident["email"])
+    except Falha:
+        return _redirecionar("/?google=erro")
+    _cookie_curto(ctx, COOKIE_GOOGLE, google.identidade_assinada(ctx.segredo, email, _nome(ident["nome"]), ctx.agora), "Strict")
+    ctx.evento("google_confirmado", email)
+    return _redirecionar("/?google=ok")
+
+
+async def _google_identidade(ctx):
+    c = _ler_cookie_curto(ctx, COOKIE_GOOGLE)
+    if not c:
+        raise Falha(404, "NOT_FOUND")
+    existe = await ctx.banco.primeiro("SELECT 1 AS x FROM contas WHERE email = ?", c["m"])
+    return Resposta(200, {"email": c["m"], "nome": c.get("nm") or "", "contaExiste": bool(existe)})
+
 # ---------------- rotas ----------------
 _PROTEGIDAS = {
     ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("DELETE", "/api/conta"),
@@ -559,7 +642,13 @@ async def _rota(ctx):
     m, c = p.metodo, p.caminho
 
     if m == "GET" and c == "/api/publico":
-        return Resposta(200, {"turnstile": str(ctx.config.get("TURNSTILE_SITE_KEY") or "") or None})
+        return Resposta(200, {"turnstile": str(ctx.config.get("TURNSTILE_SITE_KEY") or "") or None, "google": bool(_google_config(ctx))})
+    if m == "GET" and c == "/api/google/inicio":
+        return await _google_inicio(ctx)
+    if m == "GET" and c == "/api/google/retorno":
+        return await _google_retorno(ctx)
+    if m == "GET" and c == "/api/google/identidade":
+        return await _google_identidade(ctx)
     if m == "GET" and c == "/api/conta/parametros":
         return await _parametros(ctx)
     if m == "POST" and c == "/api/conta":
@@ -573,7 +662,7 @@ async def _rota(ctx):
         if not s:
             if p.cookie(_nome_cookie(ctx)) and not await _sessao(ctx, "2fa"):
                 _definir_cookie(ctx)                   # cookie que não vale mais: apaga (a sessão parcial do 2FA fica)
-            raise Falha(401, "UNAUTHORIZED")
+            return Resposta(204)                       # sem sessão: resposta normal (não é erro para quem só abriu o site)
         conta = await ctx.banco.primeiro("SELECT nome, totp_segredo FROM contas WHERE email = ?", s["email"])
         return Resposta(200, _sessao_publica(s["email"], conta["nome"], s["envelope"], conta["totp_segredo"]))
     if m == "DELETE" and c == "/api/sessao":

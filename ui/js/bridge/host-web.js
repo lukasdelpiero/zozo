@@ -233,15 +233,19 @@
 
   const ACOES = {
     async getArmazenamento() {
-      try { const p = await api("GET", "/publico"); return { available: true, turnstile: p.turnstile || null }; }
+      try { const p = await api("GET", "/publico"); return { available: true, turnstile: p.turnstile || null, google: !!p.google }; }
       catch (e) { return { available: e.code === "ACCESS_DENIED", acessoNegado: e.code === "ACCESS_DENIED" }; }
     },
+
+    /** Depois do "Continuar com Google": e-mail confirmado, nome e se a conta já existe (ou null) */
+    async getGoogle() { return api("GET", "/google/identidade"); },
 
     /** Sessão aberta (cookie) + chave guardada neste navegador → entra sem pedir a senha */
     async getSession() {
       if (sessao) return sessaoData();
       let r;
-      try { r = await api("GET", "/sessao"); } catch (e) { esquecerChaveLocal(); return { authenticated: false }; }
+      try { r = await api("GET", "/sessao"); } catch (e) { r = null; }
+      if (!r || !r.email) { esquecerChaveLocal(); return { authenticated: false }; }    // 204: ninguém logado
       const k = await recuperarChaveLocal(r.email, r.envelope);
       if (!k) {                                     // chave não está aqui: encerra a sessão e pede a senha
         await api("DELETE", "/sessao").catch(() => null);

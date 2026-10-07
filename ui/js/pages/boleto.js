@@ -92,6 +92,24 @@
       h("div", { class: "boleto-summary__total" }, h("span", null, "Total a pagar"), h("strong", { class: "money" }, comSinal(t.total))));
   }
 
+  /* ---------------- Pix (QR code no canto inferior direito do documento) ----------------
+     Cada desenho gera um código NOVO (TxID aleatório): muda ao trocar perfil, mês, ano,
+     valor, ou ao fechar e abrir de novo. O texto do QR fica em st.pixCodigo (botão "copiar"). */
+  function BoletoPix(st) {
+    st.pixCodigo = null;
+    const t = calcular(st);
+    if (!st.pix || !(t.total > 0)) return null;
+    const codigo = ZoZo.pix.payload({ chave: st.pix.chave, nome: st.pix.nome, cidade: st.pix.cidade, valor: t.total });
+    if (!codigo) return null;
+    st.pixCodigo = codigo;
+    return h("section", { class: "doc__pix", "aria-label": "Pagamento por Pix" },
+      h("div", { class: "doc__pix-texto" },
+        h("p", { class: "doc__pix-titulo" }, "Pague com Pix"),
+        h("p", { class: "doc__pix-sub" }, "No app do banco: Pix › Ler QR code"),
+        h("p", { class: "doc__pix-valor" }, F.moeda(t.total))),
+      ZoZo.verificacao.QR(codigo, 112));
+  }
+
   /* ---------------- BoletoPreview (documento A4) ---------------- */
   function BoletoPreview(st) {
     const perfil = st.perfil;
@@ -126,7 +144,8 @@
           : h("p", { class: "doc__empty" }, "Nenhum lançamento no período.")),
       ajustes("Descontos", st.descontos, R().sinalDesconto),
       ajustes("Arredondamentos", st.arredondamentos, R().sinalArredondamento),
-      BoletoSummary(st, { doc: true }));
+      BoletoSummary(st, { doc: true }),
+      BoletoPix(st));
   }
 
   /* ---------------- BoletoPrint ----------------
@@ -156,7 +175,7 @@
     const hoje = new Date();
     const st = {
       perfilId: o.perfilId || "", perfil: null, mes: hoje.getMonth() + 1, ano: hoje.getFullYear(),
-      lancamentos: null, carregando: false, erro: null, descontos: [], arredondamentos: [],
+      lancamentos: null, carregando: false, erro: null, descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
     };
     const root = document.getElementById("boleto-root");
     const anterior = document.activeElement;
@@ -167,9 +186,14 @@
     const docEl = h("div", { class: "paper" });
     const contadorEl = h("span", { class: "boleto-editor__count" });
 
+    const avisoPix = h("p", { class: "boleto-editor__pix" });
+    const copiarPix = UI.Button("Copiar Pix copia e cola", { size: "sm", variant: "secondary", icon: "copiar", class: "btn--block",
+      onClick: () => st.pixCodigo && navigator.clipboard.writeText(st.pixCodigo).then(() => ctx.toast("Código Pix copiado."), () => ctx.toast("Não foi possível copiar.", { tone: "error" })) });
     function atualizarResumo() {
       mount(resumoEl, BoletoSummary(st));
       mount(docEl, BoletoPreview(st));
+      copiarPix.hidden = !st.pixCodigo;
+      avisoPix.textContent = st.perfilId && st.lancamentos && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › Pix." : "";
     }
     function atualizarLista() {
       contadorEl.textContent = st.lancamentos ? String(st.lancamentos.length) : "";
@@ -182,7 +206,7 @@
       st.carregando = true; st.erro = null; atualizarLista();
       ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, mes: st.mes, ano: st.ano }).then((d) => {
         if (meu !== token) return;
-        st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || st.perfil; atualizarLista();
+        st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || st.perfil; st.pix = d.pix || null; atualizarLista();
       }).catch((e) => {
         if (meu !== token) return;
         st.carregando = false; st.erro = e.friendly; st.lancamentos = null; atualizarLista();
@@ -232,7 +256,7 @@
         h("h3", { class: "boleto-editor__title" }, "Arredondamentos"),
         BoletoAdjustments(st.arredondamentos, { chave: "arr", rotulo: "Arredondamento", adicionar: "Adicionar arredondamento", prefixo: "R$", aceitaNegativo: R().arredondamentoAceitaNegativo, onChange: atualizarResumo })),
       h("section", { class: "boleto-editor__section boleto-editor__section--summary" },
-        resumoEl,
+        resumoEl, avisoPix, copiarPix,
         UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: imprimir })));
 
     const preview = h("div", { class: "boleto__preview" }, h("div", { class: "paper-scaler" }, docEl));
@@ -251,8 +275,9 @@
     // Ajuste de escala do papel A4 à área disponível
     const scaler = preview.firstChild;
     const ro = new ResizeObserver(() => {
-      const largura = preview.clientWidth - 64;
-      scaler.style.zoom = String(Math.min(1, Math.max(0.4, largura / 794)));
+      // a folha A4 inteira sempre cabe na área (telas pequenas: até 25%)
+      const largura = preview.clientWidth - (preview.clientWidth < 600 ? 32 : 64);
+      scaler.style.zoom = String(Math.min(1, Math.max(0.25, largura / 794)));
     });
     ro.observe(preview);
 

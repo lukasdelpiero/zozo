@@ -80,13 +80,12 @@
     deps: (s) => [s.data.dashboard, s.errors.dashboard, s.session.user, s.data.config, s.ui.intervaloPatrimonio, s.ui.dashGruposAbertos],
     render(state, ctx) {
       const user = state.session.user || {};
-      const foto = state.data.config && state.data.config.foto;
       const primeiroNome = (user.nomeUsuario || "").split(" ")[0];
+      // Só a saudação pela hora do dia + nome (sem foto e sem ícones: a foto fica no rodapé do menu)
+      const hora = new Date().getHours();
+      const periodo = hora >= 5 && hora < 12 ? "Bom dia" : hora >= 12 && hora < 18 ? "Boa tarde" : "Boa noite";
       const saudacao = h("header", { class: "greeting" },
-        ZoZo.usuario.Avatar(foto, user.nomeUsuario, 52),
-        h("div", { class: "greeting__text" },
-          h("h2", { class: "greeting__title" }, "Olá" + (primeiroNome ? ", " + primeiroNome : ""), h("span", { class: "greeting__wave", "aria-hidden": "true" }, "👋")),
-          h("p", { class: "greeting__sub" }, "Vamos cuidar de suas finanças")));
+        h("h2", { class: "greeting__title" }, periodo + (primeiroNome ? ", " + primeiroNome : "") + "!"));
 
       const espera = C.estadoCarregamento(state, ["dashboard"], () => this.carregar(ctx, true), {
         skeleton: h("div", { class: "dash-grid" },

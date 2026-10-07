@@ -108,5 +108,33 @@
       s("path", { d, fill: "#0f2742" }));
   }
 
-  ZoZo.verificacao = { Captcha, CampoCodigo, QR };
+  /* ---------------- Senha: oculta por padrão, com "mostrar", e sem copiar ----------------
+     Copiar/recortar/arrastar ficam bloqueados (inclusive com a senha visível), para a senha
+     não parar na área de transferência. Colar continua permitido (gerenciadores de senha). */
+  function protegerSenha(input) {
+    ["copy", "cut", "dragstart"].forEach((ev) => input.addEventListener(ev, (e) => e.preventDefault()));
+    input.setAttribute("autocapitalize", "off");
+    input.setAttribute("autocorrect", "off");
+    input.spellcheck = false;
+    return input;
+  }
+
+  /** Envolve um <input type="password"> com o botão de mostrar/ocultar */
+  function ComRevelar(input, classe) {
+    protegerSenha(input);
+    const btn = h("button", { type: "button", class: "input-reveal", "aria-label": "Mostrar senha", "aria-pressed": "false", title: "Mostrar senha" },
+      ZoZo.icons.icon("olho", { size: 16 }));
+    btn.addEventListener("click", () => {
+      const visivel = input.type === "text";
+      input.type = visivel ? "password" : "text";
+      btn.setAttribute("aria-pressed", String(!visivel));
+      btn.setAttribute("aria-label", visivel ? "Mostrar senha" : "Ocultar senha");
+      btn.title = visivel ? "Mostrar senha" : "Ocultar senha";
+      mount(btn, ZoZo.icons.icon(visivel ? "olho" : "olho-fechado", { size: 16 }));
+      input.focus();
+    });
+    return h("div", { class: ["input-with-action", classe] }, input, btn);
+  }
+
+  ZoZo.verificacao = { Captcha, CampoCodigo, QR, protegerSenha, ComRevelar };
 })(window.ZoZo);

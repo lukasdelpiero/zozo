@@ -3,8 +3,10 @@
 #   .\api\publicar.ps1 previa      → https://zozo-previa.zozo-finance-app.workers.dev  (só testes; usuários não veem)
 #   .\api\publicar.ps1 producao    → https://zozo.zozo-finance-app.workers.dev         (usuários)
 #
-# Passos: testes automáticos → monta a interface → aplica migrações do banco → publica.
-# Qualquer falha interrompe tudo. Produção pede confirmação.
+# No VS Code: Terminal › Executar Tarefa… › "ZoZo: publicar na prévia" / "ZoZo: publicar em produção".
+#
+# Passos: testes automáticos → segredos → monta a interface → (produção: ponto de restauração do banco)
+#         → migrações do banco → publica. Qualquer falha interrompe tudo. Produção pede confirmação.
 param(
   [Parameter(Mandatory = $true)][ValidateSet("previa", "producao")][string]$Ambiente
 )
@@ -13,31 +15,66 @@ param(
 $ErrorActionPreference = "Continue"
 $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
 Set-Location $PSScriptRoot
+$env:CI = "true"      # sem perguntas interativas do wrangler
 
 $banco = if ($Ambiente -eq "previa") { "zozo-previa" } else { "zozo" }
 $extra = if ($Ambiente -eq "previa") { @("--env", "previa") } else { @() }
+$endereco = if ($Ambiente -eq "previa") { "https://zozo-previa.zozo-finance-app.workers.dev" } else { "https://zozo.zozo-finance-app.workers.dev" }
 
-Write-Host "1/4 Testes automáticos..." -ForegroundColor Cyan
+function Parar($mensagem) { Write-Host ""; Write-Host $mensagem -ForegroundColor Red; exit 1 }
+
+Write-Host "1/6 Testes automáticos..." -ForegroundColor Cyan
 python -m unittest discover -s tests
-if ($LASTEXITCODE -ne 0) { throw "Testes falharam: nada foi publicado." }
+if ($LASTEXITCODE -ne 0) { Parar "Testes falharam: nada foi publicado." }
 
 if ($Ambiente -eq "producao") {
+  $pendentes = git -C .. status --porcelain
   Write-Host ""
+  if ($pendentes) {
+    Write-Host "Atenção: há mudanças NÃO salvas no git (commit). O ideal é publicar só código já salvo e revisado." -ForegroundColor Yellow
+  }
   Write-Host "Você vai publicar em PRODUÇÃO (os usuários verão as mudanças)." -ForegroundColor Yellow
   Write-Host "Já testou na prévia? Digite PUBLICAR para continuar:" -ForegroundColor Yellow
-  if ((Read-Host) -ne "PUBLICAR") { Write-Host "Cancelado."; exit 1 }
+  if ((Read-Host) -ne "PUBLICAR") { Write-Host "Cancelado: nada foi publicado."; exit 1 }
 }
 
-Write-Host "2/4 Montando a interface (api/public)..." -ForegroundColor Cyan
+Write-Host "2/6 Segredos do ambiente..." -ForegroundColor Cyan
+$lista = (npx wrangler secret list @extra 2>$null) -join "`n"
+if ($lista -notmatch '"SEGREDO"') {
+  Write-Host "   SEGREDO não existe: gerando um aleatório (não aparece na tela)..."
+  python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | npx wrangler secret put SEGREDO @extra
+  if ($LASTEXITCODE -ne 0) { Parar "Não foi possível criar o SEGREDO." }
+}
+if ($lista -notmatch '"TURNSTILE_SECRET"') {
+  Write-Host "   Aviso: TURNSTILE_SECRET não configurado — o CAPTCHA fica desligado (o bloqueio continua valendo)." -ForegroundColor Yellow
+  Write-Host "   Para ligar: Cloudflare › Turnstile › ZoZo login › copie a Secret Key e rode: npx wrangler secret put TURNSTILE_SECRET $($extra -join ' ')" -ForegroundColor Yellow
+}
+
+Write-Host "3/6 Montando a interface (api/public)..." -ForegroundColor Cyan
 python montar_interface.py
-if ($LASTEXITCODE -ne 0) { throw "Falha ao montar a interface." }
+if ($LASTEXITCODE -ne 0) { Parar "Falha ao montar a interface." }
 
-Write-Host "3/4 Migrações do banco $banco..." -ForegroundColor Cyan
-$env:CI = "true"      # sem perguntas interativas do wrangler
+if ($Ambiente -eq "producao") {
+  Write-Host "4/6 Ponto de restauração do banco (antes das migrações)..." -ForegroundColor Cyan
+  $info = (npx wrangler d1 time-travel info $banco 2>$null) -join "`n"
+  $marcador = [regex]::Match($info, "bookmark[^\w]*([0-9a-f\-]{20,})").Groups[1].Value
+  if ($marcador) {
+    Add-Content -Path (Join-Path $PSScriptRoot "restauracao.log") -Value "$(Get-Date -Format s)  $banco  $marcador"
+    Write-Host "   Se precisar voltar o banco a este momento:" -ForegroundColor Gray
+    Write-Host "   npx wrangler d1 time-travel restore $banco --bookmark=$marcador" -ForegroundColor Gray
+  } else {
+    Write-Host "   (o D1 guarda 30 dias de histórico: veja 'npx wrangler d1 time-travel info $banco')" -ForegroundColor Gray
+  }
+} else {
+  Write-Host "4/6 (prévia: banco de testes, sem ponto de restauração)" -ForegroundColor Cyan
+}
+
+Write-Host "5/6 Migrações do banco $banco..." -ForegroundColor Cyan
 npx wrangler d1 migrations apply $banco --remote @extra
-if ($LASTEXITCODE -ne 0) { throw "Falha nas migrações: nada foi publicado." }
+if ($LASTEXITCODE -ne 0) { Parar "Falha nas migrações: nada foi publicado." }
 
-Write-Host "4/4 Publicando ($Ambiente)..." -ForegroundColor Cyan
+Write-Host "6/6 Publicando ($Ambiente)..." -ForegroundColor Cyan
 uv run pywrangler deploy @extra
-if ($LASTEXITCODE -ne 0) { throw "Falha ao publicar." }
-Write-Host "Pronto." -ForegroundColor Green
+if ($LASTEXITCODE -ne 0) { Parar "Falha ao publicar." }
+Write-Host ""
+Write-Host "Pronto: $endereco" -ForegroundColor Green

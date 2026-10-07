@@ -14,12 +14,14 @@ import sqlite3
 import sys
 import time
 import unittest
+from urllib.parse import parse_qs
 
 AQUI = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI.parent / "src"))
 sys.path.insert(0, str(AQUI.parent / "dev"))
 
 import acesso  # noqa: E402
+import google  # noqa: E402
 import nucleo  # noqa: E402
 import totp  # noqa: E402
 from banco_sqlite import MIGRACOES, BancoSqlite, aplicar_migracoes, conectar  # noqa: E402
@@ -113,6 +115,8 @@ class FakeServicos:
         self.chamadas.append((url, dict(cabecalhos)))
         if url.endswith("/cdn-cgi/access/certs"):
             return 200, json.dumps({"keys": self.chaves})
+        if url == google.CHAVES:
+            return 200, json.dumps({"keys": [dict(JWK, kid="g1")]})
         if url.startswith("https://api.pwnedpasswords.com/range/"):
             return 200, "0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n00D4F6E8FA6EECAD2A3AA415EEC418D38EC:2"
         return 404, ""
@@ -121,7 +125,11 @@ class FakeServicos:
         self.chamadas.append((url, dict(campos)))
         if url == nucleo.TURNSTILE_URL:
             return 200, json.dumps({"success": self.captcha_ok and campos.get("response") == "ok"})
+        if url == google.TOKEN:
+            return (200, json.dumps({"id_token": self.google_token})) if self.google_token else (400, "{}")
         return 404, ""
+
+    google_token = None        # resposta do endpoint de token do Google (falso)
 
     async def access(self, _pedido):
         if isinstance(self.identidade, Exception):
@@ -366,23 +374,23 @@ class TesteContaESessao(Base):
         self.assertEqual(self.api("DELETE", "/api/sessao")[0], 204)
         self.assertNotIn("__Host-zozo", self.api.cookies)
         self.api.cookies["__Host-zozo"] = token                             # cookie roubado/antigo não vale mais
-        self.assertEqual(self.api("GET", "/api/sessao")[0], 401)
+        self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
         self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 401)
 
     def test_sessao_expira_por_inatividade_e_idade(self):
         self.api.agora = T0 + nucleo.SESSAO_OCIOSA_S + 1
-        self.assertEqual(self.api("GET", "/api/sessao")[0], 401)
+        self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sessoes").fetchone()[0], 0)
         self.entrar()
         for dia in range(1, 32):                                            # usada todo dia, mas tem idade máxima
             self.api.agora = T0 + nucleo.SESSAO_OCIOSA_S + dia * 86400
             st, _ = self.api("GET", "/api/sessao")
-        self.assertEqual(st, 401)
+        self.assertEqual(st, 204)
 
     def test_cookie_lixo(self):
         for lixo in ("", "x", "a" * 500, "'; DROP TABLE contas; --"):
             self.api.cookies = {"__Host-zozo": lixo}
-            self.assertEqual(self.api("GET", "/api/sessao")[0], 401)
+            self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM contas").fetchone()[0], 1)
 
 
@@ -530,7 +538,7 @@ class TesteDocumento(Base):
         st, b = self.api("PUT", "/api/conta/senha", {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova,
                                                       "conteudo": c, "versaoAnterior": 1}, prova=self.prova)
         self.assertEqual((st, b), (200, {"versao": 2}))
-        self.assertEqual(celular("GET", "/api/sessao")[0], 401)              # o outro dispositivo saiu
+        self.assertEqual(celular("GET", "/api/sessao")[0], 204)              # o outro dispositivo saiu
         self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 403)
         self.assertEqual(self.api("GET", "/api/documento", prova=nova)[1]["conteudo"], c)
         self.assertEqual(self.con.execute("SELECT count(*) FROM historico").fetchone()[0], 0)
@@ -590,7 +598,7 @@ class Teste2FA(Base):
         cel.agora = T0 + 60
         st, b = self.entrar(cel)
         self.assertEqual((st, b), (200, {"doisFatores": True}))             # sem envelope antes do código
-        self.assertEqual(cel("GET", "/api/sessao")[0], 401)                 # sessão parcial não vale
+        self.assertEqual(cel("GET", "/api/sessao")[0], 204)                 # sessão parcial não vale
         self.assertEqual(cel("GET", "/api/documento", prova=self.prova)[0], 401)
         parcial = dict(cel.cookies)
         self.assertEqual(cel("POST", "/api/sessao/2fa", {"codigo": "000000"})[1]["erro"], "CODE_INVALID")
@@ -648,9 +656,9 @@ class TesteDiversos(Base):
         self.assertEqual(Cliente(self.banco, FakeServicos(identidade="teste@exemplo.com"), cfg)("GET", "/api/publico")[0], 200)
 
     def test_publico(self):
-        self.assertEqual(self.api("GET", "/api/publico"), (200, {"turnstile": None}))
+        self.assertEqual(self.api("GET", "/api/publico"), (200, {"turnstile": None, "google": False}))
         cli = Cliente(self.banco, config=dict(CONFIG, TURNSTILE_SITE_KEY="0x4AAA"))
-        self.assertEqual(cli("GET", "/api/publico")[1], {"turnstile": "0x4AAA"})
+        self.assertEqual(cli("GET", "/api/publico")[1], {"turnstile": "0x4AAA", "google": False})
 
     def test_senha_vazada_k_anonimato(self):
         st, b = self.api("GET", "/api/senha-vazada/0018a")
@@ -681,6 +689,86 @@ class TesteDiversos(Base):
         self.assertIn('"evento": "login"', texto)
         for segredo in (EMAIL, self.prova, "203.0.113.7", SEGREDO):
             self.assertNotIn(segredo, texto)
+
+
+class TesteGoogle(Base):
+    CID = "cliente-123.apps.googleusercontent.com"
+
+    def setUp(self):
+        super().setUp()
+        google._cache.update(chaves=None, em=0.0)
+        self.cfg = dict(CONFIG, GOOGLE_CLIENT_ID=self.CID, GOOGLE_CLIENT_SECRET="segredo-google", TURNSTILE_SECRET="t")
+        self.cli = Cliente(self.banco, config=self.cfg, ip="192.0.2.80")
+
+    def iniciar(self):
+        st, _ = self.cli("GET", "/api/google/inicio")
+        r = self.cli.ultima
+        self.assertEqual(st, 302)
+        local = r.cabecalhos["Location"]
+        self.assertTrue(local.startswith(google.AUTORIZAR + "?"))
+        q = {k: v[0] for k, v in parse_qs(local.split("?", 1)[1]).items()}
+        self.assertEqual((q["code_challenge_method"], q["redirect_uri"]), ("S256", "https://zozo.exemplo.com/api/google/retorno"))
+        self.assertIn("SameSite=Lax", r.cabecalhos["Set-Cookie"])
+        return q
+
+    def token(self, **extra):
+        c = {"iss": "https://accounts.google.com", "aud": self.CID, "exp": T0 + 300, "email": EMAIL,
+             "email_verified": True, "given_name": "Ana", "nonce": self.q["nonce"]}
+        c.update(extra)
+        return assinar({k: v for k, v in c.items() if v is not None}, kid="g1")
+
+    def voltar(self, token, state=None):
+        self.cli.servicos.google_token = token
+        self.cli("GET", "/api/google/retorno?code=abc&state=" + (state or self.q["state"]))
+        return self.cli.ultima.cabecalhos["Location"]
+
+    def test_publico_e_sem_configuracao(self):
+        self.assertFalse(self.api("GET", "/api/publico")[1]["google"])
+        self.assertTrue(self.cli("GET", "/api/publico")[1]["google"])
+        self.api("GET", "/api/google/inicio")
+        self.assertEqual(self.api.ultima.cabecalhos["Location"], "/?google=indisponivel")
+
+    def test_fluxo_completo_dispensa_captcha(self):
+        self.q = self.iniciar()
+        self.assertEqual(self.voltar(self.token()), "/?google=ok")
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[1], {"email": EMAIL, "nome": "Ana", "contaExiste": True})
+        troca = next(c for u, c in self.cli.servicos.chamadas if u == google.TOKEN)
+        self.assertEqual(troca["grant_type"], "authorization_code")
+        self.assertTrue(troca["code_verifier"])
+        for _ in range(4):                       # da 4ª em diante pediria CAPTCHA: o Google já confirmou a pessoa
+            self.assertEqual(self.entrar(self.cli, pv=prova())[0], 401)
+        self.assertEqual(self.entrar(self.cli)[0], 200)     # a senha continua obrigatória (é a chave dos dados)
+
+    def test_ataques_recusados(self):
+        for extra in ({"aud": "outro-app"}, {"iss": "https://evil.exemplo.com"}, {"email_verified": False},
+                      {"nonce": "outro"}, {"exp": T0 - 3600}, {"email": None}):
+            self.q = self.iniciar()
+            self.assertEqual(self.voltar(self.token(**extra)), "/?google=erro", extra)
+        self.q = self.iniciar()
+        n2, _, d2 = _chave_rsa()                 # assinatura de outra chave
+        forjado = assinar({"iss": "https://accounts.google.com", "aud": self.CID, "exp": T0 + 300, "email": EMAIL,
+                           "email_verified": True, "nonce": self.q["nonce"]}, kid="g1", d=d2, n=n2)
+        self.assertEqual(self.voltar(forjado), "/?google=erro")
+        self.q = self.iniciar()
+        self.assertEqual(self.voltar(self.token(), state="state-de-outro-site"), "/?google=erro")      # CSRF
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[0], 404)
+
+    def test_cookie_adulterado_e_vencido(self):
+        self.q = self.iniciar()
+        self.voltar(self.token())
+        nome = "__Host-zozo_google"
+        valor = self.cli.cookies[nome]
+        self.cli.cookies[nome] = valor[:-3] + "AAA"
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[0], 404)
+        self.cli.cookies[nome] = valor
+        self.cli.agora += google.VALIDADE_S + 1
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[0], 404)
+
+    def test_cadastro_com_google_sem_captcha(self):
+        self.q = self.iniciar()
+        self.voltar(self.token(email=OUTRO, given_name="Beto"))
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[1]["contaExiste"], False)
+        self.assertEqual(self.cadastrar(self.cli, OUTRO, prova(), nome="Beto")[0], 201)
 
 
 class TesteMigracoes(unittest.TestCase):

@@ -11,6 +11,7 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_PORTA        porta (padrão 8787)
   ZOZO_DEV_CADASTRO     e-mails que podem criar conta (padrão "*": qualquer um)
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
+  ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
 """
 import asyncio
 import http.server
@@ -33,10 +34,12 @@ import montar_interface  # noqa: E402
 import nucleo  # noqa: E402
 from banco_sqlite import BancoSqlite, conectar  # noqa: E402
 
-UI = (AQUI.parent.parent / "ui").resolve()
+# --publicado: serve api/public (o que vai para o Cloudflare, já empacotado) na porta 8788
+PUBLICADO = "--publicado" in sys.argv
+UI = (AQUI.parent / "public").resolve() if PUBLICADO else (AQUI.parent.parent / "ui").resolve()
 BANCO = AQUI / "zozo-local.db"
 ARQ_SEGREDO = AQUI / ".segredo-local"            # gerado na 1ª execução (fora do git)
-PORTA = int(os.environ.get("ZOZO_DEV_PORTA", "8787"))
+PORTA = int(os.environ.get("ZOZO_DEV_PORTA", "8788" if "--publicado" in sys.argv else "8787"))
 HOSTS_LOCAIS = {f"127.0.0.1:{PORTA}", f"localhost:{PORTA}"}
 
 # Chaves de TESTE públicas da Cloudflare (sempre aprovam): https://developers.cloudflare.com/turnstile/troubleshooting/testing/
@@ -54,6 +57,9 @@ CONFIG = {
     "ALLOWED_EMAILS": os.environ.get("ZOZO_DEV_CADASTRO", "*"),
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 }
+# "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
+if os.environ.get("ZOZO_DEV_GOOGLE_ID") and os.environ.get("ZOZO_DEV_GOOGLE_SECRET"):
+    CONFIG["GOOGLE_CLIENT_ID"], CONFIG["GOOGLE_CLIENT_SECRET"] = os.environ["ZOZO_DEV_GOOGLE_ID"], os.environ["ZOZO_DEV_GOOGLE_SECRET"]
 if os.environ.get("ZOZO_DEV_TURNSTILE", "1") != "0":
     CONFIG["TURNSTILE_SITE_KEY"], CONFIG["TURNSTILE_SECRET"] = TURNSTILE_TESTE
 

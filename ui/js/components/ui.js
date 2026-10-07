@@ -64,6 +64,7 @@
       class: ["input", o.class],
       type: o.type || "text",
       name: o.name,
+      id: o.id,                                   // ajuda gerenciadores de senha a reconhecer o campo
       value: o.value === undefined || o.value === null ? "" : o.value,
       placeholder: o.placeholder,
       autocomplete: o.autocomplete || "off",

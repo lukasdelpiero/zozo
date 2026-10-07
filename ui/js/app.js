@@ -49,7 +49,7 @@
     },
 
     navigate: (id, opts) => ctx.router.navigate(id, opts),
-    abrirConfiguracoes: () => ZoZo.configuracoes.abrir(ctx),
+    abrirConfiguracoes: (aba) => ZoZo.configuracoes.abrir(ctx, aba),
 
     /** Após qualquer alteração de dados: tudo fica desatualizado; recarrega a página atual e a sidebar */
     recarregarTudo() {
@@ -77,6 +77,7 @@
   /* ---------------- Autenticação ---------------- */
   let authErro = null, authEmail = "";
   let turnstile = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
+  let googleAtivo = false;       // "Continuar com Google" configurado no servidor
   let captchaLogin = false;      // o servidor pediu CAPTCHA para a próxima tentativa de login
   let errosCodigo = 0;           // erros seguidos do código 2FA (1º: "não funcionou"; depois: "algo deu errado")
 
@@ -93,7 +94,7 @@
     ZoZo.auth.render(authRoot, {
       erro: authErro,
       emailInicial: authEmail,
-      turnstile, captchaLogin,
+      turnstile, captchaLogin, google: googleAtivo,
       onIrCadastro: () => { authErro = null; store.set({ session: { status: "register" } }); },
       onVoltar: () => { authErro = null; store.set({ session: { status: "login" } }); },
       onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
@@ -101,6 +102,7 @@
         authEmail = cred.email;
         bridge.request(A.login, cred).then((r) => {
           captchaLogin = false;
+          salvarCredencial(cred.email, cred.senha);
           if (r && r.doisFatores && !r.authenticated) { authErro = null; errosCodigo = 0; store.set({ session: { status: "2fa" } }); return; }
           entrar(r);
         }).catch((e) => {
@@ -120,13 +122,37 @@
       }),
       onCancelar2FA: () => { ZoZo.auth.reiniciar(); bridge.request(A.logout).catch(() => null); authErro = null; store.set({ session: { status: "login" } }); },
       onCadastro: (dados) => {
-        bridge.request(A.registerUser, dados).then(entrar).catch((e) => {
+        bridge.request(A.registerUser, dados).then((r) => { salvarCredencial(dados.email, dados.senha, dados.nomeUsuario); entrar(r); }).catch((e) => {
           authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e)
             : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "REGISTER_FAILED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
           renderAuth();
         });
       },
     });
+  }
+
+  /** Oferece salvar no gerenciador de senhas do navegador (Chrome/Edge; os demais detectam pelo formulário) */
+  function salvarCredencial(email, senha, nome) {
+    try {
+      if (!window.PasswordCredential || !navigator.credentials || !email || !senha) return;
+      navigator.credentials.store(new window.PasswordCredential({ id: email, password: senha, name: nome || email })).catch(() => null);
+    } catch (e) { /* navegador sem suporte */ }
+  }
+
+  /** Volta do Google (?google=ok|erro|cancelado|indisponivel): prepara a etapa certa e limpa o endereço */
+  function retornoGoogle() {
+    const r = new URLSearchParams(location.search).get("google");
+    if (!r) return Promise.resolve();
+    history.replaceState(null, "", location.pathname);
+    const textos = { erro: "Não foi possível entrar com o Google. Tente de novo ou continue com e-mail.", cancelado: "Login com Google cancelado.",
+      indisponivel: "O login com Google ainda não está disponível. Continue com e-mail." };
+    if (r !== "ok") { authErro = textos[r] || textos.erro; return Promise.resolve(); }
+    return bridge.request(A.getGoogle).then((d) => {
+      if (!d || !d.email) { authErro = textos.erro; return; }
+      ZoZo.auth.prepararGoogle(d);
+      authEmail = d.email;
+      return d.contaExiste ? "login" : "register";
+    }).catch(() => { authErro = textos.erro; });
   }
 
   function entrar(sessao) {
@@ -267,10 +293,11 @@
       // Ambiente de prévia sem autorização do Access: avisa já na tela de login
       if (armazenamento && armazenamento.acessoNegado) authErro = FR.ACCESS_DENIED;
       turnstile = (armazenamento && armazenamento.turnstile) || null;
+      googleAtivo = !!(armazenamento && armazenamento.google);
       if (sessao && sessao.email) authEmail = sessao.email;       // sessão aberta sem a chave neste navegador: só pede a senha
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
-      if (sessao && sessao.authenticated) entrar(sessao);
-      else store.set({ session: { status: "login" } });
+      if (sessao && sessao.authenticated) { history.replaceState(null, "", location.pathname + (location.search.includes("mock=1") ? "?mock=1" : "")); entrar(sessao); return; }
+      return retornoGoogle().then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
     });
   }
 

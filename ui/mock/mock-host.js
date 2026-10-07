@@ -21,7 +21,7 @@
   const DATA_KEY = "zozo.mock.data.";
   const SESSION_KEY = "zozo.mock.session";
   const CRED = window.ZOZO_DEMO || {};
-  const DEMO = { nomeUsuario: String(CRED.nome || "Prévia"), email: String(CRED.email || "").trim().toLowerCase(), senha: String(CRED.senha || "") };
+  const DEMO = { nomeUsuario: String(CRED.nome || "Insight"), email: String(CRED.email || "").trim().toLowerCase(), senha: String(CRED.senha || "") };
   const temDemo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(DEMO.email) && DEMO.senha.length >= 8;
 
   const delay = (ms) => new Promise((r) => setTimeout(r, ms === undefined ? 120 + Math.random() * 180 : ms));
@@ -67,9 +67,10 @@
       if (!temDemo) return;
       const lista = usuarios();
       const u = lista.find((x) => x.id === "u-demo");
-      if (u && u.email === DEMO.email && (await conferir(u, DEMO.senha))) return;
+      if (u && u.email === DEMO.email && u.nome === DEMO.nomeUsuario && (await conferir(u, DEMO.senha))) return;
       const s = salt();
-      const novo = { id: "u-demo", nome: u ? u.nome : DEMO.nomeUsuario, email: DEMO.email, salt: s, hash: await derivar(DEMO.senha, s) };
+      // o nome vem sempre do arquivo de credenciais (padrão "Insight")
+      const novo = Object.assign({}, u || {}, { id: "u-demo", nome: DEMO.nomeUsuario, email: DEMO.email, salt: s, hash: await derivar(DEMO.senha, s) });
       salvarUsuarios(lista.filter((x) => x.id !== "u-demo" && x.email !== DEMO.email).concat(novo));
     })();
     return demoPronta;
@@ -116,7 +117,8 @@
     await garantirDemo();
 
     switch (req.action) {
-      case A.getArmazenamento: return { available: true, turnstile: null };
+      case A.getArmazenamento: return { available: true, turnstile: null, google: false };
+      case A.getGoogle: return null;
       case A.getSession: return sessaoPublica(atual());
 
       case A.registerUser: {

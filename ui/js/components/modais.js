@@ -353,12 +353,13 @@
         titulo: cfg.titulo,
         onClose: () => fim(null),
         passo: (api) => {
-          const senha = UI.Input({ type: "password", autocomplete: "current-password", placeholder: "Sua senha" });
+          const senha = UI.Input({ type: "password", name: "password", autocomplete: "current-password", placeholder: "Sua senha" });
           senha.dataset.autofocus = "";
+          const campoSenha = ZoZo.verificacao.ComRevelar(senha);              // oculta, com "mostrar" e sem copiar
           const confirmar = () => { if (!senha.value) { senha.focus(); return; } fim(senha.value); api.fechar(); };
           senha.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); confirmar(); } });
           return {
-            corpo: h("div", { class: "zm__form" }, h("p", { class: "modal__text" }, cfg.mensagem), UI.Field("Senha", senha)),
+            corpo: h("div", { class: "zm__form" }, h("p", { class: "modal__text" }, cfg.mensagem), UI.Field("Senha", campoSenha)),
             botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: cfg.botao || "Confirmar", perigo: true, onClick: confirmar }],
           };
         },

@@ -529,7 +529,8 @@
       const lancamentosMes = doc.lancamentos.filter((l) => l.perfilId && mesDe(l.data) === mes && ativos.some((p) => p.id === l.perfilId)).length;
       return { mes, perfis, resumo: { gasto: r2(ativos.reduce((s, p) => s + p.gasto, 0)), lancamentosMes } };
     },
-    [A.getConfig]: () => ({ foto: doc.config.foto || null, ultimaGravacao: doc.meta.ultimaGravacao || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false }),
+    [A.getConfig]: () => ({ foto: doc.config.foto || null, ultimaGravacao: doc.meta.ultimaGravacao || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false,
+      pix: doc.config.pix ? Object.assign({}, doc.config.pix) : null }),
     [A.getContaHistorico]: (d) => {
       const c = doc.contas.find((x) => x.id === d.id);
       if (!c) throw erro("LOAD_FAILED");
@@ -588,7 +589,8 @@
       const prefixo = d.ano + "-" + pad(d.mes);
       const perfil = doc.perfis.find((p) => p.id === d.perfilId) || null;
       const lancamentos = getLancamentos().lancamentos.filter((l) => l.perfilId === d.perfilId && l.data.startsWith(prefixo)).sort((a, b) => a.data.localeCompare(b.data));
-      return { perfil, lancamentos };
+      // Pix do boleto: chave e nome do recebedor guardados no documento cifrado
+      return { perfil, lancamentos, pix: doc.config.pix ? Object.assign({}, doc.config.pix) : null };
     },
   };
 
@@ -900,7 +902,14 @@
         doc.config.foto = d.foto;
       }
       if (typeof d.orcamentoAtivo === "boolean") doc.config.orcamentoAtivo = d.orcamentoAtivo;
-      return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false };
+      if (d.pix === null) delete doc.config.pix;
+      else if (d.pix && typeof d.pix === "object") {
+        const chave = ZoZo.pix.normalizarChave(d.pix.chave);
+        const nome = texto(d.pix.nome, 25), cidade = texto(d.pix.cidade, 15);
+        if (!chave || !nome || !cidade) throw erro("PIX_INVALID");
+        doc.config.pix = { chave, nome, cidade };
+      }
+      return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false, pix: doc.config.pix || null };
     },
   };
 

@@ -111,10 +111,13 @@
 
       if (!o.semEixo) {
         const ref = validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
-        [0, Math.floor((ref.length - 1) / 2), ref.length - 1].forEach((i, k) => {
+        // Início, meio e fim — sem repetir (séries curtas) e sem o do meio quando não cabe entre os outros dois
+        const ultimo = ref.length - 1, meio = Math.floor(ultimo / 2);
+        const indices = ultimo <= 0 ? [0] : (meio > 0 && meio < ultimo && iw >= 240) ? [0, meio, ultimo] : [0, ultimo];
+        indices.forEach((i) => {
           if (!ref[i]) return;
           const dt = F.parseData(ref[i].data);
-          const ancora = k === 0 ? "start" : k === 2 ? "end" : "middle";
+          const ancora = i === 0 ? "start" : i === ultimo ? "end" : "middle";
           if (o.rotuloX) svg.appendChild(s("text", { x: x(i, ref.length), y: H - 6, class: "line-chart__label", "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
           else rotuloDuasLinhas(svg, x(i, ref.length), H - 2, String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()), String(dt.getFullYear()), ancora);
         });
