@@ -46,7 +46,7 @@
       : null;
     mount(el,
       h("div", { class: "sidebar__header" },
-        h("span"),
+        h("img", { class: "sidebar__logo", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" }),
         refreshBtn),
       navEl, contasEl, aviso, footerEl);
 

@@ -632,7 +632,7 @@
    ============================================================= */
 /* Logo com sombra suave (como a do Copilot) */
 .auth__icon { border-radius: 14px; filter: drop-shadow(0 6px 14px rgba(15, 39, 66, 0.14)) drop-shadow(0 1px 2px rgba(15, 39, 66, 0.10)); }
-.auth__icon--selo { display: grid; place-items: center; background: linear-gradient(180deg, #8a4fc2, var(--color-primary)); color: #fff; font-size: 28px; font-weight: 700; }
+.auth__icon--selo { display: grid; place-items: center; background: var(--botao-roxo); color: #fff; font-size: 28px; font-weight: 700; }
 .auth__inicio { gap: 14px; }
 .auth__opcoes { display: flex; flex-direction: column; gap: 12px; min-height: calc(46px * 2 + 12px); justify-content: center; }
 .auth__opcao {
@@ -734,3 +734,22 @@
   .cfg .cfg-inline { width: 100%; text-align: left; margin: 0; }
   .cfg-footer { padding-left: 16px; padding-right: 16px; }
 }
+
+/* =============================================================
+   Identidade 2.3: botões roxos com gradiente da marca, menu #6948D8, nova logo
+   ============================================================= */
+:root {
+  --botao-roxo: linear-gradient(180deg, #8063EE 0%, #6948D8 100%);          /* vertical, de cima para baixo */
+  --botao-roxo-hover: linear-gradient(180deg, #7458EA 0%, #5F3FCF 100%);
+  --sidebar-bg: #6948D8;
+}
+.btn--primary, .auth__opcao--email, .detail__textbtn--primary {
+  background: var(--botao-roxo); background-color: #6948D8; border-color: transparent; color: #fff;
+}
+.btn--primary:hover:not(:disabled), .auth__opcao--email:hover, .detail__textbtn--primary:hover { background: var(--botao-roxo-hover); filter: none; }
+.btn--primary:active:not(:disabled), .auth__opcao--email:active { background: linear-gradient(180deg, #6948D8 0%, #5A3BC4 100%); }
+/* Logo nova (Z roxo sobre branco): mesma sombra suave do Copilot */
+.auth__icon { border-radius: 10px; filter: none; box-shadow: 0 6px 16px rgba(15, 39, 66, 0.12), 0 1px 3px rgba(15, 39, 66, 0.10); }
+.sidebar__logo { width: 28px; height: 28px; border-radius: 5px; flex: none; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.25); }
+.sidebar__header { justify-content: space-between; }
+@media (max-width: 900px) { .sidebar__logo { display: none; } }

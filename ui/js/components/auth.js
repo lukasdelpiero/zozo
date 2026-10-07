@@ -54,7 +54,7 @@
 
   /** Logo do ZoZo com sombra; se a imagem não carregar, mostra um selo desenhado (nunca "quebrada") */
   function logo() {
-    const img = h("img", { class: "auth__icon", src: "assets/img/zozo-icone.png", alt: "ZoZo", width: "56", height: "56", decoding: "async" });
+    const img = h("img", { class: "auth__icon", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "56", height: "56", decoding: "async" });
     img.addEventListener("error", () => img.replaceWith(h("span", { class: "auth__icon auth__icon--selo", role: "img", "aria-label": "ZoZo" }, "Z")));
     return img;
   }
