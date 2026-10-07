@@ -37,8 +37,6 @@ database_id = "7964c186-da78-4c07-942c-79d583691f75"
 migrations_dir = "migracoes"
 
 [vars]
-# Quem pode CRIAR conta (separados por vírgula). "*" = cadastro aberto a qualquer pessoa.
-ALLOWED_EMAILS = "lukas.delpiero@outlook.com.br,lk-cat2@hotmail.com,cibelecamargospp@gmail.com"
 # CAPTCHA (chave pública; a secreta é o segredo TURNSTILE_SECRET)
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 # "Continuar com Google": ID do cliente OAuth (público). Vazio = botão avisa que não está disponível.
@@ -46,8 +44,7 @@ TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 GOOGLE_CLIENT_ID = ""
 
 # ================= PRÉVIA (testes antes de publicar) =================
-# Só o e-mail de ACCESS_EMAILS passa pelo Cloudflare Access na frente do site,
-# e só o de ALLOWED_EMAILS pode criar a conta do ZoZo lá dentro.
+# Aberta: sem Cloudflare Access e sem lista de e-mails (cadastro livre, com CAPTCHA).
 [env.previa]
 name = "zozo-previa"
 workers_dev = true
@@ -63,12 +60,5 @@ database_id = "d267ce2a-3920-4c7b-8e91-7b3990dba0ba"
 migrations_dir = "migracoes"
 
 [env.previa.vars]
-ALLOWED_EMAILS = "insight@usezozo.com.br"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
-GOOGLE_CLIENT_ID = ""
-EXIGIR_ACCESS = "1"
-ACCESS_TEAM_DOMAIN = "zozo-finance-app.cloudflareaccess.com"
-ACCESS_EMAILS = "testenviroment@usezozo.com.br"
-# Cole aqui o "Application Audience (AUD) Tag" da aplicação do Access da prévia.
-# Enquanto estiver assim, a API da prévia recusa tudo (falha fechada).
-ACCESS_AUD = "1b011048994ab08dddacb8acc57dff00e5d6cf3f829eddb18faacfcc6724e974"
+GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"

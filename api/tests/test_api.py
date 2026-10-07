@@ -311,14 +311,11 @@ class TesteContaESessao(Base):
         self.assertEqual(guardado, hashlib.sha256(token.encode()).hexdigest())   # banco não guarda o token
         self.assertEqual(self.api("GET", "/api/sessao")[1]["email"], EMAIL)
 
-    def test_cadastro_duplicado_e_fora_da_lista(self):
+    def test_cadastro_aberto_e_duplicado(self):
         outro = Cliente(self.banco, ip="198.51.100.1")
         self.assertEqual(self.cadastrar(outro, EMAIL, prova())[1], {"erro": "EMAIL_IN_USE"})
-        self.assertEqual(self.cadastrar(outro, "intruso@exemplo.com", prova())[0], 403)
-        aberto = Cliente(self.banco, config=dict(CONFIG, ALLOWED_EMAILS="*"), ip="198.51.100.2")
-        self.assertEqual(self.cadastrar(aberto, "qualquer@exemplo.com", prova())[0], 201)
-        fechado = Cliente(self.banco, config=dict(CONFIG, ALLOWED_EMAILS=""), ip="198.51.100.3")
-        self.assertEqual(self.cadastrar(fechado, OUTRO, prova())[0], 403)
+        qualquer = Cliente(self.banco, ip="198.51.100.2")
+        self.assertEqual(self.cadastrar(qualquer, "qualquer@exemplo.com", prova())[0], 201)   # sem lista de e-mails
 
     def test_cadastro_validacoes(self):
         for i, corpo in enumerate(({"email": OUTRO, "nome": "B", "sal": self.sal, "iteracoes": 1000, "prova": prova()},

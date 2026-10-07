@@ -29,7 +29,7 @@ O núcleo recebe:
   banco    — primeiro(sql, *p) -> dict|None · todos -> list · executar -> int · lote([(sql, p)]) -> list
   servicos — http_get(url, cab) -> (status, texto) · http_post(url, campos) -> (status, texto)
              · access(pedido) -> e-mail|None (só se EXIGIR_ACCESS=1)
-  config   — SEGREDO, ALLOWED_EMAILS, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO, EXIGIR_ACCESS,
+  config   — SEGREDO, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO, EXIGIR_ACCESS,
              GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 """
 import base64
@@ -242,10 +242,6 @@ def _mesma_origem(pedido):
         raise Falha(403, "FORBIDDEN")
 
 
-def _cadastro_permitido(config, email):
-    """ALLOWED_EMAILS: lista de e-mails que podem criar conta, ou "*" para cadastro aberto. Vazio = fechado."""
-    lista = {x.strip().lower() for x in str(config.get("ALLOWED_EMAILS") or "").split(",") if x.strip()}
-    return "*" in lista or email in lista
 
 
 # ---------------- limites (bloqueio progressivo e contadores por IP) ----------------
@@ -451,9 +447,6 @@ async def _cadastrar(ctx):
     nome = _nome(b.get("nome"))
     if not nome:
         raise Falha(400, "INVALID_REQUEST")
-    if not _cadastro_permitido(ctx.config, email):
-        ctx.evento("cadastro_recusado", email)
-        raise Falha(403, "REGISTER_FAILED")
     n = await ctx.banco.executar(
         "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador) VALUES (?, ?, ?, ?, ?)",
         email, nome, sal, it, _verificador(prova))
