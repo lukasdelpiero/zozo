@@ -45,6 +45,7 @@
   const dataValida = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) && !isNaN(new Date(v + "T00:00:00")) ? String(v) : null);
   const cor = (v, padrao) => ZoZo.format.cor(v, padrao || "#6078a9");
   const inteiro = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : NaN; };
+  const NOME = () => R().limiteNome;          // máximo de caracteres de um nome (regras.js)
   const existe = (lista, id) => (id && lista.some((x) => x.id === id) ? id : null);
 
   function diffMeses(de, ate) { // "AAAA-MM"
@@ -242,7 +243,7 @@
     const l = entrada || {};
     const data = dataValida(l.data);
     const valor = numero(l.valor);
-    const descricao = texto(l.descricao, 140);
+    const descricao = texto(l.descricao, NOME());
     const tipo = TIPOS_LANCAMENTO.includes(l.tipo) ? l.tipo : "regular";
     if (!data || !descricao || !(valor > 0) || valor > 1e12) throw erro("OPERATION_FAILED");
     const out = {
@@ -468,7 +469,7 @@
     };
   }
   function lerCategoria(e) {
-    const nome = texto(e && e.nome, 60);
+    const nome = texto(e && e.nome, NOME());
     if (!nome) throw erro("OPERATION_FAILED");
     const reservado = numero(e.reservado);
     return {
@@ -479,7 +480,7 @@
 
   /* ---------------- contas ---------------- */
   function lerConta(e) {
-    const nome = texto(e && e.nome, 60);
+    const nome = texto(e && e.nome, NOME());
     const tipo = TIPOS_CONTA.includes(e && e.tipo) ? e.tipo : null;
     const saldo = numero(e && e.saldo);
     const dig = texto(e && e.ultimos4Digitos, 4);
@@ -488,7 +489,7 @@
     const limite = numero(e.limite);
     return {
       nome, tipo, saldo: r2(saldo), ultimos4Digitos: dig, cor: cor(e.cor), tipoInvestimento: tipo === "investimento" ? texto(e.tipoInvestimento, 40) || "Outros" : "",
-      instituicao: texto(e.instituicao, 60), limite: limite > 0 ? r2(limite) : null, fechamento: dia(e.fechamento), vencimento: dia(e.vencimento),
+      instituicao: texto(e.instituicao, NOME()), limite: limite > 0 ? r2(limite) : null, fechamento: dia(e.fechamento), vencimento: dia(e.vencimento),
     };
   }
   function registrarSaldo(c, saldo) {
@@ -500,7 +501,7 @@
 
   /* ---------------- perfis ---------------- */
   function lerPerfil(e) {
-    const nome = texto(e && e.nome, 40);
+    const nome = texto(e && e.nome, NOME());
     if (!nome) throw erro("OPERATION_FAILED");
     const orc = numero(e.orcamento);
     return { nome, cor: cor(e.cor), orcamento: orc > 0 ? r2(orc) : 0 };
@@ -719,7 +720,7 @@
       partes.forEach((p, i) => {
         const alvo = i === 0 ? base : Object.assign({}, base, { id: novoId("l") });
         Object.assign(alvo, {
-          descricao: texto(p.descricao, 140) || base.descricao, valor: centavos[i] / 100, data: base.data,
+          descricao: texto(p.descricao, NOME()) || base.descricao, valor: centavos[i] / 100, data: base.data,
           categoriaId: p.categoriaId, perfilId: p.perfilId,
           divisao: partes.length > 1 ? { id: grupo, total: r2(total), partes: partes.length } : null,
         });
@@ -765,7 +766,7 @@
         registrarSaldo(c, e.saldo);
       } else if (d.cor) c.cor = cor(d.cor, c.cor);
       if (typeof d.oculta === "boolean") c.oculta = d.oculta;
-      if (d.nome !== undefined) { const n = texto(d.nome, 60); if (!n) throw erro("OPERATION_FAILED"); c.nome = n; }
+      if (d.nome !== undefined) { const n = texto(d.nome, NOME()); if (!n) throw erro("OPERATION_FAILED"); c.nome = n; }
       if (d.saldo !== undefined) { const v = numero(d.saldo); if (!Number.isFinite(v) || Math.abs(v) > 1e12) throw erro("OPERATION_FAILED"); registrarSaldo(c, r2(v)); }
       return { conta: contaPublica(c), id: c.id, cor: c.cor };
     },
@@ -795,7 +796,7 @@
         const v = numero(d.orcamentoMes.valor);
         c.orcamentos = Object.assign({}, c.orcamentos || {}, { [d.orcamentoMes.mes]: v > 0 ? r2(v) : 0 });
       }
-      if (d.nome !== undefined) { const n = texto(d.nome, 60); if (!n) throw erro("OPERATION_FAILED"); c.nome = n; }
+      if (d.nome !== undefined) { const n = texto(d.nome, NOME()); if (!n) throw erro("OPERATION_FAILED"); c.nome = n; }
       if (d.icone !== undefined) c.icone = texto(d.icone, 8) || "•";
       return { categoria: c, id: c.id, cor: c.cor };
     },
@@ -837,7 +838,7 @@
         Object.assign(p, e);
       } else if (d.cor) p.cor = cor(d.cor, p.cor);
       if (d.nome !== undefined && !d.perfil) {
-        const n = texto(d.nome, 40);
+        const n = texto(d.nome, NOME());
         if (!n) throw erro("OPERATION_FAILED");
         if (doc.perfis.some((x) => x.id !== p.id && x.nome.toLowerCase() === n.toLowerCase())) throw erro("NAME_IN_USE");
         p.nome = n;

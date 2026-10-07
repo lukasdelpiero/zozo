@@ -2,26 +2,33 @@
 ZoZo (web) — núcleo da API (Python puro, sem dependências do Cloudflare)
 
 Camadas de proteção:
-  1. Cloudflare Access na frente do site (só e-mails autorizados);
-  2. o token do Access é validado de novo aqui (acesso.py);
-  3. lista de e-mails permitidos (ALLOWED_EMAILS) como segunda barreira;
-  4. cada pessoa só lê/grava os próprios dados (o e-mail vem do token, nunca do pedido);
-  5. PROVA DE SENHA: os dados só são lidos, gravados ou apagados com a "prova"
-     derivada da senha no navegador (o servidor guarda apenas o SHA-256 dela).
-     Uma sessão do Access roubada não basta para ler, adulterar ou apagar nada;
-  6. bloqueio de 1 minuto após 5 provas erradas;
-  7. gravação com versão (409 se outro dispositivo gravou antes) + histórico;
-  8. operações de várias etapas (troca de senha, apagar dados) são atômicas.
+  1. login próprio do ZoZo: e-mail + PROVA DE SENHA. A senha nunca sai do navegador:
+     ele deriva (PBKDF2 600.000 + HKDF) a chave dos dados e uma "prova"; o servidor
+     guarda só o SHA-256 da prova;
+  2. sessão no servidor: cookie aleatório HttpOnly + Secure + SameSite=Strict, sem
+     data de expiração (termina ao fechar o navegador); o banco guarda só o SHA-256
+     dele. Expira também por inatividade (7 dias) e idade (30 dias);
+  3. 2FA opcional por aplicativo autenticador (TOTP), com proteção contra reuso;
+  4. bloqueio progressivo por e-mail + IP: 3 tentativas livres, CAPTCHA (Turnstile)
+     da 4ª em diante, 15 min de bloqueio na 5ª falha e 24 h na 10ª. Muitas falhas
+     na mesma conta vindas de IPs diferentes também passam a exigir CAPTCHA;
+  5. mensagens genéricas: e-mail inexistente e senha errada são indistinguíveis
+     (inclusive os parâmetros da senha, que são simulados para e-mails sem conta);
+  6. cada pessoa só lê/grava os próprios dados (o e-mail vem da sessão, nunca do pedido);
+  7. leitura/gravação dos dados exigem a sessão E a prova da senha;
+  8. gravação com versão (409 se outro dispositivo gravou antes) + histórico;
+  9. operações de várias etapas (troca de senha, apagar dados) são atômicas;
+ 10. CSRF: escritas só da própria origem e só com JSON (além do SameSite=Strict).
+O ambiente de prévia pode exigir também o Cloudflare Access (EXIGIR_ACCESS=1).
 
 O servidor nunca recebe a senha nem os dados legíveis: o documento chega
 cifrado (AES-256-GCM) do navegador.
 
-O núcleo recebe um `banco` com três métodos assíncronos:
-    primeiro(sql, *params) -> dict | None
-    todos(sql, *params)    -> list[dict]
-    executar(sql, *params) -> int (linhas alteradas)
-    lote([(sql, params), ...]) -> list[int]   (transação: erro desfaz tudo)
-e uma função `http_get(url, cabecalhos) -> (status, texto)`.
+O núcleo recebe:
+  banco    — primeiro(sql, *p) -> dict|None · todos -> list · executar -> int · lote([(sql, p)]) -> list
+  servicos — http_get(url, cab) -> (status, texto) · http_post(url, campos) -> (status, texto)
+             · access(pedido) -> e-mail|None (só se EXIGIR_ACCESS=1)
+  config   — SEGREDO, ALLOWED_EMAILS, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO, EXIGIR_ACCESS
 """
 import base64
 import binascii
@@ -29,21 +36,43 @@ import hashlib
 import hmac
 import json
 import re
+import secrets
 import time
 import unicodedata
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
+
+import totp
 
 LIMITE_CORPO = 2_100_000        # bytes do pedido
 LIMITE_CONTEUDO = 1_900_000     # caracteres do documento cifrado (D1: máx. ~2 MB por linha)
 ITERACOES_MIN = 600_000
 ITERACOES_MAX = 10_000_000
-MAX_FALHAS = 5
-BLOQUEIO_S = 60
 FORMATO_DOCUMENTO = 2           # primeiro byte do documento cifrado (versão do formato)
 MAX_VERSAO = 2**53 - 1
 
+# Sessões
+SESSAO_OCIOSA_S = 7 * 86400     # sem uso por 7 dias → encerra
+SESSAO_MAXIMA_S = 30 * 86400    # no máximo 30 dias, mesmo em uso
+SESSAO_2FA_S = 600              # 10 min para digitar o código do 2FA
+TOQUE_SESSAO_S = 300            # "último uso" é gravado no máximo a cada 5 min
+COOKIE_SEGURO = "__Host-zozo"   # HTTPS: prefixo __Host- (só este site, Path=/, Secure)
+COOKIE_DEV = "zozo_dev"         # servidor local em http://127.0.0.1
+
+# Bloqueio progressivo (login e prova da senha, por e-mail + IP)
+LOGIN_SEM_CAPTCHA = 3           # 1ª a 3ª tentativa: normal; da 4ª em diante: CAPTCHA
+BLOQUEIO_1, BLOQUEIO_1_S = 5, 900          # 5ª falha → 15 min
+BLOQUEIO_2, BLOQUEIO_2_S = 10, 86400       # 10ª falha → 24 h
+ESQUECE_S = 86400                          # 24 h sem falhas → contador zera
+CONTA_CAPTCHA, CONTA_JANELA_S = 20, 3600   # 20 falhas/h na conta (todos os IPs) → CAPTCHA para todos
+# Limites por IP
+CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
+CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
+
+TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
 _B64 = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 _PREFIXO_SHA1 = re.compile(r"^[0-9A-F]{5}$")
+_EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _AGORA_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 
 CABECALHOS = {
@@ -56,9 +85,10 @@ CABECALHOS = {
 
 
 class Resposta:
-    def __init__(self, status, dados=None):
+    def __init__(self, status, dados=None, cabecalhos=None):
         self.status = status
         self.dados = dados
+        self.cabecalhos = dict(cabecalhos or {})
 
     @property
     def corpo(self):
@@ -73,18 +103,49 @@ class Pedido:
         partes = urlsplit(url)
         self.caminho = partes.path
         self.host = (partes.netloc or "").lower()
+        self.query = {k: v[0] for k, v in parse_qs(partes.query, max_num_fields=20).items()}
         self.cabecalhos = {str(k).lower(): str(v) for k, v in (cabecalhos or {}).items()}
         self.corpo = corpo or ""
+        self.ip = (self.cab("cf-connecting-ip") or "").strip()[:64] or "desconhecido"
 
     def cab(self, nome):
         return self.cabecalhos.get(nome.lower())
 
+    def cookie(self, nome):
+        for parte in (self.cab("cookie") or "").split(";"):
+            k, _, v = parte.strip().partition("=")
+            if k == nome:
+                return v
+        return None
+
 
 class Falha(Exception):
-    def __init__(self, status, codigo):
+    def __init__(self, status, codigo, extra=None):
         super().__init__(codigo)
         self.status = status
         self.codigo = codigo
+        self.extra = extra or {}
+
+
+class Contexto:
+    def __init__(self, pedido, banco, servicos, config, log, agora):
+        self.pedido, self.banco, self.servicos, self.config, self.log = pedido, banco, servicos, config, log
+        self.agora = int(agora)
+        self.segredo = str(config.get("SEGREDO") or "")
+        self.req = secrets.token_hex(8)
+        self.cabecalhos = {}          # cabeçalhos extras da resposta (Set-Cookie)
+
+    def h(self, valor):
+        """Identificador estável e não reversível (e-mail, IP) para chaves e logs."""
+        return hmac.new(self.segredo.encode(), str(valor).encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
+    def evento(self, nome, email=None, **campos):
+        """Evento de segurança: sem senha, prova, cookie, código ou e-mail em texto."""
+        dados = {"evento": nome, "req": self.req, "ip": self.h(self.pedido.ip)[:12]}
+        if email:
+            dados["conta"] = self.h(email)[:12]
+        dados.update(campos)
+        self.log(json.dumps(dados, ensure_ascii=False))
 
 
 # ---------------- validações ----------------
@@ -143,6 +204,13 @@ def _nome(valor):
     return texto.strip()[:80]
 
 
+def _email(valor):
+    e = str(valor or "").strip().lower() if isinstance(valor, str) else ""
+    if not e or len(e) > 254 or not _EMAIL.match(e) or any(unicodedata.category(c).startswith("C") for c in e):
+        raise Falha(400, "INVALID_REQUEST")
+    return e
+
+
 def _json(pedido):
     if not (pedido.cab("content-type") or "").lower().startswith("application/json"):
         raise Falha(415, "INVALID_REQUEST")
@@ -169,33 +237,163 @@ def _mesma_origem(pedido):
         raise Falha(403, "FORBIDDEN")
 
 
-# ---------------- prova de senha + bloqueio por tentativas ----------------
-async def _conferir_prova(banco, email, pedido, agora):
-    """Confere a prova enviada no cabeçalho X-ZoZo-Prova. Devolve a linha da conta."""
-    conta = await banco.primeiro("SELECT nome, verificador FROM contas WHERE email = ?", email)
-    if not conta:
-        raise Falha(404, "NOT_FOUND")
-    # A tentativa é contada ANTES de conferir a prova, num único comando atômico:
-    # pedidos em paralelo não conseguem ler o contador antigo e escapar do limite.
-    # Durante o bloqueio o contador sobe, mas "ultima" não muda (o bloqueio não é prolongado).
-    t = await banco.primeiro(
-        "INSERT INTO tentativas (email, falhas, ultima) VALUES (?, 1, ?) "
-        "ON CONFLICT(email) DO UPDATE SET "
-        "falhas = CASE WHEN excluded.ultima - tentativas.ultima >= ? THEN 1 ELSE tentativas.falhas + 1 END, "
-        "ultima = CASE WHEN tentativas.falhas >= ? AND excluded.ultima - tentativas.ultima < ? "
-        "THEN tentativas.ultima ELSE excluded.ultima END "
-        "RETURNING falhas",
-        email, int(agora), BLOQUEIO_S, MAX_FALHAS, BLOQUEIO_S)
-    if not t or t["falhas"] > MAX_FALHAS:
-        raise Falha(429, "TOO_MANY_ATTEMPTS")
+def _cadastro_permitido(config, email):
+    """ALLOWED_EMAILS: lista de e-mails que podem criar conta, ou "*" para cadastro aberto. Vazio = fechado."""
+    lista = {x.strip().lower() for x in str(config.get("ALLOWED_EMAILS") or "").split(",") if x.strip()}
+    return "*" in lista or email in lista
+
+
+# ---------------- limites (bloqueio progressivo e contadores por IP) ----------------
+async def _limite(ctx, chave):
+    return await ctx.banco.primeiro("SELECT falhas, ultima, bloqueado_ate FROM limites WHERE chave = ?", chave)
+
+
+def _proxima(ctx, linha):
+    """Número que a próxima tentativa terá (o contador zera após 24 h sem falhas)."""
+    return 1 if not linha or ctx.agora - linha["ultima"] >= ESQUECE_S else linha["falhas"] + 1
+
+
+async def _reservar(ctx, chave):
+    """
+    Conta a tentativa ANTES de conferir (um único comando atômico): pedidos em paralelo
+    não leem o contador antigo. Na 5ª e na 10ª tentativa o bloqueio já é gravado aqui;
+    durante um bloqueio nada muda e nada é devolvido (None = bloqueado).
+    """
+    a, z = ctx.agora, ESQUECE_S
+    n = "(CASE WHEN ? - limites.ultima >= ? THEN 1 ELSE limites.falhas + 1 END)"
+    return await ctx.banco.primeiro(
+        "INSERT INTO limites (chave, falhas, ultima, bloqueado_ate) VALUES (?, 1, ?, 0) "
+        f"ON CONFLICT(chave) DO UPDATE SET falhas = {n}, "
+        f"bloqueado_ate = CASE {n} WHEN ? THEN ? WHEN ? THEN ? ELSE limites.bloqueado_ate END, "
+        "ultima = ? WHERE limites.bloqueado_ate <= ? RETURNING falhas, bloqueado_ate",
+        chave, a, a, z, a, z, BLOQUEIO_1, a + BLOQUEIO_1_S, BLOQUEIO_2, a + BLOQUEIO_2_S, a, a)
+
+
+async def _registrar_falha(ctx, chave):
+    """Mesma contagem de _reservar, usada depois de conferir (rotas que já exigem sessão)."""
+    return await _reservar(ctx, chave)
+
+
+async def _contar(ctx, chave, limite, janela):
+    """Contador por janela fixa (cadastro/consultas por IP). True se passou do limite."""
+    a = ctx.agora
+    r = await ctx.banco.primeiro(
+        "INSERT INTO limites (chave, falhas, ultima) VALUES (?, 1, ?) ON CONFLICT(chave) DO UPDATE SET "
+        "falhas = CASE WHEN ? - limites.ultima >= ? THEN 1 ELSE limites.falhas + 1 END, "
+        "ultima = CASE WHEN ? - limites.ultima >= ? THEN ? ELSE limites.ultima END RETURNING falhas",
+        chave, a, a, janela, a, janela, a)
+    return bool(r) and r["falhas"] > limite
+
+
+def _bloqueado(ctx, linha):
+    if linha and linha["bloqueado_ate"] > ctx.agora:
+        return Falha(429, "TOO_MANY_ATTEMPTS", {"espera": linha["bloqueado_ate"] - ctx.agora})
+    return None
+
+
+async def _limpar_login(ctx, email):
+    h = ctx.h(email)
+    await ctx.banco.executar("DELETE FROM limites WHERE chave LIKE ? OR chave = ? OR chave = ?",
+                             f"login|{h}|%", f"conta|{h}", f"2fa|{h}")
+
+
+async def _captcha_ok(ctx, token):
+    """Turnstile. Sem TURNSTILE_SECRET configurado, a etapa de CAPTCHA é pulada (o bloqueio continua valendo)."""
+    segredo = str(ctx.config.get("TURNSTILE_SECRET") or "")
+    if not segredo:
+        return True
+    if not isinstance(token, str) or not token or len(token) > 2048:
+        return False
+    status, texto = await ctx.servicos.http_post(TURNSTILE_URL, {"secret": segredo, "response": token, "remoteip": ctx.pedido.ip})
+    if status != 200:
+        raise Falha(503, "UNAVAILABLE")
     try:
-        prova = _prova(pedido.cab("x-zozo-prova"))
-        ok = hmac.compare_digest(_verificador(prova), str(conta["verificador"]))
+        return json.loads(texto).get("success") is True
+    except (ValueError, AttributeError):
+        return False
+
+
+# ---------------- sessões ----------------
+def _hash_token(token):
+    return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+
+def _nome_cookie(ctx):
+    return COOKIE_DEV if str(ctx.config.get("COOKIE_SEGURO", "1")) == "0" else COOKIE_SEGURO
+
+
+def _definir_cookie(ctx, valor=None):
+    atributos = "Path=/; HttpOnly; SameSite=Strict" + ("" if _nome_cookie(ctx) == COOKIE_DEV else "; Secure")
+    # Sem Max-Age/Expires: cookie de sessão (o navegador apaga ao ser fechado)
+    ctx.cabecalhos["Set-Cookie"] = f"{_nome_cookie(ctx)}={valor}; {atributos}" if valor else f"{_nome_cookie(ctx)}=; Max-Age=0; {atributos}"
+
+
+async def _criar_sessao(ctx, email, estado):
+    token = secrets.token_urlsafe(32)
+    envelope = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+    await ctx.banco.executar(
+        "INSERT INTO sessoes (id, email, estado, envelope, criada, ultimo_uso) VALUES (?, ?, ?, ?, ?, ?)",
+        _hash_token(token), email, estado, envelope, ctx.agora, ctx.agora)
+    _definir_cookie(ctx, token)
+    if secrets.randbelow(20) == 0:          # limpeza ocasional do que já venceu
+        await ctx.banco.executar(
+            "DELETE FROM sessoes WHERE ultimo_uso < ? OR criada < ? OR (estado = '2fa' AND criada < ?)",
+            ctx.agora - SESSAO_OCIOSA_S, ctx.agora - SESSAO_MAXIMA_S, ctx.agora - SESSAO_2FA_S)
+        await ctx.banco.executar("DELETE FROM limites WHERE ultima < ? AND bloqueado_ate < ?", ctx.agora - 2 * ESQUECE_S, ctx.agora)
+    return envelope
+
+
+async def _sessao(ctx, estado="ativa"):
+    """Sessão válida do cookie (ou None). Sessões vencidas são apagadas."""
+    token = ctx.pedido.cookie(_nome_cookie(ctx))
+    if not token or len(token) > 128:
+        return None
+    sid = _hash_token(token)
+    s = await ctx.banco.primeiro("SELECT id, email, estado, envelope, criada, ultimo_uso FROM sessoes WHERE id = ?", sid)
+    if not s:
+        return None
+    vencida = (ctx.agora - s["ultimo_uso"] > SESSAO_OCIOSA_S or ctx.agora - s["criada"] > SESSAO_MAXIMA_S
+               or (s["estado"] == "2fa" and ctx.agora - s["criada"] > SESSAO_2FA_S))
+    if vencida:
+        await ctx.banco.executar("DELETE FROM sessoes WHERE id = ?", sid)
+        return None
+    if s["estado"] != estado:
+        return None
+    if ctx.agora - s["ultimo_uso"] > TOQUE_SESSAO_S:
+        await ctx.banco.executar("UPDATE sessoes SET ultimo_uso = ? WHERE id = ?", ctx.agora, sid)
+    return s
+
+
+async def _encerrar_outras(ctx, email, manter_id):
+    await ctx.banco.executar("DELETE FROM sessoes WHERE email = ? AND id != ?", email, manter_id)
+
+
+def _sessao_publica(email, nome, envelope, dois_fatores):
+    return {"email": email, "nome": nome, "envelope": envelope, "doisFatores": bool(dois_fatores)}
+
+
+# ---------------- prova da senha (rotas com sessão) ----------------
+async def _conferir_prova(ctx, email):
+    """Confere a prova do cabeçalho X-ZoZo-Prova. Erros contam no mesmo bloqueio do login (e-mail + IP)."""
+    conta = await ctx.banco.primeiro(
+        "SELECT nome, verificador, totp_segredo, totp_pendente, totp_ultimo_passo FROM contas WHERE email = ?", email)
+    if not conta:
+        raise Falha(401, "UNAUTHORIZED")
+    chave = f"login|{ctx.h(email)}|{ctx.h(ctx.pedido.ip)}"
+    linha = await _limite(ctx, chave)
+    bloqueio = _bloqueado(ctx, linha)
+    if bloqueio:
+        raise bloqueio
+    try:
+        ok = hmac.compare_digest(_verificador(_prova(ctx.pedido.cab("x-zozo-prova"))), str(conta["verificador"]))
     except Falha:
         ok = False
     if not ok:
+        await _registrar_falha(ctx, chave)
+        ctx.evento("prova_recusada", email)
         raise Falha(403, "WRONG_PASSWORD")
-    await banco.executar("DELETE FROM tentativas WHERE email = ?", email)
+    if linha:
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
     return conta
 
 
@@ -223,124 +421,308 @@ async def _lote_atomico(banco, comandos):
         raise
 
 
+# ---------------- rotas públicas (sem sessão) ----------------
+async def _parametros(ctx):
+    """Sal e iterações para o navegador derivar a senha. E-mail sem conta recebe um sal simulado e estável."""
+    email = _email(ctx.pedido.query.get("email"))
+    if await _contar(ctx, f"consulta|{ctx.h(ctx.pedido.ip)}", CONSULTAS_POR_IP, CONSULTA_JANELA_S):
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CONSULTA_JANELA_S})
+    conta = await ctx.banco.primeiro("SELECT sal, iteracoes FROM contas WHERE email = ?", email)
+    if conta:
+        return Resposta(200, {"sal": conta["sal"], "iteracoes": conta["iteracoes"]})
+    falso = hmac.new(ctx.segredo.encode(), ("sal-simulado|" + email).encode("utf-8"), hashlib.sha256).digest()[:16]
+    return Resposta(200, {"sal": base64.b64encode(falso).decode("ascii"), "iteracoes": ITERACOES_MIN})
+
+
+async def _cadastrar(ctx):
+    b = _json(ctx.pedido)
+    if await _contar(ctx, f"cadastro|{ctx.h(ctx.pedido.ip)}", CADASTROS_POR_IP, CADASTRO_JANELA_S):
+        ctx.evento("cadastro_limitado")
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CADASTRO_JANELA_S})
+    if not await _captcha_ok(ctx, b.get("turnstile")):
+        raise Falha(428, "CAPTCHA_REQUIRED")
+    email = _email(b.get("email"))
+    sal, it, prova = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _prova(b.get("prova"))
+    nome = _nome(b.get("nome"))
+    if not nome:
+        raise Falha(400, "INVALID_REQUEST")
+    if not _cadastro_permitido(ctx.config, email):
+        ctx.evento("cadastro_recusado", email)
+        raise Falha(403, "REGISTER_FAILED")
+    n = await ctx.banco.executar(
+        "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador) VALUES (?, ?, ?, ?, ?)",
+        email, nome, sal, it, _verificador(prova))
+    if not n:
+        raise Falha(409, "EMAIL_IN_USE")
+    envelope = await _criar_sessao(ctx, email, "ativa")
+    ctx.evento("cadastro", email)
+    return Resposta(201, _sessao_publica(email, nome, envelope, False))
+
+
+async def _entrar(ctx):
+    b = _json(ctx.pedido)
+    email = _email(b.get("email"))
+    chave = f"login|{ctx.h(email)}|{ctx.h(ctx.pedido.ip)}"
+    linha, conta_lim = await _limite(ctx, chave), await _limite(ctx, f"conta|{ctx.h(email)}")
+    bloqueio = _bloqueado(ctx, linha)
+    if bloqueio:
+        ctx.evento("login_bloqueado", email)
+        raise bloqueio
+    suspeita = bool(conta_lim) and ctx.agora - conta_lim["ultima"] < CONTA_JANELA_S and conta_lim["falhas"] >= CONTA_CAPTCHA
+    if (_proxima(ctx, linha) > LOGIN_SEM_CAPTCHA or suspeita) and not await _captcha_ok(ctx, b.get("turnstile")):
+        raise Falha(428, "CAPTCHA_REQUIRED")
+    r = await _reservar(ctx, chave)
+    if not r:                                         # bloqueado por um pedido simultâneo
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
+    conta = await ctx.banco.primeiro("SELECT nome, verificador, totp_segredo FROM contas WHERE email = ?", email)
+    try:
+        calculado = _verificador(_prova(b.get("prova")))
+    except Falha:
+        calculado = ""
+    # Conta inexistente: compara com um valor qualquer (mesmo caminho, mesma resposta)
+    ok = hmac.compare_digest(calculado, str(conta["verificador"]) if conta else "0" * 64) and bool(conta) and bool(calculado)
+    if not ok:
+        await _contar(ctx, f"conta|{ctx.h(email)}", CONTA_CAPTCHA, CONTA_JANELA_S)
+        ctx.evento("login_falhou", email, tentativa=r["falhas"])
+        if r["falhas"] == BLOQUEIO_2:
+            ctx.evento("login_bloqueio_24h", email)
+        extra = {"captcha": r["falhas"] >= LOGIN_SEM_CAPTCHA}
+        if r["bloqueado_ate"] > ctx.agora:
+            extra["espera"] = r["bloqueado_ate"] - ctx.agora
+        raise Falha(401, "INVALID_CREDENTIALS", extra)
+    if conta["totp_segredo"]:
+        # Senha certa: zera o contador deste IP (o código do 2FA tem o próprio limite) e falta o código
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
+        await _criar_sessao(ctx, email, "2fa")
+        ctx.evento("login_aguarda_2fa", email)
+        return Resposta(200, {"doisFatores": True})
+    await _limpar_login(ctx, email)
+    envelope = await _criar_sessao(ctx, email, "ativa")
+    ctx.evento("login", email)
+    return Resposta(200, _sessao_publica(email, conta["nome"], envelope, False))
+
+
+async def _segundo_fator(ctx):
+    s = await _sessao(ctx, "2fa")
+    if not s:
+        raise Falha(401, "UNAUTHORIZED")
+    b = _json(ctx.pedido)
+    email = s["email"]
+    chave = f"2fa|{ctx.h(email)}"
+    r = await _reservar(ctx, chave)
+    if not r:
+        raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
+    conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, totp_ultimo_passo FROM contas WHERE email = ?", email)
+    segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta else None
+    passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"]) if segredo else None
+    if passo is not None:      # grava o passo usado: o mesmo código não serve de novo (nem em paralelo)
+        n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?",
+                                     passo, email, passo)
+        passo = passo if n == 1 else None
+    if passo is None:
+        ctx.evento("2fa_falhou", email, tentativa=r["falhas"])
+        extra = {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {}
+        raise Falha(401, "CODE_INVALID", extra)
+    # Autenticação completa: a sessão parcial é trocada por uma nova (novo identificador)
+    await ctx.banco.executar("DELETE FROM sessoes WHERE id = ?", s["id"])
+    await _limpar_login(ctx, email)
+    envelope = await _criar_sessao(ctx, email, "ativa")
+    ctx.evento("login", email, segundo_fator=True)
+    return Resposta(200, _sessao_publica(email, conta["nome"], envelope, True))
+
+
+async def _senha_vazada(ctx):
+    # k-anonimato: só os 5 primeiros caracteres do SHA-1 saem do navegador
+    prefixo = ctx.pedido.caminho.rsplit("/", 1)[-1].upper()
+    if not _PREFIXO_SHA1.match(prefixo):
+        raise Falha(400, "INVALID_REQUEST")
+    if await _contar(ctx, f"hibp|{ctx.h(ctx.pedido.ip)}", CONSULTAS_POR_IP, CONSULTA_JANELA_S):
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CONSULTA_JANELA_S})
+    status, texto = await ctx.servicos.http_get(f"https://api.pwnedpasswords.com/range/{prefixo}",
+                                                {"Add-Padding": "true", "User-Agent": "ZoZo-web"})
+    if status != 200 or len(texto) > 2_000_000:
+        raise Falha(502, "UNAVAILABLE")
+    return Resposta(200, {"lista": texto})
+
+
 # ---------------- rotas ----------------
-async def _rota(pedido, email, banco, http_get, agora):
-    m, c = pedido.metodo, pedido.caminho
+_PROTEGIDAS = {
+    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("DELETE", "/api/conta"),
+    ("GET", "/api/documento"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
+    ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
+}
+_SEM_CORPO = {"/api/2fa/iniciar", "/api/2fa/desativar"}
 
-    if m == "GET" and c == "/api/eu":
-        return Resposta(200, {"email": email})
 
-    if m == "GET" and c == "/api/conta":
-        conta = await banco.primeiro("SELECT nome, sal, iteracoes FROM contas WHERE email = ?", email)
-        return Resposta(200, conta) if conta else Resposta(404, {"erro": "NOT_FOUND"})
+async def _rota(ctx):
+    p = ctx.pedido
+    m, c = p.metodo, p.caminho
 
+    if m == "GET" and c == "/api/publico":
+        return Resposta(200, {"turnstile": str(ctx.config.get("TURNSTILE_SITE_KEY") or "") or None})
+    if m == "GET" and c == "/api/conta/parametros":
+        return await _parametros(ctx)
     if m == "POST" and c == "/api/conta":
-        b = _json(pedido)
-        sal, it, prova = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _prova(b.get("prova"))
-        n = await banco.executar(
-            "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador) VALUES (?, ?, ?, ?, ?)",
-            email, _nome(b.get("nome")), sal, it, _verificador(prova))
-        return Resposta(201, {"criada": True}) if n else Resposta(409, {"erro": "EMAIL_IN_USE"})
-
-    if m == "GET" and c.startswith("/api/senha-vazada/"):
-        # k-anonimato: só os 5 primeiros caracteres do SHA-1 saem do navegador
-        prefixo = c.rsplit("/", 1)[-1].upper()
-        if not _PREFIXO_SHA1.match(prefixo):
-            raise Falha(400, "INVALID_REQUEST")
-        status, texto = await http_get(f"https://api.pwnedpasswords.com/range/{prefixo}",
-                                       {"Add-Padding": "true", "User-Agent": "ZoZo-web"})
-        if status != 200 or len(texto) > 2_000_000:
-            raise Falha(502, "UNAVAILABLE")
-        return Resposta(200, {"lista": texto})
-
-    # ---- daqui em diante: exige a prova da senha ----
-    rotas_protegidas = {
-        ("POST", "/api/conta/verificar"), ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"),
-        ("DELETE", "/api/conta"), ("GET", "/api/documento"), ("PUT", "/api/documento"),
-        ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
-    }
-    if (m, c) not in rotas_protegidas:
-        raise Falha(404, "NOT_FOUND")
-    # Corpo validado ANTES da prova: pedido malformado não consome tentativa
-    b = _json(pedido) if m in ("POST", "PUT") and c != "/api/conta/verificar" else {}
-    conta = await _conferir_prova(banco, email, pedido, agora)
-
-    if c == "/api/conta/verificar":
+        return await _cadastrar(ctx)
+    if m == "POST" and c == "/api/sessao":
+        return await _entrar(ctx)
+    if m == "POST" and c == "/api/sessao/2fa":
+        return await _segundo_fator(ctx)
+    if m == "GET" and c == "/api/sessao":
+        s = await _sessao(ctx)
+        if not s:
+            if p.cookie(_nome_cookie(ctx)) and not await _sessao(ctx, "2fa"):
+                _definir_cookie(ctx)                   # cookie que não vale mais: apaga (a sessão parcial do 2FA fica)
+            raise Falha(401, "UNAUTHORIZED")
+        conta = await ctx.banco.primeiro("SELECT nome, totp_segredo FROM contas WHERE email = ?", s["email"])
+        return Resposta(200, _sessao_publica(s["email"], conta["nome"], s["envelope"], conta["totp_segredo"]))
+    if m == "DELETE" and c == "/api/sessao":
+        token = p.cookie(_nome_cookie(ctx))
+        if token and len(token) <= 128:
+            await ctx.banco.executar("DELETE FROM sessoes WHERE id = ?", _hash_token(token))
+        _definir_cookie(ctx)
         return Resposta(204)
+    if m == "GET" and c.startswith("/api/senha-vazada/"):
+        return await _senha_vazada(ctx)
+
+    # ---- daqui em diante: exige sessão completa E a prova da senha ----
+    if (m, c) not in _PROTEGIDAS:
+        raise Falha(404, "NOT_FOUND")
+    s = await _sessao(ctx)
+    if not s:
+        raise Falha(401, "UNAUTHORIZED")
+    email = s["email"]
+    # Corpo validado ANTES da prova: pedido malformado não consome tentativa
+    b = _json(p) if m in ("POST", "PUT") and c not in _SEM_CORPO else {}
+    conta = await _conferir_prova(ctx, email)
 
     if c == "/api/conta/nome":
-        await banco.executar("UPDATE contas SET nome = ? WHERE email = ?", _nome(b.get("nome")), email)
+        await ctx.banco.executar("UPDATE contas SET nome = ? WHERE email = ?", _nome(b.get("nome")), email)
         return Resposta(200, {"ok": True})
 
     if c == "/api/conta/senha":
         # Novo sal + nova prova + documento recifrado, tudo na mesma transação
         sal, it = _sal(b.get("sal")), _iteracoes(b.get("iteracoes"))
         nova_prova, conteudo, va = _prova(b.get("prova")), _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
-        await _lote_atomico(banco, [
+        await _lote_atomico(ctx.banco, [
             _gravar_documento(email, va, conteudo), _GUARDA,
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ? WHERE email = ? AND verificador = ?",
              (sal, it, _verificador(nova_prova), email, conta["verificador"])), _GUARDA,
             _LIMPA_GUARDA,
             # o histórico estava cifrado com a senha anterior: é descartado
             ("DELETE FROM historico WHERE email = ?", (email,)),
-            ("DELETE FROM tentativas WHERE email = ?", (email,)),
+            # as outras sessões (outros dispositivos) terminam
+            ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
         ])
+        await _limpar_login(ctx, email)
+        ctx.evento("senha_alterada", email)
         return Resposta(200, {"versao": va + 1})
 
     if m == "DELETE" and c == "/api/conta":
-        await banco.lote([
+        await ctx.banco.lote([
             ("DELETE FROM historico WHERE email = ?", (email,)),
             ("DELETE FROM documentos WHERE email = ?", (email,)),
-            ("DELETE FROM tentativas WHERE email = ?", (email,)),
+            ("DELETE FROM sessoes WHERE email = ?", (email,)),
             ("DELETE FROM contas WHERE email = ?", (email,)),
         ])
+        await _limpar_login(ctx, email)
+        _definir_cookie(ctx)
+        ctx.evento("conta_excluida", email)
         return Resposta(204)
 
     if m == "GET" and c == "/api/documento":
-        d = await banco.primeiro("SELECT versao, conteudo FROM documentos WHERE email = ?", email)
+        d = await ctx.banco.primeiro("SELECT versao, conteudo FROM documentos WHERE email = ?", email)
         return Resposta(200, d) if d else Resposta(404, {"erro": "NOT_FOUND"})
 
     if m == "PUT" and c == "/api/documento":
         conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
         sql, params = _gravar_documento(email, va, conteudo)
-        n = await banco.executar(sql, *params)
+        n = await ctx.banco.executar(sql, *params)
         return Resposta(200, {"versao": va + 1}) if n else Resposta(409, {"erro": "DATA_CHANGED"})
 
     if c == "/api/documento/apagar":
         # "Apagar todos os dados": grava o documento vazio (a versão continua subindo,
         # então nenhum dispositivo confunde isso com um retrocesso) e descarta o histórico
         conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
-        await _lote_atomico(banco, [
+        await _lote_atomico(ctx.banco, [
             _gravar_documento(email, va, conteudo), _GUARDA, _LIMPA_GUARDA,
             ("DELETE FROM historico WHERE email = ?", (email,)),
         ])
+        ctx.evento("dados_apagados", email)
         return Resposta(200, {"versao": va + 1})
 
     if c == "/api/historico":
-        versoes = await banco.todos(
+        versoes = await ctx.banco.todos(
             "SELECT versao, conteudo, criado_em AS criadoEm FROM historico WHERE email = ? ORDER BY versao DESC LIMIT 10", email)
         return Resposta(200, {"versoes": versoes})
+
+    if c == "/api/2fa/iniciar":
+        if conta["totp_segredo"]:
+            raise Falha(409, "2FA_ALREADY_ON")
+        segredo = totp.novo_segredo()
+        await ctx.banco.executar("UPDATE contas SET totp_pendente = ? WHERE email = ?", totp.cifrar(segredo, ctx.segredo), email)
+        return Resposta(200, {"chave": totp.base32(segredo), "uri": totp.uri(segredo, email)})
+
+    if c == "/api/2fa/confirmar":
+        pendente = totp.decifrar(conta["totp_pendente"], ctx.segredo) if conta["totp_pendente"] else None
+        if not pendente or conta["totp_segredo"]:
+            raise Falha(409, "2FA_NOT_PENDING")
+        chave = f"2fa|{ctx.h(email)}"
+        r = await _reservar(ctx, chave)
+        if not r:
+            raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS")
+        passo = totp.conferir(pendente, b.get("codigo"), ctx.agora, 0)
+        if passo is None:
+            ctx.evento("2fa_ativacao_falhou", email, tentativa=r["falhas"])
+            raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
+        n = await ctx.banco.executar(
+            "UPDATE contas SET totp_segredo = totp_pendente, totp_pendente = NULL, totp_ultimo_passo = ? "
+            "WHERE email = ? AND totp_pendente = ?", passo, email, conta["totp_pendente"])
+        if n != 1:
+            raise Falha(409, "DATA_CHANGED")
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
+        await _encerrar_outras(ctx, email, s["id"])
+        ctx.evento("2fa_ativado", email)
+        return Resposta(200, {"doisFatores": True})
+
+    if c == "/api/2fa/desativar":
+        await ctx.banco.executar(
+            "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL, totp_ultimo_passo = 0 WHERE email = ?", email)
+        await _encerrar_outras(ctx, email, s["id"])
+        ctx.evento("2fa_desativado", email)
+        return Resposta(200, {"doisFatores": False})
 
     raise Falha(404, "NOT_FOUND")
 
 
-async def atender(pedido, banco, http_get, identificar, log=print):
-    """
-    Atende um pedido /api/*. `identificar(pedido)` devolve o e-mail autenticado
-    (ou None) e pode lançar Exception se a autenticação estiver indisponível.
-    """
+async def atender(pedido, banco, servicos, config, log=print, agora=None):
+    """Atende um pedido /api/*. Nunca devolve detalhes técnicos ao navegador."""
+    ctx = Contexto(pedido, banco, servicos, config, log, time.time() if agora is None else agora)
     try:
-        _mesma_origem(pedido)
-        try:
-            email = await identificar(pedido)
-        except Exception as ex:  # noqa: BLE001
-            log(f"autenticação indisponível: {type(ex).__name__}")
-            return Resposta(503, {"erro": "UNAVAILABLE"})
-        if not email:
-            return Resposta(401, {"erro": "UNAUTHORIZED"})
-        return await _rota(pedido, email, banco, http_get, time.time())
+        if len(ctx.segredo) < 32:
+            log(json.dumps({"evento": "configuracao_incompleta", "req": ctx.req, "falta": "SEGREDO"}))
+            r = Resposta(503, {"erro": "UNAVAILABLE"})
+        else:
+            _mesma_origem(pedido)
+            if str(config.get("EXIGIR_ACCESS") or "") == "1":      # ambiente de prévia: Cloudflare Access na frente
+                try:
+                    identidade = await servicos.access(pedido)
+                except Exception as ex:  # noqa: BLE001
+                    log(json.dumps({"evento": "access_indisponivel", "req": ctx.req, "tipo": type(ex).__name__}))
+                    identidade = False
+                if identidade is False:
+                    r = Resposta(503, {"erro": "UNAVAILABLE"})
+                elif not identidade:
+                    r = Resposta(401, {"erro": "ACCESS_DENIED"})
+                else:
+                    r = await _rota(ctx)
+            else:
+                r = await _rota(ctx)
     except Falha as f:
-        return Resposta(f.status, {"erro": f.codigo})
+        r = Resposta(f.status, dict({"erro": f.codigo}, **f.extra))
     except Exception as ex:  # noqa: BLE001 — nunca devolve detalhes técnicos
-        log(f"falha no servidor: {type(ex).__name__}")
-        return Resposta(500, {"erro": "STORAGE_UNAVAILABLE"})
+        log(json.dumps({"evento": "falha_no_servidor", "req": ctx.req, "tipo": type(ex).__name__}))
+        r = Resposta(500, {"erro": "STORAGE_UNAVAILABLE"})
+    r.cabecalhos.update(ctx.cabecalhos)
+    r.cabecalhos["X-Request-Id"] = ctx.req
+    return r

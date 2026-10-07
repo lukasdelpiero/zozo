@@ -80,7 +80,7 @@
     }
 
     function linha(parte, i) {
-      const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: 140, classe: "dv__name",
+      const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: ZoZo.regras.limiteNome, classe: "dv__name",
         aoSalvar: (v) => { parte.descricao = v; } });
       const dataBtn = h("button", { type: "button", class: "dv__date" }, dataCurta(parte.data));
       dataBtn.addEventListener("click", () => {

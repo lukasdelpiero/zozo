@@ -15,8 +15,10 @@ AQUI = pathlib.Path(__file__).resolve().parent
 UI = AQUI.parent / "ui"
 PUBLICO = AQUI / "public"
 
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; "
-       "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+# challenges.cloudflare.com: CAPTCHA Turnstile (script + iframe), carregado só quando é exigido
+CSP = ("default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; "
+       "font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; "
+       "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 CABECALHOS_UI = {
     "Content-Security-Policy": CSP,
@@ -39,7 +41,8 @@ def montar():
 
     index = PUBLICO / "index.html"
     html = index.read_text(encoding="utf-8")
-    html, n = re.subn(r'\s*<!-- MOCK.*?-->\s*<script src="mock/mock-data\.js"></script>\s*<script src="mock/mock-host\.js"></script>',
+    html, n = re.subn(r'\s*<!-- MOCK.*?-->\s*<script src="mock/credenciais\.local\.js"></script>\s*'
+                      r'<script src="mock/mock-data\.js"></script>\s*<script src="mock/mock-host\.js"></script>',
                       "", html, flags=re.S)
     if n != 1 or "mock/" in html:
         raise SystemExit("index.html: não encontrei o bloco do modo de demonstração")

@@ -100,7 +100,7 @@
                 : r.proxima ? h("span", { class: "status-chip status-chip--neutral" }, "Próxima: " + F.dataCurta(r.data))
                   : h("span", { class: ["status-chip", r.pago ? "status-chip--ok" : "status-chip--pending"] }, r.pago ? "Pago" : "Pendente")),
             h("div", { class: "ph__main" },
-              ZoZo.inline.texto({ valor: r.descricao, rotulo: "Nome da recorrência", max: 140, classe: "ph__name", aoSalvar: (v) => salvarOrigem({ descricao: v }) }),
+              ZoZo.inline.texto({ valor: r.descricao, rotulo: "Nome da recorrência", max: ZoZo.regras.limiteNome, classe: "ph__name", aoSalvar: (v) => salvarOrigem({ descricao: v }) }),
               ZoZo.inline.dinheiro({ valor: origem ? origem.valor : r.valor, rotulo: "Valor da recorrência", permitirZero: false, classe: "ph__value", aoSalvar: (v) => salvarOrigem({ valor: v }) }))),
           r.pago || r.proxima || r.encerrada ? null : h("div", { class: "detail-actions" }, UI.Button("Registrar pagamento", { variant: "primary", icon: "check", onClick: (e) => pagar(e.currentTarget) })),
           grafico,

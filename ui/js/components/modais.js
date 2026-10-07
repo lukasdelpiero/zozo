@@ -73,7 +73,7 @@
       classe: "modal--nova-categoria",
       passo: (api) => {
         const nome = UI.Input({ value: d.nome, placeholder: "Nome da categoria" });
-        nome.maxLength = 60; nome.dataset.autofocus = "";
+        nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const orc = campoDinheiro(0);
         const linhaOrc = h("div", { class: "field" }, h("span", { class: "field__label" }, "Orçamento"), orc.el);
         const erro = h("p", { class: "form-error", role: "alert" });
@@ -114,7 +114,7 @@
       classe: "modal--novo-perfil",
       passo: (api) => {
         const nome = UI.Input({ placeholder: "Nome do perfil" });
-        nome.maxLength = 40; nome.dataset.autofocus = "";
+        nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const erro = h("p", { class: "form-error", role: "alert" });
         const cores = h("div");
         const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor do perfil" }));
@@ -170,7 +170,7 @@
       passo: function passo(api) {
         const campos = {};
         const add = (chave, rotulo, input, dica) => { campos[chave] = input; return UI.Field(rotulo, input.el || input, { hint: dica }); };
-        const texto = (ph, max) => { const i = UI.Input({ placeholder: ph }); i.maxLength = max || 60; return i; };
+        const texto = (ph, max) => { const i = UI.Input({ placeholder: ph }); i.maxLength = max || ZoZo.regras.limiteNome; return i; };   // a instituição pode virar o nome da conta
         const diaInput = () => { const i = UI.Input({ type: "number", placeholder: "1 a 31", inputmode: "numeric" }); i.min = "1"; i.max = "31"; return i; };
         const saldo = campoDinheiro(0); campos.saldo = saldo;
         const erro = h("p", { class: "form-error", role: "alert" });

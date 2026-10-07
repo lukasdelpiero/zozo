@@ -1,10 +1,14 @@
 """
 ZoZo (web) — validação do token do Cloudflare Access (JWT RS256)
 
+Usado só no AMBIENTE DE PRÉVIA (EXIGIR_ACCESS=1): lá o Access fica na frente do
+site e apenas os e-mails de ACCESS_EMAILS passam. A produção não usa o Access —
+os usuários entram pelo login do próprio ZoZo.
+
 O Cloudflare Access fica na frente do site e envia, em cada pedido, o
 cabeçalho Cf-Access-Jwt-Assertion. Aqui o token é validado de novo:
 assinatura RSA (PKCS#1 v1.5 + SHA-256), validade (exp/nbf), emissor
-(iss), audiência (aud) e a lista de e-mails permitidos.
+(iss), audiência (aud) e a lista de e-mails permitidos (ACCESS_EMAILS).
 
 A verificação RSA é feita em Python puro, do jeito recomendado pela
 RFC 8017 (8.2.2): a mensagem esperada é recodificada por inteiro e
@@ -102,7 +106,7 @@ async def identidade(token, config, http_get, agora=None):
     """
     dominio = str(config.get("ACCESS_TEAM_DOMAIN") or "").strip().lower()
     aud_esperada = str(config.get("ACCESS_AUD") or "").strip()
-    permitidos = lista_emails(config.get("ALLOWED_EMAILS"))
+    permitidos = lista_emails(config.get("ACCESS_EMAILS"))
     # Configuração incompleta: nega tudo (nunca "abre" o sistema)
     if not dominio_valido(dominio) or not aud_esperada or "COLE-AQUI" in aud_esperada or not permitidos:
         raise ErroAcesso("configuração")

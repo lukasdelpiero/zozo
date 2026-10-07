@@ -459,3 +459,154 @@
 /* Saudação: título e subtítulo mais próximos */
 .greeting__title { line-height: 1.15; }
 .greeting__sub { margin-top: 0; line-height: 1.3; }
+
+/* ---------- Dashboard: cards estreitos ----------
+   Fica no fim (depois das grades gerais acima) e usa seletores com .dash-area para vencê-las.
+   O nome tem prioridade; etiquetas e colunas secundárias encolhem e saem antes dele. */
+.dash-area .recurrence-row.recurrence-row--compact { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) auto; }
+.dash-area .recurrence-row--compact .recurrence-row__category { min-width: 0; max-width: 140px; }
+.dash-area .launch-row--resumo .launch-row__profile { max-width: 140px; }
+@container (max-width: 460px) {
+  .dash-area .launch-row.launch-row--resumo { grid-template-columns: minmax(0, 1fr) minmax(0, max-content) auto; }
+  .dash-area .launch-row--resumo .launch-row__profile { display: none; }
+  .dash-area .launch-row--resumo .launch-row__category { max-width: 96px; }
+  .dash-area .top-cat { grid-template-columns: 16px 26px minmax(0, 1fr) auto auto; }
+  .dash-area .recurrence-row.recurrence-row--compact { grid-template-columns: 48px minmax(0, 1fr) minmax(0, max-content) auto; }
+  .dash-area .recurrence-row--compact .recurrence-row__category { max-width: 104px; }
+}
+@container (max-width: 340px) {
+  .dash-area .launch-row.launch-row--resumo { grid-template-columns: minmax(0, 1fr) auto; }
+  .dash-area .launch-row--resumo .launch-row__category { display: none; }
+  .dash-area .top-cat { grid-template-columns: 16px 26px minmax(0, 1fr) auto; }
+  .dash-area .top-cat__reserved { display: none; }
+  .dash-area .recurrence-row.recurrence-row--compact { grid-template-columns: 48px minmax(0, 1fr) auto; }
+  .dash-area .recurrence-row--compact .recurrence-row__category { display: none; }
+}
+
+/* ---------- Painéis: nomes longos (até 50 caracteres) encolhem com "…" em vez de sair do painel ---------- */
+.lp-account { max-width: 100%; min-width: 0; }
+.lp-account > span:not(.lp-account__dot) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-account > svg { flex: none; }
+.lp-chip-btn { max-width: 100%; min-width: 0; }
+.lp-chip-btn > .cat-pill, .lp-chip-btn > .tag { min-width: 0; }
+.ph__top > :first-child { min-width: 0; max-width: 100%; }
+.ph__top .cat-pill, .ph__top .lp-chip-btn { min-width: 0; }
+.ph__top > .status-chip { flex: none; }
+
+/* Listas: etiquetas de categoria/perfil têm largura máxima — o nome do lançamento nunca é espremido até sumir */
+.launch-row__category, .launch-row__profile, .recurrence-row__category { max-width: 180px; }
+.launch-row__category > *, .launch-row__profile > *, .recurrence-row__category > * { min-width: 0; max-width: 100%; }
+/* Nome editável no painel: "…" quando não está em edição */
+.lp-name, .ph__name, .inline-input { text-overflow: ellipsis; }
+
+/* Linhas com nome + conta: o nome tem prioridade, a conta encolhe primeiro (com "…") */
+.launch-row__desc > .launch-row__title { flex: 0 1 auto; min-width: 3em; }
+.launch-row__desc > .launch-row__account { flex: 0 8 auto; min-width: min(5em, 20%); overflow: hidden; text-overflow: ellipsis; }
+/* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
+.recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
+.recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(0, max-content) 120px; }
+/* Categorias: a barra cede espaço ao nome */
+.category-row { grid-template-columns: minmax(8em, 1.4fr) 112px minmax(80px, 2fr) 104px; }
+/* Área estreita (≤ 620px). As regras equivalentes em components.css nunca valiam: pages.css e este
+   arquivo carregam depois e redefiniam as grades com a mesma especificidade. Por isso ficam aqui, no fim. */
+@container (max-width: 620px) {
+  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) { grid-template-columns: 18px minmax(0, 1fr) minmax(0, max-content) 96px; }
+  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) .launch-row__category { display: none; }
+  .launch-row__profile { max-width: 110px; }
+  .recurrence-row:not(.recurrence-row--compact), .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 52px minmax(0, 1fr) 110px; }
+  .recurrence-row:not(.recurrence-row--compact) .recurrence-row__category { display: none; }
+  .category-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .category-row > .category-row__bar { display: none; }
+  .account-row { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 2px; }
+  .account-row .account-icon { grid-row: span 2; }
+  .account-row__info { grid-row: span 2; }
+  .account-row__value { grid-column: 3; grid-row: 1; }
+  .account-row__pct { grid-column: 3; grid-row: 2; }
+}
+@container (max-width: 420px) {
+  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) { grid-template-columns: 18px minmax(0, 1fr) 96px; }
+  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) .launch-row__profile { display: none; }
+}
+
+/* Telas pequenas: o painel escondido fora da tela e a busca larga não podem alargar a página */
+.workspace { overflow-x: clip; }
+.topbar__actions { min-width: 0; flex: 0 1 auto; }
+.topbar-search--larga { width: clamp(140px, 32vw, 380px); min-width: 0; }
+@media (max-width: 520px) {
+  .topbar-search--larga { width: auto; flex: 1 1 auto; }
+  .topbar__actions { flex: 1 1 auto; }
+  .topbar__actions .topbar-search__input { min-width: 0; width: 100%; }
+}
+/* Lista muito estreita: conta e dígitos saem e o nome do lançamento fica com o espaço */
+@container (max-width: 420px) {
+  .launch-row__desc > .launch-row__account, .launch-row__desc > .launch-row__digits { display: none; }
+}
+@container (max-width: 420px) {
+  .recurrence-row__desc > .recurrence-row__type { display: none; }
+  .category-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .category-row > .category-row__reserved { display: none; }
+  .allocation-row { grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) 56px; }
+}
+/* Resumos no topo das páginas (Contas, Categorias, Recorrências) em área estreita: valores menores e empilhados */
+@container (max-width: 460px) {
+  .chart-card__top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
+  .chart-card__value { font-size: var(--font-size-lg); }
+  .summary { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
+  .summary__value { font-size: var(--font-size-lg); }
+  .cat-col--res { display: none; }
+}
+@container (max-width: 420px) { .section--cat-cols .cat-col { display: none; } }
+
+/* =============================================================
+   2FA, CAPTCHA e código de 6 dígitos
+   ============================================================= */
+/* Seis caixas do código */
+.codigo6 { display: flex; justify-content: center; gap: 8px; }
+.codigo6__caixa {
+  width: 46px; height: 50px; padding: 0; text-align: center;
+  font-size: 1.25rem; font-weight: 550; font-variant-numeric: tabular-nums; color: var(--color-text-primary);
+  background: var(--color-surface-hover, #f4f5f7); border: 1px solid var(--color-border); border-radius: 8px;
+  caret-color: var(--color-primary);
+}
+.codigo6__caixa:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); background: var(--color-surface); }
+.codigo6.is-erro .codigo6__caixa { border-color: var(--color-danger); }
+.codigo6.is-ocupado { opacity: 0.6; }
+
+/* Login: "Autentique sua conta" */
+.auth__title.auth2fa__titulo { font-size: 1.5rem; font-weight: 550; margin-bottom: 8px; height: auto; line-height: 1.3; white-space: normal; }
+.auth2fa { gap: 22px; }
+.auth2fa__sub { margin: 0 0 6px; text-align: center; font-size: 0.9375rem; font-weight: 450; color: var(--color-text-primary); }
+.auth2fa__erro { margin: 0; text-align: center; font-size: 0.9375rem; font-weight: 450; color: var(--color-text-primary); }
+.auth2fa__erro:empty { display: none; }
+
+/* CAPTCHA (Turnstile) */
+.captcha { display: flex; justify-content: center; min-height: 65px; }
+
+/* Painel lateral do 2FA dentro da janela de Configurações: entra da direita para a esquerda */
+.modal--settings { position: relative; overflow: hidden; }
+.p2fa {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 5;
+  width: min(372px, 100%); overflow-y: auto;
+  background: var(--color-surface); border-left: 1px solid var(--color-border);
+  box-shadow: -12px 0 32px rgba(15, 39, 66, 0.12);
+  transform: translateX(100%); transition: transform 240ms var(--easing, ease);
+}
+.p2fa.is-aberto { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) { .p2fa { transition: none; } }
+.p2fa__topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 18px 16px 14px 20px; border-bottom: 1px solid var(--color-border); }
+.p2fa__h { margin: 0; font-size: var(--t-15); font-weight: 550; color: var(--color-text-primary); }
+.p2fa__passos { list-style: none; margin: 0; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+.p2fa__passo { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.p2fa__num { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--color-surface-hover, #f1f3f6); font-size: var(--t-13); font-weight: 550; color: var(--color-text-secondary); }
+.p2fa__titulo { margin: 1px 0 0; display: flex; align-items: center; gap: 8px; font-size: var(--t-15); font-weight: 450; color: var(--color-text-primary); }
+.p2fa__dica { margin: 4px 0 0; font-size: var(--t-13); color: var(--color-text-muted); }
+.p2fa__ok { width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--color-positive); color: #fff; flex: none; }
+.p2fa__ok[hidden] { display: none; }
+.p2fa__qr { width: 176px; min-height: 176px; margin: 12px 0 8px; display: grid; place-items: center; }
+.p2fa__qr .qr { display: block; border-radius: 8px; }
+.p2fa__chave-linha { display: flex; align-items: center; gap: 6px; }
+.p2fa__chave { font-size: var(--t-13); letter-spacing: 0.04em; color: var(--color-text-secondary); word-break: break-all; }
+.p2fa__passo .codigo6 { justify-content: flex-start; margin-top: 12px; gap: 6px; }
+.p2fa__passo .codigo6__caixa { width: 38px; height: 44px; font-size: 1.125rem; }
+.p2fa__erro { margin: 10px 0 0; font-size: 0.8125rem; font-weight: 450; color: var(--color-text-primary); }
+.p2fa__erro:empty { display: none; }

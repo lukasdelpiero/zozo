@@ -22,11 +22,13 @@
 
   function toFriendlyError(action, error) {
     const code = (error && error.code) || "UNKNOWN_ERROR";
-    if (M.FRIENDLY[code]) return new M.BridgeError(code, M.FRIENDLY[code]);
+    // Detalhes seguros que a interface usa: segundos de espera do bloqueio e se a próxima tentativa pede CAPTCHA
+    const extra = { espera: error && Number(error.espera) > 0 ? Number(error.espera) : 0, captcha: !!(error && error.captcha) };
+    if (M.FRIENDLY[code]) return Object.assign(new M.BridgeError(code, M.FRIENDLY[code]), extra);
     // Mensagens técnicas vindas do host nunca são exibidas.
     if (error) ZoZo.log.info("Erro do host", action, code);
     const isRead = /^get/.test(action) || action === M.ACTIONS.loadUserData;
-    return new M.BridgeError(code, isRead ? M.FRIENDLY.LOAD_FAILED : M.FRIENDLY.OPERATION_FAILED);
+    return Object.assign(new M.BridgeError(code, isRead ? M.FRIENDLY.LOAD_FAILED : M.FRIENDLY.OPERATION_FAILED), extra);
   }
 
   /**

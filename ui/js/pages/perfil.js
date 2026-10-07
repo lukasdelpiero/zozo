@@ -10,6 +10,7 @@
   const C = ZoZo.pagesComum;
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
+  const FR = ZoZo.messages.FRIENDLY;
   const store = ZoZo.store;
 
   const mesAbrev = (mesIso) => F.mesAbrev((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
@@ -28,7 +29,7 @@
       selected: p ? { tipo: "perfil", id: p.id } : null,
       valores: p ? { nome: p.nome, orcamento: p.orcamento || "", cor: p.cor } : { cor: ZoZo.regras.corSugerida() },
       campos: [
-        { nome: "nome", rotulo: "Nome do perfil", obrigatorio: true, placeholder: "Ex.: Casa, Mãe, Trabalho", max: 40 },
+        { nome: "nome", rotulo: "Nome do perfil", obrigatorio: true, placeholder: "Ex.: Casa, Mãe, Trabalho", max: ZoZo.regras.limiteNome },
         { nome: "cor", rotulo: "Cor da tag", tipo: "cor" },
       ],
       aoCancelar: p ? () => abrirDetalhe(p, ctx) : null,
@@ -82,7 +83,7 @@
             h("div", { class: "hero-edit" },
               h("div", { class: "hero-edit__row" },
                 ZoZo.inline.corDot(p.cor, (c) => ctx.bridge.request(A.updatePerfil, { id: p.id, cor: c }).then(() => { ctx.toast("Cor alterada."); return ctx.recarregarTudo(); })),
-                ZoZo.inline.texto({ valor: p.nome, rotulo: "Nome do perfil", max: 40,
+                ZoZo.inline.texto({ valor: p.nome, rotulo: "Nome do perfil", max: ZoZo.regras.limiteNome,
                   aoSalvar: (v) => ctx.bridge.request(A.updatePerfil, { id: p.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) })),
               p.arquivado ? h("span", { class: "status-chip status-chip--pending" }, "Arquivado") : null),
             h("div", { class: "detail-hero__figure" },
@@ -238,6 +239,85 @@
     return F.dataExtenso(F.iso(d)) + " às " + hora;
   }
 
+  /* ---------------- 2FA: painel lateral dentro da janela de Configurações ---------------- */
+  const PASSOS_2FA = ["Abra seu aplicativo 2FA", "Clique em + ou Adicionar", "Escaneie o QR code ou insira a chave de configuração", "Insira o código de seis dígitos."];
+
+  function abrirPainel2FA(ctx, janelaEl, aoAtivar) {
+    if (!janelaEl || janelaEl.querySelector(".p2fa")) return;
+    const V = ZoZo.verificacao;
+    let erros = 0, fechado = false;
+    const fechar = () => {
+      if (fechado) return;
+      fechado = true;
+      painel.classList.remove("is-aberto");                       // desliza da esquerda para a direita
+      setTimeout(() => painel.remove(), 260);
+      document.removeEventListener("keydown", tecla, true);
+    };
+    const tecla = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(); } };
+
+    const check = h("span", { class: "p2fa__ok", "aria-hidden": "true", hidden: true }, icon("check", { size: 12 }));
+    const erro = h("p", { class: "p2fa__erro", role: "alert" });
+    const qrArea = h("div", { class: "p2fa__qr", "aria-busy": "true" }, h("span", { class: "spinner", "aria-hidden": "true" }));
+    const chaveTexto = h("code", { class: "p2fa__chave" }, "");
+    let chave = "";
+    const copiar = h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Copiar chave de configuração", title: "Copiar",
+      onClick: () => navigator.clipboard.writeText(chave).then(() => ctx.toast("Chave copiada."), () => ctx.toast("Não foi possível copiar.", { tone: "error" })) },
+      icon("copiar", { size: 15 }));
+    const campo = V.CampoCodigo({
+      rotulo: "Código de 6 dígitos do aplicativo 2FA",
+      onDigitar: () => { campo.marcarErro(false); },
+      onCompleto: (codigo) => {
+        campo.desabilitar(true);
+        ctx.bridge.request(A.confirmar2FA, { codigo }).then((r) => {
+          erro.textContent = "";
+          check.hidden = false;                                     // ✓ ao lado de "Insira o código de seis dígitos."
+          store.set({ session: { user: r.user } });
+          if (aoAtivar) aoAtivar();
+          setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); }, 700);
+        }).catch((e) => {
+          erros += 1;
+          erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
+          campo.desabilitar(false); campo.marcarErro(true); campo.limpar();
+        });
+      },
+    });
+
+    const passo = (n, titulo, extra) => h("li", { class: "p2fa__passo" },
+      h("span", { class: "p2fa__num", "aria-hidden": "true" }, String(n)),
+      h("div", { class: "p2fa__corpo" }, h("p", { class: "p2fa__titulo" }, titulo, n === 4 ? check : null), extra || null));
+
+    const painel = h("aside", { class: "p2fa", role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
+      h("header", { class: "p2fa__topo" },
+        h("h3", { class: "p2fa__h" }, "Autenticação de Dois Fatores"),
+        h("button", { type: "button", class: "icon-btn", "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),
+      h("ol", { class: "p2fa__passos" },
+        passo(1, PASSOS_2FA[0], h("p", { class: "p2fa__dica" }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator, Authy ou o do seu gerenciador de senhas.")),
+        passo(2, PASSOS_2FA[1]),
+        passo(3, PASSOS_2FA[2], h("div", null, qrArea, h("div", { class: "p2fa__chave-linha" }, chaveTexto, copiar))),
+        passo(4, PASSOS_2FA[3], h("div", null, campo.el, erro))));
+
+    janelaEl.appendChild(painel);
+    document.addEventListener("keydown", tecla, true);
+    requestAnimationFrame(() => requestAnimationFrame(() => painel.classList.add("is-aberto")));   // desliza da direita para a esquerda
+
+    // QR code e chave gerados no servidor a cada abertura (o anterior, se não confirmado, é descartado)
+    ctx.bridge.request(A.iniciar2FA).then((r) => {
+      chave = r.chave;
+      chaveTexto.textContent = r.chave.replace(/(.{4})/g, "$1 ").trim();
+      mount(qrArea, V.QR(r.uri, 176));
+      qrArea.removeAttribute("aria-busy");
+      campo.foco();
+    }).catch((e) => { mount(qrArea, h("p", { class: "p2fa__erro" }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
+  }
+
+  function desativar2FA(ctx) {
+    return ZoZo.feedback.confirmarExclusao("Desativar 2FA?",
+      "Você não precisará mais de um código de verificação para iniciar sessão, mas sua conta não terá a camada extra de segurança.",
+      { confirmar: "Desativar", variante: "primary" })
+      .then((ok) => ok && ctx.bridge.request(A.desativar2FA).then((r) => { store.set({ session: { user: r.user } }); ctx.toast("Autenticação de dois fatores desativada."); }))
+      .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+  }
+
   /* ---------------- Configurações: Geral | Conta ---------------- */
   let abaConfig = "geral";
 
@@ -337,6 +417,9 @@
           linhaConfig("E-mail", null, h("span", { class: "cfg-readonly" }, u.email || "")),
           linhaConfig("Alterar senha", null,
             h("div", { class: "cfg-password" }, senhaAtual, novaSenha, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
+          linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
+            ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
+            : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
           h("h3", { class: "cfg-section" }, "Ações"),
           linhaConfig("Exportar todos os lançamentos", "Baixe seus dados em um arquivo CSV", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           linhaConfig("Apagar todos os dados", "Mantém o login e remove lançamentos, contas, categorias e perfis", UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),

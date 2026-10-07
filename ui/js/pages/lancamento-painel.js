@@ -143,7 +143,7 @@
     }
 
     function campoNome() {
-      const input = h("input", { type: "text", class: "lp-name", placeholder: "Nome", value: d.descricao, maxlength: "140", "aria-label": "Nome" });
+      const input = h("input", { type: "text", class: "lp-name", placeholder: "Nome", value: d.descricao, maxlength: String(ZoZo.regras.limiteNome), "aria-label": "Nome" });
       if (novo) input.dataset.autofocus = "";
       input.addEventListener("input", () => { if (novo) d.descricao = input.value; });
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });

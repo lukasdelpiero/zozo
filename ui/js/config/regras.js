@@ -8,10 +8,13 @@
 (function (ZoZo) {
   "use strict";
 
-  /** Identificação do programa (mantenha igual ao ZoZoHost.csproj e ao instalador) */
-  ZoZo.sobre = Object.freeze({ versao: "2.0.0", autor: "Lukas Del Piero Barros" });
+  /** Identificação do programa */
+  ZoZo.sobre = Object.freeze({ versao: "2.1.0", autor: "Lukas Del Piero Barros" });
 
   ZoZo.regras = {
+    /** Máximo de caracteres do nome de lançamentos, contas, categorias e perfis (nomes longos aparecem cortados com "…") */
+    limiteNome: 50,
+
     /** Cor sugerida para um item novo (sorteada da paleta) */
     corSugerida() {
       const n = new Uint8Array(1); crypto.getRandomValues(n);

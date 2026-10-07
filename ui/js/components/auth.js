@@ -1,7 +1,9 @@
 /* =============================================================
    ZoZo — Login e Cadastro em etapas (padrão Copilot Money)
-   Entrar:    e-mail → Continuar → senha → Continuar
+   Entrar:    e-mail → Continuar → senha → Continuar → (2FA: código de 6 dígitos)
    Cadastro:  nome + e-mail → Continuar → crie sua senha → Continuar
+   A 4ª tentativa de login em diante (e o cadastro) mostram o CAPTCHA
+   quando o servidor tem o Turnstile configurado.
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -10,6 +12,7 @@
   const UI = ZoZo.ui;
   const A = ZoZo.messages.ACTIONS;
   const FR = ZoZo.messages.FRIENDLY;
+  const V = () => ZoZo.verificacao;
 
   const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const ERRO_LOGIN = "Erro ao fazer login na sua conta. Tente novamente.";
@@ -40,14 +43,34 @@
   const erroAbaixo = (msg) => (msg ? h("p", { class: "auth__error", role: "alert" }, msg) : null);
   const rodape = (pergunta, acao, onClick) => h("p", { class: "auth__switch" },
     h("span", null, pergunta + " "), h("button", { type: "button", class: "auth__link", onClick }, acao));
-  /** E-mail do Cloudflare Access (o único aceito) + saída do Access para entrar com outro */
-  const conectadoComo = (email) => (email ? h("p", { class: "auth__switch" },
-    h("span", null, "Conectado ao site como " + email + " ·"),
-    h("a", { class: "auth__link", href: "/cdn-cgi/access/logout" }, "Trocar de conta")) : null);
+
+  /** Tela do 2FA no login: mesmo cartão, título "Autentique sua conta" e seis campos */
+  function corpo2FA(root, cfg) {
+    const aviso = h("p", { class: "auth2fa__erro", role: "alert" }, cfg.erro || "");
+    const campoCod = V().CampoCodigo({
+      rotulo: "Código de 6 dígitos do aplicativo 2FA",
+      onDigitar: () => campoCod.marcarErro(false),
+      onCompleto: (codigo) => {
+        campoCod.desabilitar(true);
+        Promise.resolve(cfg.onCodigo(codigo)).then((msgErro) => {
+          if (!msgErro) return;                       // entrou: a tela é trocada pelo app
+          aviso.textContent = msgErro;
+          campoCod.desabilitar(false);
+          campoCod.marcarErro(true);
+          campoCod.limpar();
+        });
+      },
+    });
+    requestAnimationFrame(() => campoCod.foco());
+    return h("div", { class: "auth__form auth2fa" },
+      h("p", { class: "auth2fa__sub" }, "Insira o código de 6 dígitos do seu aplicativo 2FA."),
+      campoCod.el, aviso,
+      rodape("Não é você?", "Entrar com outra conta", cfg.onCancelar2FA));
+  }
 
   function render(root, cfg) {
     const st = ZoZo.store.get().session;
-    const modo = st.status === "register" ? "register" : st.status === "loading" ? "loading" : "login";
+    const modo = st.status === "register" ? "register" : st.status === "loading" ? "loading" : st.status === "2fa" ? "2fa" : "login";
 
     if (modo === "loading") {
       mount(root, h("div", { class: "auth" },
@@ -55,40 +78,47 @@
       return;
     }
     // Trocar entre Entrar e Cadastro recomeça na primeira etapa
-    if (estado.modo !== modo) estado = { modo, etapa: 1, email: cfg.emailInicial || estado.email || "", nome: "" };
+    if (estado.modo !== modo && modo !== "2fa") estado = { modo, etapa: 1, email: cfg.emailInicial || estado.email || "", nome: "" };
 
     // Erros de senha errada viram a mensagem padrão; os demais (ex.: bloqueio) aparecem como vieram
     const erro = cfg.erro ? (cfg.erro === FR.INVALID_CREDENTIALS ? ERRO_LOGIN : cfg.erro) : null;
     const voltar = () => { estado.etapa = 1; render(root, Object.assign({}, cfg, { erro: null })); };
-    let titulo, corpo;
+    let titulo, corpo, tituloClasse = "auth__title";
 
-    if (modo === "login" && estado.etapa === 1) {
+    if (modo === "2fa") {
+      titulo = "Autentique sua conta";
+      tituloClasse = "auth__title auth2fa__titulo";
+      corpo = corpo2FA(root, cfg);
+    } else if (modo === "login" && estado.etapa === 1) {
       titulo = "Entrar no ZoZo";
       const email = campo({ type: "email", name: "email", autocomplete: "username", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: estado.email });
       email.dataset.autofocus = "";
-      // Mostra também avisos vindos de fora (ex.: sessão encerrada por inatividade)
+      // Mostra também avisos vindos de fora (ex.: sessão encerrada)
       const aviso = h("p", { class: "auth__error", role: "alert" }, erro || "");
       corpo = h("form", { class: "auth__form", novalidate: true, onSubmit: (e) => {
         e.preventDefault();
         if (!EMAIL_OK.test(email.value.trim())) { aviso.textContent = "Insira um e-mail válido."; email.focus(); return; }
         estado.email = email.value.trim(); estado.etapa = 2;
         render(root, Object.assign({}, cfg, { erro: null }));
-      } }, h("div", { class: "auth__fields" }, email), botao("Continuar"), aviso, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro), conectadoComo(cfg.emailAccess));
+      } }, h("div", { class: "auth__fields" }, email), botao("Continuar"), aviso, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro));
     } else if (modo === "login") {
       titulo = "Entrar com senha";
       const senha = campoSenha("current-password");
       senha.input.dataset.autofocus = "";
       const enviar = botao("Continuar");
+      const captcha = cfg.captchaLogin && cfg.turnstile ? V().Captcha(cfg.turnstile) : null;
+      const aviso = erroAbaixo(erro) || h("p", { class: "auth__error", role: "alert" });
       corpo = h("form", { class: "auth__form", novalidate: true, onSubmit: (e) => {
         e.preventDefault();
         if (!senha.input.value) { senha.input.focus(); return; }
+        if (captcha && !captcha.token()) { aviso.textContent = FR.CAPTCHA_REQUIRED; return; }
         enviar.disabled = true; enviar.classList.add("is-busy");
-        cfg.onLogin({ email: estado.email, senha: senha.input.value });
+        cfg.onLogin({ email: estado.email, senha: senha.input.value, turnstile: captcha ? captcha.token() : undefined });
       } },
         // e-mail escondido ajuda o gerenciador de senhas do navegador
         h("div", { class: "auth__fields" },
           h("input", { type: "email", name: "email", autocomplete: "username", value: estado.email, class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" }),
-          senha.wrap), enviar, erroAbaixo(erro), rodape(estado.email, "Usar outro e-mail", voltar), erro ? conectadoComo(cfg.emailAccess) : null);
+          senha.wrap), captcha ? captcha.el : null, enviar, aviso, rodape(estado.email, "Usar outro e-mail", voltar));
     } else if (estado.etapa === 1) {
       titulo = "Vamos começar";
       const nome = campo({ name: "nomeUsuario", autocomplete: "given-name", placeholder: "Insira seu primeiro nome", rotulo: "Primeiro nome", value: estado.nome });
@@ -102,32 +132,35 @@
         if (!EMAIL_OK.test(email.value.trim())) { aviso.textContent = "Insira um e-mail válido."; email.focus(); return; }
         estado.nome = nome.value.trim(); estado.email = email.value.trim(); estado.etapa = 2;
         render(root, Object.assign({}, cfg, { erro: null }));
-      } }, h("div", { class: "auth__fields auth__stack" }, nome, email), botao("Continuar"), aviso, rodape("Já tem uma conta?", "Entrar", cfg.onVoltar), conectadoComo(cfg.emailAccess));
+      } }, h("div", { class: "auth__fields auth__stack" }, nome, email), botao("Continuar"), aviso, rodape("Já tem uma conta?", "Entrar", cfg.onVoltar));
     } else {
       titulo = "Crie sua senha";
       const senha = campoSenha("new-password");
       senha.input.dataset.autofocus = "";
       const enviar = botao("Continuar");
+      const captcha = cfg.turnstile ? V().Captcha(cfg.turnstile) : null;      // cadastro sempre confirma que não é robô
       const aviso = h("p", { class: "auth__error", role: "alert" }, erro || "");
       corpo = h("form", { class: "auth__form", novalidate: true, onSubmit: (e) => {
         e.preventDefault();
         if (senha.input.value.length < 8) { aviso.textContent = "Use pelo menos 8 caracteres."; senha.input.focus(); return; }
+        if (captcha && !captcha.token()) { aviso.textContent = FR.CAPTCHA_REQUIRED; return; }
         enviar.disabled = true; enviar.classList.add("is-busy");
-        cfg.onCadastro({ nomeUsuario: estado.nome, email: estado.email, senha: senha.input.value });
+        cfg.onCadastro({ nomeUsuario: estado.nome, email: estado.email, senha: senha.input.value, turnstile: captcha ? captcha.token() : undefined });
       } },
         h("div", { class: "auth__fields" },
           h("input", { type: "email", name: "email", autocomplete: "username", value: estado.email, class: "visually-hidden", tabindex: "-1", "aria-hidden": "true" }),
-          senha.wrap), enviar, aviso, rodape(estado.email, "Voltar", voltar), erro ? conectadoComo(cfg.emailAccess) : null);
+          senha.wrap), captcha ? captcha.el : null, enviar, aviso, rodape(estado.email, "Voltar", voltar));
     }
 
-    const demo = modo === "login" && estado.etapa === 1 && ZoZo.bridge.isDemo && ZoZo.mock && ZoZo.mock.host
-      ? h("p", { class: "auth__demo" }, "Demonstração: ", h("strong", null, ZoZo.mock.host.demo.email), " · ", h("strong", null, ZoZo.mock.host.demo.senha)) : null;
+    // Modo demonstração: só um lembrete (as credenciais ficam no arquivo local ui/mock/credenciais.local.js)
+    const demo = modo === "login" && estado.etapa === 1 && ZoZo.bridge.isDemo
+      ? h("p", { class: "auth__demo" }, "Modo de demonstração — use a conta de prévia configurada neste computador.") : null;
 
     mount(root, h("div", { class: "auth" },
       h("div", { class: "auth__center" },
         h("div", { class: "auth__card" },
           h("img", { class: "auth__icon", src: "assets/img/zozo-icone.png", alt: "", width: "56", height: "56" }),
-          h("h1", { class: "auth__title" }, titulo),
+          h("h1", { class: tituloClasse }, titulo),
           st.storageAvailable === false ? h("div", { class: "auth__warning", role: "status" }, icon("nuvem", { size: 16 }), h("span", null, FR.STORAGE_UNAVAILABLE)) : null,
           corpo, demo))));
 

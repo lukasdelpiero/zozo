@@ -75,7 +75,7 @@
     return { fechar };
   }
 
-  /** Confirmação de exclusão → Promise<boolean>. opts: { confirmar, cancelar } */
+  /** Confirmação (exclusão por padrão) → Promise<boolean>. opts: { confirmar, cancelar, variante } */
   function confirmarExclusao(titulo, mensagem, opts) {
     const o = opts || {};
     return new Promise((resolve) => {
@@ -87,7 +87,7 @@
         onClose: (r) => resolve(!!r),
         actions: (fechar) => [
           Button(o.cancelar || "Cancelar", { variant: "secondary", onClick: () => fechar(false) }),
-          Button(o.confirmar || "Excluir", { variant: "danger", onClick: () => fechar(true) }),
+          Button(o.confirmar || "Excluir", { variant: o.variante || "danger", onClick: () => fechar(true) }),
         ],
       });
     });

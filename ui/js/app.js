@@ -76,40 +76,58 @@
 
   /* ---------------- Autenticação ---------------- */
   let authErro = null, authEmail = "";
-  let emailAccess = "";   // e-mail com que o Cloudflare Access identificou este navegador
+  let turnstile = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
+  let captchaLogin = false;      // o servidor pediu CAPTCHA para a próxima tentativa de login
+  let errosCodigo = 0;           // erros seguidos do código 2FA (1º: "não funcionou"; depois: "algo deu errado")
+
+  /** Mensagem do bloqueio com o tempo que falta, quando o servidor informa */
+  function textoBloqueio(e) {
+    const s = Number(e && e.espera) || 0;
+    if (!s) return FR.TOO_MANY_ATTEMPTS;
+    if (s >= 3600) { const hs = Math.ceil(s / 3600); return "Muitas tentativas. Por segurança, tente novamente em " + hs + (hs === 1 ? " hora." : " horas."); }
+    const m = Math.max(1, Math.ceil(s / 60));
+    return "Muitas tentativas. Por segurança, tente novamente em " + m + (m === 1 ? " minuto." : " minutos.");
+  }
+
   function renderAuth() {
     ZoZo.auth.render(authRoot, {
       erro: authErro,
       emailInicial: authEmail,
-      emailAccess,
+      turnstile, captchaLogin,
       onIrCadastro: () => { authErro = null; store.set({ session: { status: "register" } }); },
       onVoltar: () => { authErro = null; store.set({ session: { status: "login" } }); },
       onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
       onLogin: (cred) => {
         authEmail = cred.email;
-        bridge.request(A.login, cred).then(entrar).catch((e) => {
-          if (e.code === "SESSION_EXPIRED") { recarregarParaEntrar(); return; }
-          authErro = e.code === "EMAIL_MISMATCH" ? erroEmail()
-            : ["STORAGE_UNAVAILABLE", "TOO_MANY_ATTEMPTS", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
+        bridge.request(A.login, cred).then((r) => {
+          captchaLogin = false;
+          if (r && r.doisFatores && !r.authenticated) { authErro = null; errosCodigo = 0; store.set({ session: { status: "2fa" } }); return; }
+          entrar(r);
+        }).catch((e) => {
+          if (e.captcha || e.code === "CAPTCHA_REQUIRED") captchaLogin = true;
+          // a falha que inicia um bloqueio já informa o tempo de espera
+          authErro = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? textoBloqueio(e)
+            : ["STORAGE_UNAVAILABLE", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "SESSION_EXPIRED"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
           renderAuth();
         });
       },
+      /** Código do 2FA no login → Promise<mensagem de erro | null> */
+      onCodigo: (codigo) => bridge.request(A.verificar2FA, { codigo }).then((r) => { errosCodigo = 0; entrar(r); return null; }).catch((e) => {
+        if (e.code === "SESSION_EXPIRED") { authErro = FR.SESSION_EXPIRED; store.set({ session: { status: "login" } }); renderAuth(); return null; }
+        if (e.code === "TOO_MANY_ATTEMPTS" || e.espera) return textoBloqueio(e);
+        errosCodigo += 1;
+        return errosCodigo === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN;
+      }),
+      onCancelar2FA: () => { ZoZo.auth.reiniciar(); bridge.request(A.logout).catch(() => null); authErro = null; store.set({ session: { status: "login" } }); },
       onCadastro: (dados) => {
         bridge.request(A.registerUser, dados).then(entrar).catch((e) => {
-          if (e.code === "SESSION_EXPIRED") { recarregarParaEntrar(); return; }
-          authErro = e.code === "EMAIL_MISMATCH" ? erroEmail()
-            : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
+          authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e)
+            : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "REGISTER_FAILED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
           renderAuth();
         });
       },
     });
   }
-
-  /** E-mail digitado ≠ e-mail do Access: diz qual é o certo (o usuário não tem como adivinhar) */
-  const erroEmail = () => (emailAccess ? "Você entrou no site como " + emailAccess + ". Use esse e-mail no ZoZo ou clique em \"Trocar de conta\"." : FR.EMAIL_MISMATCH);
-
-  /** O login do Cloudflare Access venceu: recarregar leva à tela de login do Access */
-  function recarregarParaEntrar() { location.reload(); }
 
   function entrar(sessao) {
     authErro = null;
@@ -123,7 +141,7 @@
     if (ctx.detail) ctx.detail.close({ silencioso: true });
     if (ZoZo.boleto) ZoZo.boleto.close();
     if (ZoZo.servico) ZoZo.servico.reset();
-    authErro = null; authEmail = emailAccess;
+    authErro = null; authEmail = "";
     store.reset();
   };
 
@@ -134,7 +152,7 @@
       if (ctx.detail) ctx.detail.close({ silencioso: true });
       if (ZoZo.boleto) ZoZo.boleto.close();
       if (ZoZo.servico) ZoZo.servico.reset();
-      authErro = mensagem || null; authEmail = emailAccess;
+      authErro = mensagem || null; authEmail = "";
       store.reset();                 // limpa todo o estado da sessão (dados não são apagados)
     });
   };
@@ -216,22 +234,14 @@
     if (texto) ctx.toast(texto, { tone: "error", duration: 12000 });
   });
 
-  // Sessão do Cloudflare Access vencida (ou senha trocada em outro dispositivo): volta ao login
+  // Sessão encerrada no servidor (saiu em outro lugar, senha trocada em outro dispositivo, expirou): volta ao login
   window.addEventListener("zozo:sessao-expirada", (e) => {
     const codigo = e.detail && e.detail.codigo;
     if (store.get().session.authenticated) ctx.logout(FR[codigo] || FR.SESSION_EXPIRED);
   });
 
-  // Inatividade: depois de 30 minutos sem uso, a chave sai da memória e a senha é pedida de novo
-  const INATIVIDADE_MS = 30 * 60 * 1000;
-  let ultimoUso = Date.now();
-  ["pointerdown", "keydown", "wheel", "touchstart"].forEach((ev) => window.addEventListener(ev, () => { ultimoUso = Date.now(); }, { passive: true, capture: true }));
-  setInterval(() => {
-    if (!store.get().session.authenticated || Date.now() - ultimoUso < INATIVIDADE_MS) return;
-    ultimoUso = Date.now();
-    (ZoZo.servico ? ZoZo.servico.aguardarGravacoes() : Promise.resolve())
-      .then(() => ctx.logout("Sua sessão foi encerrada por inatividade. Entre novamente."));
-  }, 30000);
+  // Sem logout por inatividade: a sessão dura até o navegador ser fechado ou o usuário sair
+  // (o servidor ainda encerra sessões sem uso por 7 dias ou com mais de 30 dias).
 
   // Fechar a aba com gravação em andamento: o navegador pede confirmação
   window.addEventListener("beforeunload", (e) => {
@@ -254,9 +264,10 @@
       bridge.request(A.getArmazenamento).catch(() => null),
       bridge.request(A.getSession).catch(() => ({ authenticated: false })),
     ]).then(([armazenamento, sessao]) => {
-      // Identidade recusada pelo servidor: avisa já na tela de login (tentar entrar não adiantaria)
+      // Ambiente de prévia sem autorização do Access: avisa já na tela de login
       if (armazenamento && armazenamento.acessoNegado) authErro = FR.ACCESS_DENIED;
-      if (armazenamento && armazenamento.email) { emailAccess = armazenamento.email; authEmail = emailAccess; }
+      turnstile = (armazenamento && armazenamento.turnstile) || null;
+      if (sessao && sessao.email) authEmail = sessao.email;       // sessão aberta sem a chave neste navegador: só pede a senha
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
       if (sessao && sessao.authenticated) entrar(sessao);
       else store.set({ session: { status: "login" } });

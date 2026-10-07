@@ -475,7 +475,10 @@ button.cat-table__row:hover { background: var(--color-surface-hover); }
 .dash-area--top { grid-area: top; align-self: start; }
 .dash-area--proximos { grid-area: proximos; align-self: start; }
 .dash-area--recentes > .card, .dash-area--top > .card, .dash-area--proximos > .card { flex: none; }
-@media (max-width: 900px) {
+/* Responsiva pelo ESPAÇO DISPONÍVEL (muda com o menu lateral aberto/recolhido), não pela largura da janela */
+.page--dashboard { container: dashboard / inline-size; }
+.dash-area { container-type: inline-size; }
+@container dashboard (max-width: 860px) {
   .dash-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "gasto" "patrimonio" "recentes" "top" "proximos"; }
 }
 .profile-row__lead { display: flex; align-items: center; gap: 10px; min-width: 0; }

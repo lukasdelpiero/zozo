@@ -532,6 +532,7 @@
 
 /* ---------- Linha de conta: adapta à largura da área (tela dividida) ---------- */
 .main, .detail__body { container-type: inline-size; }
+/* Ajustes de área estreita: ver o fim de tipografia.css (precisam vir depois das grades de pages.css) */
 @container (max-width: 620px) {
   .account-row { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 2px; }
   .account-row .account-icon { grid-row: span 2; }

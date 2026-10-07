@@ -7,3 +7,7 @@ __pycache__/
 .venv-workers/
 python_modules/
 .wrangler/
+# segredos locais (nunca no git)
+api/dev/.segredo-local
+ui/mock/credenciais.local.js
+.dev.vars

@@ -12,6 +12,7 @@
     getSession: "getSession",
     registerUser: "registerUser",
     login: "login",
+    verificar2FA: "verificar2FA",
     logout: "logout",
     getArmazenamento: "getArmazenamento",
 
@@ -32,6 +33,9 @@
     changePassword: "changePassword",
     wipeUserData: "wipeUserData",
     deleteUser: "deleteUser",
+    iniciar2FA: "iniciar2FA",
+    confirmar2FA: "confirmar2FA",
+    desativar2FA: "desativar2FA",
 
     // Documento do usuário (cifrado no navegador e guardado no banco SQL do Cloudflare)
     loadUserData: "loadUserData",
@@ -73,30 +77,34 @@
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE = new Set([ACTIONS.login, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData]);
+  const SENSITIVE = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
   const FRIENDLY = Object.freeze({
     LOAD_FAILED: "Não foi possível carregar os dados.",
     SESSION_EXPIRED: "Sua sessão terminou. Entre novamente.",
-    ACCESS_DENIED: "O servidor não autorizou este e-mail. Confira se você entrou no Cloudflare Access com um e-mail da lista ALLOWED_EMAILS e se abriu o endereço oficial do ZoZo.",
+    ACCESS_DENIED: "Acesso não autorizado a este ambiente. Abra o endereço oficial do ZoZo.",
     NOT_IMPLEMENTED: "Essa ação não está disponível nesta versão.",
     PASSWORD_BREACHED: "Essa senha já apareceu em vazamentos de dados na internet. Escolha outra senha.",
     SPLIT_INVALID: "A divisão não é válida. Confira valores, data, categorias e perfis.",
     DATA_CHANGED: "Seus dados foram alterados em outro dispositivo. A tela foi atualizada; refaça a última alteração.",
     OPERATION_FAILED: "Não foi possível concluir a operação.",
-    INVALID_CREDENTIALS: "Email ou senha inválidos.",
-    REGISTER_FAILED: "Não foi possível criar a conta.",
+    INVALID_CREDENTIALS: "E-mail ou senha incorretos.",
+    REGISTER_FAILED: "Não foi possível criar a conta com esse e-mail.",
     EMAIL_IN_USE: "Já existe uma conta com esse email.",
     STORAGE_UNAVAILABLE: "Não foi possível falar com o servidor do ZoZo. Verifique sua conexão e tente novamente.",
-    EMAIL_MISMATCH: "Use o mesmo e-mail com que você entrou no site.",
     DOCUMENT_TOO_LARGE: "Seus dados passaram do limite de armazenamento. Remova a foto do perfil ou lançamentos antigos.",
     TIMEOUT: "Não foi possível concluir a operação.",
     PROFILE_ARCHIVED: "Esse perfil está arquivado. Desarquive para usá-lo em novos lançamentos.",
     NAME_IN_USE: "Já existe um item com esse nome.",
     WRONG_PASSWORD: "Senha incorreta.",
     WEAK_PASSWORD: "Use uma senha com pelo menos 8 caracteres.",
-    TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde 1 minuto e tente novamente.",
+    TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+    CAPTCHA_REQUIRED: "Confirme que você não é um robô para continuar.",
+    CODE_INVALID: "Esse código não funcionou. Tente o código mais recente do seu aplicativo 2FA.",
+    CODE_INVALID_AGAIN: "Algo deu errado. Por favor, tente novamente ou entre em contato com o suporte se o problema persistir.",
+    "2FA_ALREADY_ON": "A autenticação de dois fatores já está ativada.",
+    "2FA_NOT_PENDING": "Gere um novo código QR e tente novamente.",
   });
 
   let seq = 0;

@@ -3,12 +3,15 @@ ZoZo (web) — ponto de entrada no Cloudflare Python Workers
 
 Só traduz entre o Cloudflare e o núcleo (nucleo.py):
   • banco D1  → primeiro / todos / executar / lote
-  • fetch     → http_get
+  • fetch     → http_get / http_post
   • Request   → Pedido;  Resposta → Response
 A interface (pasta public) é servida pelo próprio Cloudflare (assets);
 este código só recebe os caminhos /api/*.
-Variáveis (wrangler.toml): ACCESS_TEAM_DOMAIN, ACCESS_AUD, ALLOWED_EMAILS
+Variáveis (wrangler.toml): ALLOWED_EMAILS, TURNSTILE_SITE_KEY, EXIGIR_ACCESS, ACCESS_*
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET
 """
+from urllib.parse import urlencode
+
 from pyodide.ffi import to_js
 from workers import Response, WorkerEntrypoint, fetch
 
@@ -19,6 +22,11 @@ try:                                  # Pyodide recente representa o null do JS 
     from pyodide.ffi import jsnull as _JSNULL
 except ImportError:                   # pragma: no cover
     _JSNULL = None
+
+_CONFIG = ("SEGREDO", "ALLOWED_EMAILS", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "EXIGIR_ACCESS",
+           "ACCESS_TEAM_DOMAIN", "ACCESS_AUD", "ACCESS_EMAILS")
+_CABECALHOS = ("cf-access-jwt-assertion", "cf-connecting-ip", "content-type", "content-length", "cookie",
+               "origin", "sec-fetch-site", "x-zozo-prova")
 
 
 def _py(valor):
@@ -56,15 +64,27 @@ class BancoD1:
         return [int(_py(r)["meta"]["changes"]) for r in resultados]
 
 
-async def http_get(url, cabecalhos):
-    r = await fetch(url, method="GET", headers=dict(cabecalhos))
-    return int(r.status), await r.text()
+class Servicos:
+    def __init__(self, config):
+        self.config = config
+
+    async def http_get(self, url, cabecalhos):
+        r = await fetch(url, method="GET", headers=dict(cabecalhos))
+        return int(r.status), await r.text()
+
+    async def http_post(self, url, campos):
+        r = await fetch(url, method="POST", body=urlencode(campos),
+                        headers={"Content-Type": "application/x-www-form-urlencoded"})
+        return int(r.status), await r.text()
+
+    async def access(self, pedido):
+        """E-mail do Cloudflare Access (ambiente de prévia) ou None. Lança exceção se indisponível."""
+        return await acesso.identidade(pedido.cab("cf-access-jwt-assertion"), self.config, self.http_get)
 
 
 def _cabecalhos(request):
     h = request.headers
-    nomes = ("cf-access-jwt-assertion", "content-type", "content-length", "origin", "sec-fetch-site", "x-zozo-prova")
-    return {n: h.get(n) for n in nomes if h.get(n) is not None}
+    return {n: h.get(n) for n in _CABECALHOS if h.get(n) is not None}
 
 
 def _metodo(request):
@@ -75,7 +95,7 @@ def _metodo(request):
 class Default(WorkerEntrypoint):
     async def fetch(self, request):
         env = self.env
-        config = {k: getattr(env, k, "") for k in ("ACCESS_TEAM_DOMAIN", "ACCESS_AUD", "ALLOWED_EMAILS")}
+        config = {k: str(getattr(env, k, "") or "") for k in _CONFIG}
         cab = _cabecalhos(request)
         metodo = _metodo(request)
 
@@ -93,12 +113,9 @@ class Default(WorkerEntrypoint):
         if not pedido.caminho.startswith("/api/"):
             return _responder(nucleo.Resposta(404, {"erro": "NOT_FOUND"}))
 
-        async def identificar(p):
-            return await acesso.identidade(p.cab("cf-access-jwt-assertion"), config, http_get)
-
-        resposta = await nucleo.atender(pedido, BancoD1(env.DB), http_get, identificar)
+        resposta = await nucleo.atender(pedido, BancoD1(env.DB), Servicos(config), config)
         return _responder(resposta)
 
 
 def _responder(r):
-    return Response(r.corpo, status=r.status, headers=dict(nucleo.CABECALHOS))
+    return Response(r.corpo, status=r.status, headers=dict(nucleo.CABECALHOS, **r.cabecalhos))

@@ -70,7 +70,7 @@
       valores: cat ? { nome: cat.nome, icone: cat.icone, grupo: cat.grupo || "", status: cat.status, reservado: cat.reservado, cor: cat.cor }
         : Object.assign({ status: "regular", icone: "", cor: ZoZo.regras.corSugerida() }, preset || {}),
       campos: [
-        { nome: "nome", rotulo: "Nome", obrigatorio: true, placeholder: "Ex.: Mercado", max: 60 },
+        { nome: "nome", rotulo: "Nome", obrigatorio: true, placeholder: "Ex.: Mercado", max: ZoZo.regras.limiteNome },
         { nome: "icone", rotulo: "Ícone", tipo: "emoji" },
         { nome: "grupo", rotulo: "Grupo", tipo: "lista", opcoes: grupos, placeholder: "Ex.: Alimentação", dica: "Opcional. Categorias do mesmo grupo aparecem juntas e somadas.", max: 60 },
         { nome: "status", rotulo: "Tipo de categoria", tipo: "selecao", opcoes: [
@@ -208,7 +208,7 @@
               h("div", { class: "hero-edit__row" },
                 ZoZo.inline.corDot(cat.cor, (c) => alterar({ cor: c }, "Cor alterada.")),
                 ZoZo.modais.seletorIcone(cat.icone, (e) => alterar({ icone: e }, "Ícone alterado."))),
-              ZoZo.inline.texto({ valor: cat.nome, rotulo: "Nome da categoria", max: 60, aoSalvar: (v) => alterar({ nome: v }, "Nome alterado.") }),
+              ZoZo.inline.texto({ valor: cat.nome, rotulo: "Nome da categoria", max: ZoZo.regras.limiteNome, aoSalvar: (v) => alterar({ nome: v }, "Nome alterado.") }),
               cat.grupo ? h("span", { class: "detail-hero__sub" }, cat.grupo) : null),
             editando ? areaOrcamento : h("div", { class: "detail-hero__figure" },
               h("span", { class: "detail-hero__label" }, "Gasto em " + mesAbrevDe(mes)),
