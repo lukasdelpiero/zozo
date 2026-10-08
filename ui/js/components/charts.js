@@ -218,27 +218,37 @@
     return { destroy() { ro.disconnect(); } };
   }
 
-  /* ================= Donut ================= */
+  /* ================= Donut =================
+     Fundo: disco cinza-claro com o centro branco (folga igual por fora e por dentro do anel).
+     Barras com pontas arredondadas, na ordem do relógio a partir do meio-dia. Sobreposição:
+     a 1ª fica por cima de todas (as duas pontas); cada barra cobre o começo da seguinte; a
+     última fica por baixo da penúltima e da 1ª. Por isso são desenhadas da última para a 1ª. */
   function renderDonutChart(container, segments, options) {
     const o = Object.assign({ size: 112, thickness: 15, ariaLabel: "Distribuição" }, options || {});
     clear(container);
     const c0 = o.size / 2;
-    const r = (o.size - o.thickness) / 2 - 3;           // folga para o halo externo
+    const folga = Math.max(3, Math.round(o.thickness * 0.3));
+    const r = c0 - folga - o.thickness / 2;            // raio do meio do anel
     const C = 2 * Math.PI * r;
     const svg = s("svg", { width: o.size, height: o.size, viewBox: `0 0 ${o.size} ${o.size}`, role: "img", "aria-label": o.ariaLabel, class: ["donut", o.onClick ? "donut--clicavel" : ""].join(" ") });
-    // halo discreto ao redor do anel (como no Copilot)
-    svg.appendChild(s("circle", { cx: c0, cy: c0, r: c0 - 0.5, fill: css("--color-background"), stroke: css("--color-border"), "stroke-width": 1 }));
-    svg.appendChild(s("circle", { cx: c0, cy: c0, r: r - o.thickness / 2 - 1, fill: "#fff" }));
+    svg.appendChild(s("circle", { cx: c0, cy: c0, r: c0, fill: css("--color-donut-fundo") || "#F1F2F5", class: "donut__fundo" }));
+    svg.appendChild(s("circle", { cx: c0, cy: c0, r: Math.max(0, r - o.thickness / 2 - folga), fill: "#fff" }));
     const g = s("g", { transform: `rotate(-90 ${c0} ${c0})` });
     svg.appendChild(g);
-    g.appendChild(s("circle", { cx: c0, cy: c0, r, fill: "none", stroke: css("--color-progress-track"), "stroke-width": o.thickness }));
+    const barra = (cor, offset, titulo) => {
+      const arc = s("circle", {
+        cx: c0, cy: c0, r, fill: "none", stroke: cor, "stroke-width": o.thickness, "stroke-linecap": "round",
+        "stroke-dasharray": `0 ${C}`, "stroke-dashoffset": -offset, class: "donut__arc", visibility: "hidden",
+      });
+      if (titulo) arc.appendChild(s("title", { text: titulo }));
+      return arc;
+    };
 
     const arcos = [];
     if (typeof o.progresso === "number") {
       // Anel de progresso: completa de 0 até o valor (ex.: já pago / total)
       const alvo = Math.max(0, Math.min(1, o.progresso));
-      const arc = s("circle", { cx: c0, cy: c0, r, fill: "none", stroke: o.corProgresso || css("--color-progress-ok"), "stroke-width": o.thickness, "stroke-dasharray": `0 ${C}`, class: "donut__arc" });
-      if (o.tituloProgresso) arc.appendChild(s("title", { text: o.tituloProgresso }));
+      const arc = barra(o.corProgresso || css("--color-progress-ok"), 0, o.tituloProgresso);
       g.appendChild(arc);
       arcos.push({ el: arc, ini: 0, len: alvo * C });
     } else {
@@ -247,15 +257,11 @@
       let offset = 0;
       validos.forEach((sg) => {
         const len = (F.numero(sg.valor) / total) * C;
-        const arc = s("circle", {
-          cx: c0, cy: c0, r, fill: "none", stroke: F.cor(sg.cor, css("--color-text-muted")), "stroke-width": o.thickness,
-          "stroke-dasharray": `0 ${C}`, "stroke-dashoffset": -offset, class: "donut__arc",
-        });
-        arc.appendChild(s("title", { text: sg.label + ": " + F.moeda(sg.valor) }));
-        g.appendChild(arc);
-        arcos.push({ el: arc, ini: offset, len });
+        arcos.push({ el: barra(F.cor(sg.cor, css("--color-text-muted")), offset, sg.label + ": " + F.moeda(sg.valor)), ini: offset, len });
         offset += len;
       });
+      // da última para a primeira: quem é desenhado depois fica por cima
+      arcos.slice().reverse().forEach((a) => g.appendChild(a.el));
     }
     if (o.onClick) {
       svg.setAttribute("tabindex", "0");
@@ -269,6 +275,7 @@
       arcos.forEach((a) => {
         const vis = Math.max(0, Math.min(a.len, ate - a.ini));
         a.el.setAttribute("stroke-dasharray", `${vis} ${C}`);
+        a.el.setAttribute("visibility", vis > 0 ? "visible" : "hidden");    // ponta redonda de barra vazia viraria um ponto
       });
     };
     if (ZoZo.charts.permitirAnimacao === false) pintar(1);

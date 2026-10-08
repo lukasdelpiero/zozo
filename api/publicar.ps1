@@ -46,8 +46,10 @@ if ($lista -notmatch '"SEGREDO"') {
   if ($LASTEXITCODE -ne 0) { Parar "Não foi possível criar o SEGREDO." }
 }
 if ($lista -notmatch '"TURNSTILE_SECRET"') {
-  Write-Host "   Aviso: TURNSTILE_SECRET não configurado — o CAPTCHA fica desligado (o bloqueio continua valendo)." -ForegroundColor Yellow
-  Write-Host "   Para ligar: Cloudflare › Turnstile › ZoZo login › copie a Secret Key e rode: npx wrangler secret put TURNSTILE_SECRET $($extra -join ' ')" -ForegroundColor Yellow
+  # Com a chave pública no wrangler.toml e sem a secreta, a API recusa cadastro e logins que pedem CAPTCHA
+  Write-Host "   TURNSTILE_SECRET não configurado: sem ele, o cadastro e o login com CAPTCHA são recusados." -ForegroundColor Yellow
+  Write-Host "   Para configurar: Cloudflare › Turnstile › ZoZo login › copie a Secret Key e rode: npx wrangler secret put TURNSTILE_SECRET $($extra -join ' ')" -ForegroundColor Yellow
+  if ($Ambiente -eq "producao") { Parar "Configure o TURNSTILE_SECRET e publique de novo: nada foi publicado." }
 }
 if ($lista -notmatch '"RECURSOS_AVANCADOS"') {
   Write-Host "   Aviso: RECURSOS_AVANCADOS não configurado — Perfis, boletos e Pix ficam só na conta de demonstração." -ForegroundColor Yellow

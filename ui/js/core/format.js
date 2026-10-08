@@ -71,13 +71,18 @@
   function mesAbrev(indice) { return MESES_ABREV[indice] || ""; }
   function mesNome(indice) { return MESES[indice] || ""; }
 
-  /** Converte texto digitado ("1.234,56" | "1234.56") em número */
+  /**
+   * Converte texto digitado em número: "1.234,56" · "1234,56" · "1234.56" · "1.234" (milhar) · "-12,5".
+   * O texto inteiro precisa ser um valor: "123abc" e "1,2,3" são recusados (NaN), nunca lidos pela metade.
+   */
   function parseMoeda(txt) {
-    if (typeof txt === "number") return txt;
+    if (typeof txt === "number") return Number.isFinite(txt) ? txt : NaN;
     if (!txt) return NaN;
-    let t = String(txt).trim().replace(/[R$\s]/g, "");
-    if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
-    const n = parseFloat(t);
+    let t = String(txt).trim().replace(/[R$\s\u00a0]/g, "").replace(/\u2212/g, "-");
+    if (/^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) t = t.replace(/\./g, "").replace(",", ".");   // 1.234,56 · 1.234
+    else if (/^[+-]?\d+,\d+$/.test(t)) t = t.replace(",", ".");                                       // 1234,56
+    else if (!/^[+-]?(\d+(\.\d+)?|\.\d+)$/.test(t)) return NaN;                                       // 1234.56 · 12
+    const n = Number(t);
     return Number.isFinite(n) ? n : NaN;
   }
 

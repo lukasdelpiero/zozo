@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+<title id="title">ZoZo — Roxo suave</title>
+<desc id="desc">Z arredondado com geometria consistente. Arte vetorial independente, sem imagens incorporadas.</desc>
+<defs><linearGradient id="purple" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8063EE"/><stop offset="1" stop-color="#6948D8"/></linearGradient>
+<linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8055E6"/><stop offset="1" stop-color="#6B43CE"/></linearGradient>
+<linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#EBE1FF"/><stop offset="1" stop-color="#D9CBF5"/></linearGradient>
+<linearGradient id="diagonal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF" stop-opacity="0.97"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.7"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0.95"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="0.7" y2="1"><stop stop-color="#FFFFFF" stop-opacity="0.88"/><stop offset="0.16" stop-color="#EEE5FF" stop-opacity="0.55"/><stop offset="0.5" stop-color="#E7DCFF" stop-opacity="0.38"/><stop offset="0.85" stop-color="#EDE3FF" stop-opacity="0.58"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0.9"/></linearGradient>
+<linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.18"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0.8"/></linearGradient></defs>
+<rect width="1024" height="1024" rx="184" fill="url(#background)"/>
+<path d="M 320 320 H 704 L 320 704 H 704" fill="none" stroke="url(#ribbon)" stroke-width="160" stroke-linecap="round" stroke-linejoin="round"/><path d="M704 320 L320 704" fill="none" stroke="url(#diagonal)" stroke-width="160" stroke-linecap="round"/>
+</svg>

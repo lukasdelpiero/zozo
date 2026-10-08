@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.3.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.4.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,15 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.4.0
+
+- **Boleto agora é Fatura.** Novo cabeçalho (logo roxa à esquerda; à direita o PERFIL e "FATURA 13 OUT 2026", com a data escolhida no editor), seção **Transações** sem títulos de coluna (data "13 OUT", 4 últimos dígitos da conta, nome e parcela "1/12"), **Contribuições** (nome + valor, somam ao total; `regras.boleto.sinalContribuicao`), QR do Pix à esquerda com "Leia o QR no celular e pague por Pix" e o resumo à direita. Entram **só transações de cartão de crédito e empréstimo**. Imprimir e copiar o Pix ficam bloqueados enquanto as transações do perfil/período escolhidos não chegam (inclusive no Ctrl+P).
+- **Gráficos de rosca** com fundo cinza-claro e barras de ponta arredondada, sobrepostas em sequência a partir do meio-dia.
+- **Roxo da marca (#6948D8)** em textos, barras e destaques.
+- **Login:** "Entrando no ZoZo" / "Preparando sua conta..." com carregando enquanto a senha é processada.
+- **Celular:** menu lateral oculto, abrindo como gaveta; janelas modais e seus botões centralizados; barra de seleção só com ícones.
+- **Revisão do Codex aplicada** (o que fazia sentido): a chave que protege os dados guardados no navegador não fica mais no banco (HMAC do cookie com o `SEGREDO`; quem estava logado digita a senha uma vez); documento sumido não abre vazio em silêncio (tenta o backup e avisa); falha ao salvar parcelas automáticas não é mais engolida; sem resposta ao salvar, os dados são relidos do servidor; datas inexistentes (31/02) e valores pela metade ("123abc") são recusados; documento de versão mais nova não é rebaixado; `sentido`/`direcao` das transferências unificados; resposta de outra sessão é descartada; falha ao atualizar com dados na tela aparece; Tab nas janelas ignora botões ocultos; fundo travado com a fatura aberta. **CAPTCHA:** com a chave pública e sem `TURNSTILE_SECRET`, a API recusa em vez de ficar sem proteção — e o script não publica em produção sem esse segredo.
 
 ## Novidades da versão 2.3.0
 
@@ -74,7 +83,7 @@ ZoZo/
     ├── publicar.ps1          testes → interface → migrações → publicação
     ├── montar_interface.py   gera api/public a partir de ui/
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/test_api.py     54 testes automáticos da API
+    └── tests/test_api.py     58 testes automáticos da API
 ```
 
 ## Ambientes e publicação
@@ -94,7 +103,7 @@ Fluxo recomendado: **mudar → testar no local → publicar na prévia → testa
 
 O script roda os testes, monta a interface, aplica as migrações do banco e publica; qualquer falha interrompe.
 
-**Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO` e `npx wrangler secret put TURNSTILE_SECRET` (acrescente `--env previa` para a prévia). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
+**Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO` e `npx wrangler secret put TURNSTILE_SECRET` (acrescente `--env previa` para a prévia). **Sem `TURNSTILE_SECRET` a produção não é publicada** (a chave pública está no `wrangler.toml`; sem a secreta, cadastro e login com CAPTCHA seriam recusados). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
 
 **Perfis, boletos e Pix:** liberados para a conta de demonstração e para os e-mails do segredo `RECURSOS_AVANCADOS` (separados por vírgula): `npx wrangler secret put RECURSOS_AVANCADOS` (e `--env previa`). Fica como segredo para os e-mails não irem para o GitHub. Sem ele, só a demonstração tem esses recursos.
 
@@ -129,7 +138,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 | Login | E-mail + prova da senha. Mensagem única para e-mail inexistente e senha errada; e-mail sem conta recebe parâmetros simulados (não revela quem tem conta) |
 | Senha | Nunca sai do navegador. PBKDF2-SHA256 com 600.000 iterações e sal aleatório → HKDF → chave dos dados + prova da senha. O servidor guarda só o SHA-256 da prova. O navegador recusa parâmetros mais fracos vindos do servidor |
 | Sessão | Identificador aleatório de 256 bits em cookie `__Host-` `HttpOnly` `Secure` `SameSite=Strict`, sem data de validade (termina ao fechar o navegador); o banco guarda só o SHA-256 dele; novo identificador a cada login e após o 2FA; encerra no "Sair", na troca de senha (outros dispositivos), após 7 dias sem uso ou 30 dias de idade |
-| Chave dos dados | Para não pedir a senha a cada recarga, fica no navegador **cifrada com o "envelope" da sessão**, que só o servidor entrega enquanto o cookie existir. Saiu ou fechou o navegador: vira lixo ilegível e é apagada |
+| Chave dos dados | Para não pedir a senha a cada recarga, fica no navegador **cifrada com o "envelope" da sessão** = HMAC(`SEGREDO`, cookie). O envelope **não fica no banco**: o banco + o navegador não bastam para abrir os dados. Saiu ou fechou o navegador: vira lixo ilegível e é apagada |
 | 2FA | TOTP (RFC 6238), ±30 s de tolerância, um código não vale duas vezes; segredo cifrado no banco com o `SEGREDO` do servidor; 5 códigos errados → 15 min de bloqueio |
 | Força bruta | Bloqueio progressivo por e-mail + IP (CAPTCHA na 4ª, 15 min na 5ª falha, 24 h na 10ª), contagem atômica (pedidos em paralelo não escapam); 20 falhas/h na mesma conta vindas de IPs diferentes → CAPTCHA para todos; no máximo 30 logins por IP a cada 10 min; cadastro e consultas também limitados por IP |
 | Conta demo | Senha pública, por isso **somente leitura no servidor**: nada é gravado e senha, nome, 2FA, apagar e excluir são recusados (403); até 500 sessões abertas (as mais antigas e as paradas há 6 h saem); os dados são fictícios e gerados no navegador |
@@ -154,6 +163,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 - **Cadastro revela se o e-mail já tem conta** ("Já existe uma conta com esse e-mail"): inevitável sem confirmação por e-mail.
 - **Argon2id** (recomendado pela OWASP) não existe no navegador sem biblioteca extra; usamos PBKDF2-SHA256 com 600.000 iterações (mínimo atual da OWASP para PBKDF2).
 - **Domínio próprio:** `usezozo.com.br` já aponta para o ZoZo; regras de WAF/limite na borda devem deixar `/api/*` sem desafio (veja acima).
+- **E-mail sem confirmação e recursos por lista (revisão do Codex, AUD-03):** quem cadastrar antes um e-mail que está em `RECURSOS_AVANCADOS` ganha Perfis/Fatura/Pix **nos próprios dados** (nada de outra conta). Sem provedor de e-mail não há como confirmar a titularidade: só ponha na lista e-mails cuja conta o dono **já criou**.
 - **Recursos por conta só na interface:** Perfis/boletos/Pix são escondidos e recusados no navegador; quem alterar o próprio navegador conseguiria usá-los **nos próprios dados** (o servidor não lê o documento cifrado). Não dá acesso a nada de outra conta.
 
 ## Limites

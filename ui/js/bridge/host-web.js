@@ -315,7 +315,18 @@
       if (s.demo) return { documento: ZoZo.demo.documento(new Date()), aviso: null };
       const d = await comProvaDaSessao(() => api("GET", "/documento", undefined, s.prova));
       if (sessao !== s) throw erro("SESSION_EXPIRED");
-      if (!d) { s.versao = 0; return { documento: null, aviso: null }; }
+      if (!d) {
+        s.versao = 0;
+        // Sem documento no servidor. Primeira vez: conta vazia. Mas se este navegador já viu dados desta conta,
+        // o documento sumiu: tenta o histórico (backup) e, sem ele, abre vazia COM aviso (nunca em silêncio)
+        if ((await versaoConhecida(s.email)) > 0) {
+          const doHistorico = await recuperarDoHistorico(s).catch(() => undefined);
+          if (sessao !== s) throw erro("SESSION_EXPIRED");
+          await esquecerVersao(s.email);           // a próxima gravação recomeça a contagem (sem aviso repetido)
+          return doHistorico === undefined ? { documento: null, aviso: "DOCUMENT_MISSING" } : { documento: doHistorico, aviso: "RESTORED_FROM_BACKUP" };
+        }
+        return { documento: null, aviso: null };
+      }
       let documento, aviso = null;
       try { documento = await decifrar(s.chave, s.email, d.versao, d.conteudo); }
       catch (e) {

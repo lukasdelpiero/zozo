@@ -73,7 +73,7 @@
     desvincularRecorrencia: "desvincularRecorrencia",
     dividirLancamento: "dividirLancamento",
 
-    // Boleto (o PDF é gerado pela impressão do navegador)
+    // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador)
     getBoletoData: "getBoletoData",
   });
 
@@ -110,6 +110,8 @@
     DEMO_READ_ONLY: "Isso não está disponível na conta de demonstração. Crie a sua conta para usar o ZoZo completo.",
     DEMO_LIMIT: "Na demonstração dá para criar só 1 item de cada tipo. Crie a sua conta para usar sem limites.",
     FEATURE_UNAVAILABLE: "Esse recurso não está disponível para a sua conta.",
+    DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
+    SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
   });
 

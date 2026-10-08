@@ -7,7 +7,9 @@ Camadas de proteção:
      guarda só o SHA-256 da prova;
   2. sessão no servidor: cookie aleatório HttpOnly + Secure + SameSite=Strict, sem
      data de expiração (termina ao fechar o navegador); o banco guarda só o SHA-256
-     dele. Expira também por inatividade (7 dias) e idade (30 dias);
+     dele. Expira também por inatividade (7 dias) e idade (30 dias). O "envelope" que
+     protege a chave dos dados guardada no navegador é HMAC(SEGREDO, cookie): não fica
+     no banco, então banco + navegador não bastam para abrir os dados;
   3. 2FA opcional por aplicativo autenticador (TOTP), com proteção contra reuso;
   4. bloqueio progressivo por e-mail + IP: 3 tentativas livres, CAPTCHA (Turnstile)
      da 4ª em diante, 15 min de bloqueio na 5ª falha e 24 h na 10ª. Muitas falhas
@@ -304,9 +306,16 @@ async def _limpar_login(ctx, email):
 
 
 async def _captcha_ok(ctx, token):
-    """Turnstile. Sem TURNSTILE_SECRET configurado, a etapa de CAPTCHA é pulada (o bloqueio continua valendo)."""
+    """
+    Turnstile. Sem CAPTCHA configurado (nem chave pública nem secreta: desenvolvimento), a etapa é pulada
+    (o bloqueio continua valendo). Chave pública SEM a secreta é configuração incompleta: recusa (não
+    deixa a proteção desligada sem ninguém perceber).
+    """
     segredo = str(ctx.config.get("TURNSTILE_SECRET") or "")
     if not segredo:
+        if str(ctx.config.get("TURNSTILE_SITE_KEY") or ""):
+            ctx.evento("captcha_sem_segredo")
+            raise Falha(503, "UNAVAILABLE")
         return True
     if not isinstance(token, str) or not token or len(token) > 2048:
         return False
@@ -334,12 +343,21 @@ def _definir_cookie(ctx, valor=None):
     ctx.cabecalhos["Set-Cookie"] = f"{_nome_cookie(ctx)}={valor}; {atributos}" if valor else f"{_nome_cookie(ctx)}=; Max-Age=0; {atributos}"
 
 
+def _envelope(ctx, token):
+    """
+    Chave AES que cifra a chave dos dados guardada no navegador. Derivada do cookie (que o JavaScript
+    não lê) com o SEGREDO do servidor e NUNCA gravada: quem tiver o banco e o armazenamento do
+    navegador ainda precisaria do cookie e do SEGREDO (a coluna "envelope" fica vazia).
+    """
+    return base64.b64encode(hmac.new(ctx.segredo.encode(), ("zozo/envelope/v2|" + token).encode("ascii"), hashlib.sha256).digest()).decode("ascii")
+
+
 async def _criar_sessao(ctx, email, estado):
     token = secrets.token_urlsafe(32)
-    envelope = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+    envelope = _envelope(ctx, token)
     await ctx.banco.executar(
         "INSERT INTO sessoes (id, email, estado, envelope, criada, ultimo_uso) VALUES (?, ?, ?, ?, ?, ?)",
-        _hash_token(token), email, estado, envelope, ctx.agora, ctx.agora)
+        _hash_token(token), email, estado, "", ctx.agora, ctx.agora)
     _definir_cookie(ctx, token)
     if email == DEMO_EMAIL:
         # Senha pública: qualquer um abre sessões da demo. A tabela não cresce sem limite.
@@ -361,7 +379,7 @@ async def _sessao(ctx, estado="ativa"):
     if not token or len(token) > 128:
         return None
     sid = _hash_token(token)
-    s = await ctx.banco.primeiro("SELECT id, email, estado, envelope, criada, ultimo_uso FROM sessoes WHERE id = ?", sid)
+    s = await ctx.banco.primeiro("SELECT id, email, estado, criada, ultimo_uso FROM sessoes WHERE id = ?", sid)
     if not s:
         return None
     vencida = (ctx.agora - s["ultimo_uso"] > SESSAO_OCIOSA_S or ctx.agora - s["criada"] > SESSAO_MAXIMA_S
@@ -683,7 +701,7 @@ async def _rota(ctx):
                 _definir_cookie(ctx)                   # cookie que não vale mais: apaga (a sessão parcial do 2FA fica)
             return Resposta(204)                       # sem sessão: resposta normal (não é erro para quem só abriu o site)
         conta = await ctx.banco.primeiro("SELECT nome, totp_segredo FROM contas WHERE email = ?", s["email"])
-        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], s["envelope"], conta["totp_segredo"]))
+        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], _envelope(ctx, p.cookie(_nome_cookie(ctx))), conta["totp_segredo"]))
     if m == "DELETE" and c == "/api/sessao":
         token = p.cookie(_nome_cookie(ctx))
         if token and len(token) <= 128:

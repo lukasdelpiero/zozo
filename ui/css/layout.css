@@ -135,7 +135,7 @@
   min-height: 0;
 }
 
-/* ---------- Topbar (#652590) ---------- */
+/* ---------- Topbar ---------- */
 .topbar {
   display: flex;
   align-items: center;
@@ -392,7 +392,7 @@
 .detail__body--estatico { animation: none; }
 
 /* =============================================================
-   Barra superior BRANCA e menu lateral ROXO (#652590)
+   Barra superior BRANCA e menu lateral ROXO (#6948D8)
    ============================================================= */
 :root {
   --sidebar-bg: var(--color-primary);
@@ -480,7 +480,7 @@
   border: 1px solid #e6e8ec; border-radius: 16px;
   box-shadow: none;
 }
-.auth__icon { width: 56px; height: 56px; margin-bottom: 18px; filter: drop-shadow(0 4px 10px rgba(101, 37, 144, 0.18)); }
+.auth__icon { width: 56px; height: 56px; margin-bottom: 18px; filter: drop-shadow(0 4px 10px rgba(105, 72, 216, 0.18)); }
 .auth__title { font-size: 26px; font-weight: 400; letter-spacing: -0.01em; color: #1b2a4a; margin: 0 0 4px; }
 .auth__form { gap: 14px; }
 .auth .field__label { font-size: 13px; }

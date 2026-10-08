@@ -58,7 +58,9 @@
       if (e.key === "Escape" && document.querySelector(".menu")) return;
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(false); }
       if (e.key === "Tab") {
-        const foc = dialog.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])");
+        // só o que dá para focar de verdade (visível e habilitado)
+        const foc = Array.from(dialog.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+          .filter((x) => !x.disabled && !x.hidden && x.getClientRects().length > 0 && x.getAttribute("tabindex") !== "-1");
         if (!foc.length) return;
         const first = foc[0], last = foc[foc.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }

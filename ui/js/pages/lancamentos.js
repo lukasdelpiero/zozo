@@ -218,7 +218,9 @@
       .then(() => { ctx.toast(msg); limpar(); return aposAlterar(ctx); })
       .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
 
-    const botao = (icone, texto) => h("button", { type: "button", class: "selbar__btn", "aria-haspopup": "menu" }, icon(icone, { size: 15 }), texto);
+    // no celular só o ícone aparece (o nome continua no aria-label)
+    const botao = (icone, texto) => h("button", { type: "button", class: "selbar__btn", "aria-haspopup": "menu", "aria-label": texto, title: texto },
+      icon(icone, { size: 15 }), h("span", { class: "selbar__txt" }, texto));
 
     const categoriaBtn = botao("categorias", "Categoria");
     categoriaBtn.addEventListener("click", () => {
@@ -286,7 +288,7 @@
     filtroBtn.addEventListener("click", () => abrirMenuFiltros(filtroBtn, ctx, "direita"));
     return [
       UI.IconButton("mais", "Novo lançamento", { onPrimary: true, onClick: () => abrirFormulario(null, ctx) }),
-      ZoZo.recursos.boleto() ? UI.IconButton("boleto", "Criar boleto", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }) : null,
+      ZoZo.recursos.boleto() ? UI.IconButton("boleto", "Criar fatura", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }) : null,
       UI.IconButton("baixar-circulo", "Exportar lançamentos (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
       h("div", { class: "topbar-search topbar-search--larga" }, icon("pesquisar", { size: 15 }), busca, filtroBtn),
     ];

@@ -846,3 +846,90 @@
 /* Configurações: as abas mantêm o texto em qualquer largura (a regra do menu estreito escondia os rótulos) */
 .cfg-nav .nav-item { justify-content: flex-start; padding: 0 10px; }
 .cfg-nav .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+
+/* =============================================================
+   Fatura (antigo boleto): documento A4 e editor
+   ============================================================= */
+/* Cabeçalho: logo à esquerda; à direita o PERFIL e "FATURA 13 OUT 2026" (mesmo tamanho; data em peso regular) */
+.doc__head { align-items: center; border-bottom: 3px solid #6948D8; }
+.doc__logo { box-shadow: none; border-radius: 10px; }
+.doc__title-wrap { text-align: right; display: flex; flex-direction: column; gap: 4px; }
+.doc__perfil, .doc__fatura { margin: 0; font-size: 15px; line-height: 1.3; color: var(--color-text-primary); letter-spacing: 0.02em; }
+.doc__perfil, .doc__fatura-rotulo { font-weight: 620; }
+.doc__fatura-data { font-weight: 400; }
+/* Transações: sem cabeçalho de colunas; data · dígitos + nome · parcela · valor */
+.doc__table--transacoes td { padding: 8px 6px; }
+.doc__table--transacoes .doc__date { width: 64px; text-transform: uppercase; font-weight: 400; color: var(--color-text-secondary); }
+.doc__desc { width: auto; }
+.doc__digits { margin-right: 6px; font-weight: 400; color: var(--color-text-secondary); font-variant-numeric: lining-nums tabular-nums; }
+.doc__name { color: var(--color-text-primary); }
+.doc__parcel { width: 56px; text-align: right; white-space: nowrap; color: var(--color-text-secondary); font-variant-numeric: lining-nums tabular-nums; }
+.doc__table--transacoes .doc__num { width: 120px; }
+/* Rodapé: QR do Pix à esquerda (com o texto ao lado) e o resumo à direita, na mesma linha */
+.doc__rodape { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; break-inside: avoid; page-break-inside: avoid; }
+.doc__rodape .boleto-summary--doc { margin-left: auto; }
+.doc__pix { display: flex; justify-content: flex-start; align-items: center; gap: 12px; margin: 0; }
+.doc__pix-texto { margin: 0; max-width: 150px; text-align: left; font-size: 12px; font-weight: 550; line-height: 1.35; color: var(--color-text-primary); }
+.doc__pix .qr { width: 112px; height: 112px; flex: none; }
+.boleto-summary__total strong, .boleto-summary--doc .boleto-summary__total strong { color: #6948D8; }
+/* Editor: lista de transações com data · dígitos + nome · parcela · valor */
+.boleto-list__item { grid-template-columns: 46px minmax(0, 1fr) auto auto; }
+.boleto-list__date { text-transform: uppercase; }
+.boleto-list__desc { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.boleto-list__digits { flex: none; color: var(--color-text-secondary); font-variant-numeric: lining-nums tabular-nums; }
+.boleto-list__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boleto-list__parcel { color: var(--color-text-secondary); font-variant-numeric: lining-nums tabular-nums; }
+.boleto__header { background: #6948D8; }
+
+/* ---------- Login: espera ("Entrando no ZoZo" / "Preparando sua conta...") ---------- */
+.auth__card--espera { align-items: center; }
+.auth__espera-texto { white-space: normal; height: auto; margin-bottom: 28px; text-align: center; }
+.auth__espera-spinner { width: 30px; height: 30px; border-width: 3px; }
+
+/* =============================================================
+   Celular (até 600 px)
+   ============================================================= */
+.gaveta-fundo { display: none; }
+@media (max-width: 600px) {
+  /* Menu lateral: oculto; abre como gaveta da esquerda para a direita e fecha da direita para a esquerda */
+  .app-shell, .app-shell[data-menu="recolhido"] { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .sidebar, .app-shell[data-menu="recolhido"] .sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 60;
+    width: min(280px, 84vw); visibility: visible; overflow: hidden;
+    transform: translateX(-100%); transition: transform 280ms var(--easing, ease), box-shadow 280ms;
+  }
+  .app-shell[data-gaveta="aberta"] .sidebar { transform: none; box-shadow: 8px 0 32px rgba(15, 39, 66, 0.28); }
+  .gaveta-fundo { display: block; position: fixed; inset: 0; z-index: 55; background: var(--color-overlay); opacity: 0; pointer-events: none; transition: opacity 280ms; }
+  .app-shell[data-gaveta="aberta"] .gaveta-fundo { opacity: 1; pointer-events: auto; }
+  /* dentro da gaveta o menu é o completo (com nomes, contas e logo) */
+  .sidebar__header { justify-content: flex-start; padding: 0 var(--space-3) 0 14px; }
+  .sidebar__logo { display: block; }
+  .sidebar__accounts { display: block; }
+  .sidebar__nav { flex: none; padding: var(--space-3); border-bottom: 1px solid var(--sidebar-divider); }
+  .sidebar .nav-item { justify-content: flex-start; padding: 0 10px; }
+  .sidebar .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  .sidebar__footer { flex-direction: row; padding: var(--space-3); }
+  .sidebar__user { justify-content: flex-start; width: auto; flex: 1 1 auto; padding: 0 8px; }
+  .sidebar__user-name { display: block; }
+  .sidebar .demo-badge { display: flex; }
+  /* botão de abrir/fechar: no topo da tela; com a gaveta aberta, no canto direito dela */
+  .menu-toggle, .app-shell[data-menu="recolhido"] .menu-toggle, .app-shell:not([data-menu="recolhido"]) .menu-toggle {
+    position: fixed; top: 12px; left: 12px; z-index: 65;
+    background: var(--color-surface); color: var(--color-text-secondary); box-shadow: inset 0 0 0 1px var(--color-border);
+  }
+  .app-shell[data-gaveta="aberta"] .menu-toggle { left: calc(min(280px, 84vw) - 44px); background: var(--sidebar-hover); color: #fff; box-shadow: none; }
+  .topbar, .app-shell[data-menu="recolhido"] .topbar { padding-left: 56px; }
+  @media (prefers-reduced-motion: reduce) { .app-shell .sidebar, .gaveta-fundo { transition: none; } }
+
+  /* Janelas modais centralizadas, na largura da tela, com os botões centralizados */
+  .modal-overlay { padding: 16px; }
+  .modal, .modal--nova-conta, .modal--nova-categoria, .modal--novo-perfil { width: 100%; max-width: 100%; }
+  .modal__footer, .zm__footer { justify-content: center; flex-wrap: wrap; }
+  .modal__footer > .btn { flex: 1 1 0; min-width: 0; max-width: 220px; }
+
+  /* Barra de seleção (checkbox): só ícones, tudo alinhado numa linha */
+  .selbar { width: auto; max-width: calc(100% - 8px); margin-left: auto; margin-right: auto; flex-wrap: nowrap; justify-content: center; }
+  .selbar__btn { width: 34px; height: 34px; padding: 0; justify-content: center; flex: none; }
+  .selbar__txt { display: none; }
+  .selbar__count { padding: 0 6px; }
+}

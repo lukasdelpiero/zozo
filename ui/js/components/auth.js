@@ -202,6 +202,16 @@
     requestAnimationFrame(() => { const a = root.querySelector("[data-autofocus]"); if (a) a.focus(); });
   }
 
+  /** Cartão de espera durante o login/cadastro: logo, texto ("Entrando no ZoZo" / "Preparando sua conta...") e carregando */
+  function carregando(root, texto) {
+    mount(root, h("div", { class: "auth" },
+      h("div", { class: "auth__center" },
+        h("div", { class: "auth__card auth__card--espera", role: "status", "aria-live": "polite" },
+          logo(),
+          h("p", { class: "auth__title auth__espera-texto" }, texto),
+          h("span", { class: "spinner auth__espera-spinner", "aria-hidden": "true" })))));
+  }
+
   /** Volta à primeira etapa (ex.: depois de sair da conta) */
   function reiniciar() { estado = { modo: null, etapa: 0, email: "", nome: "", google: false }; }
 
@@ -212,5 +222,5 @@
       : { modo: "register", etapa: 2, email: dados.email, nome: dados.nome || dados.email.split("@")[0], google: true };
   }
 
-  ZoZo.auth = { render, reiniciar, prepararGoogle, A };
+  ZoZo.auth = { render, reiniciar, prepararGoogle, carregando, A };
 })(window.ZoZo);

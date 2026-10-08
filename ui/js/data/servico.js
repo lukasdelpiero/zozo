@@ -61,7 +61,14 @@
   // Sanitização dos dados recebidos da interface
   const texto = (v, max) => String(v === undefined || v === null ? "" : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max || 200);
   const numero = (v) => { const n = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(n) ? n : NaN; };
-  const dataValida = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) && !isNaN(new Date(v + "T00:00:00")) ? String(v) : null);
+  /** "AAAA-MM-DD" de um dia que existe (2026-02-31 é recusada: o JavaScript a transformaria em março) */
+  function dataValida(v) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ""));
+    if (!m) return null;
+    const a = Number(m[1]), me = Number(m[2]), d = Number(m[3]);
+    const dt = new Date(a, me - 1, d);
+    return a >= 1900 && a <= 2200 && dt.getFullYear() === a && dt.getMonth() === me - 1 && dt.getDate() === d ? String(v) : null;
+  }
   const cor = (v, padrao) => ZoZo.format.cor(v, padrao || "#6078a9");
   const inteiro = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : NaN; };
   const NOME = () => R().limiteNome;          // máximo de caracteres de um nome (regras.js)
@@ -92,7 +99,14 @@
     out.contas.forEach((c) => { if (!Array.isArray(c.historico)) c.historico = []; });
     if (!out.config || typeof out.config !== "object") out.config = {};
     if (!out.meta || typeof out.meta !== "object") out.meta = {};
-    out.lancamentos.forEach((l) => { if (l.recorrencia === "fixa") l.recorrencia = "mensal"; });   // versão anterior
+    out.lancamentos.forEach((l) => {
+      if (l.recorrencia === "fixa") l.recorrencia = "mensal";                         // versão anterior
+      // Transferência: "sentido" é o campo que a tela mostra; "direcao" (antigo) passa a ser só uma cópia dele
+      if (l.tipo === "interno") {
+        l.sentido = l.sentido === "entrada" || l.sentido === "saida" ? l.sentido : (l.direcao === "entrada" ? "entrada" : "saida");
+        l.direcao = l.sentido;
+      }
+    });
     out.versao = VERSAO;
     return out;
   }
@@ -102,13 +116,24 @@
     if (!carregando) {
       carregando = ZoZo.bridge.requestHost(M.ACTIONS.loadUserData, null)
         .then((r) => {
-          doc = normalizar(r && r.documento);
+          const bruto = r && r.documento;
+          // Gravado por uma versão MAIS NOVA do ZoZo (outra aba já atualizada): não abre nem regrava com o formato antigo
+          if (bruto && typeof bruto === "object" && Number(bruto.versao) > VERSAO) throw erro("DOCUMENT_NEWER");
+          doc = normalizar(bruto);
           // Avisos do host: restaurado de backup / versão mais antiga do que a conhecida
           if (r && r.aviso) window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: r.aviso } }));
           if (sincronizarParcelas() > 0) {
             doc.meta.ultimaGravacao = new Date().toISOString();
-            // grava pela mesma fila das alterações (nunca em paralelo com elas)
-            fila = fila.then(() => ZoZo.bridge.requestHost(M.ACTIONS.saveUserData, { documento: doc })).catch((e) => tratarConflito(e));
+            // grava pela mesma fila das alterações (nunca em paralelo com elas) e conta como gravação pendente
+            pendentes += 1;
+            fila = fila.then(() => ZoZo.bridge.requestHost(M.ACTIONS.saveUserData, { documento: doc }))
+              .catch((e) => {
+                if (tratarConflito(e)) return;
+                // Não gravou: descarta a cópia em memória (as parcelas são refeitas na próxima leitura) e avisa
+                doc = null;
+                window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: "AUTOSAVE_FAILED" } }));
+              })
+              .finally(() => { pendentes -= 1; });
           }
           return doc;
         })
@@ -154,6 +179,12 @@
         .catch((e) => {
           if (doc) doc = JSON.parse(antes);
           if (tratarConflito(e)) throw erro("DATA_CHANGED");
+          if (e && e.code === "TIMEOUT") {
+            // Sem resposta: a gravação pode ter acontecido ou não. Nada de "desfazer" às cegas: relê do servidor.
+            doc = null;
+            window.dispatchEvent(new CustomEvent("zozo:dados-alterados", { detail: { codigo: "SAVE_UNCONFIRMED" } }));
+            throw erro("SAVE_UNCONFIRMED");
+          }
           throw erroDaGravacao(e);
         });
     }).finally(() => { pendentes -= 1; });
@@ -279,7 +310,7 @@
       notas: texto(l.notas, 2000),
       recorrencia: null, parcelaAtual: null, parcelaTotal: null,
       sentido: tipo === "interno" ? (l.sentido === "entrada" ? "entrada" : "saida") : null,   // transferência: saída | entrada
-      direcao: tipo === "interno" ? (l.direcao === "entrada" ? "entrada" : "saida") : null,
+      direcao: null,                                                                          // cópia de "sentido" (abaixo)
       serieId: atual ? atual.serieId || null : null,
       competencia: atual && atual.competencia ? atual.competencia : mesDe(data),
       encerradaEm: atual ? atual.encerradaEm || null : null,
@@ -292,6 +323,7 @@
         out.parcelaAtual = pa; out.parcelaTotal = pt;
       }
     }
+    out.direcao = out.sentido;
     // A competência acompanha a data quando o lançamento não é ocorrência de série
     if (!out.serieId) out.competencia = mesDe(data);
     return out;
@@ -611,12 +643,18 @@
         ultimosLancamentos: getLancamentos().lancamentos.filter((l) => l.data <= hoje).slice(0, 6),
       };
     },
+    /** Fatura de um perfil no mês: SÓ transações feitas em cartão de crédito ou empréstimo */
     [A.getBoletoData]: (d) => {
       exigir(boletoLiberado() && avancado());
-      const prefixo = d.ano + "-" + pad(d.mes);
+      const ano = inteiro(d.ano), mes = inteiro(d.mes);
+      if (!(ano >= 2000 && ano <= 2100 && mes >= 1 && mes <= 12)) throw erro("OPERATION_FAILED");
+      const prefixo = ano + "-" + pad(mes);
       const perfil = doc.perfis.find((p) => p.id === d.perfilId) || null;
-      const lancamentos = getLancamentos().lancamentos.filter((l) => l.perfilId === d.perfilId && l.data.startsWith(prefixo)).sort((a, b) => a.data.localeCompare(b.data));
-      // Pix do boleto: chave e nome do recebedor guardados no documento cifrado
+      const naFatura = new Set(doc.contas.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo").map((c) => c.id));
+      const lancamentos = getLancamentos().lancamentos
+        .filter((l) => l.perfilId === d.perfilId && l.data.startsWith(prefixo) && naFatura.has(l.contaId))
+        .sort((a, b) => a.data.localeCompare(b.data));
+      // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
       return { perfil, lancamentos, pix: pixLiberado() && doc.config.pix ? Object.assign({}, doc.config.pix) : null };
     },
   };
@@ -915,7 +953,7 @@
         if (tipo) { encerrarSerieDe(l); l.tipo = tipo; l.recorrencia = null; l.parcelaAtual = null; l.parcelaTotal = null; }
         if (perfilId !== undefined) l.perfilId = perfilId;
         if (categoriaId !== undefined) l.categoriaId = categoriaId;
-        if (tipo === "interno" && !l.direcao) l.direcao = "saida";
+        if (tipo === "interno") { l.sentido = l.sentido === "entrada" ? "entrada" : "saida"; l.direcao = l.sentido; }
         n += 1;
       });
       return { alterados: n };

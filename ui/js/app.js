@@ -15,6 +15,7 @@
 
   /* ---------------- Contexto compartilhado com as páginas ---------------- */
   const inflight = {};
+  let geracao = 0;          // muda a cada entrada/saída: resposta de uma sessão anterior é descartada
   const ctx = {
     bridge,
     toast: (...a) => ZoZo.feedback.toast(...a),
@@ -25,8 +26,10 @@
       const st = store.get();
       if (!o.force && st.data[key] && !st.stale[key]) return Promise.resolve(st.data[key]);
       if (inflight[key] && !o.force) return inflight[key];
+      const minha = geracao;
       store.set((s) => ({ loading: { [key]: true }, errors: { [key]: null } }));
       const p = bridge.request(action, payload).then((data) => {
+        if (minha !== geracao) throw new ZoZo.messages.BridgeError("SESSION_EXPIRED", FR.SESSION_EXPIRED);   // outra sessão
         const stale = Object.assign({}, store.get().stale); delete stale[key];
         // Mesmo conteúdo: mantém o objeto atual (não redesenha nem interrompe animações)
         const atual = store.get().data[key];
@@ -34,9 +37,12 @@
         store.set({ data: igual ? {} : { [key]: data }, loading: { [key]: false }, stale });
         return igual ? atual : data;
       }).catch((err) => {
+        if (minha !== geracao) throw err;
+        // Com dados anteriores na tela, a falha não pode passar despercebida
+        if (store.get().data[key] && err.code !== "SESSION_EXPIRED") ctx.toast("Não foi possível atualizar: mostrando os dados carregados antes. " + (err.friendly || ""), { tone: "error", duration: 7000 });
         store.set({ loading: { [key]: false }, errors: { [key]: err.friendly || FR.LOAD_FAILED } });
         throw err;
-      }).finally(() => { delete inflight[key]; });
+      }).finally(() => { if (inflight[key] === p) delete inflight[key]; });
       inflight[key] = p;
       return p;
     },
@@ -88,6 +94,7 @@
       onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
       onLogin: (cred) => {
         authEmail = cred.email;
+        ZoZo.auth.carregando(authRoot, "Entrando no ZoZo");
         bridge.request(A.login, cred).then((r) => {
           captchaLogin = false;
           salvarCredencial(cred.email, cred.senha);
@@ -110,6 +117,7 @@
       }),
       onCancelar2FA: () => { ZoZo.auth.reiniciar(); bridge.request(A.logout).catch(() => null); authErro = null; store.set({ session: { status: "login" } }); },
       onCadastro: (dados) => {
+        ZoZo.auth.carregando(authRoot, "Preparando sua conta...");
         bridge.request(A.registerUser, dados).then((r) => { salvarCredencial(dados.email, dados.senha, dados.nomeUsuario); entrar(r); }).catch((e) => {
           authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e)
             : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "REGISTER_FAILED", "CF_CHALLENGE"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
@@ -144,12 +152,14 @@
   }
 
   function entrar(sessao) {
+    geracao += 1;
     authErro = null;
     if (ZoZo.servico) ZoZo.servico.reset();
     store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user } });
   }
 
   ctx.encerrarSessao = function () {
+    geracao += 1;
     ZoZo.auth.reiniciar();            // próximo login começa pela etapa do e-mail
     ZoZo.menu.fechar();
     if (ctx.detail) ctx.detail.close({ silencioso: true });
@@ -160,6 +170,7 @@
   };
 
   ctx.logout = function (mensagem) {
+    geracao += 1;
     ZoZo.auth.reiniciar();
     bridge.request(A.logout).catch(() => null).finally(() => {
       ZoZo.menu.fechar();
@@ -184,19 +195,37 @@
       h("div", { class: "workspace__main" }, topbarEl, mainEl), detailEl);
     mount(shellRoot, sidebarEl, workspace);
 
-    // Recolher / expandir o menu lateral (o painel de informações continua fixo)
+    // Recolher / expandir o menu lateral (o painel de informações continua fixo).
+    // Celular: o menu começa oculto e abre como gaveta (entra da esquerda e sai para a esquerda).
+    const celular = window.matchMedia("(max-width: 600px)");
     const recolhido = (() => { try { return localStorage.getItem("zozo.menuRecolhido") === "1"; } catch (e) { return false; } })();
     shellRoot.dataset.menu = recolhido ? "recolhido" : "aberto";
-    const toggleMenu = h("button", { type: "button", class: "menu-toggle", "aria-label": recolhido ? "Mostrar menu" : "Recolher menu",
-      title: recolhido ? "Mostrar menu" : "Recolher menu", "aria-expanded": String(!recolhido) }, ZoZo.icons.icon("painel", { size: 18 }));
+    const toggleMenu = h("button", { type: "button", class: "menu-toggle" }, ZoZo.icons.icon("painel", { size: 18 }));
+    const fundoGaveta = h("div", { class: "gaveta-fundo", "aria-hidden": "true" });
+    const rotularToggle = () => {
+      const aberto = celular.matches ? shellRoot.dataset.gaveta === "aberta" : shellRoot.dataset.menu !== "recolhido";
+      const texto = aberto ? (celular.matches ? "Fechar menu" : "Recolher menu") : "Mostrar menu";
+      toggleMenu.setAttribute("aria-label", texto);
+      toggleMenu.title = texto;
+      toggleMenu.setAttribute("aria-expanded", String(aberto));
+    };
+    const gaveta = (abrir) => { shellRoot.dataset.gaveta = abrir ? "aberta" : ""; rotularToggle(); };
     toggleMenu.addEventListener("click", () => {
+      if (celular.matches) { gaveta(shellRoot.dataset.gaveta !== "aberta"); return; }
       const fechar = shellRoot.dataset.menu !== "recolhido";
       shellRoot.dataset.menu = fechar ? "recolhido" : "aberto";
-      toggleMenu.setAttribute("aria-label", fechar ? "Mostrar menu" : "Recolher menu");
-      toggleMenu.title = fechar ? "Mostrar menu" : "Recolher menu";
-      toggleMenu.setAttribute("aria-expanded", String(!fechar));
+      rotularToggle();
       try { localStorage.setItem("zozo.menuRecolhido", fechar ? "1" : "0"); } catch (e) { /* ok */ }
     });
+    fundoGaveta.addEventListener("click", () => gaveta(false));
+    // Escolheu um item do menu (página, conta, perfil, configurações): a gaveta fecha
+    sidebarEl.addEventListener("click", (e) => {
+      if (celular.matches && e.target.closest("button") && !e.target.closest(".side-group__header")) gaveta(false);
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shellRoot.dataset.gaveta === "aberta") { e.preventDefault(); gaveta(false); } });
+    celular.addEventListener("change", () => gaveta(false));
+    rotularToggle();
+    shellRoot.appendChild(fundoGaveta);
     shellRoot.appendChild(toggleMenu);
 
     const topbar = ZoZo.topbar.create(topbarEl);
@@ -234,15 +263,17 @@
   });
 
   // Integridade dos dados (avisos do host)
-  window.addEventListener("zozo:dados-alterados", () => {
+  window.addEventListener("zozo:dados-alterados", (e) => {
     if (!store.get().session.authenticated) return;
-    ctx.toast(ZoZo.messages.FRIENDLY.DATA_CHANGED, { tone: "error", duration: 9000 });
+    ctx.toast(FR[(e.detail && e.detail.codigo) || "DATA_CHANGED"] || FR.DATA_CHANGED, { tone: "error", duration: 9000 });
     ctx.recarregarTudo();
   });
   window.addEventListener("zozo:aviso-dados", (e) => {
     const textos = {
       RESTORED_FROM_BACKUP: "O arquivo de dados estava danificado e foi recuperado do backup mais recente. Confira os últimos lançamentos.",
       OLDER_VERSION: "Os dados recebidos do servidor são mais antigos do que a última versão vista neste navegador. Confira os últimos lançamentos antes de continuar.",
+      DOCUMENT_MISSING: "Os dados desta conta não foram encontrados no servidor e a conta abriu vazia. Se você esperava ver seus lançamentos, não faça alterações e peça a restauração do backup.",
+      AUTOSAVE_FAILED: "As parcelas automáticas não foram salvas (sem conexão com o servidor). Elas serão criadas de novo na próxima vez.",
     };
     const texto = textos[e.detail && e.detail.codigo];
     if (texto) ctx.toast(texto, { tone: "error", duration: 12000 });

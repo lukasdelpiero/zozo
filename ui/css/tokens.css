@@ -5,10 +5,10 @@
    ============================================================= */
 :root {
   /* Identidade */
-  --color-primary: #652590;
-  --color-primary-strong: #521d76;
-  --color-primary-soft: #f1e9f6;
-  --color-primary-softer: #f8f4fb;
+  --color-primary: #6948D8;          /* roxo da marca: textos, barras e destaques */
+  --color-primary-strong: #5A3BC4;
+  --color-primary-soft: #EFEBFC;
+  --color-primary-softer: #F7F5FE;
   --color-on-primary: #ffffff;
   --color-on-primary-muted: rgba(255, 255, 255, 0.74);
   --color-on-primary-hover: rgba(255, 255, 255, 0.14);
@@ -20,7 +20,7 @@
   --color-surface: #ffffff;
   --color-surface-hover: #f4f4f7;
   --color-surface-selected: #edf2fb;
-  --color-row-checked: #f1e9f6;   /* roxo claro: mesmo fundo do item ativo do menu */
+  --color-row-checked: #EFEBFC;   /* roxo claro: mesmo fundo do item ativo do menu */
   --color-border: #e5e5e8;
   --color-border-strong: #d4d4da;
   --color-overlay: rgba(22, 33, 58, 0.38);
@@ -43,6 +43,7 @@
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
   --color-progress-track: #eceef2;
+  --color-donut-fundo: #F1F2F5;    /* fundo dos gráficos de rosca (cinza-claro) */
   --color-allocation: #3b78e7;
 
   /* Gráficos */

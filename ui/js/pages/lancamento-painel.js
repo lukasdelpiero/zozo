@@ -167,6 +167,7 @@
       input.addEventListener("blur", () => {
         const v = F.parseMoeda(input.value);
         const valido = v > 0 && v < 1e12;
+        if (!valido && input.value.trim()) { statusEl.textContent = "Valor inválido: use só números, como 1.234,56."; statusEl.className = "lp-status lp-status--erro"; }
         if (valido && Math.round(v * 100) !== Math.round((d.valor || 0) * 100)) {
           const antes = d.valor; d.valor = Math.round(v * 100) / 100;
           salvar(() => { d.valor = antes; input.value = F.moeda(antes); });

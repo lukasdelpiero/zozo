@@ -9,7 +9,7 @@
   "use strict";
 
   /** Identificação do programa */
-  ZoZo.sobre = Object.freeze({ versao: "2.3.0", autor: "Lukas Del Piero Barros" });
+  ZoZo.sobre = Object.freeze({ versao: "2.4.0", autor: "Lukas Del Piero Barros" });
 
   ZoZo.regras = {
     /** Máximo de caracteres do nome de lançamentos, contas, categorias e perfis (nomes longos aparecem cortados com "…") */
@@ -24,12 +24,15 @@
     /** Tipos de lançamento cujo valor é exibido em verde (seção 14.5) */
     tiposValorVerde: ["receita", "estorno"],
 
+    /** Fatura (antigo "boleto"; a chave continua "boleto") */
     boleto: {
       /**
-       * Como cada tipo de lançamento entra no "Total dos lançamentos".
+       * Como cada tipo de lançamento entra no "Total das transações".
        * +1 soma, -1 subtrai, 0 ignora. AJUSTAR conforme a regra definida.
        */
       sinalPorTipo: { regular: 1, recorrente: 1, interno: 1, receita: -1, estorno: -1 },
+      /** Contribuições (nome + valor) somam ao total. Use -1 se devem abater. */
+      sinalContribuicao: 1,
       /** Descontos sempre reduzem o total (seção 46.6) */
       sinalDesconto: -1,
       /**

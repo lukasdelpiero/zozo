@@ -232,6 +232,26 @@ class TesteContaESessao(Base):
         self.assertEqual(guardado, hashlib.sha256(token.encode()).hexdigest())   # banco não guarda o token
         self.assertEqual(self.api("GET", "/api/sessao")[1]["email"], EMAIL)
 
+    def test_envelope_nao_fica_no_banco(self):
+        # banco + navegador não bastam: o envelope é HMAC(SEGREDO, cookie) e a coluna fica vazia
+        self.assertEqual({r[0] for r in self.con.execute("SELECT envelope FROM sessoes")}, {""})
+        env = self.sessao["envelope"]
+        self.assertEqual(len(base64.b64decode(env)), 32)
+        self.assertEqual(self.api("GET", "/api/sessao")[1]["envelope"], env)            # o mesmo a cada recarga
+        outro = Cliente(self.banco, ip="198.51.100.3")
+        self.assertNotEqual(self.entrar(outro)[1]["envelope"], env)                     # cada sessão tem o seu
+        trocado = Cliente(self.banco, config=dict(CONFIG, SEGREDO="t" * 48), ip="198.51.100.4")
+        trocado.cookies = dict(self.api.cookies)
+        self.assertNotEqual(trocado("GET", "/api/sessao")[1]["envelope"], env)          # depende do SEGREDO
+        self.assertNotIn(env, json.dumps([list(r) for r in self.con.execute("SELECT * FROM sessoes").fetchall()]))
+
+    def test_captcha_incompleto_recusa(self):
+        # chave pública sem a secreta: não fica "sem CAPTCHA" sem ninguém perceber
+        cfg = dict(CONFIG, TURNSTILE_SITE_KEY="0x4AAA")
+        cli = Cliente(self.banco, config=cfg, ip="198.51.100.5")
+        self.assertEqual(self.cadastrar(cli, "novo@exemplo.com", prova()), (503, {"erro": "UNAVAILABLE"}))
+        self.assertIsNone(self.con.execute("SELECT 1 FROM contas WHERE email = 'novo@exemplo.com'").fetchone())
+
     def test_cadastro_aberto_e_duplicado(self):
         outro = Cliente(self.banco, ip="198.51.100.1")
         self.assertEqual(self.cadastrar(outro, EMAIL, prova())[1], {"erro": "EMAIL_IN_USE"})
@@ -783,6 +803,16 @@ class TesteDemo(Base):
 
 
 class TesteMigracoes(unittest.TestCase):
+    def test_0004_apaga_envelopes_antigos(self):
+        con = sqlite3.connect(":memory:", isolation_level=None)
+        con.execute("PRAGMA foreign_keys = ON")
+        for nome in ("0001_inicial.sql", "0002_sessoes_2fa.sql", "0003_conta_demo.sql"):
+            con.executescript((MIGRACOES / nome).read_text(encoding="utf-8"))
+        con.execute("INSERT INTO contas (email, nome, sal, iteracoes, verificador) VALUES (?, 'A', 'c2Fs', 600000, ?)", (EMAIL, "0" * 64))
+        con.execute("INSERT INTO sessoes (id, email, estado, envelope, criada, ultimo_uso) VALUES ('x', ?, 'ativa', 'segredo-antigo', 1, 1)", (EMAIL,))
+        con.executescript((MIGRACOES / "0004_envelope_fora_do_banco.sql").read_text(encoding="utf-8"))
+        self.assertEqual(con.execute("SELECT envelope FROM sessoes").fetchone()[0], "")
+
     def test_reaplicar_nao_faz_nada(self):
         con = conectar()
         aplicar_migracoes(con)

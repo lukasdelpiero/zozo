@@ -43,7 +43,7 @@ migrations_dir = "migracoes"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 # "Continuar com Google": ID do cliente OAuth (público). Vazio = botão avisa que não está disponível.
 # A chave secreta vai por: npx wrangler secret put GOOGLE_CLIENT_SECRET  — veja docs/AMBIENTE-DE-TESTES.md
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
 
 # ================= PRÉVIA (testes antes de publicar) =================
 # Aberta: sem Cloudflare Access e sem lista de e-mails (cadastro livre, com CAPTCHA).

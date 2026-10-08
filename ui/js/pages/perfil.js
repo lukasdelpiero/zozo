@@ -71,7 +71,7 @@
       selected: { tipo: "perfil", id: p.id },
       menu: [
         { label: p.arquivado ? "Desarquivar" : "Arquivar", onClick: () => arquivar(p, ctx) },
-        ZoZo.recursos.boleto() ? { label: "Gerar boleto", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) } : null,
+        ZoZo.recursos.boleto() ? { label: "Gerar fatura", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) } : null,
         { label: "Editar perfil", onClick: () => abrirFormPerfil(ctx, p) },
         { separador: true },
         { label: "Excluir perfil", perigo: true, onClick: () => excluirPerfil(p, ctx) },
@@ -136,7 +136,7 @@
       const sel = state.selectedItem && state.selectedItem.tipo === "perfil" ? state.selectedItem.id : null;
 
       if (!perfis.length) {
-        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada lançamento (ex.: Casa, Mãe)" + (ZoZo.recursos.boleto() ? " e são usados no boleto." : "."),
+        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada lançamento (ex.: Casa, Mãe)" + (ZoZo.recursos.boleto() ? " e são usados na fatura." : "."),
           { icon: "perfil", action: { label: "Novo perfil", icon: "mais", onClick: () => ZoZo.modais.novoPerfil(ctx, {}) } }));
       }
 
@@ -326,7 +326,7 @@
       .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
-  /* ---------------- Pix dos boletos (fica no documento cifrado) ---------------- */
+  /* ---------------- Pix das faturas (fica no documento cifrado) ---------------- */
   const mascarar = (c) => (/^\d{11}$/.test(c) ? "***." + c.slice(3, 6) + "." + c.slice(6, 9) + "-**"
     : /^\d{14}$/.test(c) ? c.slice(0, 2) + ".***.***/" + c.slice(8, 12) + "-**" : c.replace(/^(.{3}).*(@.*)$/, "$1***$2"));
 
@@ -339,14 +339,14 @@
     const salvar = (btn) => {
       btn.disabled = true;
       ctx.bridge.request(A.updateConfig, { pix: { chave: chave.value || (pix && pix.chave), nome: nome.value, cidade: cidade.value } })
-        .then(() => { chave.value = ""; ctx.toast("Chave Pix salva. O QR code aparece nos boletos."); return ctx.loadData("config", A.getConfig, null, { force: true }); })
+        .then(() => { chave.value = ""; ctx.toast("Chave Pix salva. O QR code aparece nas faturas."); return ctx.loadData("config", A.getConfig, null, { force: true }); })
         .catch((e) => ctx.toast(e.friendly, { tone: "error" }))
         .finally(() => { btn.disabled = false; });
     };
     return h("div", { class: "cfg-row cfg-row--bloco" },
       h("div", { class: "cfg-row__text" },
         h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
-        h("span", { class: "cfg-row__sub" }, "Usada no QR code Pix dos boletos. Fica criptografada com seus dados.")),
+        h("span", { class: "cfg-row__sub" }, "Usada no QR code Pix das faturas. Fica criptografada com seus dados.")),
       h("div", { class: "cfg-pix" }, chave, nome, cidade),
       h("div", { class: "cfg-pix__acoes" },
         pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
@@ -394,8 +394,8 @@
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
               .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })))),
-          // Pix dos boletos: só contas com o recurso
-          ZoZo.recursos.pix() ? h("h3", { class: "cfg-section" }, "Pix dos boletos") : null,
+          // Pix das faturas: só contas com o recurso
+          ZoZo.recursos.pix() ? h("h3", { class: "cfg-section" }, "Pix das faturas") : null,
           ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
           h("h3", { class: "cfg-section" }, "Armazenamento"),
           linhaConfig(
