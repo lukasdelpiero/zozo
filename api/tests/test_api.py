@@ -774,6 +774,13 @@ class TesteDemo(Base):
         # a lista não dá privilégio nenhum além disso: o documento continua exigindo a prova da própria conta
         self.assertEqual(cli("GET", "/api/documento", prova=prova())[0], 403)
 
+    def test_segredo_dos_recursos_digitado_de_varios_jeitos(self):
+        for valor in (f"﻿{EMAIL}\r\n", f'"{EMAIL}"', f"outro@exemplo.com; {EMAIL}", f"outro@exemplo.com\n{EMAIL.upper()}"):
+            cli = Cliente(self.banco, config=dict(CONFIG, RECURSOS_AVANCADOS=valor), ip="198.51.100.64")
+            self.assertTrue(self.entrar(cli)[1]["recursos"]["perfis"], repr(valor))
+        cli = Cliente(self.banco, config=dict(CONFIG, RECURSOS_AVANCADOS="ana@exemplo.co"), ip="198.51.100.65")
+        self.assertFalse(self.entrar(cli)[1]["recursos"]["perfis"])           # e-mail parecido não vale
+
 
 class TesteMigracoes(unittest.TestCase):
     def test_reaplicar_nao_faz_nada(self):

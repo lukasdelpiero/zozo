@@ -382,7 +382,10 @@ async def _encerrar_outras(ctx, email, manter_id):
 
 def _avancado(ctx, email):
     """Perfis, boletos e Pix: só a demonstração e os e-mails do segredo RECURSOS_AVANCADOS (lista separada por vírgula)."""
-    lista = {e.strip().lower() for e in str(ctx.config.get("RECURSOS_AVANCADOS") or "").split(",") if e.strip()}
+    # Tolerante ao jeito de digitar o segredo: vírgula, ponto e vírgula, espaço ou quebra de linha
+    # separam; aspas e caracteres invisíveis (ex.: marca BOM colada pelo terminal) são ignorados
+    texto = "".join(c for c in str(ctx.config.get("RECURSOS_AVANCADOS") or "") if unicodedata.category(c) != "Cf")
+    lista = {e.strip("\"'<>").lower() for e in re.split(r"[,;\s]+", texto) if e.strip("\"'<>")}
     return email == DEMO_EMAIL or email in lista
 
 
