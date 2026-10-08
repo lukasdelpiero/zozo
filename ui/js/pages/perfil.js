@@ -318,12 +318,33 @@
     }).catch((e) => { mount(qrArea, h("p", { class: "p2fa__erro" }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
   }
 
+  /** Desativar o 2FA pede um código ATUAL do aplicativo (o servidor confere): sessão aberta não basta */
   function desativar2FA(ctx) {
-    return ZoZo.feedback.confirmarExclusao("Desativar 2FA?",
-      "Você não precisará mais de um código de verificação para iniciar sessão, mas sua conta não terá a camada extra de segurança.",
-      { confirmar: "Desativar", variante: "primary" })
-      .then((ok) => ok && ctx.bridge.request(A.desativar2FA).then((r) => { store.set({ session: { user: r.user } }); ctx.toast("Autenticação de dois fatores desativada."); }))
-      .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+    const erro = h("p", { class: "p2fa__erro", role: "alert" });
+    let erros = 0;
+    const campo = ZoZo.verificacao.CampoCodigo({
+      rotulo: "Código de 6 dígitos do aplicativo 2FA",
+      onDigitar: () => campo.marcarErro(false),
+      onCompleto: (codigo) => {
+        campo.desabilitar(true);
+        ctx.bridge.request(A.desativar2FA, { codigo }).then((r) => {
+          janela.fechar(true);
+          store.set({ session: { user: r.user } });
+          ctx.toast("Autenticação de dois fatores desativada.");
+        }).catch((e) => {
+          erros += 1;
+          erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
+          campo.desabilitar(false); campo.marcarErro(true); campo.limpar();
+        });
+      },
+    });
+    const janela = ZoZo.feedback.modal({
+      title: "Desativar 2FA?", class: "modal--confirm",
+      body: h("div", { class: "desativar2fa" },
+        h("p", { class: "modal__text" }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA."),
+        campo.el, erro),
+    });
+    requestAnimationFrame(() => campo.foco());
   }
 
   /* ---------------- Pix das faturas (fica no documento cifrado) ---------------- */

@@ -21,11 +21,13 @@
   }
   const r2 = (n) => Math.round(n * 100) / 100;
   function calcular(st) {
-    const lanc = (st.lancamentos || []).reduce((s, l) => s + F.numero(l.valor) * sinalDoTipo(l.tipo), 0);
-    const contrib = (st.contribuicoes || []).reduce((s, d) => s + Math.abs(F.numero(d.valor)), 0) * R().sinalContribuicao;
-    const desc = st.descontos.reduce((s, d) => s + Math.abs(F.numero(d.valor)), 0) * R().sinalDesconto;
-    const arr = st.arredondamentos.reduce((s, d) => s + F.numero(d.valor), 0) * R().sinalArredondamento;
-    return { lancamentos: r2(lanc), contribuicoes: r2(contrib), descontos: r2(desc), arredondamentos: r2(arr), total: r2(lanc + contrib + desc + arr) };
+    // Soma em CENTAVOS inteiros: cada linha é arredondada antes de somar (o total confere com as linhas exibidas)
+    const c = (v) => Math.round(F.numero(v) * 100);
+    const lanc = (st.lancamentos || []).reduce((s, l) => s + c(l.valor) * sinalDoTipo(l.tipo), 0);
+    const contrib = (st.contribuicoes || []).reduce((s, d) => s + Math.abs(c(d.valor)), 0) * R().sinalContribuicao;
+    const desc = st.descontos.reduce((s, d) => s + Math.abs(c(d.valor)), 0) * R().sinalDesconto;
+    const arr = st.arredondamentos.reduce((s, d) => s + c(d.valor), 0) * R().sinalArredondamento;
+    return { lancamentos: lanc / 100, contribuicoes: contrib / 100, descontos: desc / 100, arredondamentos: arr / 100, total: (lanc + contrib + desc + arr) / 100 };
   }
 
   /** Valor com sinal explícito para o resumo e o documento */
@@ -46,7 +48,8 @@
   const parcela = (l) => (l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : "");
 
   /** Os dados na tela correspondem exatamente ao perfil e ao período escolhidos? (pode imprimir/copiar Pix) */
-  const pronto = (st) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st));
+  const invalido = (st) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x) => x.invalido));
+  const pronto = (st) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
   const chaveFiltro = (st) => st.perfilId + "|" + st.ano + "-" + st.mes;
 
   /* ---------------- Lista de transações (editor) ---------------- */
@@ -80,8 +83,10 @@
             item.valorTexto = valor.value;
             const n = F.parseMoeda(valor.value);
             const ok = Number.isFinite(n) && Math.abs(n) < 1e12;
-            item.valor = ok ? (cfg.aceitaNegativo ? n : Math.abs(n)) : 0;
-            valor.toggleAttribute("aria-invalid", valor.value !== "" && !ok);
+            // em centavos: o que aparece em cada linha é exatamente o que entra no total
+            item.valor = ok ? r2(cfg.aceitaNegativo ? n : Math.abs(n)) : 0;
+            item.invalido = valor.value.trim() !== "" && !ok;            // valor inválido bloqueia imprimir e o Pix
+            if (item.invalido) valor.setAttribute("aria-invalid", "true"); else valor.removeAttribute("aria-invalid");
             cfg.onChange();
           });
           return h("div", { class: "adjustments__row" },
@@ -124,7 +129,7 @@
     if (!codigo) return null;
     st.pixCodigo = codigo;
     return h("section", { class: "doc__pix", "aria-label": "Pagamento por Pix" },
-      ZoZo.verificacao.QR(codigo, 112),
+      ZoZo.verificacao.QR(codigo, 112, "Código QR do Pix para pagar " + F.moeda(t.total)),
       h("p", { class: "doc__pix-texto" }, "Leia o QR no celular e pague por Pix"));
   }
 
@@ -219,7 +224,8 @@
       mount(docEl, Documento(st));
       copiarPix.hidden = !st.pixCodigo;
       imprimirBtn.disabled = !pronto(st);
-      avisoPix.textContent = pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › Pix." : "";
+      avisoPix.textContent = invalido(st) ? "Corrija o valor marcado em vermelho para imprimir a fatura."
+        : pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › Pix." : "";
     }
     function atualizarLista() {
       contadorEl.textContent = st.lancamentos && !st.carregando ? String(st.lancamentos.length) : "";
@@ -272,6 +278,7 @@
 
     function imprimir() {
       if (!st.perfilId) { ctx.toast("Selecione um perfil para imprimir.", { tone: "error" }); perfilSel.focus(); return; }
+      if (invalido(st)) { ctx.toast("Há um valor inválido nos ajustes da fatura.", { tone: "error" }); return; }
       if (!pronto(st)) { ctx.toast("Espere as transações carregarem para imprimir.", { tone: "error" }); return; }
       imprimirDocumento(st);
     }

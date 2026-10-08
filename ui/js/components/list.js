@@ -133,20 +133,16 @@
     const o = opts || {};
     const key = "sidebar:" + titulo;
     const fechado = !!ZoZo.store.get().ui.gruposFechados[key];
-    const toggle = () => {
-      const g = Object.assign({}, ZoZo.store.get().ui.gruposFechados);
-      if (g[key]) delete g[key]; else g[key] = true;
-      ZoZo.store.set({ ui: { gruposFechados: g } });
-    };
+    const toggle = () => UI.alternarGrupo(key);
     return h("div", { class: ["side-group", fechado && "is-collapsed"] },
       h("button", { type: "button", class: "side-group__header", "aria-expanded": String(!fechado), onClick: toggle },
         icon("chevron-down", { size: 12, class: "side-group__caret", stroke: 2.5 }),
         h("span", null, titulo)),
-      fechado ? null : h("ul", { class: "side-group__list" },
+      fechado ? null : UI.corpoArvore(key, h("ul", { class: "side-group__list" },
         contas.map((c) => h("li", null, h("button", { type: "button", class: "side-account", onClick: () => o.onSelect && o.onSelect(c) },
           h("span", { class: "side-account__dot", style: { background: F.cor(c.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
           h("span", { class: "side-account__name" }, c.nome),
-          h("span", { class: "side-account__value" }, F.moeda(c.valor, { inteiro: true, comSinal: true })))))));
+          h("span", { class: "side-account__value" }, F.moeda(c.valor, { inteiro: true, comSinal: true }))))))));
   }
 
   /* ---------- Lista de lançamentos nos painéis (formato do Copilot) ----------

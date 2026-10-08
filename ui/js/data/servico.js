@@ -33,6 +33,7 @@
   let fila = Promise.resolve(); // operações de escrita em série
   let pendentes = 0;            // gravações ainda não confirmadas pelo servidor
   let criadosDemo = {};         // demonstração: itens criados pelo visitante, por tipo
+  let somenteLeitura = false;   // documento sumiu do servidor sem backup: nada é gravado até um recomeço deliberado
 
   /* ---------------- recursos da conta ---------------- */
   const avancado = () => !!(ZoZo.recursos && ZoZo.recursos.perfis());     // Perfis (e boletos/Pix, que dependem deles)
@@ -60,7 +61,12 @@
 
   // Sanitização dos dados recebidos da interface
   const texto = (v, max) => String(v === undefined || v === null ? "" : v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max || 200);
-  const numero = (v) => { const n = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(n) ? n : NaN; };
+  /** Número vindo da interface: número finito ou texto numérico COMPLETO ("123abc" → NaN) */
+  const numero = (v) => {
+    if (typeof v === "number") return Number.isFinite(v) ? v : NaN;
+    const t = String(v === undefined || v === null ? "" : v).trim();
+    return /^[+-]?(\d+(\.\d+)?|\.\d+)$/.test(t) ? Number(t) : NaN;
+  };
   /** "AAAA-MM-DD" de um dia que existe (2026-02-31 é recusada: o JavaScript a transformaria em março) */
   function dataValida(v) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v || ""));
@@ -93,10 +99,25 @@
   function vazio() {
     return { versao: VERSAO, perfis: [], contas: [], categorias: [], lancamentos: [], config: {}, meta: {} };
   }
+  const objeto = (x) => !!x && typeof x === "object" && !Array.isArray(x);
   function normalizar(d) {
-    const out = Object.assign(vazio(), d && typeof d === "object" ? d : {});
-    ["perfis", "contas", "categorias", "lancamentos"].forEach((k) => { if (!Array.isArray(out[k])) out[k] = []; });
-    out.contas.forEach((c) => { if (!Array.isArray(c.historico)) c.historico = []; });
+    const out = Object.assign(vazio(), objeto(d) ? d : {});
+    // Itens que não são registros (null, número, texto) não carregam dado nenhum: saem; os demais ganham os campos mínimos
+    ["perfis", "contas", "categorias", "lancamentos"].forEach((k) => { out[k] = Array.isArray(out[k]) ? out[k].filter(objeto) : []; });
+    const prefixo = { perfis: "p", contas: "c", categorias: "k", lancamentos: "l" };
+    Object.keys(prefixo).forEach((k) => {
+      const vistos = new Set();
+      out[k].forEach((x) => { if (typeof x.id !== "string" || !x.id || vistos.has(x.id)) x.id = novoId(prefixo[k]); vistos.add(x.id); });
+    });
+    out.contas.forEach((c) => {
+      c.historico = Array.isArray(c.historico) ? c.historico.filter((p) => objeto(p) && typeof p.data === "string" && Number.isFinite(p.saldo)) : [];
+      if (typeof c.nome !== "string") c.nome = String(c.nome || "Conta");
+    });
+    out.lancamentos.forEach((l) => {
+      if (typeof l.data !== "string") l.data = "";
+      if (typeof l.descricao !== "string") l.descricao = String(l.descricao || "");
+      if (typeof l.valor !== "number" || !Number.isFinite(l.valor)) l.valor = 0;
+    });
     if (!out.config || typeof out.config !== "object") out.config = {};
     if (!out.meta || typeof out.meta !== "object") out.meta = {};
     out.lancamentos.forEach((l) => {
@@ -120,6 +141,7 @@
           // Gravado por uma versão MAIS NOVA do ZoZo (outra aba já atualizada): não abre nem regrava com o formato antigo
           if (bruto && typeof bruto === "object" && Number(bruto.versao) > VERSAO) throw erro("DOCUMENT_NEWER");
           doc = normalizar(bruto);
+          somenteLeitura = !!(r && r.somenteLeitura);
           // Avisos do host: restaurado de backup / versão mais antiga do que a conhecida
           if (r && r.aviso) window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: r.aviso } }));
           if (sincronizarParcelas() > 0) {
@@ -170,6 +192,7 @@
   function alterar(fn) {
     pendentes += 1;
     const exec = fila.then(() => garantirCarregado()).then(() => {
+      if (somenteLeitura) throw erro("DOCUMENT_MISSING_LOCKED");
       const antes = JSON.stringify(doc);
       let resultado;
       try { resultado = fn(doc); } catch (e) { doc = JSON.parse(antes); throw e; }
@@ -192,7 +215,7 @@
     return exec;
   }
 
-  function reset() { doc = null; carregando = null; fila = Promise.resolve(); criadosDemo = {}; }
+  function reset() { doc = null; carregando = null; fila = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; }
   const gravando = () => pendentes > 0;
 
   /* ---------------- saldos e séries ---------------- */
@@ -300,7 +323,8 @@
     const valor = numero(l.valor);
     const descricao = texto(l.descricao, NOME());
     const tipo = TIPOS_LANCAMENTO.includes(l.tipo) ? l.tipo : "regular";
-    if (!data || !descricao || !(valor > 0) || valor > 1e12) throw erro("OPERATION_FAILED");
+    // valor em centavos: 0,001 vira 0,00 e é recusado (nunca grava um lançamento de R$ 0,00)
+    if (!data || !descricao || !(r2(valor) > 0) || valor > 1e12) throw erro("OPERATION_FAILED");
     const out = {
       data, descricao, valor: r2(valor), tipo,
       contaId: existe(doc.contas, l.contaId),

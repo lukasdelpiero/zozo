@@ -93,17 +93,18 @@
   }
 
   /* ---------------- QR code ---------------- */
-  function QR(texto, px) {
+  /** QR em SVG com a margem recomendada (4 módulos brancos). rotulo: o que o código é (leitor de tela) */
+  function QR(texto, px, rotulo) {
     const q = window.qrcode(0, "M");
     q.addData(texto);
     q.make();
-    const n = q.getModuleCount(), borda = 2, total = n + borda * 2;
+    const n = q.getModuleCount(), borda = 4, total = n + borda * 2;
     let d = "";
     for (let r = 0; r < n; r++) {
       for (let col = 0; col < n; col++) if (q.isDark(r, col)) d += "M" + (col + borda) + " " + (r + borda) + "h1v1h-1z";
     }
     return s("svg", { class: "qr", viewBox: "0 0 " + total + " " + total, width: String(px || 176), height: String(px || 176),
-      role: "img", "aria-label": "Código QR para o aplicativo autenticador", "shape-rendering": "crispEdges" },
+      role: "img", "aria-label": rotulo || "Código QR para o aplicativo autenticador", "shape-rendering": "crispEdges" },
       s("rect", { width: String(total), height: String(total), fill: "#ffffff" }),
       s("path", { d, fill: "#0f2742" }));
   }

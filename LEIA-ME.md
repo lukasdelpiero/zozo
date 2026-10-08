@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.4.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.5.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,22 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.5.0
+
+- **Animações:** ao recolher/mostrar o menu, o menu desliza junto com o conteúdo; grupos que abrem e fecham (contas do menu, seções, grupos de categorias, Top categorias) animam a altura.
+- **Fatura:** botão Fechar branco (fundo ao passar/clicar igual ao do menu); texto do QR no topo, roxo #6948D8, peso 550; QR com margem de 4 módulos; ajuste com valor inválido bloqueia imprimir e o Pix; somas em centavos (as linhas exibidas batem com o total).
+- **Patrimônio total** com o degradê do Gasto mensal; **avisos** (ex.: CSV gerado) com largura limitada e texto alinhado; no celular o título do painel de informações não fica mais embaixo do botão do menu.
+- **Segunda revisão do Codex:**
+  - a publicação não troca mais o `SEGREDO` por engano (lista de segredos com falha = para tudo; em produção nunca é criado automaticamente);
+  - documento sumido sem backup abre **só para leitura** (recomeço só por "Apagar todos os dados");
+  - recursos por e-mail exigem **e-mail confirmado** (pelo Google; contas existentes já marcadas);
+  - **desativar o 2FA pede o código atual**;
+  - cota por conta nas rotas de dados;
+  - corpo da requisição só é lido com tamanho declarado;
+  - chave Pix no formato do DICT (e-mail ASCII, CNPJ alfanumérico);
+  - código 2FA com dígitos Unicode recusado sem erro interno;
+  - documento carregado validado item a item.
 
 ## Novidades da versão 2.4.0
 
@@ -83,7 +99,7 @@ ZoZo/
     ├── publicar.ps1          testes → interface → migrações → publicação
     ├── montar_interface.py   gera api/public a partir de ui/
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/test_api.py     58 testes automáticos da API
+    └── tests/test_api.py     63 testes automáticos da API
 ```
 
 ## Ambientes e publicação
@@ -163,7 +179,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 - **Cadastro revela se o e-mail já tem conta** ("Já existe uma conta com esse e-mail"): inevitável sem confirmação por e-mail.
 - **Argon2id** (recomendado pela OWASP) não existe no navegador sem biblioteca extra; usamos PBKDF2-SHA256 com 600.000 iterações (mínimo atual da OWASP para PBKDF2).
 - **Domínio próprio:** `usezozo.com.br` já aponta para o ZoZo; regras de WAF/limite na borda devem deixar `/api/*` sem desafio (veja acima).
-- **E-mail sem confirmação e recursos por lista (revisão do Codex, AUD-03):** quem cadastrar antes um e-mail que está em `RECURSOS_AVANCADOS` ganha Perfis/Fatura/Pix **nos próprios dados** (nada de outra conta). Sem provedor de e-mail não há como confirmar a titularidade: só ponha na lista e-mails cuja conta o dono **já criou**.
+- **E-mail confirmado só pelo Google:** recursos de `RECURSOS_AVANCADOS` exigem o e-mail confirmado. Sem provedor de e-mail, a confirmação é o "Continuar com Google" (no cadastro ou entrando uma vez com ele). Contas criadas antes da 2.5 foram marcadas como confirmadas.
 - **Recursos por conta só na interface:** Perfis/boletos/Pix são escondidos e recusados no navegador; quem alterar o próprio navegador conseguiria usá-los **nos próprios dados** (o servidor não lê o documento cifrado). Não dá acesso a nada de outra conta.
 
 ## Limites

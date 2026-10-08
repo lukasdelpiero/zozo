@@ -91,13 +91,16 @@ class Default(WorkerEntrypoint):
 
         corpo = ""
         if metodo in ("POST", "PUT"):
-            try:
-                tamanho = int(cab.get("content-length") or 0)
-            except ValueError:
-                tamanho = nucleo.LIMITE_CORPO + 1
-            if tamanho > nucleo.LIMITE_CORPO:      # recusa antes de ler o corpo
-                return _responder(nucleo.Resposta(413, {"erro": "DOCUMENT_TOO_LARGE"}))
-            corpo = await request.text()
+            declarado = cab.get("content-length")
+            if declarado is not None:
+                # Só lê o corpo com tamanho declarado e dentro do limite (o HTTP garante que o corpo não passa disso).
+                # Sem Content-Length (o site sempre envia), o corpo NÃO é lido: a rota recebe vazio e recusa.
+                if not declarado.isdigit() or len(declarado) > 9:
+                    return _responder(nucleo.Resposta(400, {"erro": "INVALID_REQUEST"}))
+                if int(declarado) > nucleo.LIMITE_CORPO:      # recusa antes de ler o corpo
+                    return _responder(nucleo.Resposta(413, {"erro": "DOCUMENT_TOO_LARGE"}))
+                if int(declarado) > 0:
+                    corpo = await request.text()
 
         pedido = nucleo.Pedido(metodo, request.url, cab, corpo)
         if not pedido.caminho.startswith("/api/"):

@@ -30,11 +30,12 @@
     blocos.forEach((b) => {
       if (b.tipo === "categoria") { out.push(filho(b.cat, false)); return; }
       const aberto = !!abertos[b.nome];
+      const chave = "dash:grp:" + b.nome;
       out.push(linha(h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(aberto), "aria-label": (aberto ? "Ocultar" : "Mostrar") + " categorias de " + b.nome,
-        onClick: () => ZoZo.store.set({ ui: { dashGruposAbertos: Object.assign({}, abertos, { [b.nome]: !aberto }) } }) },
+        onClick: () => UI.alternarArvore(chave, () => ZoZo.store.set({ ui: { dashGruposAbertos: Object.assign({}, ZoZo.store.get().ui.dashGruposAbertos || {}, { [b.nome]: !aberto }) } })) },
         icon(aberto ? "chevron-down" : "chevron-right", { size: 14, stroke: 2.25 })),
         h("span", { class: "category-row__count" }, String(b.quantidade)), b.nome, b.gasto, b.reservado, { class: "top-cat--group" }));
-      if (aberto) b.itens.forEach((c) => out.push(filho(c, true)));
+      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: "arvore-grupo" }, b.itens.map((c) => filho(c, true)))));
     });
     return h("div", { class: "top-cats" }, out);
   }
@@ -135,7 +136,7 @@
       const cardGasto = d.gastoMensal ? Card("Gasto mensal", "Lançamentos", () => ctx.navigate("lancamentos"), GastoMensal(d.gastoMensal)) : null;
 
       const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"),
-        ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
+        ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, area: true, alturaGrafico: alturaGraficos(),
           intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];

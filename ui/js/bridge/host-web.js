@@ -31,6 +31,7 @@
   const ITERACOES_MAX = 10000000;
   const FORMATO = 2;                       // primeiro byte do documento cifrado
   const LIMITE_CONTEUDO = 1900000;         // mesmo limite da API (D1: ~2 MB por linha)
+  const LIMITE_EXPANDIDO = 40 * 1024 * 1024; // documento descomprimido: no máximo 40 MB
   const CHAVE_LOCAL = "zozo.sessao";       // chave dos dados, cifrada com o envelope da sessão
   const enc = new TextEncoder(), dec = new TextDecoder();
 
@@ -196,12 +197,16 @@
     const tudo = deB64(texto);
     if (tudo.length < 30 || tudo[0] !== FORMATO) throw erro("LOAD_FAILED");
     const claro = await crypto.subtle.decrypt({ name: "AES-GCM", iv: tudo.subarray(1, 13), additionalData: aad(email, versao) }, chave, tudo.subarray(13));
-    return JSON.parse(dec.decode(await transformar(new Uint8Array(claro), new DecompressionStream("gzip"))));
+    const expandido = await transformar(new Uint8Array(claro), new DecompressionStream("gzip"));
+    if (expandido.length > LIMITE_EXPANDIDO) throw erro("LOAD_FAILED");      // documento expandido grande demais
+    return JSON.parse(dec.decode(expandido));
   }
 
   /** Histórico (mais recente primeiro): primeira versão que decifra corretamente */
   async function recuperarDoHistorico(s) {
-    const h = await comProvaDaSessao(() => api("GET", "/historico", undefined, s.prova));
+    let h;
+    try { h = await comProvaDaSessao(() => api("GET", "/historico", undefined, s.prova)); }
+    catch (e) { throw e.code === "SESSION_EXPIRED" ? e : erro("DOCUMENT_UNAVAILABLE"); }
     for (const v of (h && Array.isArray(h.versoes) ? h.versoes : [])) {
       try { return await decifrar(s.chave, s.email, v.versao, v.conteudo); } catch (e) { /* tenta a anterior */ }
     }
@@ -320,10 +325,16 @@
         // Sem documento no servidor. Primeira vez: conta vazia. Mas se este navegador já viu dados desta conta,
         // o documento sumiu: tenta o histórico (backup) e, sem ele, abre vazia COM aviso (nunca em silêncio)
         if ((await versaoConhecida(s.email)) > 0) {
-          const doHistorico = await recuperarDoHistorico(s).catch(() => undefined);
+          // Histórico fora do ar: não dá para saber se há backup → erro (nada é gravado), sem apagar o marcador
+          const doHistorico = await recuperarDoHistorico(s);
           if (sessao !== s) throw erro("SESSION_EXPIRED");
-          await esquecerVersao(s.email);           // a próxima gravação recomeça a contagem (sem aviso repetido)
-          return doHistorico === undefined ? { documento: null, aviso: "DOCUMENT_MISSING" } : { documento: doHistorico, aviso: "RESTORED_FROM_BACKUP" };
+          if (doHistorico !== undefined) {
+            await esquecerVersao(s.email);         // recuperado: a contagem recomeça a partir da cópia restaurada
+            return { documento: doHistorico, aviso: "RESTORED_FROM_BACKUP" };
+          }
+          // Sem backup legível: abre vazia e SÓ PARA LEITURA (o marcador fica). Para recomeçar de propósito:
+          // Configurações › Conta › Apagar todos os dados (wipeUserData zera o marcador).
+          return { documento: null, aviso: "DOCUMENT_MISSING", somenteLeitura: true };
         }
         return { documento: null, aviso: null };
       }
@@ -399,6 +410,7 @@
       const conteudo = await cifrar(k.chave, s.email, va + 1, null);
       await api("POST", "/documento/apagar", { versaoAnterior: va, conteudo }, k.prova);
       if (sessao === s) s.versao = va + 1;
+      await esquecerVersao(s.email);              // recomeço deliberado: vale também depois de "documento sumido"
       await lembrarVersao(s.email, va + 1);
       return { apagado: true };
     },
@@ -425,9 +437,9 @@
       s.doisFatores = true;
       return sessaoData();
     },
-    async desativar2FA() {
+    async desativar2FA(d) {
       const s = exigirContaReal();
-      await comProvaDaSessao(() => api("POST", "/2fa/desativar", undefined, s.prova));
+      await comProvaDaSessao(() => api("POST", "/2fa/desativar", { codigo: String((d && d.codigo) || "") }, s.prova));
       s.doisFatores = false;
       return sessaoData();
     },

@@ -16,6 +16,7 @@
   /* ---------------- Contexto compartilhado com as páginas ---------------- */
   const inflight = {};
   let geracao = 0;          // muda a cada entrada/saída: resposta de uma sessão anterior é descartada
+  const ordem = {};         // número da carga mais recente de cada coleção (respostas fora de ordem são ignoradas)
   const ctx = {
     bridge,
     toast: (...a) => ZoZo.feedback.toast(...a),
@@ -27,9 +28,11 @@
       if (!o.force && st.data[key] && !st.stale[key]) return Promise.resolve(st.data[key]);
       if (inflight[key] && !o.force) return inflight[key];
       const minha = geracao;
+      const pedido = (ordem[key] = (ordem[key] || 0) + 1);
       store.set((s) => ({ loading: { [key]: true }, errors: { [key]: null } }));
       const p = bridge.request(action, payload).then((data) => {
         if (minha !== geracao) throw new ZoZo.messages.BridgeError("SESSION_EXPIRED", FR.SESSION_EXPIRED);   // outra sessão
+        if (pedido !== ordem[key]) return store.get().data[key];                                               // chegou uma mais nova
         const stale = Object.assign({}, store.get().stale); delete stale[key];
         // Mesmo conteúdo: mantém o objeto atual (não redesenha nem interrompe animações)
         const atual = store.get().data[key];
@@ -272,7 +275,7 @@
     const textos = {
       RESTORED_FROM_BACKUP: "O arquivo de dados estava danificado e foi recuperado do backup mais recente. Confira os últimos lançamentos.",
       OLDER_VERSION: "Os dados recebidos do servidor são mais antigos do que a última versão vista neste navegador. Confira os últimos lançamentos antes de continuar.",
-      DOCUMENT_MISSING: "Os dados desta conta não foram encontrados no servidor e a conta abriu vazia. Se você esperava ver seus lançamentos, não faça alterações e peça a restauração do backup.",
+      DOCUMENT_MISSING: "Os dados desta conta não foram encontrados no servidor nem no backup. A conta abriu vazia e SÓ PARA LEITURA: peça a restauração do banco ou, para recomeçar do zero, use Configurações › Conta › Apagar todos os dados.",
       AUTOSAVE_FAILED: "As parcelas automáticas não foram salvas (sem conexão com o servidor). Elas serão criadas de novo na próxima vez.",
     };
     const texto = textos[e.detail && e.detail.codigo];

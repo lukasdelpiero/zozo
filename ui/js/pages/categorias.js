@@ -47,15 +47,8 @@
       if (b.tipo === "categoria") { out.push(linha(b.cat, false)); return; }
       const key = "cat:grp:" + (excluida ? "x:" : "r:") + b.nome;
       const fechado = !!fechados[key];
-      out.push(L.CategoryGroupRow(b, {
-        excluida, fechado,
-        onToggle: () => {
-          const g = Object.assign({}, ZoZo.store.get().ui.gruposFechados);
-          if (g[key]) delete g[key]; else g[key] = true;
-          ZoZo.store.set({ ui: { gruposFechados: g } });
-        },
-      }));
-      if (!fechado) b.itens.forEach((c) => out.push(linha(c, true)));
+      out.push(L.CategoryGroupRow(b, { excluida, fechado, onToggle: () => UI.alternarGrupo(key) }));
+      if (!fechado) out.push(UI.corpoArvore(key, h("div", { class: "arvore-grupo" }, b.itens.map((c) => linha(c, true)))));
     });
     return out;
   }

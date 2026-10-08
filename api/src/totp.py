@@ -50,7 +50,7 @@ def conferir(segredo, texto, agora, ultimo_passo=0):
     Recusa passos já usados (<= ultimo_passo): um código não serve duas vezes.
     """
     t = str(texto or "").strip().replace(" ", "")
-    if len(t) != DIGITOS or not t.isdigit():
+    if len(t) != DIGITOS or not t.isascii() or not t.isdigit():          # "１２３４５６" (dígitos Unicode) não é código
         return None
     atual = int(agora) // PASSO
     achado = None

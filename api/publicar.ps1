@@ -39,19 +39,28 @@ if ($Ambiente -eq "producao") {
 }
 
 Write-Host "2/6 Segredos do ambiente..." -ForegroundColor Cyan
-$lista = (npx wrangler secret list @extra 2>$null) -join "`n"
-if ($lista -notmatch '"SEGREDO"') {
-  Write-Host "   SEGREDO não existe: gerando um aleatório (não aparece na tela)..."
+# A lista precisa vir certa: uma falha (rede, login vencido) NUNCA pode parecer "segredo ausente".
+# Trocar o SEGREDO sem querer deixa o 2FA de todos sem funcionar.
+$saida = npx wrangler secret list @extra 2>$null
+if ($LASTEXITCODE -ne 0) { Parar "Não foi possível listar os segredos (rede ou login do wrangler). Nada foi publicado e nenhum segredo foi alterado." }
+try { $segredos = @(($saida -join "`n") | ConvertFrom-Json) } catch { Parar "Resposta inesperada ao listar os segredos. Nada foi publicado e nenhum segredo foi alterado." }
+$nomes = @($segredos | ForEach-Object { $_.name })
+if ($nomes -notcontains "SEGREDO") {
+  if ($Ambiente -eq "producao") {
+    # Em produção o SEGREDO só é criado de propósito, uma vez, fora da publicação
+    Parar "SEGREDO não encontrado em produção. Se é mesmo a primeira publicação, crie-o de propósito: npx wrangler secret put SEGREDO (um texto aleatório longo). Nada foi publicado."
+  }
+  Write-Host "   SEGREDO não existe na prévia: gerando um aleatório (não aparece na tela)..."
   python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | npx wrangler secret put SEGREDO @extra
   if ($LASTEXITCODE -ne 0) { Parar "Não foi possível criar o SEGREDO." }
 }
-if ($lista -notmatch '"TURNSTILE_SECRET"') {
+if ($nomes -notcontains "TURNSTILE_SECRET") {
   # Com a chave pública no wrangler.toml e sem a secreta, a API recusa cadastro e logins que pedem CAPTCHA
   Write-Host "   TURNSTILE_SECRET não configurado: sem ele, o cadastro e o login com CAPTCHA são recusados." -ForegroundColor Yellow
   Write-Host "   Para configurar: Cloudflare › Turnstile › ZoZo login › copie a Secret Key e rode: npx wrangler secret put TURNSTILE_SECRET $($extra -join ' ')" -ForegroundColor Yellow
   if ($Ambiente -eq "producao") { Parar "Configure o TURNSTILE_SECRET e publique de novo: nada foi publicado." }
 }
-if ($lista -notmatch '"RECURSOS_AVANCADOS"') {
+if ($nomes -notcontains "RECURSOS_AVANCADOS") {
   Write-Host "   Aviso: RECURSOS_AVANCADOS não configurado — Perfis, boletos e Pix ficam só na conta de demonstração." -ForegroundColor Yellow
   Write-Host "   Para liberar a sua conta: npx wrangler secret put RECURSOS_AVANCADOS $($extra -join ' ')  (e-mails separados por vírgula)" -ForegroundColor Yellow
 }
@@ -69,7 +78,7 @@ if ($Ambiente -eq "producao") {
     Write-Host "   Se precisar voltar o banco a este momento:" -ForegroundColor Gray
     Write-Host "   npx wrangler d1 time-travel restore $banco --bookmark=$marcador" -ForegroundColor Gray
   } else {
-    Write-Host "   (o D1 guarda 30 dias de histórico: veja 'npx wrangler d1 time-travel info $banco')" -ForegroundColor Gray
+    Write-Host "   Atenção: não foi possível registrar o ponto de restauração. O D1 guarda histórico (30 dias no plano pago, 7 no gratuito): veja 'npx wrangler d1 time-travel info $banco'" -ForegroundColor Yellow
   }
 } else {
   Write-Host "4/6 (prévia: banco de testes, sem ponto de restauração)" -ForegroundColor Cyan

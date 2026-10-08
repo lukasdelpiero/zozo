@@ -235,17 +235,51 @@
   }
 
   /** Seção recolhível com título (ex.: "Cartões de crédito", "Esse mês") */
+  /* ---------- Árvores (grupos que abrem e fecham) ----------
+     Fechar: a altura do conteúdo encolhe até zero e só então o estado muda.
+     Abrir: o estado muda, a lista é redesenhada e o novo conteúdo cresce de zero
+     até a altura dele. corpoArvore(chave, el) marca o conteúdo de cada grupo. */
+  const abrindo = new Set();
+  const semMovimento = () => !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const DURACAO_ARVORE = 200;
+  function alternarArvore(chave, aplicar) {
+    const corpo = document.querySelector('[data-arvore="' + CSS.escape(chave) + '"]');
+    if (!corpo || corpo.hidden || semMovimento() || !corpo.animate) { if (!corpo || corpo.hidden) abrindo.add(chave); aplicar(); return; }
+    let feito = false;
+    const fim = () => { if (!feito) { feito = true; aplicar(); } };
+    corpo.style.overflow = "hidden";
+    corpo.animate([{ height: corpo.scrollHeight + "px", opacity: 1 }, { height: "0px", opacity: 0 }],
+      { duration: DURACAO_ARVORE, easing: "cubic-bezier(.2,.7,.3,1)", fill: "forwards" }).onfinish = fim;
+    setTimeout(fim, DURACAO_ARVORE + 80);              // se a animação for interrompida, o grupo fecha assim mesmo
+  }
+  function corpoArvore(chave, el) {
+    el.dataset.arvore = chave;
+    if (abrindo.has(chave)) {
+      abrindo.delete(chave);
+      requestAnimationFrame(() => {
+        if (!el.isConnected || el.hidden || !el.animate) return;
+        el.style.overflow = "hidden";
+        el.animate([{ height: "0px", opacity: 0 }, { height: el.scrollHeight + "px", opacity: 1 }],
+          { duration: DURACAO_ARVORE + 20, easing: "cubic-bezier(.2,.7,.3,1)" }).onfinish = () => { el.style.overflow = ""; };
+      });
+    }
+    return el;
+  }
+  /** Alterna um grupo guardado em ui.gruposFechados, com animação */
+  function alternarGrupo(chave) {
+    alternarArvore(chave, () => {
+      const g = Object.assign({}, ZoZo.store.get().ui.gruposFechados);
+      if (g[chave]) delete g[chave]; else g[chave] = true;
+      ZoZo.store.set({ ui: { gruposFechados: g } });
+    });
+  }
+
   function Section(opts, ...children) {
     const o = opts || {};
     const st = ZoZo.store.get();
     const fechado = !!(o.key && st.ui.gruposFechados[o.key]);
     const corpoId = uid("secao");
-    const toggle = () => {
-      if (!o.key) return;
-      const g = Object.assign({}, ZoZo.store.get().ui.gruposFechados);
-      if (g[o.key]) delete g[o.key]; else g[o.key] = true;
-      ZoZo.store.set({ ui: { gruposFechados: g } });
-    };
+    const toggle = () => { if (o.key) alternarGrupo(o.key); };
     return h("section", { class: ["section", fechado && "is-collapsed", o.class] },
       h("header", { class: "section__header" },
         h("div", { class: "section__lead" },
@@ -254,7 +288,8 @@
             h("h2", { class: "section__title" }, o.title)),
           o.adorno || null),
         o.aside ? h("div", { class: "section__aside" }, o.aside) : null),
-      h("div", { class: "section__body", id: corpoId, hidden: fechado }, ...children));
+      o.key ? corpoArvore(o.key, h("div", { class: "section__body", id: corpoId, hidden: fechado }, ...children))
+        : h("div", { class: "section__body", id: corpoId, hidden: fechado }, ...children));
   }
 
   /* ---------- Loading / Vazio ---------- */
@@ -332,6 +367,6 @@
   ZoZo.ui = {
     Button, IconButton, Field, Input, Select, Textarea, Toggle, Tag, CategoryLabel, PercentageChange, ProgressBar,
     FilterTabs, recortarSerie, Segmented, Card, Section, Skeleton, EmptyState, ErrorState, ColorPicker,
-    AccountIcon, INTERVALOS, refocus, Checkbox,
+    AccountIcon, INTERVALOS, refocus, Checkbox, alternarArvore, corpoArvore, alternarGrupo,
   };
 })(window.ZoZo);

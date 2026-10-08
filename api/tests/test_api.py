@@ -573,12 +573,23 @@ class Teste2FA(Base):
         cel.agora += nucleo.SESSAO_2FA_S + 1
         self.assertEqual(cel("POST", "/api/sessao/2fa", {"codigo": self.codigo(cel)})[0], 401)
 
-    def test_desativar(self):
+    def test_desativar_exige_codigo_atual(self):
         self.ativar()
-        self.assertEqual(self.api("POST", "/api/2fa/desativar", prova=prova())[0], 403)    # exige a senha
+        self.api.agora += 60                                                 # o código da ativação não vale de novo
+        # sessão + prova guardadas não bastam: precisa de um código atual do aplicativo
+        self.assertEqual(self.api("POST", "/api/2fa/desativar", {}, prova=self.prova)[1]["erro"], "CODE_INVALID")
+        self.assertEqual(self.api("POST", "/api/2fa/desativar", {"codigo": "１２３４５６"}, prova=self.prova)[1]["erro"], "CODE_INVALID")
+        self.assertEqual(self.api("POST", "/api/2fa/desativar", {"codigo": self.codigo()}, prova=prova())[0], 403)    # e a senha
         self.con.execute("DELETE FROM limites")
-        self.assertEqual(self.api("POST", "/api/2fa/desativar", prova=self.prova)[1], {"doisFatores": False})
+        self.assertEqual(self.api("POST", "/api/2fa/desativar", {"codigo": self.codigo()}, prova=self.prova)[1], {"doisFatores": False})
         self.assertFalse(self.entrar(Cliente(self.banco, ip="198.51.100.44"))[1]["doisFatores"])
+
+    def test_codigo_com_digitos_unicode_nao_quebra(self):
+        self.ativar()
+        cel = Cliente(self.banco, ip="198.51.100.46")
+        cel.agora = T0 + 60
+        self.entrar(cel)
+        self.assertEqual(cel("POST", "/api/sessao/2fa", {"codigo": "１２３４５６"}), (401, {"erro": "CODE_INVALID"}))
 
 
 class TesteDiversos(Base):
@@ -659,6 +670,18 @@ class TesteGoogle(Base):
         self.assertTrue(self.cli("GET", "/api/publico")[1]["google"])
         self.api("GET", "/api/google/inicio")
         self.assertEqual(self.api.ultima.cabecalhos["Location"], "/?google=indisponivel")
+
+    def test_google_confirma_o_email_da_conta(self):
+        self.assertEqual(self.con.execute("SELECT email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 0)
+        self.q = self.iniciar()
+        self.voltar(self.token())
+        self.assertEqual(self.entrar(self.cli)[0], 200)                      # senha certa + Google
+        self.assertEqual(self.con.execute("SELECT email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 1)
+        # cadastro feito pelo Google já nasce confirmado
+        self.q = self.iniciar()
+        self.voltar(self.token(email=OUTRO, given_name="Beto"))
+        self.cadastrar(self.cli, OUTRO, prova(), nome="Beto")
+        self.assertEqual(self.con.execute("SELECT email_verificado FROM contas WHERE email = ?", (OUTRO,)).fetchone()[0], 1)
 
     def test_fluxo_completo_dispensa_captcha(self):
         self.q = self.iniciar()
@@ -775,6 +798,18 @@ class TesteDemo(Base):
         self.assertEqual(velho("GET", "/api/sessao")[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sessoes WHERE email = ?", (DEMO,)).fetchone()[0], 1)
 
+    def test_cota_das_rotas_de_dados(self):
+        original = nucleo.COTA_DADOS
+        nucleo.COTA_DADOS = 5
+        try:
+            st = [self.api("GET", "/api/documento", prova=self.prova)[0] for _ in range(7)]
+        finally:
+            nucleo.COTA_DADOS = original
+        self.assertEqual(st[:5], [404] * 5)                                  # conta sem documento ainda
+        self.assertEqual(st[5:], [429, 429])
+        self.api.agora += nucleo.COTA_JANELA_S
+        self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 404)
+
     def test_logins_por_ip_tem_limite(self):
         cli = Cliente(self.banco, ip="198.51.100.70")
         st = [self.entrar(cli, email=DEMO, pv=self.PROVA)[0] for _ in range(nucleo.ENTRADAS_POR_IP + 1)]
@@ -784,7 +819,15 @@ class TesteDemo(Base):
         cli.agora += nucleo.ENTRADA_JANELA_S
         self.assertEqual(self.entrar(cli, email=DEMO, pv=self.PROVA)[0], 200)
 
+    def test_recursos_exigem_email_confirmado(self):
+        cfg = dict(CONFIG, RECURSOS_AVANCADOS=EMAIL)
+        cli = Cliente(self.banco, config=cfg, ip="198.51.100.66")
+        # cadastrou o e-mail da lista sem confirmar que é dono dele: não ganha nada
+        self.assertFalse(self.entrar(cli)[1]["recursos"]["perfis"])
+        self.assertEqual(self.con.execute("SELECT email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 0)
+
     def test_recursos_so_para_a_lista(self):
+        self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))
         self.assertFalse(self.entrar()[1]["recursos"]["perfis"])
         cfg = dict(CONFIG, RECURSOS_AVANCADOS=f" outro@exemplo.com , {EMAIL.upper()} ")
         cli = Cliente(self.banco, config=cfg, ip="198.51.100.63")
@@ -795,6 +838,7 @@ class TesteDemo(Base):
         self.assertEqual(cli("GET", "/api/documento", prova=prova())[0], 403)
 
     def test_segredo_dos_recursos_digitado_de_varios_jeitos(self):
+        self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))
         for valor in (f"﻿{EMAIL}\r\n", f'"{EMAIL}"', f"outro@exemplo.com; {EMAIL}", f"outro@exemplo.com\n{EMAIL.upper()}"):
             cli = Cliente(self.banco, config=dict(CONFIG, RECURSOS_AVANCADOS=valor), ip="198.51.100.64")
             self.assertTrue(self.entrar(cli)[1]["recursos"]["perfis"], repr(valor))
@@ -803,6 +847,17 @@ class TesteDemo(Base):
 
 
 class TesteMigracoes(unittest.TestCase):
+    def test_0005_confirma_contas_existentes(self):
+        con = sqlite3.connect(":memory:", isolation_level=None)
+        con.execute("PRAGMA foreign_keys = ON")
+        for nome in ("0001_inicial.sql", "0002_sessoes_2fa.sql", "0003_conta_demo.sql", "0004_envelope_fora_do_banco.sql"):
+            con.executescript((MIGRACOES / nome).read_text(encoding="utf-8"))
+        con.execute("INSERT INTO contas (email, nome, sal, iteracoes, verificador) VALUES (?, 'A', 'c2Fs', 600000, ?)", (EMAIL, "0" * 64))
+        con.executescript((MIGRACOES / "0005_email_verificado.sql").read_text(encoding="utf-8"))
+        self.assertEqual(con.execute("SELECT email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 1)
+        con.execute("INSERT INTO contas (email, nome, sal, iteracoes, verificador) VALUES ('novo@exemplo.com', 'B', 'c2Fs', 600000, ?)", ("0" * 64,))
+        self.assertEqual(con.execute("SELECT email_verificado FROM contas WHERE email = 'novo@exemplo.com'").fetchone()[0], 0)
+
     def test_0004_apaga_envelopes_antigos(self):
         con = sqlite3.connect(":memory:", isolation_level=None)
         con.execute("PRAGMA foreign_keys = ON")

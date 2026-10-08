@@ -75,6 +75,7 @@ CONTA_CAPTCHA, CONTA_JANELA_S = 20, 3600   # 20 falhas/h na conta (todos os IPs)
 # Limites por IP
 CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
 ENTRADAS_POR_IP, ENTRADA_JANELA_S = 30, 600          # logins (certos ou errados) por IP: a senha da demo é pública
+COTA_DADOS, COTA_JANELA_S = 600, 600                 # pedidos às rotas de dados por conta (leituras e gravações)
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
@@ -398,17 +399,25 @@ async def _encerrar_outras(ctx, email, manter_id):
     await ctx.banco.executar("DELETE FROM sessoes WHERE email = ? AND id != ?", email, manter_id)
 
 
-def _avancado(ctx, email):
-    """Perfis, boletos e Pix: só a demonstração e os e-mails do segredo RECURSOS_AVANCADOS (lista separada por vírgula)."""
+def _avancado(ctx, email, verificado=False):
+    """
+    Perfis, boletos e Pix: só a demonstração e os e-mails do segredo RECURSOS_AVANCADOS (lista separada
+    por vírgula) — e só se a conta tiver o e-mail CONFIRMADO (pelo Google; as contas anteriores à 2.5
+    foram marcadas na migração 0005). Cadastrar antes um e-mail da lista não dá os recursos.
+    """
+    if email == DEMO_EMAIL:
+        return True
+    if not verificado:
+        return False
     # Tolerante ao jeito de digitar o segredo: vírgula, ponto e vírgula, espaço ou quebra de linha
     # separam; aspas e caracteres invisíveis (ex.: marca BOM colada pelo terminal) são ignorados
     texto = "".join(c for c in str(ctx.config.get("RECURSOS_AVANCADOS") or "") if unicodedata.category(c) != "Cf")
     lista = {e.strip("\"'<>").lower() for e in re.split(r"[,;\s]+", texto) if e.strip("\"'<>")}
-    return email == DEMO_EMAIL or email in lista
+    return email in lista
 
 
-def _sessao_publica(ctx, email, nome, envelope, dois_fatores):
-    av = _avancado(ctx, email)
+def _sessao_publica(ctx, email, nome, envelope, dois_fatores, verificado=False):
+    av = _avancado(ctx, email, verificado)
     return {"email": email, "nome": nome, "envelope": envelope, "doisFatores": bool(dois_fatores),
             "demo": email == DEMO_EMAIL, "recursos": {"perfis": av, "boleto": av, "pix": av}}
 
@@ -489,14 +498,15 @@ async def _cadastrar(ctx):
     nome = _nome(b.get("nome"))
     if not nome:
         raise Falha(400, "INVALID_REQUEST")
+    verificado = 1 if _google_confirmado(ctx, email) else 0      # o Google confirmou que a pessoa é dona do e-mail
     n = await ctx.banco.executar(
-        "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador) VALUES (?, ?, ?, ?, ?)",
-        email, nome, sal, it, _verificador(prova))
+        "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador, email_verificado) VALUES (?, ?, ?, ?, ?, ?)",
+        email, nome, sal, it, _verificador(prova), verificado)
     if not n:
         raise Falha(409, "EMAIL_IN_USE")
     envelope = await _criar_sessao(ctx, email, "ativa")
     ctx.evento("cadastro", email)
-    return Resposta(201, _sessao_publica(ctx, email, nome, envelope, False))
+    return Resposta(201, _sessao_publica(ctx, email, nome, envelope, False, verificado))
 
 
 async def _entrar(ctx):
@@ -518,7 +528,7 @@ async def _entrar(ctx):
     r = await _reservar(ctx, chave)
     if not r:                                         # bloqueado por um pedido simultâneo
         raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
-    conta = await ctx.banco.primeiro("SELECT nome, verificador, totp_segredo FROM contas WHERE email = ?", email)
+    conta = await ctx.banco.primeiro("SELECT nome, verificador, totp_segredo, email_verificado FROM contas WHERE email = ?", email)
     try:
         calculado = _verificador(_prova(b.get("prova")))
     except Falha:
@@ -534,6 +544,7 @@ async def _entrar(ctx):
         if r["bloqueado_ate"] > ctx.agora:
             extra["espera"] = r["bloqueado_ate"] - ctx.agora
         raise Falha(401, "INVALID_CREDENTIALS", extra)
+    verificado = await _marcar_verificado(ctx, email, conta["email_verificado"])
     if conta["totp_segredo"]:
         # Senha certa: zera o contador deste IP (o código do 2FA tem o próprio limite) e falta o código
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
@@ -543,7 +554,18 @@ async def _entrar(ctx):
     await _limpar_login(ctx, email)
     envelope = await _criar_sessao(ctx, email, "ativa")
     ctx.evento("login", email)
-    return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, False))
+    return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, False, verificado))
+
+
+async def _marcar_verificado(ctx, email, atual):
+    """Senha certa + Google confirmou este e-mail agora: a conta passa a ter o e-mail verificado."""
+    if atual:
+        return True
+    if _google_confirmado(ctx, email):
+        await ctx.banco.executar("UPDATE contas SET email_verificado = 1 WHERE email = ?", email)
+        ctx.evento("email_verificado", email)
+        return True
+    return False
 
 
 async def _segundo_fator(ctx):
@@ -556,7 +578,7 @@ async def _segundo_fator(ctx):
     r = await _reservar(ctx, chave)
     if not r:
         raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
-    conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, totp_ultimo_passo FROM contas WHERE email = ?", email)
+    conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, totp_ultimo_passo, email_verificado FROM contas WHERE email = ?", email)
     segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta else None
     passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"]) if segredo else None
     if passo is not None:      # grava o passo usado: o mesmo código não serve de novo (nem em paralelo)
@@ -572,7 +594,7 @@ async def _segundo_fator(ctx):
     await _limpar_login(ctx, email)
     envelope = await _criar_sessao(ctx, email, "ativa")
     ctx.evento("login", email, segundo_fator=True)
-    return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, True))
+    return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, True, conta["email_verificado"]))
 
 
 async def _senha_vazada(ctx):
@@ -671,7 +693,7 @@ _PROTEGIDAS = {
     ("GET", "/api/documento"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
 }
-_SEM_CORPO = {"/api/2fa/iniciar", "/api/2fa/desativar"}
+_SEM_CORPO = {"/api/2fa/iniciar"}
 
 
 async def _rota(ctx):
@@ -700,8 +722,9 @@ async def _rota(ctx):
             if p.cookie(_nome_cookie(ctx)) and not await _sessao(ctx, "2fa"):
                 _definir_cookie(ctx)                   # cookie que não vale mais: apaga (a sessão parcial do 2FA fica)
             return Resposta(204)                       # sem sessão: resposta normal (não é erro para quem só abriu o site)
-        conta = await ctx.banco.primeiro("SELECT nome, totp_segredo FROM contas WHERE email = ?", s["email"])
-        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], _envelope(ctx, p.cookie(_nome_cookie(ctx))), conta["totp_segredo"]))
+        conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, email_verificado FROM contas WHERE email = ?", s["email"])
+        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], _envelope(ctx, p.cookie(_nome_cookie(ctx))), conta["totp_segredo"],
+                                             conta["email_verificado"]))
     if m == "DELETE" and c == "/api/sessao":
         token = p.cookie(_nome_cookie(ctx))
         if token and len(token) <= 128:
@@ -722,6 +745,10 @@ async def _rota(ctx):
         # Demonstração (senha pública): nada é gravado no servidor e a conta não pode ser alterada por ninguém
         ctx.evento("demo_somente_leitura", rota=c)
         raise Falha(403, "DEMO_READ_ONLY")
+    # Cota por conta nas rotas de dados: uma sessão não consome o banco sem limite
+    if await _contar(ctx, f"cota|{ctx.h(email)}", COTA_DADOS, COTA_JANELA_S):
+        ctx.evento("cota_excedida", email)
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": COTA_JANELA_S})
     # Corpo validado ANTES da prova: pedido malformado não consome tentativa
     b = _json(p) if m in ("POST", "PUT") and c not in _SEM_CORPO else {}
     conta = await _conferir_prova(ctx, email)
@@ -816,6 +843,19 @@ async def _rota(ctx):
         return Resposta(200, {"doisFatores": True})
 
     if c == "/api/2fa/desativar":
+        # Exige um código ATUAL do aplicativo (fator recente): a sessão e a prova guardadas não bastam
+        segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta["totp_segredo"] else None
+        if not segredo:
+            raise Falha(409, "2FA_NOT_PENDING")
+        chave = f"2fa|{ctx.h(email)}"
+        r = await _reservar(ctx, chave)
+        if not r:
+            raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS")
+        passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"])
+        if passo is None:
+            ctx.evento("2fa_desativacao_recusada", email, tentativa=r["falhas"])
+            raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
         await ctx.banco.executar(
             "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL, totp_ultimo_passo = 0 WHERE email = ?", email)
         await _encerrar_outras(ctx, email, s["id"])

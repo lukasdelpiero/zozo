@@ -99,8 +99,10 @@
           const altura = ih / validas.length;
           const topo = m.t + altura * k;
           sr._y = (v) => topo + altura - ((v - mn) / (mx - mn)) * altura;
+          sr._base = topo + altura;                 // a área degradê vai só até o fim da faixa desta série
         } else {
           sr._y = (v) => m.t + ih - ((v - global[0]) / (global[1] - global[0])) * ih;
+          sr._base = m.t + ih;
         }
       });
       const x = (i, len) => m.l + (len <= 1 ? iw : (i / (len - 1)) * iw);
@@ -154,7 +156,7 @@
             svg.insertBefore(s("defs", null, s("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 },
               s("stop", { offset: "0%", "stop-color": sr.color, "stop-opacity": 0.22 }),
               s("stop", { offset: "100%", "stop-color": sr.color, "stop-opacity": 0 }))), svg.firstChild);
-            const area = d + ` L${x(L - 1, L).toFixed(1)} ${m.t + ih} L${x(0, L).toFixed(1)} ${m.t + ih} Z`;
+            const area = d + ` L${x(L - 1, L).toFixed(1)} ${sr._base} L${x(0, L).toFixed(1)} ${sr._base} Z`;
             g.appendChild(s("path", { d: area, fill: `url(#${gid})`, stroke: "none" }));
           }
           g.appendChild(s("path", { d, fill: "none", stroke: sr.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": sr.tracejado ? "4 5" : null }));

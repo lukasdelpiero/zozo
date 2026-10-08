@@ -933,3 +933,49 @@
   .selbar__txt { display: none; }
   .selbar__count { padding: 0 6px; }
 }
+
+/* =============================================================
+   ZoZo 2.5 — animações e acertos
+   ============================================================= */
+/* Recolher/mostrar o menu (computador): o menu desliza junto com o conteúdo */
+@media (min-width: 601px) {
+  .sidebar { width: var(--sidebar-width); transition: transform var(--duration-medium) var(--easing), visibility 0s linear 0s; }
+  .app-shell[data-menu="recolhido"] .sidebar {
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform var(--duration-medium) var(--easing), visibility 0s linear var(--duration-medium);
+  }
+}
+@media (prefers-reduced-motion: reduce) { .sidebar, .app-shell { transition: none !important; } }
+
+/* Grupos que abrem/fecham (animação em ui.js: alternarArvore/corpoArvore) */
+.arvore-grupo { display: flex; flex-direction: column; }
+
+/* Fatura: botão Fechar branco; fundo ao passar/clicar igual ao dos botões do menu */
+.boleto .boleto__header .icon-btn { color: #fff; }
+.boleto .boleto__header .icon-btn:hover:not(:disabled) { background: var(--sidebar-hover); color: #fff; }
+.boleto .boleto__header .icon-btn:active:not(:disabled) { background: var(--sidebar-active); color: #fff; }
+.boleto .boleto__header .icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* Fatura: texto ao lado do QR alinhado ao topo, roxo da marca */
+.doc__pix { align-items: flex-start; }
+.doc__pix-texto { color: #6948D8; font-weight: 550; margin-top: 2px; }
+
+/* Avisos (toasts): largura limitada, texto alinhado à esquerda e ícone no topo da primeira linha */
+#toast-root { width: min(440px, calc(100vw - 32px)); bottom: 24px; }
+.toast {
+  width: max-content; max-width: 100%; align-items: flex-start; gap: 10px;
+  padding: 11px 16px; border-radius: 12px;
+  font-size: 0.875rem; font-weight: 450; line-height: 1.45; text-align: left;
+}
+.toast__icon { flex: none; margin-top: 2px; }
+.toast__text { min-width: 0; overflow-wrap: anywhere; }
+
+/* Celular: o título do painel de informações (tela cheia) vai para o lado do botão do menu;
+   na fatura (janela própria, com Fechar) o botão do menu sai */
+@media (max-width: 600px) {
+  .detail__header { padding-left: 56px; }
+  body.has-boleto .menu-toggle { display: none; }
+}
+/* Desativar 2FA: código atual do aplicativo */
+.desativar2fa .codigo6 { margin-top: 16px; }
+.desativar2fa .p2fa__erro { text-align: center; }

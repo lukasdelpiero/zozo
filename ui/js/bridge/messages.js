@@ -110,6 +110,8 @@
     DEMO_READ_ONLY: "Isso não está disponível na conta de demonstração. Crie a sua conta para usar o ZoZo completo.",
     DEMO_LIMIT: "Na demonstração dá para criar só 1 item de cada tipo. Crie a sua conta para usar sem limites.",
     FEATURE_UNAVAILABLE: "Esse recurso não está disponível para a sua conta.",
+    DOCUMENT_UNAVAILABLE: "Seus dados não foram encontrados agora e o backup não respondeu. Nada foi alterado: tente de novo em instantes.",
+    DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
