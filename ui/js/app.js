@@ -60,18 +60,6 @@
         page ? page.carregar(ctx, true) : null,
       ]);
     },
-
-    /** Atualizar dados da página (seção 53) */
-    refresh() {
-      const st = store.get();
-      store.set({ loading: { _refresh: true } });
-      ctx.invalidate(Object.keys(st.data));
-      const page = ctx.router.current();
-      Promise.allSettled([
-        ctx.loadData("contas", A.getContas, null, { force: true }),
-        page ? page.carregar(ctx, true) : null,
-      ]).finally(() => store.set({ loading: { _refresh: false } }));
-    },
   };
 
   /* ---------------- Autenticação ---------------- */
@@ -109,7 +97,7 @@
           if (e.captcha || e.code === "CAPTCHA_REQUIRED") captchaLogin = true;
           // a falha que inicia um bloqueio já informa o tempo de espera
           authErro = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? textoBloqueio(e)
-            : ["STORAGE_UNAVAILABLE", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "SESSION_EXPIRED"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
+            : ["STORAGE_UNAVAILABLE", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "SESSION_EXPIRED", "CF_CHALLENGE"].includes(e.code) ? FR[e.code] : FR.INVALID_CREDENTIALS;
           renderAuth();
         });
       },
@@ -124,7 +112,7 @@
       onCadastro: (dados) => {
         bridge.request(A.registerUser, dados).then((r) => { salvarCredencial(dados.email, dados.senha, dados.nomeUsuario); entrar(r); }).catch((e) => {
           authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e)
-            : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "REGISTER_FAILED"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
+            : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "REGISTER_FAILED", "CF_CHALLENGE"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
           renderAuth();
         });
       },
@@ -266,6 +254,17 @@
     if (store.get().session.authenticated) ctx.logout(FR[codigo] || FR.SESSION_EXPIRED);
   });
 
+  // Proteção do Cloudflare na frente da API (ex.: modo "Under Attack" com a verificação vencida):
+  // os pedidos não chegam ao ZoZo até a página ser recarregada (o navegador refaz a verificação)
+  let avisoProtecao = false;
+  window.addEventListener("zozo:protecao-cloudflare", () => {
+    if (avisoProtecao || !store.get().session.authenticated) return;
+    avisoProtecao = true;
+    ZoZo.feedback.confirmarExclusao("Verificação de segurança", FR.CF_CHALLENGE + " O que não foi salvo precisará ser refeito.",
+      { confirmar: "Recarregar página", cancelar: "Agora não", variante: "primary" })
+      .then((ok) => { avisoProtecao = false; if (ok) location.reload(); });
+  });
+
   // Sem logout por inatividade: a sessão dura até o navegador ser fechado ou o usuário sair
   // (o servidor ainda encerra sessões sem uso por 7 dias ou com mais de 30 dias).
 
@@ -290,8 +289,17 @@
       bridge.request(A.getArmazenamento).catch(() => null),
       bridge.request(A.getSession).catch(() => ({ authenticated: false })),
     ]).then(([armazenamento, sessao]) => {
-      // Ambiente de prévia sem autorização do Access: avisa já na tela de login
-      if (armazenamento && armazenamento.acessoNegado) authErro = FR.ACCESS_DENIED;
+      // A proteção do Cloudflare barrou a API logo na abertura: recarrega uma vez (o navegador refaz a verificação)
+      if (armazenamento && armazenamento.desafio) {
+        let recarregou = 0;
+        try { recarregou = Number(sessionStorage.getItem("zozo.recarga-protecao")) || 0; } catch (e) { /* ok */ }
+        if (Date.now() - recarregou > 60000) {
+          try { sessionStorage.setItem("zozo.recarga-protecao", String(Date.now())); } catch (e) { /* ok */ }
+          location.reload();
+          return;
+        }
+        authErro = FR.CF_CHALLENGE;
+      }
       turnstile = (armazenamento && armazenamento.turnstile) || null;
       googleAtivo = !!(armazenamento && armazenamento.google);
       if (sessao && sessao.email) authEmail = sessao.email;       // sessão aberta sem a chave neste navegador: só pede a senha

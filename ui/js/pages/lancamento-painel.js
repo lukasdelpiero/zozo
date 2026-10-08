@@ -69,12 +69,14 @@
     const cats = ((st.data.categorias && st.data.categorias.categorias) || []);
     const perfis = ((st.data.perfis && st.data.perfis.perfis) || []);
     const filtroPerfil = ((st.ui.filtros && st.ui.filtros.perfis) || []);
+    // Perfil (campo, regra de perfil obrigatório e divisão entre perfis): só contas com o recurso de Perfis
+    const comPerfis = ZoZo.recursos.perfis();
     const d = novo
       ? Object.assign({
         tipo: "regular", data: F.iso(new Date()), descricao: "", valor: 0,
         contaId: (contas.find((c) => !c.oculta) || {}).id || null,
         categoriaId: (cats.find((c) => c.status === "regular") || {}).id || null,
-        perfilId: filtroPerfil.length === 1 ? filtroPerfil[0] : null, notas: "", sentido: "saida",
+        perfilId: comPerfis && filtroPerfil.length === 1 ? filtroPerfil[0] : null, notas: "", sentido: "saida",
       }, opts.preset || {})
       : Object.assign({}, original);
     d.sentido = d.sentido || "saida";
@@ -332,10 +334,10 @@
           h("div", { class: "lp-top__right" }, subtipo(), campoValor())),
         h("section", { class: "lp-props" },
           temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Categoria"), chipCat) : null,
-          h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Perfil"), campoPerfil()),
+          comPerfis ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Perfil"), campoPerfil()) : null,
           temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Recorrência"), chipRec) : null,
           // Divisão (lançamento rachado entre perfis)
-          !novo && d.divisao ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
+          comPerfis && !novo && d.divisao ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
             h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },
               icon("dividir", { size: 14 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")) : null),
         h("section", { class: "lp-notes-wrap" }, campoNotas()),
@@ -352,7 +354,7 @@
       if (!d.descricao) { statusEl.textContent = "Informe o nome."; statusEl.className = "lp-status lp-status--erro"; if (nomeAtual) nomeAtual.focus(); return; }
       if (!(d.valor > 0)) { statusEl.textContent = "Informe um valor maior que zero."; statusEl.className = "lp-status lp-status--erro"; corpo.querySelector(".lp-value").focus(); return; }
       if (temCategoria(d) && !d.categoriaId) { statusEl.textContent = "Escolha uma categoria."; statusEl.className = "lp-status lp-status--erro"; return; }
-      if (!d.perfilId) { statusEl.textContent = "Escolha um perfil."; statusEl.className = "lp-status lp-status--erro"; return; }
+      if (comPerfis && !d.perfilId) { statusEl.textContent = "Escolha um perfil."; statusEl.className = "lp-status lp-status--erro"; return; }
       btn.disabled = true;
       ctx.bridge.request(A.createLancamento, { lancamento: payload() }).then((r) => {
         const id = r.lancamento.id;
@@ -375,7 +377,7 @@
     };
 
     const abrirDivisao = () => ZoZo.dividir.abrir(original, ctx, (id) => abrir({ id }, ctx, opts));
-    const podeDividir = !novo && d.tipo !== "recorrente";
+    const podeDividir = comPerfis && !novo && d.tipo !== "recorrente";
 
     ctx.detail.open({
       tituloNode: tituloBtn,

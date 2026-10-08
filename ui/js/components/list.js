@@ -40,7 +40,8 @@
     const marcaTitulo = { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita" }[marca] || "";
     const compacto = (o.class || "").includes("compact");
     const resumo = !!o.resumo;
-    return rowBase(["launch-row", o.marcado && "is-checked"].filter(Boolean).join(" "), Object.assign({ id: l.id }, o),
+    const comPerfil = ZoZo.recursos.perfis();          // pílula de perfil só para contas com o recurso
+    return rowBase(["launch-row", o.marcado && "is-checked", !comPerfil && "launch-row--sem-perfil"].filter(Boolean).join(" "), Object.assign({ id: l.id }, o),
       compacto || resumo ? null : (o.onMarcar ? UI.Checkbox(o.marcado, o.onMarcar, { label: "Selecionar " + l.descricao, class: "launch-row__check" }) : h("span")),
       h("span", { class: "launch-row__desc" },
         // data primeiro (largura fixa) para os nomes alinharem com ou sem a letra T/R/I/P
@@ -51,7 +52,7 @@
         l.nomeConta && !compacto && !resumo ? h("span", { class: "launch-row__account" }, l.nomeConta) : null,
         l.ultimos4Digitos && !compacto && !resumo ? h("span", { class: "launch-row__digits" }, l.ultimos4Digitos) : null),
       compacto ? null : h("span", { class: "launch-row__category" }, UI.CategoryLabel(l.categoria, { pill: true })),
-      compacto ? null : h("span", { class: "launch-row__profile" }, UI.Tag(l.perfil && l.perfil.nome, l.perfil && l.perfil.cor, { class: "tag--upper" })),
+      compacto || !comPerfil ? null : h("span", { class: "launch-row__profile" }, UI.Tag(l.perfil && l.perfil.nome, l.perfil && l.perfil.cor, { class: "tag--upper" })),
       h("span", { class: ["launch-row__value", "money", verde && "money--income"] }, F.moeda(l.valor)));
   }
 

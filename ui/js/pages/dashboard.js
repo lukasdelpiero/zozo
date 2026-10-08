@@ -48,6 +48,40 @@
       ...children);
   }
 
+  /* ---------- Cabe na tela ----------
+     No computador (duas colunas e altura suficiente), o Dashboard ocupa exatamente a área visível:
+     os gráficos ficam mais baixos em telas baixas e as listas mostram só as linhas inteiras que
+     cabem no card (o link do card abre a lista completa). Em telas estreitas a página rola. */
+  const ALTURA_MINIMA = 600;
+  const alturaGraficos = () => (innerHeight >= 1000 ? 150 : innerHeight >= 860 ? 128 : 104);
+
+  function ajustarNaTela() {
+    const pagina = document.querySelector(".page--dashboard");
+    const grade = pagina && pagina.querySelector(".dash-layout");
+    if (!grade) return;
+    const listas = Array.from(grade.querySelectorAll(".dash-area .list, .dash-area .top-cats"));
+    listas.forEach((l) => Array.from(l.children).forEach((x) => { x.hidden = false; }));
+    const duasColunas = getComputedStyle(grade).gridTemplateColumns.trim().split(/\s+/).length >= 2;
+    pagina.classList.toggle("dash--na-tela", duasColunas && innerHeight >= ALTURA_MINIMA);
+    if (!pagina.classList.contains("dash--na-tela")) return;
+    listas.forEach((l) => {
+      const card = l.closest(".card");
+      const limite = card.getBoundingClientRect().bottom - parseFloat(getComputedStyle(card).paddingBottom || "0");
+      const itens = Array.from(l.children);
+      // esconde de baixo para cima o que não cabe inteiro (sempre sobra ao menos a primeira linha)
+      for (let i = itens.length - 1; i > 0 && itens[i].getBoundingClientRect().bottom > limite + 0.5; i--) itens[i].hidden = true;
+    });
+  }
+  let observador = null;
+  function acompanharTela() {
+    queueMicrotask(ajustarNaTela);            // logo depois de a página entrar no lugar (o router monta em seguida)
+    if (observador || !window.ResizeObserver) return;
+    const main = document.getElementById("main");
+    if (!main) return;
+    observador = new ResizeObserver(() => requestAnimationFrame(ajustarNaTela));
+    observador.observe(main);
+  }
+
   /** Gasto acumulado do mês × ritmo do orçamento (linha tracejada) */
   function GastoMensal(g) {
     const acima = g.orcamento > 0 && g.total > g.orcamento;
@@ -59,7 +93,7 @@
       series.push({ name: "Orçamento", color: cs.getPropertyValue("--color-text-muted").trim(), tracejado: true,
         points: g.dias.map((d) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
     }
-    ZoZo.charts.renderLineChart(chart, series, { height: 150, area: true, ariaLabel: "Gasto acumulado no mês" });
+    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), area: true, ariaLabel: "Gasto acumulado no mês" });
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
     return h("div", { class: "spend" },
@@ -101,7 +135,7 @@
       const cardGasto = d.gastoMensal ? Card("Gasto mensal", "Lançamentos", () => ctx.navigate("lancamentos"), GastoMensal(d.gastoMensal)) : null;
 
       const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"),
-        ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true,
+        ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
           intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
@@ -122,6 +156,7 @@
 
       // Grade: [Gasto mensal | Patrimônio] com a mesma altura; Recentes e Top categorias começam na mesma linha
       const area = (nome, el) => (el ? h("div", { class: "dash-area dash-area--" + nome }, el) : null);
+      acompanharTela();
       return C.pagina("page--dashboard", saudacao,
         h("div", { class: "dash-layout" },
           area("gasto", cardGasto), area("patrimonio", cardPatrimonio),

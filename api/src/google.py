@@ -10,6 +10,11 @@ Proteções: state (CSRF) + PKCE S256 + nonce guardados num cookie assinado
 (HMAC com o SEGREDO) de 10 min; troca do código pelo servidor; ID token com
 assinatura RS256 conferida nas chaves públicas do Google, emissor, audiência,
 validade, nonce e e-mail verificado.
+
+A verificação RSA é feita em Python puro, do jeito recomendado pela RFC 8017
+(8.2.2): a mensagem esperada é recodificada por inteiro e comparada em tempo
+constante — sem "interpretar" a assinatura, o que evita as falsificações
+clássicas de PKCS#1 v1.5.
 """
 import base64
 import hashlib
@@ -19,14 +24,48 @@ import secrets
 import time
 from urllib.parse import urlencode
 
-import acesso
-
 AUTORIZAR = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN = "https://oauth2.googleapis.com/token"
 CHAVES = "https://www.googleapis.com/oauth2/v3/certs"
 EMISSORES = ("https://accounts.google.com", "accounts.google.com")
 VALIDADE_S = 600
 _cache = {"chaves": None, "em": 0.0}
+
+# Prefixo DER do DigestInfo para SHA-256 (RFC 8017, seção 9.2, nota 1)
+_DIGEST_INFO_SHA256 = bytes.fromhex("3031300d060960864801650304020105000420")
+_MIN_BITS_RSA = 2048
+
+
+def b64url(texto):
+    if not isinstance(texto, str) or not texto or len(texto) > 16384:
+        raise ValueError("base64url inválido")
+    return base64.urlsafe_b64decode(texto + "=" * (-len(texto) % 4))
+
+
+def _inteiro(texto):
+    return int.from_bytes(b64url(texto), "big")
+
+
+def verificar_rs256(jwk, mensagem, assinatura):
+    """True se `assinatura` (bytes) é uma assinatura RS256 válida de `mensagem` (bytes)."""
+    try:
+        if jwk.get("kty") != "RSA":
+            return False
+        n, e = _inteiro(jwk["n"]), _inteiro(jwk["e"])
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return False
+    k = (n.bit_length() + 7) // 8
+    if n.bit_length() < _MIN_BITS_RSA or e < 3 or e % 2 == 0 or len(assinatura) != k:
+        return False
+    s = int.from_bytes(assinatura, "big")
+    if s >= n:
+        return False
+    recebido = pow(s, e, n).to_bytes(k, "big")
+    t = _DIGEST_INFO_SHA256 + hashlib.sha256(mensagem).digest()
+    if k < len(t) + 11:
+        return False
+    esperado = b"\x00\x01" + b"\xff" * (k - len(t) - 3) + b"\x00" + t
+    return hmac.compare_digest(recebido, esperado)
 
 
 def b64u(dados):
@@ -48,7 +87,7 @@ def ler_assinado(segredo, texto, agora):
     if not hmac.compare_digest(mac, esperado):
         return None
     try:
-        carga = json.loads(acesso.b64url(corpo))
+        carga = json.loads(b64url(corpo))
     except ValueError:
         return None
     if not isinstance(carga, dict) or not isinstance(carga.get("e"), int) or carga["e"] < agora:
@@ -98,7 +137,7 @@ async def trocar_codigo(servicos, client_id, client_secret, redirect_uri, codigo
     try:
         token = json.loads(texto).get("id_token")
         h, p, s = token.split(".")
-        cab, claims, assinatura = json.loads(acesso.b64url(h)), json.loads(acesso.b64url(p)), acesso.b64url(s)
+        cab, claims, assinatura = json.loads(b64url(h)), json.loads(b64url(p)), b64url(s)
     except (ValueError, AttributeError, TypeError):
         return None
     if not isinstance(cab, dict) or not isinstance(claims, dict) or cab.get("alg") != "RS256" or not isinstance(cab.get("kid"), str):
@@ -108,7 +147,7 @@ async def trocar_codigo(servicos, client_id, client_secret, redirect_uri, codigo
     if jwk is None:                                   # rotação das chaves do Google
         chaves = await _chaves(servicos.http_get, forcar=True)
         jwk = next((k for k in chaves if k.get("kid") == cab["kid"]), None)
-    if jwk is None or not acesso.verificar_rs256(jwk, (h + "." + p).encode("ascii"), assinatura):
+    if jwk is None or not verificar_rs256(jwk, (h + "." + p).encode("ascii"), assinatura):
         return None
     aud = claims.get("aud")
     exp = claims.get("exp")

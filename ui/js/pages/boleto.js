@@ -126,7 +126,7 @@
 
     return h("article", { class: "doc", "aria-label": "Pré-visualização do boleto" },
       h("header", { class: "doc__head" },
-        h("div", { class: "doc__brand" }, h("img", { class: "doc__logo", src: "assets/img/zozo-icone.png", alt: "ZoZo", width: "48", height: "48" })),
+        h("div", { class: "doc__brand" }, h("img", { class: "doc__logo", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "44", height: "44", decoding: "sync" })),
         h("div", { class: "doc__title-wrap" }, h("h2", { class: "doc__title" }, "Boleto"), h("p", { class: "doc__period" }, periodo))),
       h("dl", { class: "doc__meta" },
         h("div", null, h("dt", null, "Perfil"), h("dd", null, perfil ? perfil.nome : "—")),
@@ -171,6 +171,8 @@
   /* ---------------- BoletoEditor (overlay) ---------------- */
   function open(ctx, opts) {
     if (atual) return;
+    // Boleto: só contas com o recurso (o serviço de dados também recusa os dados do boleto)
+    if (!ZoZo.recursos.boleto() || !ZoZo.recursos.perfis()) { ctx.toast(ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE, { tone: "error" }); return; }
     const o = opts || {};
     const hoje = new Date();
     const st = {

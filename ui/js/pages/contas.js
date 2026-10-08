@@ -36,7 +36,7 @@
     ZoZo.charts.renderLineChart(chart, [
       { name: "Ativos", color: css.getPropertyValue("--color-assets").trim(), points: serie.map((p) => ({ data: p.data, valor: p.ativos })) },
       { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
-    ], { height: o.compact ? 150 : 190, independentScale: true, ariaLabel: "Evolução de ativos e passivos" });
+    ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos" });
 
     return h("section", { class: ["chart-card", !o.embedded && "card", o.compact && "chart-card--compact", o.embedded && "chart-card--embedded"], "aria-label": "Gráfico de contas" },
       h("div", { class: "chart-card__top" },

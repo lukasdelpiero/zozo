@@ -76,11 +76,12 @@
     const cats = (st.data.categorias && st.data.categorias.categorias) || [];
     const statusDe = (id) => { const c = cats.find((x) => x.id === id); return c ? c.status : null; };
     const faixa = f.periodo ? intervalo(f.periodo).map(F.iso) : null;
+    const comPerfis = ZoZo.recursos.perfis();            // filtro de perfil só existe para contas com o recurso
     let out = lancamentos.filter((l) => {
       if (f.contas.length && !f.contas.includes(l.contaId)) return false;
       if (f.categorias.length && !f.categorias.includes(l.categoriaId)) return false;
       if (f.statusCategoria !== "ambos" && statusDe(l.categoriaId) !== (f.statusCategoria === "excluidas" ? "excluida" : "regular")) return false;
-      if (f.perfis.length && !f.perfis.includes(l.perfilId)) return false;
+      if (comPerfis && f.perfis.length && !f.perfis.includes(l.perfilId)) return false;
       if (faixa && (l.data < faixa[0] || l.data > faixa[1])) return false;
       if (f.tipos.length && !f.tipos.includes(l.tipo)) return false;
       if (f.recorrencias.length && !f.recorrencias.some((sid) => l.id === sid || l.serieId === sid)) return false;
@@ -95,7 +96,7 @@
 
   function temFiltro(st) {
     const f = filtros();
-    return !!(f.contas.length || f.categorias.length || f.statusCategoria !== "ambos" || f.perfis.length || f.periodo || f.recorrencias.length || f.tipos.length || f.ordem !== "data-desc" || (st.ui.busca || "").trim());
+    return !!(f.contas.length || f.categorias.length || f.statusCategoria !== "ambos" || (ZoZo.recursos.perfis() && f.perfis.length) || f.periodo || f.recorrencias.length || f.tipos.length || f.ordem !== "data-desc" || (st.ui.busca || "").trim());
   }
 
   function totais(itens) {
@@ -145,8 +146,8 @@
         submenu: LM({ itens: contas.map((c) => ({ value: c.id, label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), cor: c.cor })), marcados: marcados("contas"), alternar: alternar("contas"), vazio: "Nenhuma conta." }) },
       { icone: "categorias", label: "Categoria", valor: qtd(filtros().categorias.length + (filtros().statusCategoria !== "ambos" ? 1 : 0)),
         submenu: LM({ itens: cats.map((c) => ({ value: c.id, label: c.nome, icone: c.icone })), marcados: marcados("categorias"), alternar: alternar("categorias"), topo: statusCategoria, vazio: "Nenhuma categoria." }) },
-      { icone: "perfil", label: "Perfil", valor: qtd(filtros().perfis.length),
-        submenu: LM({ itens: perfis.map((p) => ({ value: p.id, label: p.nome + (p.arquivado ? " (arquivado)" : ""), cor: p.cor })), marcados: marcados("perfis"), alternar: alternar("perfis"), vazio: "Nenhum perfil." }) },
+      ...(ZoZo.recursos.perfis() ? [{ icone: "perfil", label: "Perfil", valor: qtd(filtros().perfis.length),
+        submenu: LM({ itens: perfis.map((p) => ({ value: p.id, label: p.nome + (p.arquivado ? " (arquivado)" : ""), cor: p.cor })), marcados: marcados("perfis"), alternar: alternar("perfis"), vazio: "Nenhum perfil." }) }] : []),
       { icone: "calendario", label: "Data", valor: filtros().periodo ? "1" : "", submenu: unico("periodo", PERIODOS) },
       { icone: "recorrencias", label: "Recorrência", valor: qtd(filtros().recorrencias.length),
         submenu: LM({ itens: recs.filter((r, i, arr) => arr.findIndex((x) => x.serieId === r.serieId) === i).map((r) => ({ value: r.serieId, label: r.descricao + " · " + r.tipoRecorrencia, icone: r.categoria && r.categoria.icone })),
@@ -177,7 +178,7 @@
     if (f.contas.length) chip("Conta", nomes(f.contas, contas), () => setFiltros({ contas: [] }, ctx));
     if (f.categorias.length) chip("Categoria", nomes(f.categorias, cats), () => setFiltros({ categorias: [] }, ctx));
     if (f.statusCategoria !== "ambos") chip("Categorias", f.statusCategoria === "excluidas" ? "Excluídas" : "Regulares", () => setFiltros({ statusCategoria: "ambos" }, ctx));
-    if (f.perfis.length) chip("Perfil", nomes(f.perfis, perfis), () => setFiltros({ perfis: [] }, ctx));
+    if (ZoZo.recursos.perfis() && f.perfis.length) chip("Perfil", nomes(f.perfis, perfis), () => setFiltros({ perfis: [] }, ctx));
     if (f.periodo) chip("Data", (PERIODOS.find((p) => p.value === f.periodo) || {}).label, () => setFiltros({ periodo: null }, ctx));
     if (f.recorrencias.length) chip("Recorrência", f.recorrencias.map((sid) => { const r = recs.find((x) => x.serieId === sid); return r ? r.descricao : "—"; }).join(", "), () => setFiltros({ recorrencias: [] }, ctx));
     if (f.tipos.length) chip("Tipo", f.tipos.map((t) => (TIPOS_FILTRO.find((x) => x.value === t) || {}).label).join(", "), () => setFiltros({ tipos: [] }, ctx));
@@ -240,8 +241,8 @@
       ["receita", "Receita"], ["interno", "Transferência"], ["regular", "Regular"],
     ].map(([v, t]) => ({ label: t, onClick: () => aplicar({ tipo: v }, "Tipo alterado.") })), { posicao: "acima", label: "Mudar tipo" }));
 
-    const perfilBtn = botao("perfil", "Perfil");
-    perfilBtn.addEventListener("click", () => {
+    const perfilBtn = ZoZo.recursos.perfis() ? botao("perfil", "Perfil") : null;      // só contas com o recurso de Perfis
+    if (perfilBtn) perfilBtn.addEventListener("click", () => {
       const perfis = ((store.get().data.perfis && store.get().data.perfis.perfis) || []).filter((p) => !p.arquivado);
       ZoZo.menu.abrir(perfilBtn, perfis.map((p) => ({ render: (api) => h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); aplicar({ perfilId: p.id }, "Perfil definido."); } }, UI.Tag(p.nome, p.cor, { class: "tag--upper" })) }))
         .concat([{ label: "Sem perfil", onClick: () => aplicar({ perfilId: null }, "Perfil removido.") }, { separador: true },
@@ -285,7 +286,7 @@
     filtroBtn.addEventListener("click", () => abrirMenuFiltros(filtroBtn, ctx, "direita"));
     return [
       UI.IconButton("mais", "Novo lançamento", { onPrimary: true, onClick: () => abrirFormulario(null, ctx) }),
-      UI.IconButton("boleto", "Criar boleto", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }),
+      ZoZo.recursos.boleto() ? UI.IconButton("boleto", "Criar boleto", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }) : null,
       UI.IconButton("baixar-circulo", "Exportar lançamentos (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
       h("div", { class: "topbar-search topbar-search--larga" }, icon("pesquisar", { size: 15 }), busca, filtroBtn),
     ];

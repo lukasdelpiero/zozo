@@ -71,11 +71,11 @@
       selected: { tipo: "perfil", id: p.id },
       menu: [
         { label: p.arquivado ? "Desarquivar" : "Arquivar", onClick: () => arquivar(p, ctx) },
-        { label: "Gerar boleto", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) },
+        ZoZo.recursos.boleto() ? { label: "Gerar boleto", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) } : null,
         { label: "Editar perfil", onClick: () => abrirFormPerfil(ctx, p) },
         { separador: true },
         { label: "Excluir perfil", perigo: true, onClick: () => excluirPerfil(p, ctx) },
-      ],
+      ].filter(Boolean),
       render(body) {
         const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
         mount(body,
@@ -104,19 +104,25 @@
     });
   }
 
+  /** Ícone redondo do perfil: fundo na cor do perfil e a inicial do nome (mesmo formato do ícone das contas) */
+  function AvatarPerfil(p) {
+    const inicial = (Array.from(String(p.nome || "").trim())[0] || "?").toLocaleUpperCase("pt-BR");
+    return h("span", { class: "account-icon profile-avatar", style: { "--account-color": F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }, inicial);
+  }
+
+  /** Linha como a de Contas: [ícone] nome / quantidade de lançamentos ........ gasto no mês */
   function linhaPerfil(p, sel, ctx) {
     return h("button", { type: "button", class: ["row", "row--interactive", "profile-row", p.id === sel && "is-selected"], "aria-current": p.id === sel ? "true" : undefined, onClick: () => abrirDetalhe(p, ctx) },
-      h("span", { class: "profile-row__lead" },
-        h("span", { class: "category-row__dot profile-row__dot", style: { background: F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
-        // nome e, abaixo, a quantidade de lançamentos
-        h("span", { class: "profile-row__text" },
-          h("span", { class: "profile-row__name" }, p.nome),
-          h("span", { class: "profile-row__count" }, p.quantidade === 1 ? "1 lançamento" : (p.quantidade || 0) + " lançamentos"))),
+      AvatarPerfil(p),
+      h("span", { class: "profile-row__text" },
+        h("span", { class: "profile-row__name" }, p.nome),
+        h("span", { class: "profile-row__count" }, p.quantidade === 1 ? "1 lançamento" : (p.quantidade || 0) + " lançamentos")),
       h("span", { class: "profile-row__value money" }, F.moeda(p.gasto || 0)));
   }
 
   ZoZo.pages.perfil = {
     titulo: "Perfis",
+    recurso: "perfis",                 // a página só existe para contas com o recurso (router.js)
     topbar: (ctx) => [UI.IconButton("mais", "Novo perfil", { onPrimary: true, onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (p) => abrirDetalhe(Object.assign({ gasto: 0, quantidade: 0 }, p), ctx) }) })],
     carregar: (ctx, force) => ctx.loadData("perfis", A.getPerfis, null, { force }),
     deps: (s) => [s.data.perfis, s.errors.perfis, s.selectedItem, s.ui.gruposFechados],
@@ -130,7 +136,7 @@
       const sel = state.selectedItem && state.selectedItem.tipo === "perfil" ? state.selectedItem.id : null;
 
       if (!perfis.length) {
-        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada lançamento (ex.: Casa, Mãe) e são usados no boleto.",
+        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada lançamento (ex.: Casa, Mãe)" + (ZoZo.recursos.boleto() ? " e são usados no boleto." : "."),
           { icon: "perfil", action: { label: "Novo perfil", icon: "mais", onClick: () => ZoZo.modais.novoPerfil(ctx, {}) } }));
       }
 
@@ -148,7 +154,7 @@
     },
   };
 
-  ZoZo.perfilShared = { abrirFormPerfil };
+  ZoZo.perfilShared = { abrirFormPerfil, AvatarPerfil };
 
   /* =============================================================
      Configurações (região inferior do painel lateral — seção 8)
@@ -198,14 +204,16 @@
     const entra = (l) => ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
     const tipos = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", estorno: "Estorno" };
     const freq = ZoZo.servico.FREQUENCIAS;
-    const linhas = [["Data", "Nome", "Valor", "Tipo", "Conta", "Categoria", "Perfil", "Recorrência", "Parcela", "Notas"].join(";")];
+    const comPerfil = ZoZo.recursos.perfis();             // coluna Perfil só para contas com o recurso
+    const linhas = [["Data", "Nome", "Valor", "Tipo", "Conta", "Categoria"].concat(comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
     lancamentos.slice().sort((a, b) => a.data.localeCompare(b.data)).forEach((l) => {
       const recorrencia = l.tipo !== "recorrente" ? "" : l.recorrencia === "parcelada" ? "Parcelada" : (freq[l.recorrencia] || freq.mensal).rotulo;
       linhas.push([
         texto(F.parseData(l.data).toLocaleDateString("pt-BR")), texto(l.descricao), numero((entra(l) ? 1 : -1) * F.numero(l.valor)),
-        texto(tipos[l.tipo] || l.tipo), texto(l.nomeConta), texto(l.categoria ? l.categoria.nome : ""), texto(l.perfil ? l.perfil.nome : ""),
+        texto(tipos[l.tipo] || l.tipo), texto(l.nomeConta), texto(l.categoria ? l.categoria.nome : ""),
+      ].concat(comPerfil ? [texto(l.perfil ? l.perfil.nome : "")] : [], [
         texto(recorrencia), texto(l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : ""), texto(l.notas),
-      ].join(";"));
+      ]).join(";"));
     });
     return "\ufeff" + linhas.join("\r\n");
   }
@@ -363,6 +371,7 @@
       const u = state.session.user || {};
       const cfg = state.data.config || {};
       const disponivel = state.session.storageAvailable !== false;
+      const demo = ZoZo.recursos.demo();       // conta de demonstração: nome, senha, 2FA, apagar e excluir não existem
       const redesenhar = ctx.redesenharConfig || (() => {});
 
       const nav = h("nav", { class: "cfg-nav", "aria-label": "Seções das configurações" },
@@ -385,12 +394,15 @@
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
               .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })))),
-          h("h3", { class: "cfg-section" }, "Pix dos boletos"),
-          SecaoPix(ctx, cfg, u),
+          // Pix dos boletos: só contas com o recurso
+          ZoZo.recursos.pix() ? h("h3", { class: "cfg-section" }, "Pix dos boletos") : null,
+          ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
           h("h3", { class: "cfg-section" }, "Armazenamento"),
           linhaConfig(
-            ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador." : disponivel ? "Seus dados são criptografados neste navegador e guardados na nuvem do ZoZo. Ninguém lê seus dados sem a sua senha." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
-            "Última gravação: " + quando(cfg.ultimaGravacao) + ".",
+            ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador."
+              : demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
+              : disponivel ? "Seus dados são criptografados neste navegador e guardados na nuvem do ZoZo. Ninguém lê seus dados sem a sua senha." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
+            demo ? "Ao sair ou recarregar a página, novos dados são sorteados." : "Última gravação: " + quando(cfg.ultimaGravacao) + ".",
             icon(disponivel ? "nuvem" : "alerta", { size: 18, class: disponivel ? "cfg-ok" : "cfg-alerta" })),
         ];
       } else {
@@ -420,7 +432,7 @@
             .finally(() => { btn.disabled = false; });
         };
         const apagarDados = () => ZoZo.modais.confirmarComSenha({ titulo: "Apagar todos os dados?", botao: "Apagar dados",
-          mensagem: "Lançamentos, contas, categorias e perfis serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
+          mensagem: "Lançamentos, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
           .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha })).then(() => {
             ZoZo.servico.reset();
             // Filtros, seleção e preferências apontavam para itens que não existem mais
@@ -440,27 +452,31 @@
             cfg.foto ? UI.Button("Remover", { size: "sm", onClick: () => ctx.bridge.request(A.updateConfig, { foto: null })
               .then(() => ctx.loadData("config", A.getConfig, null, { force: true })) }) : null,
             arquivo),
-          linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: "cfg-inline",
+          demo ? linhaConfig("Nome", null, h("span", { class: "cfg-readonly" }, u.nomeUsuario || "")) : linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: "cfg-inline",
             aoSalvar: (v) => ZoZo.modais.confirmarComSenha({ titulo: "Confirmar alteração", botao: "Salvar", mensagem: "Digite sua senha para alterar o nome." })
               .then((senha) => {
                 if (!senha) throw new ZoZo.messages.BridgeError("CANCELADO", "Alteração cancelada.");
                 return ctx.bridge.request(A.updateUser, { nomeUsuario: v, email: u.email, senhaAtual: senha });
               }).then((sessao) => { store.set({ session: { user: sessao.user } }); ctx.toast("Nome alterado."); }) })),
           linhaConfig("E-mail", null, h("span", { class: "cfg-readonly" }, u.email || "")),
-          linhaConfig("Alterar senha", null,
+          demo ? h("p", { class: "cfg-nota" }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
+          // Senha: título em cima e, abaixo, senha atual · nova senha · Alterar (sem espremer o título ao lado)
+          demo ? null : h("div", { class: "cfg-row cfg-row--bloco" },
+            h("div", { class: "cfg-row__text" }, h("span", { class: "cfg-row__title" }, "Alterar senha")),
             h("div", { class: "cfg-password" }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
-          linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
+          demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
           h("h3", { class: "cfg-section" }, "Ações"),
           linhaConfig("Exportar todos os lançamentos", "Baixe seus dados em um arquivo CSV", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
-          linhaConfig("Apagar todos os dados", "Mantém o login e remove lançamentos, contas, categorias e perfis", UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
+          demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove lançamentos, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
+            UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
         ];
       }
       // Sair e Excluir conta ficam fixos no rodapé da janela (aba Conta)
       const rodape = abaConfig === "conta" ? h("div", { class: "cfg-footer" },
         UI.Button("Sair", { onClick: () => ctx.logout() }),
-        h("button", { type: "button", class: "cfg-danger-btn", onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
+        demo ? null : h("button", { type: "button", class: "cfg-danger-btn", onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
           mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." })
           .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
             .catch((e) => ctx.toast(e.friendly, { tone: "error" }))) }, "Excluir conta")) : null;

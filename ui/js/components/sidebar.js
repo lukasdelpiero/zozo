@@ -1,5 +1,6 @@
 /* =============================================================
    ZoZo — Painel lateral (seções 5, 7, 8)
+   Topo: logo (esquerda) e o botão de recolher/mostrar o menu (direita, criado em app.js)
    Superior: navegação · Central: resumo de contas · Inferior: foto + nome (esquerda) e Configurações (ícone, direita)
    ============================================================= */
 (function (ZoZo) {
@@ -15,8 +16,9 @@
     { id: "investimentos", label: "Investimentos", icon: "investimentos" },
     { id: "categorias", label: "Categorias", icon: "categorias" },
     { id: "recorrencias", label: "Recorrências", icon: "recorrencias" },
-    { id: "perfil", label: "Perfis", icon: "perfil" },
+    { id: "perfil", label: "Perfis", icon: "perfil", recurso: "perfis" },   // só contas com o recurso de Perfis
   ];
+  const visivel = (n) => !n.recurso || ZoZo.recursos[n.recurso]();
 
   // Ordem e títulos dos grupos da região central (seção 7)
   const GRUPOS = [
@@ -39,28 +41,28 @@
     const navEl = h("nav", { class: "sidebar__nav", "aria-label": "Navegação principal" });
     const contasEl = h("div", { class: "sidebar__accounts", "aria-label": "Resumo das contas", role: "region", tabindex: "-1" });
     const footerEl = h("div", { class: "sidebar__footer" });
-    const refreshBtn = UI.IconButton("atualizar", "Atualizar dados", { onClick: () => ctx.refresh(), class: "sidebar__refresh" });
+    const avisoEl = h("div", { class: "sidebar__aviso" });
 
-    const aviso = ZoZo.bridge.isDemo
-      ? h("p", { class: "demo-badge", role: "note" }, icon("alerta", { size: 14 }), "Modo de demonstração: nada é salvo no servidor.")
-      : null;
     mount(el,
       h("div", { class: "sidebar__header" },
-        h("img", { class: "sidebar__logo", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" }),
-        refreshBtn),
-      navEl, contasEl, aviso, footerEl);
+        h("img", { class: "sidebar__logo", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" })),
+      navEl, contasEl, avisoEl, footerEl);
 
     let assinatura = null;
     function render(state) {
       const contas = state.data.contas && state.data.contas.contas;
       const usuario = state.session.user || {};
       const foto = state.data.config && state.data.config.foto;
-      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, state.loading._refresh, usuario, foto].map((x) => (typeof x === "object" ? x : String(x)));
+      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto].map((x) => (typeof x === "object" ? x : String(x)));
       if (assinatura && sig.every((v, i) => v === assinatura[i])) return;
       assinatura = sig;
 
-      refreshBtn.classList.toggle("is-spinning", !!state.loading._refresh);
-      mount(navEl, NAV.map((n) => navItem(n, state.currentPage, ctx.navigate)));
+      mount(navEl, NAV.filter(visivel).map((n) => navItem(n, state.currentPage, ctx.navigate)));
+      // Demonstração (modo local ou conta demo): nada é gravado
+      mount(avisoEl, ZoZo.bridge.isDemo || ZoZo.recursos.demo()
+        ? h("p", { class: "demo-badge", role: "note" }, icon("alerta", { size: 14 }),
+          ZoZo.bridge.isDemo ? "Modo de demonstração: nada é salvo no servidor." : "Conta de demonstração: dados fictícios, nada é salvo.")
+        : null);
 
       if (!contas) {
         mount(contasEl, state.errors.contas ? h("p", { class: "sidebar__note" }, state.errors.contas) : UI.Skeleton(5, { class: "skeleton--sidebar" }));
@@ -83,5 +85,5 @@
     return { render };
   }
 
-  ZoZo.sidebar = { create, NAV };
+  ZoZo.sidebar = { create, NAV, visivel };
 })(window.ZoZo);

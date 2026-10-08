@@ -19,8 +19,10 @@ Camadas de proteção:
   8. gravação com versão (409 se outro dispositivo gravou antes) + histórico;
   9. operações de várias etapas (troca de senha, apagar dados) são atômicas;
  10. CSRF: escritas só da própria origem e só com JSON (além do SameSite=Strict).
-O ambiente de prévia pode exigir também o Cloudflare Access (EXIGIR_ACCESS=1).
 "Continuar com Google" (google.py) só confirma o e-mail: a senha continua sendo a chave dos dados.
+Conta de demonstração (DEMO_EMAIL, senha pública): somente leitura — a API recusa toda rota
+protegida (gravar documento, senha, nome, 2FA, apagar, excluir); os dados são gerados no navegador.
+Perfis, boletos e Pix: liberados só para a demonstração e os e-mails de RECURSOS_AVANCADOS.
 
 O servidor nunca recebe a senha nem os dados legíveis: o documento chega
 cifrado (AES-256-GCM) do navegador.
@@ -28,9 +30,8 @@ cifrado (AES-256-GCM) do navegador.
 O núcleo recebe:
   banco    — primeiro(sql, *p) -> dict|None · todos -> list · executar -> int · lote([(sql, p)]) -> list
   servicos — http_get(url, cab) -> (status, texto) · http_post(url, campos) -> (status, texto)
-             · access(pedido) -> e-mail|None (só se EXIGIR_ACCESS=1)
-  config   — SEGREDO, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO, EXIGIR_ACCESS,
-             GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+  config   — SEGREDO, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO,
+             GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS
 """
 import base64
 import binascii
@@ -71,9 +72,15 @@ ESQUECE_S = 86400                          # 24 h sem falhas → contador zera
 CONTA_CAPTCHA, CONTA_JANELA_S = 20, 3600   # 20 falhas/h na conta (todos os IPs) → CAPTCHA para todos
 # Limites por IP
 CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
+ENTRADAS_POR_IP, ENTRADA_JANELA_S = 30, 600          # logins (certos ou errados) por IP: a senha da demo é pública
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+# Conta de demonstração pública (criada pela migração 0003_conta_demo.sql)
+DEMO_EMAIL = "demo@usezozo.com.br"
+DEMO_SESSOES_MAX = 500          # sessões abertas da demo ao mesmo tempo (as mais antigas saem)
+DEMO_OCIOSA_S = 6 * 3600        # sessão da demo parada há 6 h é descartada
 
 _B64 = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 _PREFIXO_SHA1 = re.compile(r"^[0-9A-F]{5}$")
@@ -242,8 +249,6 @@ def _mesma_origem(pedido):
         raise Falha(403, "FORBIDDEN")
 
 
-
-
 # ---------------- limites (bloqueio progressivo e contadores por IP) ----------------
 async def _limite(ctx, chave):
     return await ctx.banco.primeiro("SELECT falhas, ultima, bloqueado_ate FROM limites WHERE chave = ?", chave)
@@ -336,6 +341,12 @@ async def _criar_sessao(ctx, email, estado):
         "INSERT INTO sessoes (id, email, estado, envelope, criada, ultimo_uso) VALUES (?, ?, ?, ?, ?, ?)",
         _hash_token(token), email, estado, envelope, ctx.agora, ctx.agora)
     _definir_cookie(ctx, token)
+    if email == DEMO_EMAIL:
+        # Senha pública: qualquer um abre sessões da demo. A tabela não cresce sem limite.
+        await ctx.banco.executar("DELETE FROM sessoes WHERE email = ? AND ultimo_uso < ?", email, ctx.agora - DEMO_OCIOSA_S)
+        await ctx.banco.executar(
+            "DELETE FROM sessoes WHERE email = ? AND id NOT IN (SELECT id FROM sessoes WHERE email = ? ORDER BY ultimo_uso DESC, criada DESC LIMIT ?)",
+            email, email, DEMO_SESSOES_MAX)
     if secrets.randbelow(20) == 0:          # limpeza ocasional do que já venceu
         await ctx.banco.executar(
             "DELETE FROM sessoes WHERE ultimo_uso < ? OR criada < ? OR (estado = '2fa' AND criada < ?)",
@@ -369,8 +380,16 @@ async def _encerrar_outras(ctx, email, manter_id):
     await ctx.banco.executar("DELETE FROM sessoes WHERE email = ? AND id != ?", email, manter_id)
 
 
-def _sessao_publica(email, nome, envelope, dois_fatores):
-    return {"email": email, "nome": nome, "envelope": envelope, "doisFatores": bool(dois_fatores)}
+def _avancado(ctx, email):
+    """Perfis, boletos e Pix: só a demonstração e os e-mails do segredo RECURSOS_AVANCADOS (lista separada por vírgula)."""
+    lista = {e.strip().lower() for e in str(ctx.config.get("RECURSOS_AVANCADOS") or "").split(",") if e.strip()}
+    return email == DEMO_EMAIL or email in lista
+
+
+def _sessao_publica(ctx, email, nome, envelope, dois_fatores):
+    av = _avancado(ctx, email)
+    return {"email": email, "nome": nome, "envelope": envelope, "doisFatores": bool(dois_fatores),
+            "demo": email == DEMO_EMAIL, "recursos": {"perfis": av, "boleto": av, "pix": av}}
 
 
 # ---------------- prova da senha (rotas com sessão) ----------------
@@ -441,6 +460,8 @@ async def _cadastrar(ctx):
         ctx.evento("cadastro_limitado")
         raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CADASTRO_JANELA_S})
     email = _email(b.get("email"))
+    if email == DEMO_EMAIL:                       # a conta de demonstração já existe (migração) e não é recriada
+        raise Falha(409, "EMAIL_IN_USE")
     if not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile")):
         raise Falha(428, "CAPTCHA_REQUIRED")
     sal, it, prova = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _prova(b.get("prova"))
@@ -454,12 +475,15 @@ async def _cadastrar(ctx):
         raise Falha(409, "EMAIL_IN_USE")
     envelope = await _criar_sessao(ctx, email, "ativa")
     ctx.evento("cadastro", email)
-    return Resposta(201, _sessao_publica(email, nome, envelope, False))
+    return Resposta(201, _sessao_publica(ctx, email, nome, envelope, False))
 
 
 async def _entrar(ctx):
     b = _json(ctx.pedido)
     email = _email(b.get("email"))
+    if await _contar(ctx, f"entrada|{ctx.h(ctx.pedido.ip)}", ENTRADAS_POR_IP, ENTRADA_JANELA_S):
+        ctx.evento("login_limitado_ip")
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": ENTRADA_JANELA_S})
     chave = f"login|{ctx.h(email)}|{ctx.h(ctx.pedido.ip)}"
     linha, conta_lim = await _limite(ctx, chave), await _limite(ctx, f"conta|{ctx.h(email)}")
     bloqueio = _bloqueado(ctx, linha)
@@ -498,7 +522,7 @@ async def _entrar(ctx):
     await _limpar_login(ctx, email)
     envelope = await _criar_sessao(ctx, email, "ativa")
     ctx.evento("login", email)
-    return Resposta(200, _sessao_publica(email, conta["nome"], envelope, False))
+    return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, False))
 
 
 async def _segundo_fator(ctx):
@@ -527,7 +551,7 @@ async def _segundo_fator(ctx):
     await _limpar_login(ctx, email)
     envelope = await _criar_sessao(ctx, email, "ativa")
     ctx.evento("login", email, segundo_fator=True)
-    return Resposta(200, _sessao_publica(email, conta["nome"], envelope, True))
+    return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, True))
 
 
 async def _senha_vazada(ctx):
@@ -542,7 +566,6 @@ async def _senha_vazada(ctx):
     if status != 200 or len(texto) > 2_000_000:
         raise Falha(502, "UNAVAILABLE")
     return Resposta(200, {"lista": texto})
-
 
 
 # ---------------- Continuar com Google ----------------
@@ -657,7 +680,7 @@ async def _rota(ctx):
                 _definir_cookie(ctx)                   # cookie que não vale mais: apaga (a sessão parcial do 2FA fica)
             return Resposta(204)                       # sem sessão: resposta normal (não é erro para quem só abriu o site)
         conta = await ctx.banco.primeiro("SELECT nome, totp_segredo FROM contas WHERE email = ?", s["email"])
-        return Resposta(200, _sessao_publica(s["email"], conta["nome"], s["envelope"], conta["totp_segredo"]))
+        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], s["envelope"], conta["totp_segredo"]))
     if m == "DELETE" and c == "/api/sessao":
         token = p.cookie(_nome_cookie(ctx))
         if token and len(token) <= 128:
@@ -674,6 +697,10 @@ async def _rota(ctx):
     if not s:
         raise Falha(401, "UNAUTHORIZED")
     email = s["email"]
+    if email == DEMO_EMAIL:
+        # Demonstração (senha pública): nada é gravado no servidor e a conta não pode ser alterada por ninguém
+        ctx.evento("demo_somente_leitura", rota=c)
+        raise Falha(403, "DEMO_READ_ONLY")
     # Corpo validado ANTES da prova: pedido malformado não consome tentativa
     b = _json(p) if m in ("POST", "PUT") and c not in _SEM_CORPO else {}
     conta = await _conferir_prova(ctx, email)
@@ -786,20 +813,7 @@ async def atender(pedido, banco, servicos, config, log=print, agora=None):
             r = Resposta(503, {"erro": "UNAVAILABLE"})
         else:
             _mesma_origem(pedido)
-            if str(config.get("EXIGIR_ACCESS") or "") == "1":      # ambiente de prévia: Cloudflare Access na frente
-                try:
-                    identidade = await servicos.access(pedido)
-                except Exception as ex:  # noqa: BLE001
-                    log(json.dumps({"evento": "access_indisponivel", "req": ctx.req, "tipo": type(ex).__name__}))
-                    identidade = False
-                if identidade is False:
-                    r = Resposta(503, {"erro": "UNAVAILABLE"})
-                elif not identidade:
-                    r = Resposta(401, {"erro": "ACCESS_DENIED"})
-                else:
-                    r = await _rota(ctx)
-            else:
-                r = await _rota(ctx)
+            r = await _rota(ctx)
     except Falha as f:
         r = Resposta(f.status, dict({"erro": f.codigo}, **f.extra))
     except Exception as ex:  # noqa: BLE001 — nunca devolve detalhes técnicos

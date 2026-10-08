@@ -9,13 +9,15 @@
 #   npx wrangler secret put SEGREDO                       (e: --env previa)
 #   npx wrangler secret put TURNSTILE_SECRET              (e: --env previa)
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET          (opcional, para o "Continuar com Google")
+#   npx wrangler secret put RECURSOS_AVANCADOS            (e-mails com Perfis, boletos e Pix, separados por vírgula;
+#                                                          a conta demo@usezozo.com.br sempre tem)
 name = "zozo"
 main = "src/entry.py"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["python_workers"]
 
-# Endereço: workers.dev. As URLs de pré-visualização por versão ficam desligadas
-# (a prévia oficial é o ambiente "previa", protegido pelo Cloudflare Access).
+# Endereço: workers.dev (e o domínio usezozo.com.br). As URLs de pré-visualização por versão
+# ficam desligadas (a prévia oficial é o ambiente "previa").
 workers_dev = true
 preview_urls = false
 

@@ -9,7 +9,7 @@ o servidor só aceita conexões do próprio computador (127.0.0.1).
 
 Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_PORTA        porta (padrão 8787)
-  ZOZO_DEV_CADASTRO     e-mails que podem criar conta (padrão "*": qualquer um)
+  ZOZO_DEV_RECURSOS     e-mails com Perfis, boletos e Pix (separados por vírgula; a conta demo sempre tem)
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
 """
@@ -54,7 +54,7 @@ def _segredo_local():
 
 CONFIG = {
     "SEGREDO": _segredo_local(),
-    "ALLOWED_EMAILS": os.environ.get("ZOZO_DEV_CADASTRO", "*"),
+    "RECURSOS_AVANCADOS": os.environ.get("ZOZO_DEV_RECURSOS", ""),
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 }
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
@@ -89,9 +89,6 @@ class Servicos:
     async def http_post(self, url, campos):
         dados = urllib.parse.urlencode(campos).encode("utf-8")
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
-
-    async def access(self, _pedido):              # não há Cloudflare Access aqui
-        return None
 
 
 class Manipulador(http.server.BaseHTTPRequestHandler):

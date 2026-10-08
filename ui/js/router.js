@@ -48,6 +48,8 @@
       const o = opts || {};
       const alvo = ZoZo.pages[id];
       if (!alvo) return;
+      // Página de um recurso que a conta não tem (ex.: Perfis): vai para o Dashboard
+      if (alvo.recurso && !ZoZo.recursos[alvo.recurso]()) { if (id !== "dashboard") navigate("dashboard"); return; }
       ZoZo.menu.fechar();
       ctx.detail.close({ silencioso: true });
       const mudou = !page || page !== alvo;

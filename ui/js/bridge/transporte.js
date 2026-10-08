@@ -28,7 +28,10 @@
     // Mensagens técnicas vindas do host nunca são exibidas.
     if (error) ZoZo.log.info("Erro do host", action, code);
     const isRead = /^get/.test(action) || action === M.ACTIONS.loadUserData;
-    return Object.assign(new M.BridgeError(code, isRead ? M.FRIENDLY.LOAD_FAILED : M.FRIENDLY.OPERATION_FAILED), extra);
+    // O código (nome interno, nunca detalhe técnico) ajuda a identificar o problema quando o usuário relata
+    const base = isRead ? M.FRIENDLY.LOAD_FAILED : M.FRIENDLY.OPERATION_FAILED;
+    const texto = /^[A-Z0-9_]{3,40}$/.test(code) && code !== "UNKNOWN_ERROR" ? base.replace(/\.$/, "") + " (código " + code + ")." : base;
+    return Object.assign(new M.BridgeError(code, texto), extra);
   }
 
   /**

@@ -481,8 +481,6 @@ button.cat-table__row:hover { background: var(--color-surface-hover); }
 @container dashboard (max-width: 860px) {
   .dash-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "gasto" "patrimonio" "recentes" "top" "proximos"; }
 }
-.profile-row__lead { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.profile-row__dot { width: 8px; height: 8px; }
 .profile-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Contas ocultas */
 .account-row__line { display: flex; align-items: center; gap: 6px; min-width: 0; }

@@ -71,6 +71,21 @@
 
   ZoZo.store = { get, set, subscribe, reset };
 
+  /**
+   * Recursos da conta, informados pelo SERVIDOR no login (nunca decididos aqui):
+   *   perfis / boleto / pix — Perfis, boletos e Pix (conta de demonstração e e-mails liberados no servidor)
+   *   demo                  — conta de demonstração pública: dados gerados no navegador, nada é gravado
+   * Esconder na interface é conforto; quem garante é o servidor (a conta demo é somente leitura lá).
+   */
+  const usuario = () => state.session.user || {};
+  const recurso = (nome) => !!(usuario().recursos && usuario().recursos[nome] === true);
+  ZoZo.recursos = {
+    perfis: () => recurso("perfis"),
+    boleto: () => recurso("boleto"),
+    pix: () => recurso("pix"),
+    demo: () => usuario().demo === true,
+  };
+
   /* Log interno — nunca exibido ao usuário e nunca registra dados de formulário */
   ZoZo.log = {
     info: (...a) => { if (window.ZOZO_DEBUG) console.info("[ZoZo]", ...a); },

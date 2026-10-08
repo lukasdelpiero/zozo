@@ -20,6 +20,9 @@
        e o que ficou guardado vira lixo ilegível (é apagado).
      • versão vista por último fica neste navegador: o servidor não
        consegue "voltar no tempo" sem que o usuário seja avisado.
+     • conta de demonstração (o servidor informa "demo"): os dados são
+       gerados aqui (js/data/demo.js), ficam só na memória e nada é
+       enviado — a API também recusa gravações dessa conta.
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -31,7 +34,7 @@
   const CHAVE_LOCAL = "zozo.sessao";       // chave dos dados, cifrada com o envelope da sessão
   const enc = new TextEncoder(), dec = new TextDecoder();
 
-  let sessao = null;    // { email, nome, chave, prova, envelope, versao, doisFatores }
+  let sessao = null;    // { email, nome, chave, prova, envelope, versao, doisFatores, demo, recursos }
   let pendente = null;  // senha certa, falta o código do 2FA: { email, k }
 
   /* ---------------- utilitários ---------------- */
@@ -54,7 +57,7 @@
   const limparNome = (n) => String(n || "").replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, "").trim().slice(0, 80);
   function validarSenha(s) { if (typeof s !== "string" || s.length < 8 || s.length > 256) throw erro("WEAK_PASSWORD"); }
 
-  /** Encerra a sessão na interface. ACCESS_DENIED: o Cloudflare Access (ambiente de prévia) recusou. */
+  /** Encerra a sessão na interface */
   function sessaoExpirada(codigo, manterChave) {
     const c = codigo || "SESSION_EXPIRED";
     sessao = null; pendente = null;
@@ -72,11 +75,16 @@
     try {
       r = await fetch(API + caminho, {
         method: metodo, credentials: "same-origin", cache: "no-store",
-        redirect: "manual",                       // Access vencido (prévia) redireciona para o login dele
+        redirect: "manual",                       // a API nunca redireciona: um redirecionamento vem de algo na frente dela
         headers, body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
       });
     } catch (e) { throw erro("STORAGE_UNAVAILABLE"); }
-    if (r.type === "opaqueredirect") throw sessaoExpirada("ACCESS_DENIED");
+    if (r.type === "opaqueredirect") throw erro("CF_CHALLENGE");          // redirecionamento de uma proteção na frente da API
+    // Proteção do Cloudflare (ex.: modo "Under Attack") pedindo verificação: o pedido nem chegou ao ZoZo
+    if (r.headers.get("cf-mitigated") === "challenge" || (r.status === 403 && !/json/i.test(r.headers.get("content-type") || ""))) {
+      window.dispatchEvent(new CustomEvent("zozo:protecao-cloudflare"));
+      throw erro("CF_CHALLENGE");
+    }
     let dados = null;
     if (r.status !== 204) { try { dados = await r.json(); } catch (e) { dados = null; } }
     if (r.ok) return dados || {};
@@ -84,11 +92,11 @@
     const extra = { espera: dados && dados.espera, captcha: dados && dados.captcha };
     if (r.status === 401) {
       if (codigo === "INVALID_CREDENTIALS" || codigo === "CODE_INVALID") throw erro(codigo, extra);
-      throw sessaoExpirada(codigo === "ACCESS_DENIED" ? "ACCESS_DENIED" : "SESSION_EXPIRED");
+      throw sessaoExpirada("SESSION_EXPIRED");
     }
     if (r.status === 404 && metodo === "GET") return null;
     if (r.status === 409) throw erro(["EMAIL_IN_USE", "2FA_ALREADY_ON", "2FA_NOT_PENDING"].includes(codigo) ? codigo : "DATA_CHANGED");
-    if (r.status === 403 && (codigo === "WRONG_PASSWORD" || codigo === "REGISTER_FAILED")) throw erro(codigo);
+    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY"].includes(codigo)) throw erro(codigo);
     if (r.status === 403) throw erro("ACCESS_DENIED");                   // pedido recusado pela checagem de origem
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
     if (r.status === 429) throw erro("TOO_MANY_ATTEMPTS", extra);
@@ -154,10 +162,15 @@
   }
   function esquecerChaveLocal() { try { localStorage.removeItem(CHAVE_LOCAL); } catch (e) { /* ok */ } }
 
+  /** Recursos que o servidor liberou para a conta (só valores booleanos conhecidos) */
+  const lerRecursos = (r) => ({ perfis: !!(r && r.perfis === true), boleto: !!(r && r.boleto === true), pix: !!(r && r.pix === true) });
+  const novaSessao = (r, k) => ({ email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0,
+    doisFatores: !!r.doisFatores, demo: r.demo === true, recursos: lerRecursos(r.recursos) });
+
   async function concluir(r, k) {
     await guardarChaveLocal(r.email, r.envelope, k.bits, k.prova);
     k.bits.fill(0);
-    sessao = { email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0, doisFatores: !!r.doisFatores };
+    sessao = novaSessao(r, k);
     return sessaoData();
   }
 
@@ -220,9 +233,12 @@
   }
 
   /* ---------------- ações ---------------- */
-  const usuario = () => (sessao ? { nomeUsuario: sessao.nome, email: sessao.email, doisFatores: sessao.doisFatores } : null);
+  const usuario = () => (sessao ? { nomeUsuario: sessao.nome, email: sessao.email, doisFatores: sessao.doisFatores,
+    demo: sessao.demo, recursos: Object.assign({}, sessao.recursos) } : null);
   const sessaoData = () => ({ authenticated: !!sessao, user: usuario() });
   function exigirSessao() { if (!sessao) throw erro("SESSION_EXPIRED"); return sessao; }
+  /** Conta de demonstração: senha, nome, 2FA, apagar e excluir não existem (o servidor também recusa) */
+  function exigirContaReal() { const s = exigirSessao(); if (s.demo) throw erro("DEMO_READ_ONLY"); return s; }
   /** Prova recusada durante a sessão = senha trocada em outro dispositivo: a sessão acabou */
   async function comProvaDaSessao(fn) {
     try { return await fn(); } catch (e) {
@@ -234,7 +250,7 @@
   const ACOES = {
     async getArmazenamento() {
       try { const p = await api("GET", "/publico"); return { available: true, turnstile: p.turnstile || null, google: !!p.google }; }
-      catch (e) { return { available: e.code === "ACCESS_DENIED", acessoNegado: e.code === "ACCESS_DENIED" }; }
+      catch (e) { return { available: false, desafio: e.code === "CF_CHALLENGE" }; }
     },
 
     /** Depois do "Continuar com Google": e-mail confirmado, nome e se a conta já existe (ou null) */
@@ -251,7 +267,7 @@
         await api("DELETE", "/sessao").catch(() => null);
         return { authenticated: false, email: r.email };
       }
-      sessao = { email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0, doisFatores: !!r.doisFatores };
+      sessao = novaSessao(r, k);
       return sessaoData();
     },
 
@@ -295,6 +311,8 @@
 
     async loadUserData() {
       const s = exigirSessao();
+      // Demonstração: dados fictícios, sorteados a cada acesso (nada vem do servidor)
+      if (s.demo) return { documento: ZoZo.demo.documento(new Date()), aviso: null };
       const d = await comProvaDaSessao(() => api("GET", "/documento", undefined, s.prova));
       if (sessao !== s) throw erro("SESSION_EXPIRED");
       if (!d) { s.versao = 0; return { documento: null, aviso: null }; }
@@ -315,6 +333,7 @@
 
     async saveUserData(d) {
       const s = exigirSessao();
+      if (s.demo) return { salvo: true };      // demonstração: as alterações ficam só na memória desta aba
       const va = s.versao;
       const conteudo = await cifrar(s.chave, s.email, va + 1, d.documento);
       // o servidor recusa (409) se outro dispositivo gravou depois da nossa leitura
@@ -326,7 +345,7 @@
     },
 
     async changePassword(d) {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       validarSenha(d.novaSenha);
       const atual = await derivarConta(d.senhaAtual, await parametros(s.email));
       atual.bits.fill(0);
@@ -350,7 +369,7 @@
     },
 
     async updateUser(d) {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       const nome = limparNome(d.nomeUsuario);
       if (!nome) throw erro("OPERATION_FAILED");
       const k = await derivarConta(d.senhaAtual, await parametros(s.email));
@@ -361,7 +380,7 @@
     },
 
     async wipeUserData(d) {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       const k = await derivarConta(d.senha, await parametros(s.email));
       k.bits.fill(0);
       const doc = await api("GET", "/documento", undefined, k.prova);         // confere a senha e a versão atual
@@ -374,7 +393,7 @@
     },
 
     async deleteUser(d) {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       const k = await derivarConta(d.senha, await parametros(s.email));
       k.bits.fill(0);
       await api("DELETE", "/conta", undefined, k.prova);
@@ -386,17 +405,17 @@
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */
     async iniciar2FA() {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       return comProvaDaSessao(() => api("POST", "/2fa/iniciar", undefined, s.prova));
     },
     async confirmar2FA(d) {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       await comProvaDaSessao(() => api("POST", "/2fa/confirmar", { codigo: String(d.codigo || "") }, s.prova));
       s.doisFatores = true;
       return sessaoData();
     },
     async desativar2FA() {
-      const s = exigirSessao();
+      const s = exigirContaReal();
       await comProvaDaSessao(() => api("POST", "/2fa/desativar", undefined, s.prova));
       s.doisFatores = false;
       return sessaoData();

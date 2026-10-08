@@ -7,15 +7,14 @@ Só traduz entre o Cloudflare e o núcleo (nucleo.py):
   • Request   → Pedido;  Resposta → Response
 A interface (pasta public) é servida pelo próprio Cloudflare (assets);
 este código só recebe os caminhos /api/*.
-Variáveis (wrangler.toml): ALLOWED_EMAILS, TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID, EXIGIR_ACCESS, ACCESS_*
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET
+Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS
 """
 from urllib.parse import urlencode
 
 from pyodide.ffi import to_js
 from workers import Response, WorkerEntrypoint, fetch
 
-import acesso
 import nucleo
 
 try:                                  # Pyodide recente representa o null do JS assim
@@ -23,10 +22,8 @@ try:                                  # Pyodide recente representa o null do JS 
 except ImportError:                   # pragma: no cover
     _JSNULL = None
 
-_CONFIG = ("SEGREDO", "ALLOWED_EMAILS", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "EXIGIR_ACCESS",
-           "ACCESS_TEAM_DOMAIN", "ACCESS_AUD", "ACCESS_EMAILS", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET")
-_CABECALHOS = ("cf-access-jwt-assertion", "cf-connecting-ip", "content-type", "content-length", "cookie",
-               "origin", "sec-fetch-site", "x-zozo-prova")
+_CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS")
+_CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 
 def _py(valor):
@@ -65,9 +62,6 @@ class BancoD1:
 
 
 class Servicos:
-    def __init__(self, config):
-        self.config = config
-
     async def http_get(self, url, cabecalhos):
         r = await fetch(url, method="GET", headers=dict(cabecalhos))
         return int(r.status), await r.text()
@@ -76,10 +70,6 @@ class Servicos:
         r = await fetch(url, method="POST", body=urlencode(campos),
                         headers={"Content-Type": "application/x-www-form-urlencoded"})
         return int(r.status), await r.text()
-
-    async def access(self, pedido):
-        """E-mail do Cloudflare Access (ambiente de prévia) ou None. Lança exceção se indisponível."""
-        return await acesso.identidade(pedido.cab("cf-access-jwt-assertion"), self.config, self.http_get)
 
 
 def _cabecalhos(request):
@@ -113,7 +103,7 @@ class Default(WorkerEntrypoint):
         if not pedido.caminho.startswith("/api/"):
             return _responder(nucleo.Resposta(404, {"erro": "NOT_FOUND"}))
 
-        resposta = await nucleo.atender(pedido, BancoD1(env.DB), Servicos(config), config)
+        resposta = await nucleo.atender(pedido, BancoD1(env.DB), Servicos(), config)
         return _responder(resposta)
 
 

@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.2.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.3.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -9,9 +9,20 @@ Aplicativo web com design baseado no Copilot Money.
 | Front-end | HTML, CSS e JavaScript (pasta `ui`) |
 | Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`) |
 | Dados | **Cloudflare D1** (banco SQL) — só dados cifrados |
-| Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional). O Cloudflare Access protege só o **ambiente de prévia** |
+| Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.3.0
+
+- **Conta de demonstração:** entre com **demo@usezozo.com.br** e a senha **zozo1234**. A cada acesso, o navegador sorteia perfis, contas, cartões, categorias, lançamentos e recorrências fictícios; nada é gravado (o servidor recusa gravações dessa conta e não deixa trocar senha, nome, 2FA nem excluí-la). O visitante pode criar **1 item de cada tipo** além do que foi gerado.
+- **Perfis, boletos e Pix só para contas liberadas:** a demonstração e os e-mails do segredo `RECURSOS_AVANCADOS`. Para as demais contas somem o menu e a página Perfis, o campo e a pílula de perfil, a regra de perfil obrigatório, o filtro e a ação em lote de perfil, "Dividir lançamento", o botão e a página do boleto, a área do Pix nas Configurações e a coluna Perfil do CSV. Perfis já gravados ficam guardados (nada é apagado).
+- **"Não foi possível concluir a operação":** a causa era o modo **Under Attack** do Cloudflare no `usezozo.com.br` desafiando também as chamadas `/api/*` (veja [Cloudflare na frente do ZoZo](#cloudflare-na-frente-do-zozo)). O ZoZo agora reconhece o desafio, explica o que houve e oferece recarregar a página; os demais erros mostram a mensagem certa (com o código, quando é genérico).
+- **Dashboard cabe na tela** do computador, sem rolagem (gráficos mais baixos e listas com as linhas que cabem em telas menores).
+- **Menu:** botão de atualizar removido; o botão de recolher/mostrar foi para a direita e a logo para a esquerda.
+- **Perfis** com ícone redondo na cor do perfil e a inicial do nome, como em Contas; **boleto** com a logo nova.
+- **Celular:** painel de informações em tela cheia e "Novo lançamento" empilhado; **Configurações** com o campo de senha arrumado; **2FA no login** com a mesma caixa das outras etapas.
+- **Segurança:** limite de logins por IP; sessões da demo limitadas; código antigo do Cloudflare Access e da lista de e-mails removido.
 
 ## Novidades da versão 2.2.0
 
@@ -47,6 +58,7 @@ ZoZo/
 │   │   ├── config/regras.js  regras configuráveis (inclui limiteNome = 50)
 │   │   ├── data/servico.js   regras de dados (lançamentos, parcelas, recorrências…)
 │   │   ├── data/pix.js       Pix copia e cola / QR (BR Code do BACEN)
+│   │   ├── data/demo.js      dados sorteados da conta de demonstração
 │   │   ├── bridge/           messages.js (contrato) · host-web.js (criptografia + API) · transporte.js
 │   │   ├── components/       … · verificacao.js (CAPTCHA, código de 6 dígitos, QR code)
 │   │   ├── vendor/           qrcode-generator.js (MIT, versão e integridade no cabeçalho)
@@ -57,13 +69,12 @@ ZoZo/
     ├── src/nucleo.py         rotas, sessões, bloqueio progressivo, prova de senha
     ├── src/totp.py           2FA (TOTP RFC 6238) e cifra do segredo do 2FA
     ├── src/google.py         "Continuar com Google" (OpenID Connect + PKCE)
-    ├── src/acesso.py         Cloudflare Access (só no ambiente de prévia)
     ├── migracoes/            tabelas do banco (aplicadas em ordem, uma vez)
     ├── wrangler.toml         produção + prévia
     ├── publicar.ps1          testes → interface → migrações → publicação
     ├── montar_interface.py   gera api/public a partir de ui/
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/test_api.py     59 testes automáticos da API
+    └── tests/test_api.py     54 testes automáticos da API
 ```
 
 ## Ambientes e publicação
@@ -71,8 +82,8 @@ ZoZo/
 | Ambiente | Endereço | Banco | Quem acessa |
 |---|---|---|---|
 | **Local** | http://127.0.0.1:8787 | `api/dev/zozo-local.db` | só o seu computador |
-| **Prévia** | https://zozo-previa.zozo-finance-app.workers.dev | `zozo-previa` | Cloudflare Access: só **testenviroment@usezozo.com.br**; conta do ZoZo: **insight@usezozo.com.br** |
-| **Produção** | https://zozo.zozo-finance-app.workers.dev | `zozo` | usuários (cadastro só para os e-mails de `ALLOWED_EMAILS`) |
+| **Prévia** | https://zozo-previa.zozo-finance-app.workers.dev | `zozo-previa` | testes (aberta, banco separado) |
+| **Produção** | https://usezozo.com.br · https://zozo.zozo-finance-app.workers.dev | `zozo` | usuários (cadastro aberto, com CAPTCHA) |
 
 Fluxo recomendado: **mudar → testar no local → publicar na prévia → testar → publicar em produção**.
 
@@ -85,7 +96,18 @@ O script roda os testes, monta a interface, aplica as migrações do banco e pub
 
 **Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO` e `npx wrangler secret put TURNSTILE_SECRET` (acrescente `--env previa` para a prévia). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
 
-**Quem pode criar conta:** `ALLOWED_EMAILS` no `wrangler.toml` (lista separada por vírgula, ou `"*"` para cadastro aberto). Mudanças no `wrangler.toml` só valem depois de publicar.
+**Perfis, boletos e Pix:** liberados para a conta de demonstração e para os e-mails do segredo `RECURSOS_AVANCADOS` (separados por vírgula): `npx wrangler secret put RECURSOS_AVANCADOS` (e `--env previa`). Fica como segredo para os e-mails não irem para o GitHub. Sem ele, só a demonstração tem esses recursos.
+
+**Conta de demonstração:** criada pela migração `0003_conta_demo.sql` (login `demo@usezozo.com.br`, senha `zozo1234`). Ninguém consegue recadastrá-la, trocar a senha ou ativar 2FA nela.
+
+### Cloudflare na frente do ZoZo
+
+O modo **"I'm Under Attack"** (ou uma regra de WAF com *Managed Challenge*) desafia **todo** pedido, inclusive as chamadas da API que o próprio site faz. Quando a verificação do navegador vence (padrão: 30 min), as ações passam a ser barradas pelo Cloudflare antes de chegar ao ZoZo — era o "Não foi possível concluir a operação". O ZoZo já tem CAPTCHA, bloqueio progressivo e limites por IP próprios, então o recomendado é:
+
+1. **Desligar o Under Attack** (Cloudflare › usezozo.com.br › Visão geral › *Under Attack Mode* › desligado) e usar só em ataque real; **ou**
+2. manter ligado e criar uma exceção para a API: Cloudflare › usezozo.com.br › **Regras › Configuration Rules** › *Create rule* → quando *URI Path* começa com `/api/` → **Security Level: Essentially Off** (ou *Medium*). Assim a página continua protegida e a API não é desafiada.
+
+Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" com o botão **Recarregar página**.
 
 **Backup:** o D1 guarda 30 dias de histórico (*Time Travel*): `npx wrangler d1 time-travel restore zozo --timestamp=<data>` volta o banco a um momento anterior.
 
@@ -109,7 +131,9 @@ O script roda os testes, monta a interface, aplica as migrações do banco e pub
 | Sessão | Identificador aleatório de 256 bits em cookie `__Host-` `HttpOnly` `Secure` `SameSite=Strict`, sem data de validade (termina ao fechar o navegador); o banco guarda só o SHA-256 dele; novo identificador a cada login e após o 2FA; encerra no "Sair", na troca de senha (outros dispositivos), após 7 dias sem uso ou 30 dias de idade |
 | Chave dos dados | Para não pedir a senha a cada recarga, fica no navegador **cifrada com o "envelope" da sessão**, que só o servidor entrega enquanto o cookie existir. Saiu ou fechou o navegador: vira lixo ilegível e é apagada |
 | 2FA | TOTP (RFC 6238), ±30 s de tolerância, um código não vale duas vezes; segredo cifrado no banco com o `SEGREDO` do servidor; 5 códigos errados → 15 min de bloqueio |
-| Força bruta | Bloqueio progressivo por e-mail + IP (CAPTCHA na 4ª, 15 min na 5ª falha, 24 h na 10ª), contagem atômica (pedidos em paralelo não escapam); 20 falhas/h na mesma conta vindas de IPs diferentes → CAPTCHA para todos; cadastro e consultas também limitados por IP |
+| Força bruta | Bloqueio progressivo por e-mail + IP (CAPTCHA na 4ª, 15 min na 5ª falha, 24 h na 10ª), contagem atômica (pedidos em paralelo não escapam); 20 falhas/h na mesma conta vindas de IPs diferentes → CAPTCHA para todos; no máximo 30 logins por IP a cada 10 min; cadastro e consultas também limitados por IP |
+| Conta demo | Senha pública, por isso **somente leitura no servidor**: nada é gravado e senha, nome, 2FA, apagar e excluir são recusados (403); até 500 sessões abertas (as mais antigas e as paradas há 6 h saem); os dados são fictícios e gerados no navegador |
+| Recursos por conta | Perfis, boletos e Pix: o servidor informa no login quais a conta tem (e-mails num segredo, nunca no código). A interface esconde e o serviço de dados recusa; como os dados são cifrados no navegador, o servidor não enxerga perfis — o recurso é de produto, não uma barreira entre contas (cada conta continua só com os próprios dados) |
 | Dados | JSON → gzip → AES-256-GCM no navegador. E-mail e número da versão entram como dados autenticados: bloco adulterado, trocado entre contas ou de outra versão é recusado |
 | Prova da senha | Exigida, além da sessão, em toda leitura/gravação dos dados: um cookie roubado sozinho não lê nem altera nada |
 | Integridade | Gravação com versão (outro dispositivo gravou antes → recusa e recarrega); documento danificado → recuperado do histórico com aviso; versão mais antiga que a já vista neste navegador → aviso |
@@ -126,10 +150,11 @@ O script roda os testes, monta a interface, aplica as migrações do banco e pub
 
 ### Pontos em aberto (documentados, não escondidos)
 
-- **Sem envio de e-mail** (o ZoZo não tem provedor de e-mail): não há aviso por e-mail no bloqueio de 24 h nem confirmação do e-mail no cadastro. Por isso o cadastro é limitado a `ALLOWED_EMAILS` — quem souber um e-mail da lista poderia criar a conta antes do dono (os dados de ninguém ficam expostos, mas o dono não conseguiria usar aquele e-mail). Crie as contas permitidas logo.
+- **Sem envio de e-mail** (o ZoZo não tem provedor de e-mail): não há aviso por e-mail no bloqueio de 24 h nem confirmação do e-mail no cadastro. Com o cadastro aberto, alguém pode criar uma conta com um e-mail que não é dele (os dados de ninguém ficam expostos, mas o dono real não conseguiria usar aquele e-mail).
 - **Cadastro revela se o e-mail já tem conta** ("Já existe uma conta com esse e-mail"): inevitável sem confirmação por e-mail.
 - **Argon2id** (recomendado pela OWASP) não existe no navegador sem biblioteca extra; usamos PBKDF2-SHA256 com 600.000 iterações (mínimo atual da OWASP para PBKDF2).
-- **Domínio próprio:** `usezozo.com.br` já está na sua conta Cloudflare; ligar o ZoZo a ele permite regras de WAF/limite de requisições na borda.
+- **Domínio próprio:** `usezozo.com.br` já aponta para o ZoZo; regras de WAF/limite na borda devem deixar `/api/*` sem desafio (veja acima).
+- **Recursos por conta só na interface:** Perfis/boletos/Pix são escondidos e recusados no navegador; quem alterar o próprio navegador conseguiria usá-los **nos próprios dados** (o servidor não lê o documento cifrado). Não dá acesso a nada de outra conta.
 
 ## Limites
 
@@ -141,7 +166,7 @@ O script roda os testes, monta a interface, aplica as migrações do banco e pub
 - **Dashboard:** foto, saudação, Gasto mensal (curva do mês × orçamento), Patrimônio, Top categorias, Próximos lançamentos, Lançamentos recentes.
 - **Lançamentos:** agrupados por mês e dia, ícones R (recorrente) e P (parcelado), tags de categoria e perfil, pesquisa, filtros, seleção com ações em lote; painel com histórico e edição.
 - **Parcelas automáticas**, **Recorrências** (semanal a anual ou parcelada), **Dividir lançamento** entre perfis.
-- **Contas e Investimentos**, **Categorias** (com orçamento fixo ou por mês), **Perfis** (com boleto por perfil).
+- **Contas e Investimentos**, **Categorias** (com orçamento fixo ou por mês), **Perfis** (com boleto por perfil e Pix — só contas liberadas).
 - **Configurações:** orçamento, armazenamento e última gravação; foto, nome, alterar senha, **2FA**, exportar CSV, apagar dados, sair, excluir conta.
 
 ## Regras configuráveis (`ui/js/config/regras.js`)

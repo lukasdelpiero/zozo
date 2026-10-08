@@ -9,6 +9,13 @@
    As regras configuráveis ficam em js/config/regras.js.
    Nenhum componente visual acessa este módulo diretamente:
    tudo passa pelo bridge (ZoZo.bridge.request).
+
+   Recursos por conta (o servidor informa no login — ZoZo.recursos):
+   • Perfis, boletos e Pix só existem para as contas liberadas; nas
+     demais, as ações recusam e os perfis já gravados ficam guardados
+     sem aparecer (nada é apagado).
+   • Conta de demonstração: o documento é gerado no navegador e nada
+     é gravado; o visitante cria no máximo 1 item de cada tipo.
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -25,6 +32,18 @@
   let carregando = null;   // Promise de carga
   let fila = Promise.resolve(); // operações de escrita em série
   let pendentes = 0;            // gravações ainda não confirmadas pelo servidor
+  let criadosDemo = {};         // demonstração: itens criados pelo visitante, por tipo
+
+  /* ---------------- recursos da conta ---------------- */
+  const avancado = () => !!(ZoZo.recursos && ZoZo.recursos.perfis());     // Perfis (e boletos/Pix, que dependem deles)
+  const pixLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.pix());
+  const boletoLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.boleto());
+  const ehDemo = () => !!(ZoZo.recursos && ZoZo.recursos.demo());
+  function exigir(liberado) { if (!liberado) throw erro("FEATURE_UNAVAILABLE"); }
+  /** Demonstração: além do que foi gerado, só 1 perfil, conta, cartão, categoria, lançamento e recorrência */
+  const LIMITE_DEMO = 1;
+  function conferirLimiteDemo(tipo) { if (ehDemo() && (criadosDemo[tipo] || 0) >= LIMITE_DEMO) throw erro("DEMO_LIMIT"); }
+  function contarDemo(tipo) { if (ehDemo()) criadosDemo[tipo] = (criadosDemo[tipo] || 0) + 1; }
 
   /* ---------------- utilitários ---------------- */
   const pad = (n) => String(n).padStart(2, "0");
@@ -114,8 +133,13 @@
     return true;
   }
 
-  /** Erros que a interface precisa conhecer pelo nome; os demais viram "não foi possível concluir" */
-  const ERROS_REPASSADOS = ["SESSION_EXPIRED", "DOCUMENT_TOO_LARGE", "STORAGE_UNAVAILABLE", "TIMEOUT"];
+  /** Erro da gravação para a interface: com mensagem própria quando existe; senão o genérico com o código */
+  function erroDaGravacao(e) {
+    const code = e && e.code;
+    if (code && code !== "OPERATION_FAILED" && M.FRIENDLY[code]) return erro(code);
+    if (e && e.friendly) return e;                                   // já tem texto amigável (com o código)
+    return erro("OPERATION_FAILED");
+  }
 
   /** Executa uma alteração e grava. Se a gravação falhar, desfaz. */
   function alterar(fn) {
@@ -130,14 +154,14 @@
         .catch((e) => {
           if (doc) doc = JSON.parse(antes);
           if (tratarConflito(e)) throw erro("DATA_CHANGED");
-          throw erro(e && ERROS_REPASSADOS.includes(e.code) ? e.code : "OPERATION_FAILED");
+          throw erroDaGravacao(e);
         });
     }).finally(() => { pendentes -= 1; });
     fila = exec.catch(() => null);
     return exec;
   }
 
-  function reset() { doc = null; carregando = null; fila = Promise.resolve(); }
+  function reset() { doc = null; carregando = null; fila = Promise.resolve(); criadosDemo = {}; }
   const gravando = () => pendentes > 0;
 
   /* ---------------- saldos e séries ---------------- */
@@ -219,7 +243,7 @@
   function enriquecer(l) {
     const conta = doc.contas.find((c) => c.id === l.contaId);
     const cat = doc.categorias.find((c) => c.id === l.categoriaId);
-    const perfil = doc.perfis.find((p) => p.id === l.perfilId);
+    const perfil = avancado() ? doc.perfis.find((p) => p.id === l.perfilId) : null;   // sem o recurso: o perfil não aparece
     return Object.assign({}, l, {
       nomeConta: conta ? conta.nome : "",
       ultimos4Digitos: conta ? conta.ultimos4Digitos || "" : "",
@@ -250,7 +274,8 @@
       data, descricao, valor: r2(valor), tipo,
       contaId: existe(doc.contas, l.contaId),
       categoriaId: existe(doc.categorias, l.categoriaId),
-      perfilId: perfilPermitido(l.perfilId, atual),
+      // Sem o recurso de Perfis: o perfil já gravado continua como estava (não é apagado nem alterado)
+      perfilId: avancado() ? perfilPermitido(l.perfilId, atual) : (atual ? atual.perfilId || null : null),
       notas: texto(l.notas, 2000),
       recorrencia: null, parcelaAtual: null, parcelaTotal: null,
       sentido: tipo === "interno" ? (l.sentido === "entrada" ? "entrada" : "saida") : null,   // transferência: saída | entrada
@@ -521,6 +546,7 @@
     [A.getRecorrencias]: getRecorrencias,
     [A.getPerfis]: () => {
       const mes = mesAtual();
+      if (!avancado()) return { mes, perfis: [], resumo: { gasto: 0, lancamentosMes: 0 } };
       const perfis = doc.perfis.map((p) => Object.assign({ orcamento: 0, arquivado: false }, p, {
         gasto: gastoDoPerfil(p.id, mes),
         quantidade: doc.lancamentos.filter((l) => l.perfilId === p.id).length,
@@ -530,7 +556,7 @@
       return { mes, perfis, resumo: { gasto: r2(ativos.reduce((s, p) => s + p.gasto, 0)), lancamentosMes } };
     },
     [A.getConfig]: () => ({ foto: doc.config.foto || null, ultimaGravacao: doc.meta.ultimaGravacao || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false,
-      pix: doc.config.pix ? Object.assign({}, doc.config.pix) : null }),
+      pix: pixLiberado() && doc.config.pix ? Object.assign({}, doc.config.pix) : null }),
     [A.getContaHistorico]: (d) => {
       const c = doc.contas.find((x) => x.id === d.id);
       if (!c) throw erro("LOAD_FAILED");
@@ -586,20 +612,24 @@
       };
     },
     [A.getBoletoData]: (d) => {
+      exigir(boletoLiberado() && avancado());
       const prefixo = d.ano + "-" + pad(d.mes);
       const perfil = doc.perfis.find((p) => p.id === d.perfilId) || null;
       const lancamentos = getLancamentos().lancamentos.filter((l) => l.perfilId === d.perfilId && l.data.startsWith(prefixo)).sort((a, b) => a.data.localeCompare(b.data));
       // Pix do boleto: chave e nome do recebedor guardados no documento cifrado
-      return { perfil, lancamentos, pix: doc.config.pix ? Object.assign({}, doc.config.pix) : null };
+      return { perfil, lancamentos, pix: pixLiberado() && doc.config.pix ? Object.assign({}, doc.config.pix) : null };
     },
   };
 
   const ESCRITAS = {
     /* Lançamentos */
     [A.createLancamento]: (d) => {
+      const tipo = d.lancamento && d.lancamento.tipo === "recorrente" ? "recorrencia" : "lancamento";
+      conferirLimiteDemo(tipo);
       const l = Object.assign({ id: novoId("l") }, lerLancamento(d.lancamento, null));
       doc.lancamentos.push(l);
       sincronizarParcelas();
+      contarDemo(tipo);
       return { lancamento: enriquecer(l) };
     },
     [A.updateLancamento]: (d) => {
@@ -662,6 +692,7 @@
     },
     /** Transforma um lançamento existente na origem de uma recorrência (modal "Nova recorrência") */
     [A.tornarRecorrente]: (d) => {
+      conferirLimiteDemo("recorrencia");
       const l = doc.lancamentos.find((x) => x.id === d.id);
       if (l && l.divisao) throw erro("SPLIT_INVALID");                      // lançamento dividido não vira recorrente
       if (!l || (l.serieId && l.serieId !== l.id && !String(l.serieId).startsWith("removida:"))) throw erro("OPERATION_FAILED");
@@ -673,6 +704,7 @@
       } else Object.assign(l, { parcelaAtual: null, parcelaTotal: null });
       Object.assign(l, { tipo: "recorrente", recorrencia: rec, serieId: null, competencia: mesDe(l.data), encerradaEm: null, sentido: null });
       sincronizarParcelas();
+      contarDemo("recorrencia");
       return { serieId: l.id };
     },
     /** Liga um lançamento a uma recorrência existente (vira um pagamento dela) */
@@ -703,6 +735,7 @@
      * Uma única parte desfaz a divisão.
      */
     [A.dividirLancamento]: (d) => {
+      exigir(avancado());                                                     // divisão é entre perfis
       const base = doc.lancamentos.find((l) => l.id === d.id);
       if (!base || base.tipo === "recorrente") throw erro("SPLIT_INVALID");
       const membros = base.divisao ? doc.lancamentos.filter((l) => l.divisao && l.divisao.id === base.divisao.id) : [base];
@@ -752,10 +785,13 @@
     /* Contas */
     [A.createConta]: (d) => {
       const e = lerConta(d.conta);
+      const tipoDemo = e.tipo === "cartao" ? "cartao" : "conta";
+      conferirLimiteDemo(tipoDemo);
       const c = { id: novoId("c"), nome: e.nome, tipo: e.tipo, ultimos4Digitos: e.ultimos4Digitos, cor: e.cor, tipoInvestimento: e.tipoInvestimento,
         instituicao: e.instituicao, limite: e.limite, fechamento: e.fechamento, vencimento: e.vencimento, historico: [] };
       registrarSaldo(c, e.saldo);
       doc.contas.push(c);
+      contarDemo(tipoDemo);
       return { conta: contaPublica(c) };
     },
     [A.updateConta]: (d) => {
@@ -781,8 +817,10 @@
 
     /* Categorias */
     [A.createCategoria]: (d) => {
+      conferirLimiteDemo("categoria");
       const c = Object.assign({ id: novoId("k") }, lerCategoria(d.categoria));
       doc.categorias.push(c);
+      contarDemo("categoria");
       return { categoria: c };
     },
     [A.updateCategoria]: (d) => {
@@ -816,6 +854,7 @@
       return { id: d.id };
     },
     [A.createCategoriasSugeridas]: () => {
+      if (ehDemo()) throw erro("DEMO_LIMIT");                                 // cria várias de uma vez
       (R().categoriasSugeridas || []).forEach((s) => {
         if (doc.categorias.some((c) => c.nome.toLowerCase() === s.nome.toLowerCase())) return;
         doc.categorias.push(Object.assign({ id: novoId("k") }, lerCategoria(s)));
@@ -825,13 +864,17 @@
 
     /* Perfis */
     [A.createPerfil]: (d) => {
+      exigir(avancado());
+      conferirLimiteDemo("perfil");
       const e = lerPerfil(d.perfil);
       if (doc.perfis.some((p) => p.nome.toLowerCase() === e.nome.toLowerCase())) throw erro("NAME_IN_USE");
       const p = Object.assign({ id: novoId("p") }, e);
       doc.perfis.push(p);
+      contarDemo("perfil");
       return { perfil: p };
     },
     [A.updatePerfil]: (d) => {
+      exigir(avancado());
       const p = doc.perfis.find((x) => x.id === d.id);
       if (!p) throw erro("OPERATION_FAILED");
       if (d.perfil) {
@@ -849,6 +892,7 @@
       return { perfil: p, id: p.id, cor: p.cor };
     },
     [A.deletePerfil]: (d) => {
+      exigir(avancado());
       if (!doc.perfis.some((p) => p.id === d.id)) throw erro("OPERATION_FAILED");
       doc.perfis = doc.perfis.filter((p) => p.id !== d.id);
       doc.lancamentos.forEach((l) => { if (l.perfilId === d.id) l.perfilId = null; });
@@ -864,7 +908,7 @@
       if (d.categoriaId !== undefined) categoriaId = existe(doc.categorias, d.categoriaId);
       if (d.tipo !== undefined && !tipo) throw erro("OPERATION_FAILED");
       let perfilId;
-      if (d.perfilId !== undefined) perfilId = d.perfilId ? perfilPermitido(d.perfilId, null) : null;
+      if (d.perfilId !== undefined) { exigir(avancado()); perfilId = d.perfilId ? perfilPermitido(d.perfilId, null) : null; }
       let n = 0;
       doc.lancamentos.forEach((l) => {
         if (!ids.includes(l.id)) return;
@@ -888,6 +932,7 @@
 
     /* Perfis: arquivar */
     [A.arquivarPerfil]: (d) => {
+      exigir(avancado());
       const p = doc.perfis.find((x) => x.id === d.id);
       if (!p) throw erro("OPERATION_FAILED");
       p.arquivado = !!d.arquivar;
@@ -902,6 +947,7 @@
         doc.config.foto = d.foto;
       }
       if (typeof d.orcamentoAtivo === "boolean") doc.config.orcamentoAtivo = d.orcamentoAtivo;
+      if (d.pix !== undefined) exigir(pixLiberado());
       if (d.pix === null) delete doc.config.pix;
       else if (d.pix && typeof d.pix === "object") {
         const chave = ZoZo.pix.normalizarChave(d.pix.chave);
@@ -909,19 +955,26 @@
         if (!chave || !nome || !cidade) throw erro("PIX_INVALID");
         doc.config.pix = { chave, nome, cidade };
       }
-      return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false, pix: doc.config.pix || null };
+      return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false, pix: pixLiberado() ? doc.config.pix || null : null };
     },
   };
 
   function atende(action) { return action in LEITURAS || action in ESCRITAS; }
 
+  /** Falha inesperada (ex.: dado antigo num formato que a regra não previa) vira erro amigável com o código */
+  function amigavel(e) {
+    if (e instanceof M.BridgeError) return e;
+    ZoZo.log.error("serviço", e);
+    return new M.BridgeError("INTERNAL_ERROR", M.FRIENDLY.OPERATION_FAILED.replace(/\.$/, "") + " (código INTERNAL_ERROR).");
+  }
+
   function handle(action, data) {
     const d = data || {};
     if (action in LEITURAS) {
-      return fila.then(() => garantirCarregado()).then(() => clone(LEITURAS[action](d)));
+      return fila.then(() => garantirCarregado()).then(() => clone(LEITURAS[action](d))).catch((e) => { throw amigavel(e); });
     }
     if (action in ESCRITAS) {
-      return alterar(() => clone(ESCRITAS[action](d)));
+      return alterar(() => clone(ESCRITAS[action](d))).catch((e) => { throw amigavel(e); });
     }
     return Promise.reject(erro("OPERATION_FAILED"));
   }

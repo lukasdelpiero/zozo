@@ -49,6 +49,10 @@ if ($lista -notmatch '"TURNSTILE_SECRET"') {
   Write-Host "   Aviso: TURNSTILE_SECRET não configurado — o CAPTCHA fica desligado (o bloqueio continua valendo)." -ForegroundColor Yellow
   Write-Host "   Para ligar: Cloudflare › Turnstile › ZoZo login › copie a Secret Key e rode: npx wrangler secret put TURNSTILE_SECRET $($extra -join ' ')" -ForegroundColor Yellow
 }
+if ($lista -notmatch '"RECURSOS_AVANCADOS"') {
+  Write-Host "   Aviso: RECURSOS_AVANCADOS não configurado — Perfis, boletos e Pix ficam só na conta de demonstração." -ForegroundColor Yellow
+  Write-Host "   Para liberar a sua conta: npx wrangler secret put RECURSOS_AVANCADOS $($extra -join ' ')  (e-mails separados por vírgula)" -ForegroundColor Yellow
+}
 
 Write-Host "3/6 Montando a interface (api/public)..." -ForegroundColor Cyan
 python montar_interface.py

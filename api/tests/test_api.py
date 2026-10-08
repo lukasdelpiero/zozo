@@ -6,6 +6,7 @@ Testes da API do ZoZo (núcleo Python + banco SQLite com as mesmas migrações d
 import asyncio
 import base64
 import hashlib
+import hmac
 import json
 import os
 import pathlib
@@ -20,7 +21,6 @@ AQUI = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI.parent / "src"))
 sys.path.insert(0, str(AQUI.parent / "dev"))
 
-import acesso  # noqa: E402
 import google  # noqa: E402
 import nucleo  # noqa: E402
 import totp  # noqa: E402
@@ -28,11 +28,9 @@ from banco_sqlite import MIGRACOES, BancoSqlite, aplicar_migracoes, conectar  # 
 
 EMAIL = "ana@exemplo.com"
 OUTRO = "beto@exemplo.com"
-DOMINIO = "time.cloudflareaccess.com"
-AUD = "aud-123"
 SEGREDO = "s" * 48
-CONFIG = {"SEGREDO": SEGREDO, "ALLOWED_EMAILS": f"{EMAIL}, {OUTRO.upper()}"}
-ACCESS_CONFIG = {"ACCESS_TEAM_DOMAIN": DOMINIO, "ACCESS_AUD": AUD, "ACCESS_EMAILS": f"{EMAIL}, {OUTRO.upper()}"}
+CONFIG = {"SEGREDO": SEGREDO}
+DEMO = nucleo.DEMO_EMAIL
 T0 = 1_800_000_000          # "agora" fixo dos testes
 
 
@@ -40,7 +38,7 @@ def rodar(coro):
     return asyncio.run(coro)
 
 
-# ---------------- RSA de teste (só para assinar tokens do Access nos testes) ----------------
+# ---------------- RSA de teste (só para assinar os ID tokens do Google nos testes) ----------------
 def _primo(bits):
     while True:
         n = secrets.randbits(bits) | (1 << (bits - 1)) | 1
@@ -91,30 +89,19 @@ def assinar(claims, kid="k1", alg="RS256", d=D, n=N):
     h = _b64u(json.dumps({"alg": alg, "kid": kid}).encode())
     p = _b64u(json.dumps(claims).encode())
     k = (n.bit_length() + 7) // 8
-    t = acesso._DIGEST_INFO_SHA256 + hashlib.sha256(f"{h}.{p}".encode()).digest()
+    t = google._DIGEST_INFO_SHA256 + hashlib.sha256(f"{h}.{p}".encode()).digest()
     em = b"\x00\x01" + b"\xff" * (k - len(t) - 3) + b"\x00" + t
     s = pow(int.from_bytes(em, "big"), d, n).to_bytes(k, "big")
     return f"{h}.{p}.{_b64u(s)}"
 
 
-def claims(**extra):
-    agora = int(time.time())
-    c = {"email": EMAIL, "aud": [AUD], "iss": f"https://{DOMINIO}", "exp": agora + 300, "iat": agora, "type": "app"}
-    c.update(extra)
-    return {k: v for k, v in c.items() if v is not None}
-
-
 class FakeServicos:
-    def __init__(self, chaves=None, captcha_ok=True, identidade=None):
-        self.chaves = chaves if chaves is not None else [JWK]
+    def __init__(self, captcha_ok=True):
         self.chamadas = []
         self.captcha_ok = captcha_ok
-        self.identidade = identidade
 
     async def http_get(self, url, cabecalhos):
         self.chamadas.append((url, dict(cabecalhos)))
-        if url.endswith("/cdn-cgi/access/certs"):
-            return 200, json.dumps({"keys": self.chaves})
         if url == google.CHAVES:
             return 200, json.dumps({"keys": [dict(JWK, kid="g1")]})
         if url.startswith("https://api.pwnedpasswords.com/range/"):
@@ -130,73 +117,6 @@ class FakeServicos:
         return 404, ""
 
     google_token = None        # resposta do endpoint de token do Google (falso)
-
-    async def access(self, _pedido):
-        if isinstance(self.identidade, Exception):
-            raise self.identidade
-        return self.identidade
-
-
-def limpar_cache():
-    acesso._cache.update(chaves=None, em=0.0, dominio=None, ultima_recarga=0.0)
-
-
-class TesteAcesso(unittest.TestCase):
-    def setUp(self):
-        limpar_cache()
-        self.http = FakeServicos().http_get
-
-    def ident(self, token, config=ACCESS_CONFIG):
-        return rodar(acesso.identidade(token, config, self.http))
-
-    def test_token_valido(self):
-        self.assertEqual(self.ident(assinar(claims())), EMAIL)
-
-    def test_email_permitido_maiusculas(self):
-        self.assertEqual(self.ident(assinar(claims(email="Beto@Exemplo.com"))), OUTRO)
-
-    def test_email_fora_da_lista(self):
-        self.assertIsNone(self.ident(assinar(claims(email="intruso@exemplo.com"))))
-
-    def test_expirado_sem_exp_nbf_futuro(self):
-        self.assertIsNone(self.ident(assinar(claims(exp=int(time.time()) - 3600))))
-        self.assertIsNone(self.ident(assinar(claims(exp=None))))
-        self.assertIsNone(self.ident(assinar(claims(nbf=int(time.time()) + 3600))))
-
-    def test_audiencia_e_emissor_errados(self):
-        self.assertIsNone(self.ident(assinar(claims(aud=["outra"]))))
-        self.assertIsNone(self.ident(assinar(claims(iss="https://outro.cloudflareaccess.com"))))
-
-    def test_alg_none_e_hs256(self):
-        self.assertIsNone(self.ident(assinar(claims(), alg="none")))
-        self.assertIsNone(self.ident(assinar(claims(), alg="HS256")))
-
-    def test_payload_adulterado_e_outra_chave(self):
-        t = assinar(claims()).split(".")
-        t[1] = _b64u(json.dumps(claims(email=OUTRO)).encode())
-        self.assertIsNone(self.ident(".".join(t)))
-        n2, _, d2 = _chave_rsa()
-        self.assertIsNone(self.ident(assinar(claims(), d=d2, n=n2)))
-
-    def test_lixo(self):
-        for t in (None, "", "a.b", "a.b.c", "....", "x" * 20000):
-            self.assertIsNone(self.ident(t))
-
-    def test_rotacao_de_chave_recarrega(self):
-        self.ident(assinar(claims()))
-        fake = FakeServicos(chaves=[dict(JWK, kid="k2")])
-        self.http = fake.http_get
-        self.assertEqual(self.ident(assinar(claims(), kid="k2")), EMAIL)
-
-    def test_configuracao_incompleta_nega(self):
-        for cfg in ({**ACCESS_CONFIG, "ACCESS_TEAM_DOMAIN": "SEU-TIME.cloudflareaccess.com"},
-                    {**ACCESS_CONFIG, "ACCESS_AUD": ""}, {**ACCESS_CONFIG, "ACCESS_EMAILS": ""},
-                    {**ACCESS_CONFIG, "ACCESS_TEAM_DOMAIN": "evil.com"}):
-            with self.assertRaises(acesso.ErroAcesso):
-                self.ident(assinar(claims()), cfg)
-
-    def test_rsa_rejeita_chave_pequena(self):
-        self.assertFalse(acesso.verificar_rs256({"kty": "RSA", "n": _int_b64u(2**1023 + 1), "e": "AQAB"}, b"x", b"\x00" * 128))
 
 
 class TesteTotp(unittest.TestCase):
@@ -305,7 +225,8 @@ class TesteContaESessao(Base):
             self.assertIn(attr, sc)
         self.assertNotIn("Max-Age", sc)          # cookie de sessão: some ao fechar o navegador
         self.assertNotIn("Expires", sc)
-        self.assertEqual(set(self.sessao), {"email", "nome", "envelope", "doisFatores"})
+        self.assertEqual(set(self.sessao), {"email", "nome", "envelope", "doisFatores", "demo", "recursos"})
+        self.assertEqual((self.sessao["demo"], self.sessao["recursos"]), (False, {"perfis": False, "boleto": False, "pix": False}))
         token = self.api.cookies["__Host-zozo"]
         guardado = self.con.execute("SELECT id FROM sessoes").fetchone()[0]
         self.assertEqual(guardado, hashlib.sha256(token.encode()).hexdigest())   # banco não guarda o token
@@ -328,7 +249,7 @@ class TesteContaESessao(Base):
             self.assertEqual(cli("POST", "/api/conta", corpo)[0], 400, corpo)
 
     def test_cadastro_limitado_por_ip(self):
-        cli = Cliente(self.banco, config=dict(CONFIG, ALLOWED_EMAILS="*"), ip="198.51.100.9")
+        cli = Cliente(self.banco, ip="198.51.100.9")
         st = [self.cadastrar(cli, f"u{i}@exemplo.com", prova())[0] for i in range(7)]
         self.assertEqual(st.count(201), nucleo.CADASTROS_POR_IP)
         self.assertEqual(st[-1], 429)
@@ -388,7 +309,7 @@ class TesteContaESessao(Base):
         for lixo in ("", "x", "a" * 500, "'; DROP TABLE contas; --"):
             self.api.cookies = {"__Host-zozo": lixo}
             self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
-        self.assertEqual(self.con.execute("SELECT count(*) FROM contas").fetchone()[0], 1)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email != ?", (DEMO,)).fetchone()[0], 1)
 
 
 class TesteBloqueio(Base):
@@ -562,7 +483,7 @@ class TesteDocumento(Base):
         self.assertEqual(self.api("DELETE", "/api/conta", prova=self.prova)[0], 204)
         self.assertNotIn("__Host-zozo", self.api.cookies)
         for t in ("contas", "documentos", "historico", "sessoes"):
-            self.assertEqual(self.con.execute(f"SELECT count(*) FROM {t}").fetchone()[0], 0, t)
+            self.assertEqual(self.con.execute(f"SELECT count(*) FROM {t} WHERE email = ?", (EMAIL,)).fetchone()[0], 0, t)
 
 
 class Teste2FA(Base):
@@ -585,7 +506,7 @@ class Teste2FA(Base):
         st, _ = self.api("POST", "/api/2fa/confirmar", {"codigo": self.codigo()}, prova=self.prova)
         self.assertEqual(st, 200)
         self.assertTrue(self.api("GET", "/api/sessao")[1]["doisFatores"])
-        bruto = self.con.execute("SELECT totp_segredo FROM contas").fetchone()[0]
+        bruto = self.con.execute("SELECT totp_segredo FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0]
         self.assertEqual(len(base64.b64decode(bruto)), 16 + 20 + 16)        # nonce + segredo cifrado + etiqueta
         self.assertEqual(self.api("POST", "/api/2fa/iniciar", prova=self.prova)[1]["erro"], "2FA_ALREADY_ON")
 
@@ -645,12 +566,6 @@ class TesteDiversos(Base):
         for cfg in ({}, {"SEGREDO": "curto"}):
             cli = Cliente(self.banco, config=cfg)
             self.assertEqual(cli("GET", "/api/publico")[0], 503)
-
-    def test_ambiente_de_previa_exige_access(self):
-        cfg = dict(CONFIG, EXIGIR_ACCESS="1")
-        self.assertEqual(Cliente(self.banco, FakeServicos(identidade=None), cfg)("GET", "/api/publico"), (401, {"erro": "ACCESS_DENIED"}))
-        self.assertEqual(Cliente(self.banco, FakeServicos(identidade=RuntimeError("x")), cfg)("GET", "/api/publico")[0], 503)
-        self.assertEqual(Cliente(self.banco, FakeServicos(identidade="teste@exemplo.com"), cfg)("GET", "/api/publico")[0], 200)
 
     def test_publico(self):
         self.assertEqual(self.api("GET", "/api/publico"), (200, {"turnstile": None, "google": False}))
@@ -761,11 +676,103 @@ class TesteGoogle(Base):
         self.cli.agora += google.VALIDADE_S + 1
         self.assertEqual(self.cli("GET", "/api/google/identidade")[0], 404)
 
+    def test_rsa_rejeita_chave_pequena_e_lixo(self):
+        self.assertFalse(google.verificar_rs256({"kty": "RSA", "n": _int_b64u(2**1023 + 1), "e": "AQAB"}, b"x", b"\x00" * 128))
+        self.assertFalse(google.verificar_rs256({"kty": "EC"}, b"x", b"\x00" * 256))
+        for lixo in (None, "", "a" * 20000):
+            with self.assertRaises(ValueError):
+                google.b64url(lixo)
+
     def test_cadastro_com_google_sem_captcha(self):
         self.q = self.iniciar()
         self.voltar(self.token(email=OUTRO, given_name="Beto"))
         self.assertEqual(self.cli("GET", "/api/google/identidade")[1]["contaExiste"], False)
         self.assertEqual(self.cadastrar(self.cli, OUTRO, prova(), nome="Beto")[0], 201)
+
+
+def prova_da_senha(senha, sal_b64, iteracoes=600000):
+    """Mesma derivação do navegador (host-web.js): PBKDF2-SHA256 → HKDF-SHA256 (sal zerado, info zozo/prova/v2)."""
+    mestre = hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), base64.b64decode(sal_b64), iteracoes, 32)
+    prk = hmac.new(b"\x00" * 32, mestre, hashlib.sha256).digest()
+    return b64(hmac.new(prk, b"zozo/prova/v2\x01", hashlib.sha256).digest())
+
+
+class TesteDemo(Base):
+    """Conta de demonstração pública (senha zozo1234): entra, mas não grava nem altera nada no servidor."""
+    PROVA = None
+
+    def setUp(self):
+        super().setUp()
+        if TesteDemo.PROVA is None:                                         # PBKDF2 de 600 mil iterações: uma vez só
+            sal = self.con.execute("SELECT sal FROM contas WHERE email = ?", (DEMO,)).fetchone()[0]
+            TesteDemo.PROVA = prova_da_senha("zozo1234", sal)
+        self.demo = Cliente(self.banco, ip="198.51.100.60")
+
+    def test_senha_publica_entra_com_recursos(self):
+        st, s = self.entrar(self.demo, email=DEMO, pv=self.PROVA)
+        self.assertEqual((st, s["demo"], s["recursos"]), (200, True, {"perfis": True, "boleto": True, "pix": True}))
+        self.assertTrue(self.demo("GET", "/api/sessao")[1]["demo"])
+        self.assertEqual(self.entrar(Cliente(self.banco, ip="198.51.100.61"), email=DEMO, pv=prova())[0], 401)   # senha errada
+
+    def test_somente_leitura(self):
+        self.entrar(self.demo, email=DEMO, pv=self.PROVA)
+        consulta = "SELECT nome, sal, verificador, totp_segredo, totp_pendente FROM contas WHERE email = ?"
+        antes = tuple(self.con.execute(consulta, (DEMO,)).fetchone())
+        for m, c, corpo in (("PUT", "/api/documento", {"versaoAnterior": 0, "conteudo": conteudo()}),
+                            ("GET", "/api/documento", None), ("GET", "/api/historico", None),
+                            ("PUT", "/api/conta/nome", {"nome": "Invasor"}),
+                            ("PUT", "/api/conta/senha", {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": prova(),
+                                                         "conteudo": conteudo(), "versaoAnterior": 0}),
+                            ("POST", "/api/documento/apagar", {"versaoAnterior": 0, "conteudo": conteudo()}),
+                            ("DELETE", "/api/conta", None), ("POST", "/api/2fa/iniciar", None),
+                            ("POST", "/api/2fa/confirmar", {"codigo": "123456"}), ("POST", "/api/2fa/desativar", None)):
+            self.assertEqual(self.demo(m, c, corpo, prova=self.PROVA), (403, {"erro": "DEMO_READ_ONLY"}), c)
+        self.assertEqual(tuple(self.con.execute(consulta, (DEMO,)).fetchone()), antes)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM documentos WHERE email = ?", (DEMO,)).fetchone()[0], 0)
+        self.assertEqual(self.demo("GET", "/api/sessao")[0], 200)              # continua logada
+        self.assertEqual(self.demo("DELETE", "/api/sessao")[0], 204)           # e pode sair
+
+    def test_nao_pode_ser_recadastrada(self):
+        cli = Cliente(self.banco, ip="198.51.100.62")
+        self.assertEqual(self.cadastrar(cli, DEMO.upper(), prova())[1], {"erro": "EMAIL_IN_USE"})
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (DEMO,)).fetchone()[0], 1)
+
+    def test_sessoes_da_demo_tem_limite(self):
+        original = nucleo.DEMO_SESSOES_MAX
+        nucleo.DEMO_SESSOES_MAX = 3
+        try:
+            for i in range(6):
+                self.assertEqual(self.entrar(Cliente(self.banco, ip=f"198.51.101.{i}"), email=DEMO, pv=self.PROVA)[0], 200)
+        finally:
+            nucleo.DEMO_SESSOES_MAX = original
+        self.assertEqual(self.con.execute("SELECT count(*) FROM sessoes WHERE email = ?", (DEMO,)).fetchone()[0], 3)
+        # sessões da demo paradas há mais de 6 h também saem
+        velho = Cliente(self.banco, ip="198.51.101.50")
+        self.entrar(velho, email=DEMO, pv=self.PROVA)
+        novo = Cliente(self.banco, ip="198.51.101.51")
+        novo.agora = T0 + nucleo.DEMO_OCIOSA_S + 1
+        self.entrar(novo, email=DEMO, pv=self.PROVA)
+        self.assertEqual(velho("GET", "/api/sessao")[0], 204)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM sessoes WHERE email = ?", (DEMO,)).fetchone()[0], 1)
+
+    def test_logins_por_ip_tem_limite(self):
+        cli = Cliente(self.banco, ip="198.51.100.70")
+        st = [self.entrar(cli, email=DEMO, pv=self.PROVA)[0] for _ in range(nucleo.ENTRADAS_POR_IP + 1)]
+        self.assertEqual(st.count(200), nucleo.ENTRADAS_POR_IP)
+        self.assertEqual(st[-1], 429)                                       # nem a senha certa entra agora
+        self.assertEqual(self.entrar(Cliente(self.banco, ip="198.51.100.71"))[0], 200)   # outro IP continua
+        cli.agora += nucleo.ENTRADA_JANELA_S
+        self.assertEqual(self.entrar(cli, email=DEMO, pv=self.PROVA)[0], 200)
+
+    def test_recursos_so_para_a_lista(self):
+        self.assertFalse(self.entrar()[1]["recursos"]["perfis"])
+        cfg = dict(CONFIG, RECURSOS_AVANCADOS=f" outro@exemplo.com , {EMAIL.upper()} ")
+        cli = Cliente(self.banco, config=cfg, ip="198.51.100.63")
+        st, s = self.entrar(cli)
+        self.assertEqual((st, s["recursos"], s["demo"]), (200, {"perfis": True, "boleto": True, "pix": True}, False))
+        self.assertTrue(cli("GET", "/api/sessao")[1]["recursos"]["pix"])
+        # a lista não dá privilégio nenhum além disso: o documento continua exigindo a prova da própria conta
+        self.assertEqual(cli("GET", "/api/documento", prova=prova())[0], 403)
 
 
 class TesteMigracoes(unittest.TestCase):

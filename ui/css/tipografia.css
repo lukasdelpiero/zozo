@@ -200,8 +200,6 @@
 .topbar .topbar-search__filter:hover, .topbar .topbar-search__filter.is-open { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .topbar .topbar-search__filter.is-active { background: var(--color-primary-soft); color: var(--color-primary); }
 
-/* Boleto: logo no documento */
-.doc__logo { width: 157px; height: auto; display: block; }
 
 /* Ícones do menu mais nítidos (traço alinhado ao pixel) */
 .sidebar .nav-item .icon { width: 18px; height: 18px; shape-rendering: geometricPrecision; }
@@ -299,7 +297,7 @@
    ============================================================= */
 /* Boleto: logo do tamanho do bloco "Boleto" + mês */
 .doc__head { align-items: center; }
-.doc__logo { width: 44px; height: 44px; }
+.doc__logo { width: 44px; height: 44px; display: block; border-radius: 8px; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.18); }
 
 /* Modais de exclusão: título .9375rem/550, texto .8125rem/450, sem sobra à direita */
 .modal--confirm { width: min(380px, calc(100vw - 32px)); }
@@ -753,3 +751,98 @@
 .sidebar__logo { width: 28px; height: 28px; border-radius: 5px; flex: none; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.25); }
 .sidebar__header { justify-content: space-between; }
 @media (max-width: 900px) { .sidebar__logo { display: none; } }
+
+/* =============================================================
+   ZoZo 2.3 — acertos de layout
+   ============================================================= */
+
+/* ---------- Topo do menu: logo à esquerda (onde ficava o botão de recolher) e o botão
+   de recolher/mostrar à direita (onde ficava o botão de atualizar, que saiu) ---------- */
+.sidebar__header { justify-content: flex-start; padding: 0 var(--space-3) 0 14px; }
+.menu-toggle { top: 12px; left: calc(var(--sidebar-width) - 44px); transition: left var(--duration-medium) var(--easing), background var(--duration-fast), color var(--duration-fast); }
+.app-shell[data-menu="recolhido"] .menu-toggle { left: 12px; }
+@media (max-width: 900px) {
+  /* menu estreito (só ícones): o botão fica centralizado no topo do menu */
+  .app-shell:not([data-menu="recolhido"]) .menu-toggle { left: 16px; top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .menu-toggle { transition: none; } }
+
+/* ---------- Contas sem o recurso de Perfis: a linha do lançamento não tem a coluna do perfil ---------- */
+.launch-row.launch-row--sem-perfil:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) {
+  grid-template-columns: 18px minmax(0, 1fr) minmax(0, max-content) 112px;
+}
+.launch-row--sem-perfil.launch-row--resumo { grid-template-columns: minmax(110px, 1fr) minmax(0, max-content) auto; }
+@container (max-width: 620px) {
+  .launch-row.launch-row--sem-perfil:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) { grid-template-columns: 18px minmax(0, 1fr) 96px; }
+}
+
+/* ---------- Perfis: linha igual à de Contas, com ícone redondo na cor do perfil e a inicial ---------- */
+.profile-row { grid-template-columns: 36px minmax(0, 1fr) auto; min-height: var(--row-height-tall); column-gap: var(--space-3); }
+.profile-avatar { font-size: var(--t-15); font-weight: 620; line-height: 1; text-transform: uppercase; user-select: none; }
+.profile-row__text { padding: 0; }
+
+/* ---------- Configurações › Conta: "Alterar senha" com o título em cima e os campos na largura toda ---------- */
+.cfg-row--bloco .cfg-password { display: flex; flex-direction: row; align-items: center; gap: 8px; width: 100%; }
+.cfg-row--bloco .cfg-password .input-with-action--sm { flex: 1 1 0; min-width: 0; }
+.cfg-row--bloco .cfg-password .input-with-action--sm .input { width: 100%; }
+.cfg-row--bloco .cfg-password > .btn { flex: none; }
+@container (max-width: 480px) {
+  .cfg-row--bloco .cfg-password { flex-direction: column; align-items: stretch; }
+  .cfg-row--bloco .cfg-password > .btn { align-self: flex-end; }
+}
+.cfg-nota { margin: 4px 0 8px; font-size: var(--t-13); color: var(--color-text-secondary); }
+
+/* ---------- Login: a etapa do código 2FA usa a mesma caixa, o mesmo título e as mesmas posições ---------- */
+.auth__title.auth2fa__titulo { font-size: 28px; font-weight: 550; height: 34px; line-height: 34px; margin: 0 0 28px; white-space: nowrap; }
+.auth2fa { gap: 18px; }
+.auth2fa__sub { margin: 0; }
+.auth2fa .codigo6 { gap: 8px; }
+.auth2fa .codigo6__caixa { width: min(52px, calc((100% - 40px) / 6)); height: 52px; }
+/* Telas estreitas (celular): a caixa acompanha a largura e a altura do conteúdo */
+@media (max-width: 640px) {
+  .auth__center { padding: 16px; }
+  .auth__card { height: auto; min-height: 0; padding: 48px 24px 32px; }
+  .auth__title, .auth__title.auth2fa__titulo { font-size: 24px; white-space: normal; height: auto; line-height: 1.25; }
+  .auth__warning, .auth__card .auth__warning { position: static; transform: none; width: 100%; margin-top: 16px; }
+}
+@media (max-height: 640px) and (min-width: 641px) {
+  .auth__card { height: auto; min-height: 0; padding-top: 48px; padding-bottom: 32px; }
+}
+
+/* ---------- Dashboard no computador: cabe na tela, sem rolagem (classe posta por dashboard.js
+   quando há duas colunas e altura suficiente; as listas mostram só as linhas inteiras que cabem) ---------- */
+.page--dashboard.dash--na-tela { height: 100%; display: flex; flex-direction: column; padding-bottom: var(--space-5); overflow: hidden; }
+.dash--na-tela .greeting { flex: none; }
+.dash--na-tela .dash-layout { flex: 1 1 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr); }
+.dash--na-tela .dash-area { min-height: 0; }
+.dash--na-tela .dash-area--recentes, .dash--na-tela .dash-area--top, .dash--na-tela .dash-area--proximos { align-self: stretch; }
+.dash--na-tela .dash-area > .card,
+.dash--na-tela .dash-area--recentes > .card, .dash--na-tela .dash-area--top > .card, .dash--na-tela .dash-area--proximos > .card {
+  flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
+}
+.dash--na-tela .dash-card .list, .dash--na-tela .dash-card .top-cats { min-height: 0; overflow: hidden; }
+.dash--na-tela .dash-card .empty { min-height: 0; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+/* Telas baixas (notebooks): menos respiro para caber mais linhas nas listas */
+@media (max-height: 860px) {
+  .page--dashboard.dash--na-tela { padding-top: var(--space-4); padding-bottom: var(--space-4); }
+  .dash--na-tela .greeting { margin-bottom: var(--space-3); }
+  .dash--na-tela .dash-layout { gap: var(--space-4); }
+  .dash--na-tela .dash-card--boxed { padding: var(--space-4); }
+  .dash--na-tela .dash-card__header { margin-bottom: var(--space-2); }
+}
+.main:has(> .page--dashboard.dash--na-tela) { overflow-y: hidden; }    /* sem barra durante a animação de entrada */
+
+/* ---------- Celular: painel de informações em tela cheia e "Novo lançamento" empilhado ---------- */
+.lp-date { white-space: nowrap; }
+@media (max-width: 600px) {
+  .detail { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; z-index: 45; border-left: 0; }
+  .lp-top { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .lp-top__right { flex-direction: row-reverse; align-items: center; justify-content: space-between; }
+  .lp-name { font-size: var(--t-20); }
+  .lp-value { text-align: left; }
+  .lp-account { max-width: 100%; }
+  .lp-account > span:last-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Configurações: as abas mantêm o texto em qualquer largura (a regra do menu estreito escondia os rótulos) */
+.cfg-nav .nav-item { justify-content: flex-start; padding: 0 10px; }
+.cfg-nav .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }

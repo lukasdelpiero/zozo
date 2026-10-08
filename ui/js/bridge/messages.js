@@ -84,7 +84,7 @@
   const FRIENDLY = Object.freeze({
     LOAD_FAILED: "Não foi possível carregar os dados.",
     SESSION_EXPIRED: "Sua sessão terminou. Entre novamente.",
-    ACCESS_DENIED: "Acesso não autorizado a este ambiente. Abra o endereço oficial do ZoZo.",
+    ACCESS_DENIED: "O servidor recusou o pedido. Abra o ZoZo pelo endereço oficial (usezozo.com.br) e tente de novo.",
     NOT_IMPLEMENTED: "Essa ação não está disponível nesta versão.",
     PASSWORD_BREACHED: "Essa senha já apareceu em vazamentos de dados na internet. Escolha outra senha.",
     SPLIT_INVALID: "A divisão não é válida. Confira valores, data, categorias e perfis.",
@@ -107,6 +107,10 @@
     CODE_INVALID_AGAIN: "Algo deu errado. Por favor, tente novamente ou entre em contato com o suporte se o problema persistir.",
     "2FA_ALREADY_ON": "A autenticação de dois fatores já está ativada.",
     "2FA_NOT_PENDING": "Gere um novo código QR e tente novamente.",
+    DEMO_READ_ONLY: "Isso não está disponível na conta de demonstração. Crie a sua conta para usar o ZoZo completo.",
+    DEMO_LIMIT: "Na demonstração dá para criar só 1 item de cada tipo. Crie a sua conta para usar sem limites.",
+    FEATURE_UNAVAILABLE: "Esse recurso não está disponível para a sua conta.",
+    CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
   });
 
   let seq = 0;

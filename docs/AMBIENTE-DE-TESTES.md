@@ -4,7 +4,7 @@ O ZoZo tem **dois sites separados**, cada um com o **seu próprio banco de dados
 
 | | Endereço | Quem usa |
 |---|---|---|
-| **Principal (produção)** | https://zozo.zozo-finance-app.workers.dev | os usuários |
+| **Principal (produção)** | https://usezozo.com.br (e https://zozo.zozo-finance-app.workers.dev) | os usuários |
 | **Testes (prévia)** | https://zozo-previa.zozo-finance-app.workers.dev | só você, para testar antes |
 
 Tudo o que você faz na prévia (criar conta, lançamentos, apagar dados…) **não afeta** o site principal.
@@ -14,15 +14,12 @@ A ideia é sempre: **mudou algo → publica na prévia → testa → só então 
 
 ## 1. Configurar (uma vez só)
 
-> Você já fez a parte do Cloudflare Access e colou o AUD no `api/wrangler.toml`. Falta só publicar (passo 2).
-> Os passos abaixo ficam como referência caso precise refazer.
+A prévia é aberta (sem Cloudflare Access): qualquer pessoa com o endereço vê a tela de login, mas o banco é separado e só tem dados de teste.
 
-1. Entre em **dash.cloudflare.com** com a sua conta.
-2. Menu da esquerda: **Workers e Pages** → clique em **zozo-previa**.
-3. Aba **Configurações** (Settings) → **Domínios e rotas** (Domains & Routes) → na linha **workers.dev**, clique em **Ativar Cloudflare Access** (Enable Cloudflare Access).
-4. Clique em **Gerenciar** (Manage) → na política, deixe **apenas** o e-mail `testenviroment@usezozo.com.br` → Salvar.
-5. Na mesma tela, copie o **Application Audience (AUD) Tag** (um código longo de letras e números).
-6. No VS Code, abra `ZoZo/api/wrangler.toml`, procure `ACCESS_AUD` dentro de `[env.previa.vars]` e cole o código entre as aspas. Salve.
+**Perfis, boletos e Pix** aparecem só para a conta de demonstração e para os e-mails que você liberar. Para liberar a sua conta (uma vez em cada ambiente), dentro de `ZoZo/api`:
+
+- `npx wrangler secret put RECURSOS_AVANCADOS --env previa` → cole o seu e-mail (vários: separados por vírgula) e Enter.
+- `npx wrangler secret put RECURSOS_AVANCADOS` → o mesmo, para o site principal.
 
 ## 2. Publicar a prévia (sempre que quiser testar algo)
 
@@ -38,13 +35,9 @@ O que acontece por trás: roda os testes automáticos (se algo falhar, **nada é
 ## 3. Acessar a prévia
 
 1. Abra **https://zozo-previa.zozo-finance-app.workers.dev**.
-2. Aparece uma tela da **Cloudflare** pedindo e-mail: digite **testenviroment@usezozo.com.br** → **Enviar código**.
-3. Abra a caixa de entrada desse e-mail, copie o código de 6 dígitos e cole na tela da Cloudflare.
-4. Agora aparece a tela do ZoZo (**Entrar no ZoZo**).
-   - **Primeira vez:** clique em **Inscreva-se** → nome + **insight@usezozo.com.br** → crie a senha que quiser (é a conta de testes do ZoZo).
-   - **Próximas vezes:** **Continuar com e-mail** → insight@usezozo.com.br → sua senha.
-
-São duas "portas": a da Cloudflare (só o e-mail de testes passa) e a do próprio ZoZo (a conta de testes).
+2. Aparece a tela do ZoZo (**Entrar no ZoZo**).
+   - **Conta de demonstração:** **Continuar com e-mail** → **demo@usezozo.com.br** → senha **zozo1234** (dados fictícios, nada é salvo).
+   - **Sua conta de testes:** **Inscreva-se** na primeira vez; depois, **Continuar com e-mail** → seu e-mail → sua senha.
 
 ## 4. Publicar no site principal
 
@@ -57,8 +50,9 @@ Depois de testar e gostar do resultado:
 
 | O que aparece | O que fazer |
 |---|---|
-| "Não foi possível falar com o servidor do ZoZo" | A prévia está com configuração antiga: publique de novo (passo 2). Se continuar, confira o AUD (passo 1.5–1.6). |
-| "Acesso não autorizado a este ambiente" | Você entrou na Cloudflare com outro e-mail. Feche o navegador e entre com testenviroment@usezozo.com.br. |
+| "Não foi possível falar com o servidor do ZoZo" | A prévia está com configuração antiga: publique de novo (passo 2). |
+| "Verificação de segurança" / "A proteção do Cloudflare pediu uma nova verificação" | O modo Under Attack (ou uma regra de desafio) está barrando a API. Recarregue a página; para não acontecer mais, veja "Cloudflare na frente do ZoZo" no LEIA-ME. |
+| "Não foi possível concluir a operação (código …)" | Me mande o código que aparece entre parênteses: ele diz exatamente o que falhou. |
 | A publicação parou com texto vermelho | Leia a mensagem: se foram os testes, nada foi publicado (seguro). Me mande o texto. |
 | Voltar o banco principal a um momento anterior | Use o comando mostrado na publicação (também fica em `api/restauracao.log`). |
 
