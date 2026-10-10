@@ -273,8 +273,8 @@
     anoSel.addEventListener("change", () => { st.ano = Number(anoSel.value); carregar(); });
     const periodoId = ZoZo.dom.id("periodo");
     mesSel.id = periodoId;
-    const dataInput = h("input", { type: "date", class: "input", value: st.dataFatura, "aria-label": "Data da fatura" });
-    dataInput.addEventListener("change", () => { if (F.parseData(dataInput.value)) { st.dataFatura = dataInput.value; atualizarResumo(); } });
+    const dataInput = ZoZo.calendario.Campo({ valor: st.dataFatura, rotulo: "Data da fatura",
+      aoMudar: (v) => { if (F.parseData(v)) { st.dataFatura = v; atualizarResumo(); } } });
 
     function imprimir() {
       if (!st.perfilId) { ctx.toast("Selecione um perfil para imprimir.", { tone: "error" }); perfilSel.focus(); return; }
@@ -311,6 +311,7 @@
     mount(root, el);
     document.body.classList.add("has-boleto");
     if (shell) shell.inert = true;               // o fundo não recebe foco nem cliques enquanto a fatura está aberta
+    void el.offsetWidth;                         // garante o estado inicial antes da transição de entrada
     requestAnimationFrame(() => { el.classList.add("is-open"); perfilSel.focus(); });
 
     // Ajuste de escala do papel A4 à área disponível
@@ -334,7 +335,10 @@
         document.removeEventListener("keydown", tecla);
         document.body.classList.remove("has-boleto", "is-printing-boleto");
         if (shell) shell.inert = false;
-        clear(root);
+        // saída suave: a fatura some e desce um pouco; só esta folha é removida (outra pode ter sido aberta)
+        el.classList.remove("is-open");
+        el.inert = true;
+        setTimeout(() => el.remove(), 280);
         atual = null;
         if (anterior && anterior.isConnected && anterior.focus) anterior.focus();
       },

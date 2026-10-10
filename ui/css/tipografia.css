@@ -424,7 +424,6 @@
 .dv__name { font-size: var(--t-15); font-weight: 450; }
 .dv__date { border: 0; background: none; padding: 4px 6px; border-radius: 8px; font-size: var(--t-15); font-weight: 450; color: var(--color-text-secondary); text-align: right; justify-self: end; white-space: nowrap; }
 .dv__date:hover { background: var(--color-surface-hover); }
-.dv__date-input { height: 30px; border: 1px solid var(--color-primary); border-radius: 8px; padding: 0 6px; font-size: var(--t-13); }
 .dv__pill { border: 0; background: none; padding: 0; justify-self: end; border-radius: var(--radius-pill); }
 .dv__pill:hover { box-shadow: 0 0 0 2px var(--color-primary-soft); }
 .dv__missing { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px dashed var(--color-danger); border-radius: var(--radius-pill); color: var(--color-danger); font-size: var(--t-11); font-weight: 620; text-transform: uppercase; }
@@ -433,7 +432,8 @@
 .dv__remove { justify-self: end; }
 .dv__errors:empty { display: none; }
 .dv__errors { margin-top: var(--space-3); padding: 10px 14px; border-radius: 8px; background: var(--color-danger-soft); color: var(--color-danger); font-size: var(--t-13); font-weight: 450; }
-.dv__errors ul { margin: 0; padding-left: 18px; }
+.dv__errors ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.dv__errors li, .dv__errors p { margin: 0; text-align: left; line-height: 1.4; }
 /* rodapé: Restante para dividir + botões, centralizados na vertical */
 .dv__footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-5); }
 .dv__rest { display: flex; align-items: center; gap: 10px; font-size: var(--t-15); font-weight: 550; }
@@ -620,8 +620,8 @@
 .boleto-editor__pix:empty { display: none; }
 .boleto-editor__section--summary .btn[hidden] { display: none; }
 /* Configurações › Pix */
-.cfg-pix { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 110px; gap: 8px; width: 100%; }
-.cfg-pix__acoes { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.cfg-pix { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.7fr) auto; gap: 8px; width: 100%; align-items: center; }
+.cfg-pix__acoes { display: flex; gap: 8px; justify-content: flex-end; }
 @container (max-width: 560px) { .cfg-pix { grid-template-columns: minmax(0, 1fr); } }
 .cfg-row.cfg-row--bloco { flex-direction: column; align-items: stretch; gap: 8px; }
 
@@ -698,14 +698,6 @@
 .greeting { display: block; margin-bottom: var(--space-5); }
 .greeting__title { display: block; margin: 0; }
 
-/* ---------- Barra de rolagem ----------
-   Chrome/Edge/Safari: ::-webkit-scrollbar em base.css (fina, arredondada, sem setas).
-   Firefox não tem ::-webkit-scrollbar: usa as propriedades padrão, só nele — no Chrome do
-   Windows elas anulariam o estilo e trariam de volta a barra antiga com setas. */
-@-moz-document url-prefix() {
-  * { scrollbar-width: thin; scrollbar-color: rgba(22, 33, 58, 0.22) transparent; }
-  .sidebar, .sidebar * { scrollbar-color: rgba(255, 255, 255, 0.28) transparent; }
-}
 /* Perfis: nome + contagem à esquerda, valor à direita (a grade antiga tinha 3 colunas para 2 itens e quebrava no celular) */
 .profile-row { grid-template-columns: minmax(0, 1fr) auto; }
 .profile-row__count, .profile-row__value { white-space: nowrap; }
@@ -1016,7 +1008,7 @@
 
 /* Grupo de categorias selecionável + painel do grupo */
 .category-row--group.row--interactive { cursor: pointer; }
-.category-row--group.is-selected { background: var(--color-surface-hover); box-shadow: inset 3px 0 0 var(--color-primary); }
+.category-row--group.is-selected { background: var(--color-surface-hover); }
 .grupo-hero { align-items: flex-start; }
 .grupo-orc { display: grid; justify-items: end; gap: 10px; }
 .grupo-orc__valores { display: grid; grid-auto-flow: column; gap: var(--space-5); }
@@ -1035,3 +1027,73 @@
 .page--lancamentos > * { flex-shrink: 0; }
 .page--lancamentos > .selbar { position: sticky; bottom: var(--space-5); margin-top: auto; align-self: center; }
 .page--lancamentos > :has(+ .selbar) { margin-bottom: var(--space-5); }
+
+/* =============================================================
+   ZoZo 2.7
+   ============================================================= */
+/* Fatura: QR maior e texto do Pix com peso 620 */
+.doc__pix .qr { width: 132px; height: 132px; }
+.doc__pix-texto { font-weight: 620; }
+
+/* Recorrências: check de pago sem o fundo circular */
+.recurrence-row__paid { background: transparent !important; width: auto; }
+
+/* Aviso de demonstração no menu: fundo laranja-claro, texto laranja */
+.demo-badge { background: #fff1e3; color: #e8730c; font-weight: 550; border-radius: 8px; }
+.demo-badge .icon { color: #e8730c; }
+
+/* Janelas de aviso (confirmação) mais largas */
+.modal--confirm { width: min(500px, calc(100vw - 32px)); }
+
+/* Configurações: janela maior — o conteúdo de Geral cabe sem rolagem */
+.modal--settings { width: min(980px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); }
+
+/* Menus: linha com interruptor (ex.: Investimentos › Contas incluídas) */
+.menu__toggle { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px; }
+.menu__toggle .menu__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu__toggle .toggle { flex: none; margin-left: auto; gap: 0; }
+.menu__toggle .toggle__label:empty { display: none; }
+.menu__swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.menu__item--estatico { cursor: default; }
+.menu__item--estatico:hover { background: none; }
+
+/* "+N" das categorias do grupo: clicável */
+.tag-more--btn { border: 0; cursor: pointer; font-family: inherit; }
+.tag-more--btn:hover, .tag-more--btn.is-open { background: var(--color-primary-soft); color: var(--color-primary); }
+
+/* Parcelas: valor total só para leitura (é o valor da transação) */
+.input--leitura, .input--leitura:hover, .input--leitura:focus { background: var(--color-background); color: var(--color-text-secondary); cursor: default; box-shadow: none; }
+
+/* Exportar CSV: ícone de carregando no botão */
+.spinner--btn { width: 14px; height: 14px; border-width: 2px; flex: none; }
+.btn--primary .spinner--btn { border-color: rgba(255, 255, 255, 0.35); border-top-color: #fff; }
+
+/* Calendário do ZoZo (substitui o do navegador) */
+.menu--cal { padding: 10px; }
+.cal { display: grid; gap: 8px; }
+.cal__topo { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cal__titulo { font-size: var(--t-15); font-weight: 550; text-transform: capitalize; }
+.cal__nav { border-radius: 8px; }
+.cal__grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal__semana { display: grid; place-items: center; height: 26px; font-size: 11px; font-weight: 600; color: var(--color-text-muted); }
+.cal__dia {
+  height: 34px; border: 0; border-radius: 8px; background: none; cursor: pointer;
+  font: inherit; font-size: var(--t-13); font-weight: 450; color: var(--color-text-primary);
+  transition: background-color 120ms var(--easing), color 120ms var(--easing);
+}
+.cal__dia:hover { background: var(--color-primary-soft); color: var(--color-primary); }
+.cal__dia.is-hoje { font-weight: 650; color: var(--color-primary); }
+.cal__dia.is-selected, .cal__dia.is-selected:hover { background: var(--color-primary); color: #fff; font-weight: 600; }
+.cal__dia:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.cal__rodape { display: flex; justify-content: flex-end; border-top: 1px solid var(--color-border); padding-top: 8px; }
+.cal__hoje { border: 0; background: none; border-radius: 8px; padding: 4px 10px; font: inherit; font-size: var(--t-13); font-weight: 550; color: var(--color-primary); cursor: pointer; }
+.cal__hoje:hover { background: var(--color-primary-soft); }
+.cal-campo { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; }
+.cal-campo .icon { color: var(--color-text-secondary); flex: none; }
+
+/* Transações: a lista entra suave quando a pesquisa muda */
+.lanc--busca .month-group, .lanc--busca .empty { animation: busca-in 220ms var(--easing) both; }
+.lanc--busca .month-group:nth-of-type(2) { animation-delay: 30ms; }
+.lanc--busca .month-group:nth-of-type(n+3) { animation-delay: 60ms; }
+@keyframes busca-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lanc--busca .month-group, .lanc--busca .empty { animation: none; } }

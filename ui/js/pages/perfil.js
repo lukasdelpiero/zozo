@@ -65,10 +65,12 @@
   }
 
   /* ---------------- Painel do perfil ---------------- */
-  function abrirDetalhe(p, ctx) {
+  function abrirDetalhe(p, ctx, opts) {
+    const o = opts || {};
     ctx.detail.open({
       title: "Perfil",
       selected: { tipo: "perfil", id: p.id },
+      voltar: o.voltar,
       menu: [
         { label: p.arquivado ? "Desarquivar" : "Arquivar", onClick: () => arquivar(p, ctx) },
         ZoZo.recursos.boleto() ? { label: "Gerar fatura", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) } : null,
@@ -154,7 +156,7 @@
     },
   };
 
-  ZoZo.perfilShared = { abrirFormPerfil, AvatarPerfil };
+  ZoZo.perfilShared = { abrirFormPerfil, AvatarPerfil, abrirDetalhe: (...a) => abrirDetalhe(...a) };
 
   /* =============================================================
      Configurações (região inferior do painel lateral — seção 8)
@@ -219,7 +221,14 @@
 
   /** Gera o CSV no próprio navegador e baixa (nada passa pelo servidor). Atenção: o arquivo baixado NÃO é cifrado. */
   function exportarCsv(ctx, botao) {
+    if (botao.disabled) return;
+    // Carregando: ícone animado no lugar do ícone do botão (pelo menos 600 ms, para dar para ver)
+    const iconeOriginal = botao.querySelector("svg");
+    const giro = h("span", { class: "spinner spinner--btn", "aria-hidden": "true" });
+    if (iconeOriginal) iconeOriginal.replaceWith(giro); else botao.prepend(giro);
     botao.disabled = true;
+    botao.setAttribute("aria-busy", "true");
+    const minimo = new Promise((r) => setTimeout(r, 600));
     ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
       const cfg = store.get().data.config || {};
       const moeda = cfg.multicambio ? (["BRL", "EUR", "USD"].includes(cfg.moeda) ? cfg.moeda : "BRL") : null;
@@ -229,9 +238,9 @@
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      ctx.toast("Arquivo CSV gerado. Ele não é criptografado: guarde-o em local seguro.");
     }).catch((e) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
-      .finally(() => { botao.disabled = false; });
+      .then(() => minimo)
+      .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); });
   }
 
   /** Ações de conta esperam as gravações em andamento (evita conflito de versão com elas) */
@@ -355,7 +364,7 @@
   function SecaoPix(ctx, cfg, u) {
     const pix = cfg.pix || null;
     const entrada = (ph, valor, max, rotulo) => { const i = h("input", { class: "input input--sm", placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo }); return i; };
-    const chave = entrada("Chave Pix (CPF, CNPJ, e-mail, celular…)", "", 77, "Chave Pix");
+    const chave = entrada("CPF, telefone ou e-mail", "", 77, "Chave Pix");
     const nome = entrada("Nome do recebedor", pix ? pix.nome : (u.nomeUsuario || ""), 25, "Nome do recebedor");
     const cidade = entrada("Cidade", pix ? pix.cidade : "", 15, "Cidade do recebedor");
     const salvar = (btn) => {
@@ -368,12 +377,13 @@
     return h("div", { class: "cfg-row cfg-row--bloco" },
       h("div", { class: "cfg-row__text" },
         h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
-        h("span", { class: "cfg-row__sub" }, "Usada no QR code Pix das faturas. Fica criptografada com seus dados.")),
-      h("div", { class: "cfg-pix" }, chave, nome, cidade),
-      h("div", { class: "cfg-pix__acoes" },
-        pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
-          .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => ctx.toast(e.friendly, { tone: "error" })) }) : null,
-        UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) })));
+        h("span", { class: "cfg-row__sub" }, "Definir chave Pix para o QRCode.")),
+      // chave · nome · cidade · [Remover] Salvar — tudo numa linha
+      h("div", { class: "cfg-pix" }, chave, nome, cidade,
+        h("div", { class: "cfg-pix__acoes" },
+          pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
+            .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => ctx.toast(e.friendly, { tone: "error" })) }) : null,
+          UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) }))));
   }
 
   /* ---------------- Configurações: Geral | Conta ---------------- */
@@ -496,7 +506,7 @@
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
           h("h3", { class: "cfg-section" }, "Ações"),
-          linhaConfig("Exportar todas as transações", "Baixe seus dados em um arquivo CSV", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
+          linhaConfig("Exportar todas as transações", "Baixe seus dados em um arquivo CSV (o arquivo não é criptografado)", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
         ];

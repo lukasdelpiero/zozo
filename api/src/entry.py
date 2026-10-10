@@ -11,7 +11,7 @@ Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
   API_FASTAPI = "1"  → transição: os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py)
                        antes do núcleo. Desligado por padrão; ligar primeiro só na prévia, depois de
                        mover fastapi/pydantic para [project].dependencies (pyproject.toml).
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO
 """
 import json
 from urllib.parse import urlencode
@@ -26,7 +26,7 @@ try:                                  # Pyodide recente representa o null do JS 
 except ImportError:                   # pragma: no cover
     _JSNULL = None
 
-_CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS")
+_CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO")
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 

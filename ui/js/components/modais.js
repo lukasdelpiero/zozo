@@ -161,8 +161,11 @@
   /* ---------------- Nova conta ---------------- */
   const TITULOS_CONTA = { cartao: "Cartão de crédito", poupanca: "Conta poupança", corrente: "Conta corrente", investimento: "Investimento", emprestimo: "Empréstimo", outros: "Outros" };
 
-  function novaConta(ctx, tipoInicial) {
-    const bancos = ["cartao", "poupanca", "corrente"].includes(tipoInicial || "corrente");
+  /** Nova conta. Cartão de crédito tem janela própria (sem troca de tipo); poupança e corrente dividem a
+      mesma janela, alternando entre as duas. opts.aoCriar(conta): ex.: já escolher a conta numa transação */
+  function novaConta(ctx, tipoInicial, opts) {
+    const o = opts || {};
+    const bancos = ["poupanca", "corrente"].includes(tipoInicial || "corrente");
     const d = { tipo: tipoInicial || "corrente", cor: ZoZo.regras.corSugerida(), tipoInvestimento: ZoZo.regras.tiposInvestimento[0] };
     janela({
       titulo: TITULOS_CONTA[d.tipo],
@@ -217,13 +220,13 @@
             nome, tipo: d.tipo, ultimos4Digitos: dig, saldo: Number.isFinite(s) ? s : 0, cor: d.cor, instituicao: d.tipo === "cartao" || d.tipo === "poupanca" || d.tipo === "corrente" ? inst : inst,
             limite: campos.limite ? campos.limite.ler() : null, fechamento: v("fechamento") || null, vencimento: v("vencimento") || null,
             tipoInvestimento: campos.tipoInvestimento ? campos.tipoInvestimento.value : null,
-          } }).then(() => { api.fechar(); ctx.toast("Conta criada."); return ctx.recarregarTudo(); })
+          } }).then((r) => { api.fechar(); ctx.toast("Conta criada."); return ctx.recarregarTudo().then(() => { if (o.aoCriar && r && r.conta) o.aoCriar(r.conta); }); })
             .catch((e) => { erro.textContent = e.friendly; btn.disabled = false; });
         };
         return {
           titulo: TITULOS_CONTA[d.tipo],
           corpo: h("div", { class: "zm__form" },
-            bancos ? UI.Segmented([{ value: "cartao", label: "Cartão de crédito" }, { value: "poupanca", label: "Poupança" }, { value: "corrente", label: "Corrente" }],
+            bancos ? UI.Segmented([{ value: "poupanca", label: "Poupança" }, { value: "corrente", label: "Corrente" }],
               d.tipo, (t) => { d.tipo = t; api.ir(passo); }, { label: "Tipo de conta", class: "segmented--pilulas" }) : null,
             linhas, h("div", { class: "field" }, h("span", { class: "field__label" }, "Cor"), cores), erro),
           botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: "Criar", primario: true, onClick: enviar }],
@@ -278,11 +281,15 @@
 
   function passoParcelas(aoConfirmar, voltar, valorInicial) {
     return (api) => {
+      // Valor total = o valor da transação (não se edita aqui: muda-se no próprio painel)
       const total = UI.Input({ inputmode: "decimal", placeholder: "0,00", value: valorInicial > 0 ? F.moedaEditavel(valorInicial) : "" });
+      total.readOnly = true;
+      total.tabIndex = -1;
+      total.classList.add("input--leitura");
       const ini = UI.Input({ type: "number", inputmode: "numeric", placeholder: "1" });
       const fim = UI.Input({ type: "number", inputmode: "numeric", placeholder: "10" });
       [ini, fim].forEach((i) => { i.min = "1"; i.step = "1"; i.addEventListener("keydown", (e) => { if ([".", ",", "e", "-", "+"].includes(e.key)) e.preventDefault(); }); });
-      (valorInicial > 0 ? ini : total).dataset.autofocus = "";
+      ini.dataset.autofocus = "";
       const previa = h("p", { class: "field__hint parcelas__previa", "aria-live": "polite" });
       const erro = h("p", { class: "form-error", role: "alert" });
       const ler = () => ({ v: F.parseMoeda(total.value), a: Number(ini.value), b: Number(fim.value) });
@@ -290,20 +297,19 @@
         const { v, a, b } = ler();
         previa.textContent = v > 0 && Number.isInteger(a) && Number.isInteger(b) && a >= 1 && b >= 2 && a <= b && b <= 999 ? (previaParcelas(v, a, b) || "") : "";
       };
-      [total, ini, fim].forEach((i) => i.addEventListener("input", atualizar));
+      [ini, fim].forEach((i) => i.addEventListener("input", atualizar));
       return {
         titulo: "Parcelas",
         corpo: h("div", { class: "zm__form" },
           UI.Field("Valor total da compra", h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, F.simbolo()), total)),
           h("div", { class: "form-row form-row--2" }, UI.Field("Parcela atual", ini), UI.Field("Total de parcelas", fim)),
           previa,
-          h("p", { class: "field__hint" }, "O ZoZo divide o total pelas parcelas. Ex.: " + F.moeda(141) + " em 7x → 1ª de " + F.moeda(20.16) + " e 6 de " + F.moeda(20.14) + ". Já na 3ª de 10? Atual 3, total 10: as seguintes são criadas sozinhas."),
           erro),
         botoes: [
           { label: "Voltar", onClick: () => voltar() },
           { label: "Criar", primario: true, onClick: (btn) => {
             const { v, a, b } = ler();
-            if (!(v > 0 && v < 1e12)) { erro.textContent = "Informe o valor total da compra."; total.focus(); return; }
+            if (!(v > 0 && v < 1e12)) { erro.textContent = "Informe o valor da transação antes de parcelar."; return; }
             if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 1 && b >= 2 && a <= b && b <= 999)) { erro.textContent = "Use números inteiros: parcela atual a partir de 1 e total maior ou igual à atual."; return; }
             if (!previaParcelas(v, a, b)) { erro.textContent = "O valor é pequeno demais para esse número de parcelas."; return; }
             aoConfirmar({ recorrencia: "parcelada", parcelaAtual: a, parcelaTotal: b, valorTotal: v }, api, btn);

@@ -109,7 +109,7 @@
 
   // Modo local de desenvolvimento: todos os recursos ligados (no site, quem decide é o servidor)
   const sessaoPublica = (u) => (u ? { authenticated: true, user: { nomeUsuario: u.nome, email: u.email, doisFatores: !!u.totp, demo: false,
-    recursos: { perfis: true, boleto: true, pix: true } } } : { authenticated: false });
+    recursos: { perfis: true, boleto: true, pix: true, cambio: true } } } : { authenticated: false });
   const atual = () => { const id = getSessao(); return id ? usuarios().find((u) => u.id === id) : null; };
   const emailOk = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 

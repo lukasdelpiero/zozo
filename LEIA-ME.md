@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.6.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.7.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,19 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.7.0
+
+- **Campos de valor como maquininha:** os dígitos entram pelos centavos (1 → 0,01 · 1200 → 12,00 · 120000 → 1.200,00); colar "1.234,56" mantém o valor.
+- **Painel da transação:** a seta ao lado da conta, categoria, perfil e recorrência abre o painel dela (com "voltar"), sem mexer nos filtros da lista; a conta abre a lista com um clique (sem a setinha) e tem **+ Nova conta** (corrente/poupança ou cartão, já escolhida na transação); a recorrência usa o mesmo menu da criação, com **Sem recorrência**; sem "Sem perfil" nas contas com Perfis; Débito sem o rótulo "Saída"; nome e valor sem fundo/borda ao editar.
+- **Calendário do ZoZo** (cantos arredondados, roxo no dia escolhido e ao passar o mouse) no painel, na divisão e na fatura — o do navegador não aceita estilo.
+- **Gráficos:** degradê em todas as linhas; com duas linhas, o da de cima vai até a de baixo; Investimentos com linha contínua.
+- **Contas:** janela própria para cartão de crédito; poupança e corrente juntas.
+- **Categorias:** "+N" do grupo abre a lista das categorias; "Excluída" (fora do orçamento) só para categoria sem transações (regra também no serviço); texto novo e botão vermelho ao desagrupar; janelas de aviso mais largas.
+- **Parcelas:** valor total = valor da transação (não editável), sem o texto explicativo.
+- **Multicâmbio:** textos novos; levar transações para outra moeda só para contas liberadas (segredo `RECURSOS_CAMBIO`, além das de `RECURSOS_AVANCADOS` e da demonstração).
+- **Pix:** "Definir chave Pix para o QRCode.", aceita CPF, telefone ou e-mail (CNPJ sem suporte por enquanto), Salvar na mesma linha; na fatura, QR maior e texto com peso 620.
+- **Outros:** barra de rolagem do sistema; Configurações maiores (Geral sem rolagem); menu "Contas incluídas" de Investimentos alinhado; check de pago sem fundo; aviso de demonstração laranja; pesquisa de Transações com animação; CSV com ícone de carregando e sem aviso; fatura abre e fecha com transição.
 
 ## Novidades da versão 2.6.0
 
@@ -142,6 +155,8 @@ O script roda os testes (API, serviço de dados e tipos), monta a interface com 
 **Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO` e `npx wrangler secret put TURNSTILE_SECRET` (acrescente `--env previa` para a prévia). **Sem `TURNSTILE_SECRET` a produção não é publicada** (a chave pública está no `wrangler.toml`; sem a secreta, cadastro e login com CAPTCHA seriam recusados). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
 
 **Perfis, boletos e Pix:** liberados para a conta de demonstração e para os e-mails do segredo `RECURSOS_AVANCADOS` (separados por vírgula): `npx wrangler secret put RECURSOS_AVANCADOS` (e `--env previa`). Fica como segredo para os e-mails não irem para o GitHub. Sem ele, só a demonstração tem esses recursos.
+
+**Transferir transações entre moedas (multicâmbio):** liberado para a demonstração, para os e-mails de `RECURSOS_AVANCADOS` e para os do segredo `RECURSOS_CAMBIO`: `npx wrangler secret put RECURSOS_CAMBIO` (e `--env previa`). Também exige e-mail confirmado.
 
 **Conta de demonstração:** criada pela migração `0003_conta_demo.sql` (login `demo@usezozo.com.br`, senha `zozo1234`). Ninguém consegue recadastrá-la, trocar a senha ou ativar 2FA nela.
 

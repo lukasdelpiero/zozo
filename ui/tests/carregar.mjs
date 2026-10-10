@@ -10,7 +10,7 @@ const MODULOS = ["core/format.ts", "core/state.js", "config/regras.js", "bridge/
 // Módulos já em TypeScript: só os tipos são removidos (o código que roda é o mesmo do navegador)
 const codigo = (m) => { const t = readFileSync(new URL(m, RAIZ), "utf8"); return m.endsWith(".ts") ? stripTypeScriptTypes(t) : t; };
 
-export function carregar({ recursos = { perfis: true, boleto: true, pix: true }, demo = false, documento = null } = {}) {
+export function carregar({ recursos = { perfis: true, boleto: true, pix: true, cambio: true }, demo = false, documento = null } = {}) {
   const eventos = [];
   const salvos = [];
   const ctx = {

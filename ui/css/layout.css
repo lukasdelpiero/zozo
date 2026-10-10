@@ -464,7 +464,6 @@
 .sidebar__note { color: var(--sidebar-fg-muted); }
 .sidebar .skeleton__block { background: rgba(255, 255, 255, 0.14); animation: none; }
 .sidebar :focus-visible { outline-color: #fff; }
-.sidebar ::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.25); }
 
 /* Botão de recolher: branco sobre o menu roxo; cinza sobre a barra branca quando recolhido */
 .menu-toggle { background: var(--sidebar-hover); color: #fff; box-shadow: none; }

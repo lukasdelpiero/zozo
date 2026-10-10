@@ -402,11 +402,11 @@ async def _encerrar_outras(ctx, email, manter_id):
     await ctx.banco.executar("DELETE FROM sessoes WHERE email = ? AND id != ?", email, manter_id)
 
 
-def _avancado(ctx, email, verificado=False):
+def _na_lista(ctx, segredo, email, verificado):
     """
-    Perfis, boletos e Pix: só a demonstração e os e-mails do segredo RECURSOS_AVANCADOS (lista separada
-    por vírgula) — e só se a conta tiver o e-mail CONFIRMADO (pelo Google; as contas anteriores à 2.5
-    foram marcadas na migração 0005). Cadastrar antes um e-mail da lista não dá os recursos.
+    E-mail liberado num segredo de lista (separada por vírgula) — e só se a conta tiver o e-mail
+    CONFIRMADO (pelo Google; as contas anteriores à 2.5 foram marcadas na migração 0005).
+    Cadastrar antes um e-mail da lista não dá o recurso. A demonstração tem tudo.
     """
     if email == DEMO_EMAIL:
         return True
@@ -414,15 +414,22 @@ def _avancado(ctx, email, verificado=False):
         return False
     # Tolerante ao jeito de digitar o segredo: vírgula, ponto e vírgula, espaço ou quebra de linha
     # separam; aspas e caracteres invisíveis (ex.: marca BOM colada pelo terminal) são ignorados
-    texto = "".join(c for c in str(ctx.config.get("RECURSOS_AVANCADOS") or "") if unicodedata.category(c) != "Cf")
+    texto = "".join(c for c in str(ctx.config.get(segredo) or "") if unicodedata.category(c) != "Cf")
     lista = {e.strip("\"'<>").lower() for e in re.split(r"[,;\s]+", texto) if e.strip("\"'<>")}
     return email in lista
 
 
+def _avancado(ctx, email, verificado=False):
+    """Perfis, faturas e Pix: segredo RECURSOS_AVANCADOS."""
+    return _na_lista(ctx, "RECURSOS_AVANCADOS", email, verificado)
+
+
 def _sessao_publica(ctx, email, nome, envelope, dois_fatores, verificado=False):
     av = _avancado(ctx, email, verificado)
+    # Levar transações de uma moeda para outra (multicâmbio): contas avançadas + segredo RECURSOS_CAMBIO
+    cambio = av or _na_lista(ctx, "RECURSOS_CAMBIO", email, verificado)
     return {"email": email, "nome": nome, "envelope": envelope, "doisFatores": bool(dois_fatores),
-            "demo": email == DEMO_EMAIL, "recursos": {"perfis": av, "boleto": av, "pix": av}}
+            "demo": email == DEMO_EMAIL, "recursos": {"perfis": av, "boleto": av, "pix": av, "cambio": cambio}}
 
 
 # ---------------- prova da senha (rotas com sessão) ----------------

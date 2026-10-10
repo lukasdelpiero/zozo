@@ -9,6 +9,7 @@
 #   npx wrangler secret put SEGREDO                       (e: --env previa)
 #   npx wrangler secret put TURNSTILE_SECRET              (e: --env previa)
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET          (opcional, para o "Continuar com Google")
+#   npx wrangler secret put RECURSOS_CAMBIO               (e-mails que podem levar transações entre moedas no multicâmbio)
 #   npx wrangler secret put RECURSOS_AVANCADOS            (e-mails com Perfis, boletos e Pix, separados por vírgula;
 #                                                          a conta demo@usezozo.com.br sempre tem)
 name = "zozo"

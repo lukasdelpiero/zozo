@@ -27,7 +27,7 @@ declare global {
     mesNome(indice: number): string;
     parseMoeda(txt: unknown): number;
     moedaEditavel(v: unknown): string;
-    mascararValor(input: HTMLInputElement, digitado?: string | null): void;
+    mascararValor(input: HTMLInputElement, digitado?: string | null, tipo?: string): void;
     completarValor(input: HTMLInputElement): void;
     cor(v: unknown, padrao?: string | null): string | null;
     diaSemana(d: Date): string;

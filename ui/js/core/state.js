@@ -83,6 +83,7 @@
     perfis: () => recurso("perfis"),
     boleto: () => recurso("boleto"),
     pix: () => recurso("pix"),
+    cambio: () => recurso("cambio"),          // levar transações de uma moeda para outra (multicâmbio)
     demo: () => usuario().demo === true,
   };
 

@@ -3,7 +3,9 @@
    Recebem dados já preparados e apenas desenham.
 
    renderLineChart(container, series, options)
-     series: [{ name, color, points:[{ data:"AAAA-MM-DD", valor }], colorBySlope? }]
+     series: [{ name, color, points:[{ data:"AAAA-MM-DD", valor }], colorBySlope?, tracejado?, area? }]
+     Toda linha tem degradê embaixo (area: false desliga; tracejado nunca tem); com duas linhas o
+     degradê da de cima vai até a de baixo.
    renderDonutChart(container, segments, options)
      segments: [{ valor, cor, label }]   ·  options.progresso (0–1) → anel de progresso
    renderBarChart(container, barras, options)
@@ -132,6 +134,33 @@
       const g = s("g", { "clip-path": `url(#${clipId})` });
       svg.appendChild(g);
 
+      // Degradê sob a linha (todas as linhas de todos os gráficos, menos as tracejadas de referência).
+      // Com duas linhas, o degradê da de cima desce até a de baixo (preenche o espaço entre elas).
+      const caminho = (sr) => sr.points.map((p, i) => (i ? "L" : "M") + x(i, sr.points.length).toFixed(1) + " " + sr._y(p.valor).toFixed(1)).join(" ");
+      const degrade = (cor) => {
+        const gid = "zz-grad-" + (++seq);
+        svg.insertBefore(s("defs", null, s("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 },
+          s("stop", { offset: "0%", "stop-color": cor, "stop-opacity": 0.22 }),
+          s("stop", { offset: "100%", "stop-color": cor, "stop-opacity": 0 }))), svg.firstChild);
+        return `url(#${gid})`;
+      };
+      const comArea = validas.filter((sr) => sr.area !== false && !sr.tracejado);
+      validas.forEach((sr) => {
+        if (sr.area === false || sr.tracejado) return;
+        const pts = sr.points, L = pts.length;
+        const corArea = sr.colorBySlope ? (L > 1 && pts[L - 1].valor < pts[0].valor ? css("--color-chart-down") : css("--color-chart-up")) : sr.color;
+        const abaixo = comArea[comArea.indexOf(sr) + 1];
+        let contorno;
+        if (abaixo && abaixo.points.length === L) {
+          // até a linha de baixo: vai pela linha desta série e volta pela de baixo
+          const volta = abaixo.points.map((p, i) => [x(i, L), abaixo._y(p.valor)]).reverse().map(([px, py]) => `L${px.toFixed(1)} ${py.toFixed(1)}`).join(" ");
+          contorno = caminho(sr) + " " + volta + " Z";
+        } else {
+          contorno = caminho(sr) + ` L${x(L - 1, L).toFixed(1)} ${sr._base} L${x(0, L).toFixed(1)} ${sr._base} Z`;
+        }
+        g.appendChild(s("path", { d: contorno, fill: degrade(corArea), stroke: "none", class: "line-chart__area" }));
+      });
+
       validas.forEach((sr) => {
         const y = sr._y;
         const pts = sr.points;
@@ -141,7 +170,7 @@
           const flush = () => {
             if (trecho.length < 2) return;
             const cor = atual === "up" ? css("--color-chart-up") : atual === "down" ? css("--color-chart-down") : css("--color-chart-flat");
-            g.appendChild(s("polyline", { points: trecho.join(" "), fill: "none", stroke: cor, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", class: atual === "flat" ? "line-chart__flat" : null }));
+            g.appendChild(s("polyline", { points: trecho.join(" "), fill: "none", stroke: cor, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
           };
           for (let i = 1; i < L; i++) {
             const dir = pts[i].valor > pts[i - 1].valor ? "up" : pts[i].valor < pts[i - 1].valor ? "down" : "flat";
@@ -150,15 +179,7 @@
           }
           flush();
         } else {
-          const d = pts.map((p, i) => (i ? "L" : "M") + x(i, L).toFixed(1) + " " + y(p.valor).toFixed(1)).join(" ");
-          if (sr.area || (o.area && sr.area !== false && !sr.tracejado)) {
-            const gid = "zz-grad-" + (++seq);
-            svg.insertBefore(s("defs", null, s("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 },
-              s("stop", { offset: "0%", "stop-color": sr.color, "stop-opacity": 0.22 }),
-              s("stop", { offset: "100%", "stop-color": sr.color, "stop-opacity": 0 }))), svg.firstChild);
-            const area = d + ` L${x(L - 1, L).toFixed(1)} ${sr._base} L${x(0, L).toFixed(1)} ${sr._base} Z`;
-            g.appendChild(s("path", { d: area, fill: `url(#${gid})`, stroke: "none" }));
-          }
+          const d = caminho(sr);
           g.appendChild(s("path", { d, fill: "none", stroke: sr.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": sr.tracejado ? "4 5" : null }));
           if (sr.pontos) pts.forEach((p, i) => g.appendChild(s("circle", { cx: x(i, L), cy: y(p.valor), r: 3.5, fill: p.vazio ? "#fff" : sr.color, stroke: sr.color, "stroke-width": 2 })));
         }

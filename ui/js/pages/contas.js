@@ -34,9 +34,9 @@
     const chart = h("div", { class: "chart-card__chart" });
     const css = getComputedStyle(document.documentElement);
     ZoZo.charts.renderLineChart(chart, [
-      // area: degradê abaixo de cada linha, como no Gasto mensal (usado no Patrimônio total do Dashboard)
-      { name: "Ativos", color: css.getPropertyValue("--color-assets").trim(), area: !!o.area, points: serie.map((p) => ({ data: p.data, valor: p.ativos })) },
-      { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), area: !!o.area, points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
+      // degradê: o de Ativos desce até a linha de Passivos; o de Passivos, até o fim do gráfico
+      { name: "Ativos", color: css.getPropertyValue("--color-assets").trim(), points: serie.map((p) => ({ data: p.data, valor: p.ativos })) },
+      { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
     ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos" });
 
     return h("section", { class: ["chart-card", !o.embedded && "card", o.compact && "chart-card--compact", o.embedded && "chart-card--embedded"], "aria-label": "Gráfico de contas" },

@@ -100,37 +100,24 @@
   }
 
   /**
-   * Campo de valor enquanto a pessoa digita: milhar com ponto e decimais com vírgula ("12000" → "12.000",
-   * ao sair do campo "12.000,00"). Um "." digitado vira a vírgula dos centavos. O cursor fica no lugar.
+   * Campo de valor enquanto a pessoa digita, como numa maquininha: os dígitos entram pelos centavos
+   * e vão subindo ("1" → "0,01", "12" → "0,12", "1200" → "12,00", "120000" → "1.200,00").
+   * Apagar tira o último dígito. Valor colado ("1.234,56", "1234.5") é lido inteiro, sem deslocar casas.
    */
-  function mascararValor(input: HTMLInputElement, digitado?: string | null): void {
+  function mascararValor(input: HTMLInputElement, _digitado?: string | null, tipo?: string): void {
     const v = input.value;
     const negativo = /^\s*[-−]/.test(v);
-    let cursor = input.selectionStart == null ? v.length : input.selectionStart;
-    let bruto = v;
-    if (digitado === "." && !v.slice(0, cursor - 1).includes(",") && !v.slice(cursor).includes(",")) {
-      bruto = v.slice(0, cursor - 1) + "," + v.slice(cursor);
+    let centavos: number;
+    if (tipo === "insertFromPaste" || tipo === "insertFromDrop") {
+      const n = parseMoeda(v);
+      centavos = Number.isFinite(n) ? Math.round(Math.abs(n) * 100) : 0;
+    } else {
+      const digitos = v.replace(/\D/g, "").replace(/^0+/, "").slice(0, 15);   // até R$ 9.999.999.999.999,99
+      centavos = digitos ? Number(digitos) : 0;
     }
-    // conta dígitos e a vírgula antes do cursor, para devolvê-lo ao mesmo ponto
-    let antes = 0, viuVirgula = false;
-    for (let i = 0; i < cursor && i < bruto.length; i++) {
-      if (/\d/.test(bruto[i])) antes += 1;
-      else if (bruto[i] === "," && !viuVirgula) { antes += 1; viuVirgula = true; }
-    }
-    let int = "", dec: string | null = null;
-    for (const ch of bruto) {
-      if (/\d/.test(ch)) { if (dec === null) int += ch; else if (dec.length < 2) dec += ch; }
-      else if (ch === "," && dec === null) dec = "";
-    }
-    int = int.replace(/^0+(?=\d)/, "");
-    if (!int && dec !== null) int = "0";
-    const comPontos = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    const novo = (negativo ? "-" : "") + comPontos + (dec !== null ? "," + dec : "");
-    if (novo === v) return;
-    input.value = novo;
-    let pos = negativo ? 1 : 0, vistos = 0;
-    while (pos < novo.length && vistos < antes) { if (/[\d,]/.test(novo[pos])) vistos += 1; pos += 1; }
-    try { input.setSelectionRange(pos, pos); } catch (e) { /* campo sem seleção */ }
+    const novo = !centavos && !/\d/.test(v) ? (negativo ? "-" : "") : (negativo ? "-" : "") + moedaEditavel(centavos / 100);
+    if (novo !== v) input.value = novo;
+    try { input.setSelectionRange(novo.length, novo.length); } catch (e) { /* campo sem seleção */ }
   }
   /** Ao sair do campo: completa os centavos ("12.000" → "12.000,00"). Texto que não é valor fica como está. */
   function completarValor(input: HTMLInputElement): void {

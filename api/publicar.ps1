@@ -69,6 +69,9 @@ if ($nomes -notcontains "TURNSTILE_SECRET") {
   Write-Host "   Para configurar: Cloudflare › Turnstile › ZoZo login › copie a Secret Key e rode: npx wrangler secret put TURNSTILE_SECRET $($extra -join ' ')" -ForegroundColor Yellow
   if ($Ambiente -eq "producao") { Parar "Configure o TURNSTILE_SECRET e publique de novo: nada foi publicado." }
 }
+if ($nomes -notcontains "RECURSOS_CAMBIO") {
+  Write-Host "   Aviso: RECURSOS_CAMBIO não configurado — levar transações entre moedas fica só para a demonstração e as contas de RECURSOS_AVANCADOS." -ForegroundColor Yellow
+}
 if ($nomes -notcontains "RECURSOS_AVANCADOS") {
   Write-Host "   Aviso: RECURSOS_AVANCADOS não configurado — Perfis, boletos e Pix ficam só na conta de demonstração." -ForegroundColor Yellow
   Write-Host "   Para liberar a sua conta: npx wrangler secret put RECURSOS_AVANCADOS $($extra -join ' ')  (e-mails separados por vírgula)" -ForegroundColor Yellow

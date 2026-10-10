@@ -275,6 +275,7 @@
 
   /* ---------------- Ações da barra superior ---------------- */
   let buscaTimer = null;
+  let ultimaBusca = null;        // a lista entra com animação quando o termo pesquisado muda
   function acoes(ctx) {
     const st = store.get();
     const busca = h("input", {
@@ -328,6 +329,9 @@
 
       const todos = state.data.lancamentos.lancamentos || [];
       const itens = aplicarFiltros(todos, state);
+      const termoAtual = normalizar(state.ui.busca).trim();
+      const pagina = "page--lancamentos" + (ultimaBusca !== null && termoAtual !== ultimaBusca ? " lanc--busca" : "");
+      ultimaBusca = termoAtual;
       const filtrando = temFiltro(state);
       const selId = state.selectedItem && state.selectedItem.tipo === "lancamento" ? state.selectedItem.id : null;
       const marcados = new Set(state.ui.selecionados || []);
@@ -345,7 +349,7 @@
       const topo = filtrando ? [barraInformacoes(itens), chipsFiltros(state, ctx)] : null;
 
       if (!itens.length) {
-        return C.pagina("page--lancamentos", topo, filtrando
+        return C.pagina(pagina, topo, filtrando
           ? UI.EmptyState("Nenhuma transação encontrada com esses filtros.", { icon: "pesquisar", action: { label: "Limpar filtros", onClick: () => { store.set({ ui: { filtros: FILTROS_VAZIOS(), busca: "" } }); ctx.refreshTopbar(); } } })
           : UI.EmptyState("Nenhuma transação ainda.", { action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
       }
@@ -387,7 +391,7 @@
         });
       }
 
-      return C.pagina("page--lancamentos", topo, blocos, barraSelecao(state, ctx, itens));
+      return C.pagina(pagina, topo, blocos, barraSelecao(state, ctx, itens));
     },
     selecionar(sel, ctx) {
       const l = (store.get().data.lancamentos.lancamentos || []).find((x) => x.id === sel.id);

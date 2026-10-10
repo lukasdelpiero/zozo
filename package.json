@@ -1,6 +1,6 @@
 {
   "name": "zozo",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "type": "module",
   "description": "ZoZo — interface (Vite + TypeScript + Tailwind CSS). A API Python fica em api/.",

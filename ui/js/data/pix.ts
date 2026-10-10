@@ -17,14 +17,14 @@
   "use strict";
 
   /* ---------------- chave Pix (formatos do DICT/BACEN) ---------------- */
-  // CPF/CNPJ: só pontuação de formatação é removida ("12a3" não vira "123")
+  // CPF: só pontuação de formatação é removida ("12a3" não vira "123"). CNPJ: sem suporte por enquanto.
   const semFormatacao = (t: unknown): string => String(t || "").replace(/[\s.\-/]/g, "");
   function cpfValido(c: string): boolean {
     if (!/^\d{11}$/.test(c) || /^(\d)\1{10}$/.test(c)) return false;
     const dv = (n: number) => { let s = 0; for (let i = 0; i < n; i++) s += Number(c[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
     return dv(9) === Number(c[9]) && dv(10) === Number(c[10]);
   }
-  /** CNPJ numérico ou alfanumérico (12 caracteres [0-9A-Z] + 2 dígitos verificadores; valor = código ASCII − 48) */
+  /** CNPJ numérico ou alfanumérico (só para RECUSAR: chave CNPJ ainda não é aceita) */
   function cnpjValido(c: string): boolean {
     if (!/^[0-9A-Z]{12}\d{2}$/.test(c) || /^(\d)\1{13}$/.test(c)) return false;
     const v = (ch: string) => ch.charCodeAt(0) - 48;
@@ -34,7 +34,7 @@
   // E-mail no formato aceito pelo DICT: só ASCII, até 77 caracteres
   const EMAIL_DICT = /^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
-  /** Normaliza a chave no formato do DICT (CPF/CNPJ só dígitos, celular +55…, e-mail minúsculo, aleatória). null se inválida. */
+  /** Normaliza a chave no formato do DICT (CPF só dígitos, celular +55…, e-mail minúsculo, aleatória). CNPJ → null. null se inválida. */
   function normalizarChave(texto: unknown): string | null {
     const t = String(texto || "").trim();
     if (!t) return null;
@@ -46,7 +46,7 @@
     }
     const d = semFormatacao(t).toUpperCase();
     if (/^\d{11}$/.test(d) && cpfValido(d)) return d;
-    if (cnpjValido(d)) return d;
+    if (cnpjValido(d)) return null;                                                                                     // CNPJ: sem suporte por enquanto
     if (/^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$/.test(t)) return "+55" + t.replace(/\D/g, "");                                   // celular sem +55
     return null;
   }

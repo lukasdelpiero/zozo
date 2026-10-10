@@ -269,7 +269,6 @@
 .line-chart__svg { display: block; overflow: visible; }
 .line-chart__label { fill: var(--color-text-muted); font-size: 11px; font-family: var(--font-family); }
 .line-chart__cursor { stroke: var(--color-border-strong); stroke-width: 1; }
-.line-chart__flat { stroke-dasharray: 1 4; }
 .chart-empty { display: grid; place-items: center; color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .chart-tooltip {
   position: absolute; top: -6px;

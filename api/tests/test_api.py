@@ -226,7 +226,7 @@ class TesteContaESessao(Base):
         self.assertNotIn("Max-Age", sc)          # cookie de sessão: some ao fechar o navegador
         self.assertNotIn("Expires", sc)
         self.assertEqual(set(self.sessao), {"email", "nome", "envelope", "doisFatores", "demo", "recursos"})
-        self.assertEqual((self.sessao["demo"], self.sessao["recursos"]), (False, {"perfis": False, "boleto": False, "pix": False}))
+        self.assertEqual((self.sessao["demo"], self.sessao["recursos"]), (False, {"perfis": False, "boleto": False, "pix": False, "cambio": False}))
         token = self.api.cookies["__Host-zozo"]
         guardado = self.con.execute("SELECT id FROM sessoes").fetchone()[0]
         self.assertEqual(guardado, hashlib.sha256(token.encode()).hexdigest())   # banco não guarda o token
@@ -753,7 +753,7 @@ class TesteDemo(Base):
 
     def test_senha_publica_entra_com_recursos(self):
         st, s = self.entrar(self.demo, email=DEMO, pv=self.PROVA)
-        self.assertEqual((st, s["demo"], s["recursos"]), (200, True, {"perfis": True, "boleto": True, "pix": True}))
+        self.assertEqual((st, s["demo"], s["recursos"]), (200, True, {"perfis": True, "boleto": True, "pix": True, "cambio": True}))
         self.assertTrue(self.demo("GET", "/api/sessao")[1]["demo"])
         self.assertEqual(self.entrar(Cliente(self.banco, ip="198.51.100.61"), email=DEMO, pv=prova())[0], 401)   # senha errada
 
@@ -832,10 +832,20 @@ class TesteDemo(Base):
         cfg = dict(CONFIG, RECURSOS_AVANCADOS=f" outro@exemplo.com , {EMAIL.upper()} ")
         cli = Cliente(self.banco, config=cfg, ip="198.51.100.63")
         st, s = self.entrar(cli)
-        self.assertEqual((st, s["recursos"], s["demo"]), (200, {"perfis": True, "boleto": True, "pix": True}, False))
+        self.assertEqual((st, s["recursos"], s["demo"]), (200, {"perfis": True, "boleto": True, "pix": True, "cambio": True}, False))
         self.assertTrue(cli("GET", "/api/sessao")[1]["recursos"]["pix"])
         # a lista não dá privilégio nenhum além disso: o documento continua exigindo a prova da própria conta
         self.assertEqual(cli("GET", "/api/documento", prova=prova())[0], 403)
+
+    def test_cambio_so_para_a_lista_e_email_confirmado(self):
+        cfg = dict(CONFIG, RECURSOS_CAMBIO=f"outro@exemplo.com, {EMAIL}")
+        cli = Cliente(self.banco, config=cfg, ip="198.51.100.67")
+        self.assertFalse(self.entrar(cli)[1]["recursos"]["cambio"])          # e-mail não confirmado: nada
+        self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))
+        st, s = self.entrar(cli)
+        self.assertEqual((st, s["recursos"]), (200, {"perfis": False, "boleto": False, "pix": False, "cambio": True}))  # só o câmbio
+        cli2 = Cliente(self.banco, config=dict(CONFIG, RECURSOS_CAMBIO="outro@exemplo.com"), ip="198.51.100.68")
+        self.assertFalse(self.entrar(cli2)[1]["recursos"]["cambio"])         # fora da lista
 
     def test_segredo_dos_recursos_digitado_de_varios_jeitos(self):
         self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))

@@ -263,9 +263,11 @@
   grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   background: var(--color-background);
   opacity: 0;
-  transition: opacity var(--duration-medium) var(--easing);
+  transform: translateY(16px) scale(0.99);
+  transition: opacity var(--duration-medium) var(--easing), transform var(--duration-medium) var(--easing);
 }
-.boleto.is-open { opacity: 1; }
+.boleto.is-open { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .boleto { transform: none; transition: opacity 120ms linear; } }
 .boleto__header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 var(--space-4) 0 var(--space-6);
@@ -501,7 +503,6 @@ button.cat-table__row:hover { background: var(--color-surface-hover); }
   color: var(--color-text-secondary); font-size: var(--font-size-sm);
 }
 .lp-date:hover, .lp-account:hover, .lp-sub:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
-.lp-date-input { height: 28px; width: 170px; border: 1px solid var(--color-primary); border-radius: 6px; padding: 0 6px; font-size: var(--font-size-sm); }
 .lp-account--fixo:hover { background: none; color: var(--color-text-secondary); }
 .lp-account__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .lp-sub { align-self: flex-end; margin: 0 -6px 0 0; }
@@ -514,8 +515,10 @@ button.cat-table__row:hover { background: var(--color-surface-hover); }
 .lp-value { width: 170px; text-align: right; margin: 0 -7px 0 0; }
 .lp-value.money--income { color: var(--color-income); }
 .lp-name::placeholder { color: var(--color-text-muted); }
-.lp-name:hover, .lp-value:hover { background: var(--color-surface-hover); }
-.lp-name:focus, .lp-value:focus { outline: none; border-color: var(--color-primary); background: var(--color-surface); box-shadow: 0 0 0 3px var(--color-primary-soft); }
+/* Nome e valor: edição "invisível" — sem fundo, borda ou destaque; só o cursor de texto indica */
+.lp-name, .lp-value, .lp-name:hover, .lp-value:hover, .lp-name:focus, .lp-value:focus {
+  background: transparent; border-color: transparent; box-shadow: none; outline: none;
+}
 .lp-props { display: flex; flex-direction: column; gap: 4px; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
 .lp-prop { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; min-height: 34px; }
 .lp-prop > :last-child { justify-self: start; }

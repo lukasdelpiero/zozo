@@ -164,7 +164,7 @@
   function esquecerChaveLocal() { try { localStorage.removeItem(CHAVE_LOCAL); } catch (e) { /* ok */ } }
 
   /** Recursos que o servidor liberou para a conta (só valores booleanos conhecidos) */
-  const lerRecursos = (r) => ({ perfis: !!(r && r.perfis === true), boleto: !!(r && r.boleto === true), pix: !!(r && r.pix === true) });
+  const lerRecursos = (r) => ({ perfis: !!(r && r.perfis === true), boleto: !!(r && r.boleto === true), pix: !!(r && r.pix === true), cambio: !!(r && r.cambio === true) });
   const novaSessao = (r, k) => ({ email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0,
     doisFatores: !!r.doisFatores, demo: r.demo === true, recursos: lerRecursos(r.recursos) });
 

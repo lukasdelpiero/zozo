@@ -71,13 +71,14 @@
         { nome: "nome", rotulo: "Nome", obrigatorio: true, placeholder: "Ex.: Mercado", max: ZoZo.regras.limiteNome },
         { nome: "icone", rotulo: "Ícone", tipo: "emoji" },
         { nome: "grupo", rotulo: "Grupo", tipo: "lista", opcoes: grupos, placeholder: "Ex.: Alimentação", dica: "Opcional. Categorias do mesmo grupo aparecem juntas e somadas.", max: 60 },
-        { nome: "status", rotulo: "Tipo de categoria", tipo: "selecao", opcoes: [
+        // Excluída (fora do orçamento): só para categoria sem transações (a regra também está no serviço)
+        cat && cat.usada && cat.status !== "excluida" ? null : { nome: "status", rotulo: "Tipo de categoria", tipo: "selecao", opcoes: [
           { value: "regular", label: "Regular (entra no orçamento)" },
           { value: "excluida", label: "Excluída (não entra no orçamento)" },
         ] },
         { nome: "reservado", rotulo: "Valor reservado por mês", tipo: "dinheiro", mostrarSe: (x) => x.status === "regular" },
         { nome: "cor", rotulo: "Cor", tipo: "cor" },
-      ],
+      ].filter(Boolean),
       validar: (d) => (d.reservado !== null && Number.isFinite(d.reservado) && d.reservado < 0 ? "O valor reservado não pode ser negativo." : null),
       salvar: (d) => {
         if (!Number.isFinite(d.reservado)) d.reservado = 0;
@@ -187,14 +188,15 @@
         { label: "Grupo de categorias", checkEsquerda: true, submenu: () => grupos().map((g) => ({ label: g, check: cat.grupo === g, onClick: () => alterar({ grupo: g }, "Grupo alterado.") }))
           .concat([{ label: "Sem grupo", check: !cat.grupo, onClick: () => alterar({ grupo: "" }, "Categoria sem grupo.") }, { separador: true },
             { icone: "mais", label: "Criar novo grupo", onClick: () => ZoZo.modais.criarGrupo((nome) => alterar({ grupo: nome }, "Grupo criado.")) }]) },
-        { label: "Tipo de categoria", checkEsquerda: true, submenu: () => [
+        // Tirar do orçamento só quando a categoria não tem nenhuma transação
+        cat.usada && cat.status !== "excluida" ? null : { label: "Tipo de categoria", checkEsquerda: true, submenu: () => [
           { label: "Regular", check: cat.status === "regular", onClick: () => alterar({ status: "regular" }, "Categoria regular.") },
           { label: "Excluída", check: cat.status === "excluida", onClick: () => alterar({ status: "excluida" }, "Categoria excluída do orçamento.") },
         ] },
         { label: "Editar categoria", onClick: () => abrirFormCategoria(ctx, cat) },
         { separador: true },
         { label: "Excluir categoria", perigo: true, onClick: excluir },
-      ],
+      ].filter(Boolean),
       render(body) {
         const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
         const grafico = h("div", { class: "detail-chart" });
@@ -274,8 +276,8 @@
       }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
     }
     function desagrupar() {
-      ZoZo.feedback.confirmarExclusao("Desagrupar categorias?", "As " + cats.length + " categorias de “" + nome + "” continuam existindo, só deixam de ficar juntas. O valor não atribuído do grupo é descartado.",
-        { confirmar: "Desagrupar", variante: "primary" })
+      ZoZo.feedback.confirmarExclusao("Desagrupar categorias?", "O valor não planejado do grupo será apagado. Os orçamentos das categorias individuais continuam valendo. Essa ação não pode ser desfeita.",
+        { confirmar: "Desagrupar" })
         .then((ok) => ok && ctx.bridge.request(A.desagruparCategorias, { nome }).then(() => {
           ctx.detail.close({ silencioso: true }); ctx.toast("Categorias desagrupadas."); return ctx.recarregarTudo();
         }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
@@ -297,7 +299,7 @@
           h("div", { class: "detail-hero grupo-hero" },
             h("div", { class: "detail-hero__lead detail-hero__lead--stack" },
               h("div", { class: "tag-row" }, ordenadas.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
-                ordenadas.length > 2 ? h("span", { class: "tag-more" }, "+" + (ordenadas.length - 2)) : null),
+                maisCategorias(ordenadas, 2)),
               h("span", { class: "detail-hero__name" }, nome)),
             orcamentoAtivo() ? h("div", { class: "grupo-orc" },
               modoBtn,
@@ -324,6 +326,17 @@
     });
   }
 
+  /** "+N": abre a lista (só leitura) das categorias que não couberam nas pílulas */
+  function maisCategorias(lista, visiveis) {
+    if (lista.length <= visiveis) return null;
+    const btn = h("button", { type: "button", class: "tag-more tag-more--btn", "aria-haspopup": "menu",
+      "aria-label": "Ver as outras " + (lista.length - visiveis) + " categorias" }, "+" + (lista.length - visiveis));
+    btn.addEventListener("click", () => ZoZo.menu.abrir(btn, lista.map((c) => ({
+      render: () => h("div", { class: "menu__item menu__item--estatico", role: "menuitem", "aria-disabled": "true" }, UI.CategoryLabel(c, { pill: true })),
+    })), { posicao: "esquerda", largura: 240, label: "Categorias" }));
+    return btn;
+  }
+
   /** Painel "Todas as categorias regulares" (ao clicar no gráfico) */
   function abrirTodas(ctx) {
     const d = ZoZo.store.get().data.categorias;
@@ -338,7 +351,7 @@
           h("div", { class: "detail-hero" },
             h("div", { class: "detail-hero__lead detail-hero__lead--stack" },
               h("div", { class: "tag-row" }, tags.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
-                tags.length > 2 ? h("span", { class: "tag-more" }, "+" + (tags.length - 2)) : null),
+                maisCategorias(tags, 2)),
               h("span", { class: "detail-hero__name" }, "Todas as categorias regulares")),
             h("div", { class: "detail-hero__figure" },
               h("span", { class: "detail-hero__label" }, "Gasto em " + mesAbrevDe(d.mes)),

@@ -58,14 +58,15 @@
     const cfg = config();
     if (!cfg.multicambio || cfg.moeda === codigo) return Promise.resolve();
     const primeiraVez = codigo !== "BRL" && !(cfg.moedasIniciadas || ["BRL"]).includes(codigo);
+    // Transferir transações para outra moeda: só contas liberadas (segredo RECURSOS_CAMBIO no servidor)
     // a lista é lida ANTES de trocar (são as transações da moeda atual)
-    const anteriores = primeiraVez ? ctx.bridge.request(A.getLancamentos).then((d) => d.lancamentos || []).catch(() => []) : Promise.resolve([]);
+    const anteriores = primeiraVez && ZoZo.recursos.cambio() ? ctx.bridge.request(A.getLancamentos).then((d) => d.lancamentos || []).catch(() => []) : Promise.resolve([]);
     const origem = MOEDAS.find((m) => m.codigo === (cfg.moeda || "BRL"));
     return anteriores.then((lista) => ctx.bridge.request(A.updateConfig, { moeda: codigo }).then(() => {
       return ctx.loadData("config", A.getConfig, null, { force: true }).then(() => aplicarMoeda(ctx, codigo)).then(() => {
         const m = MOEDAS.find((x) => x.codigo === codigo);
         ctx.toast("Moeda: " + m.nome + " (" + m.simbolo + ").");
-        if (primeiraVez && lista.length) oferecerTransferencia(ctx, lista, origem, m);
+        if (primeiraVez && lista.length && ZoZo.recursos.cambio()) oferecerTransferencia(ctx, lista, origem, m);
       });
     })).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
   }
@@ -85,7 +86,7 @@
         const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
         const itensEl = h("div", { class: "zm__list" });
         let botao = null;
-        const contar = () => { if (botao) botao.querySelector(".btn__label").textContent = marcadas.size ? "Transferir (" + marcadas.size + ")" : "Transferir"; if (botao) botao.disabled = !marcadas.size; };
+        const contar = () => { if (botao) botao.disabled = !marcadas.size; };          // só "Transferir", sem contador
         const desenhar = () => {
           const itens = lista.filter((l) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
           mount(itensEl, itens.length ? itens.map((l) => {
@@ -103,9 +104,7 @@
         return {
           titulo: "Usar transações em " + destino.nome + "?",
           corpo: h("div", { class: "zm__pick" },
-            h("p", { class: "modal__text cambio__aviso" }, "É a primeira vez que você usa " + destino.nome + ". Quer levar alguma transação de " + origem.nome +
-              " para cá? Atenção: o valor NÃO é convertido pelo câmbio — " + origem.simbolo + " 200,00 vira " + destino.simbolo + " 200,00. " +
-              "Parcelas e recorrências vão com a série inteira; a conta, a categoria e o perfil são criados em " + destino.nome + " se ainda não existirem (conta nova começa com saldo zero)."),
+            h("p", { class: "modal__text cambio__aviso" }, "Selecione as transações que deseja transferir para sua conta em " + destino.nome + "."),
             h("div", { class: "zm__search" }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           botoes: [
             { label: "Agora não", onClick: () => api.fechar() },
@@ -139,11 +138,11 @@
   function SecaoConfig(ctx, cfg) {
     return h("div", { class: "cfg-row" },
       h("div", { class: "cfg-row__text" },
-        h("span", { class: "cfg-row__title" }, "Trabalhar com Real, Euro e Dólar"),
-        h("span", { class: "cfg-row__sub" }, "Cada moeda tem as próprias transações, contas, cartões, categorias, perfis, recorrências, orçamentos e faturas. Sem conversão de câmbio. Ao desativar, tudo fica guardado e o ZoZo volta ao Real.")),
+        h("span", { class: "cfg-row__title" }, "Ativar multicâmbio"),
+        h("span", { class: "cfg-row__sub" }, "Trabalhar com diferentes câmbios (Real, Euro e Dólar)")),
       h("div", { class: "cfg-row__right" }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v) => ctx.bridge.request(A.updateConfig, { multicambio: v })
         .then(() => ctx.loadData("config", A.getConfig, null, { force: true }))
-        .then((c) => { ctx.toast(v ? "Multicâmbio ativado: escolha a moeda no menu lateral." : "Multicâmbio desativado: tudo em Real."); return aplicarMoeda(ctx, (c && c.moeda) || "BRL"); })
+        .then((c) => { ctx.toast(v ? "Multicâmbio ativado: escolha a moeda no menu lateral." : "Multicâmbio desativado"); return aplicarMoeda(ctx, (c && c.moeda) || "BRL"); })
         .catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar multicâmbio")));
   }
 

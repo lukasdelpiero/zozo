@@ -136,20 +136,11 @@
 
     function campoData() {
       const rotulo = h("button", { type: "button", class: "lp-date", title: "Alterar data" }, dataLonga(d.data));
-      rotulo.addEventListener("click", () => {
-        const input = h("input", { type: "date", class: "lp-date-input", value: d.data, "aria-label": "Data" });
-        rotulo.replaceWith(input);
-        input.focus();
-        try { input.showPicker(); } catch (e) { /* navegador sem showPicker */ }
-        const fim = () => {
-          const v = input.value;
-          if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v !== d.data) { const antes = d.data; d.data = v; salvar(() => { d.data = antes; }); }
-          rotulo.textContent = dataLonga(d.data);
-          input.replaceWith(rotulo);
-        };
-        input.addEventListener("blur", fim);
-        input.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); input.blur(); } });
-      });
+      rotulo.addEventListener("click", () => ZoZo.calendario.abrir(rotulo, d.data, (v) => {
+        const antes = d.data; d.data = v;
+        rotulo.textContent = dataLonga(d.data);
+        salvar(() => { d.data = antes; rotulo.textContent = dataLonga(antes); });
+      }, { rotulo: "Data da transação" }));
       return rotulo;
     }
 
@@ -188,8 +179,7 @@
 
     /** "Despesa ▾" / "Saída ▾" acima do valor */
     function subtipo() {
-      if (d.tipo === "debito") return h("span", { class: "lp-sub lp-sub--fixo" }, "Saída");     // débito é sempre saída
-      if (d.tipo === "receita" || d.tipo === "recorrente") return null;
+      if (d.tipo === "debito" || d.tipo === "receita" || d.tipo === "recorrente") return null;    // débito é sempre saída: sem rótulo
       const regular = d.tipo === "regular" || d.tipo === "estorno";
       const opcoes = regular ? [["regular", "Despesa"], ["estorno", "Estorno"]] : [["saida", "Saída"], ["entrada", "Entrada"]];
       const atual = regular ? d.tipo : d.sentido;
@@ -209,15 +199,12 @@
       return btn;
     }
 
-    /** Seta ao lado de uma pílula: abre Transações filtradas por ela (conta, categoria, perfil, recorrência) */
-    function seta(rotulo, filtro) {
+    /** Seta ao lado de uma pílula: mostra no painel de informações a conta, categoria, perfil ou recorrência
+        (com "voltar" para esta transação). Não mexe nos filtros da lista de Transações. */
+    function seta(rotulo, abrirPainel) {
       if (novo) return null;
-      return h("button", { type: "button", class: "icon-btn icon-btn--sm lp-ver", "aria-label": "Ver transações de " + rotulo, title: "Ver transações de " + rotulo,
-        onClick: () => {
-          ZoZo.lancamentosShared.setFiltros(Object.assign(ZoZo.lancamentosShared.FILTROS_VAZIOS(), filtro));
-          store.set({ ui: { busca: "", selecionados: [] } });
-          ctx.navigate("lancamentos");
-        } }, icon("chevron-right", { size: 14 }));
+      return h("button", { type: "button", class: "icon-btn icon-btn--sm lp-ver", "aria-label": "Ver " + rotulo, title: "Ver " + rotulo,
+        onClick: abrirPainel }, icon("chevron-right", { size: 14 }));
     }
 
     /** Conta: escolhida no menu (ao criar e depois, em qualquer tipo); a seta ao lado lista as transações dela */
@@ -225,7 +212,7 @@
       const conta = contas.find((c) => c.id === d.contaId);
       const conteudo = [h("span", { class: "lp-account__dot", style: { background: F.cor(conta && conta.cor, "var(--palette-16)") } }),
         h("span", null, conta ? conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "") : "Sem conta")];
-      const btn = h("button", { type: "button", class: "lp-account", "aria-haspopup": "menu" }, conteudo, icon("chevron-down", { size: 13 }));
+      const btn = h("button", { type: "button", class: "lp-account", "aria-haspopup": "menu", title: "Trocar conta" }, conteudo);   // clicar na conta abre a lista
       const escolhiveis = contas.filter((c) => (!c.oculta || c.id === d.contaId) && (!ehDebito(d) || c.tipo !== "cartao"));   // débito: cartão não
       btn.addEventListener("click", () => ZoZo.menu.abrir(btn, escolhiveis.map((c) => ({
         label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), check: c.id === d.contaId,
@@ -235,9 +222,24 @@
           if (novo) desenhar(); else salvar(() => { d.contaId = antes; }).then(reabrir);
         },
       })).concat(escolhiveis.length ? [] : [{ label: ehDebito(d) ? "Nenhuma conta (cartão não vale para débito)" : "Nenhuma conta cadastrada", desabilitado: true }],
-        !novo && conta ? [{ separador: true }, { label: "Abrir conta", icone: "chevron-right", onClick: () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, "contas", { voltar: voltarParaCa }) }] : []),
+        [{ separador: true }, ehDebito(d)
+          ? { icone: "mais", label: "Nova conta", onClick: () => novaConta("corrente") }
+          : { icone: "mais", label: "Nova conta", submenu: [
+            { icone: "banco", label: "Conta corrente ou poupança", onClick: () => novaConta("corrente") },
+            { icone: "cartao", label: "Cartão de crédito", onClick: () => novaConta("cartao") }] }]),
       { posicao: "esquerda", label: "Conta", largura: 260 }));
-      return h("div", { class: "lp-account-linha" }, btn, conta ? seta(conta.nome, { contas: [conta.id] }) : null);
+      const origem = conta && conta.tipo === "investimento" ? "investimentos" : "contas";
+      return h("div", { class: "lp-account-linha" }, btn,
+        conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa })) : null);
+    }
+    /** Cria a conta e já a escolhe nesta transação */
+    function novaConta(tipo) {
+      ZoZo.modais.novaConta(ctx, tipo, { aoCriar: (c) => {
+        const antes = d.contaId; d.contaId = c.id;
+        ctx.loadData("contas", A.getContas, null, { force: true }).catch(() => null).then(() => {
+          if (novo) desenhar(); else salvar(() => { d.contaId = antes; }).then(reabrir);
+        });
+      } });
     }
 
     /** Menu de categorias (pesquisa, seta → painel da categoria, + Nova categoria) */
@@ -263,26 +265,39 @@
       } }, { posicao: "esquerda", largura: 280, label: "Categoria", focar: false });
     }
 
-    /** Menu de recorrências (vincular, seta → painel da recorrência, Nova recorrência, Remover) */
+    /** Menu de recorrências — o mesmo ao criar e ao editar: as recorrências (a atual marcada, seta → painel
+        dela), "Sem recorrência" logo abaixo da última quando há uma, e "+ Nova recorrência". */
     function menuRecorrencia(anchor) {
-      const lista = origens().filter((o) => novo || o.id !== original.id);
-      const ehMembro = !novo && d.tipo === "recorrente";
-      const itens = [];
-      if (ehMembro) {
-        itens.push({ label: "Ver recorrência", icone: "chevron-right", onClick: () => abrirRecorrencia(d.serieId || original.id) });
-        itens.push({ label: "Remover recorrência", perigo: true, onClick: () => ctx.bridge.request(A.desvincularRecorrencia, { id: original.id })
-          .then(() => { ctx.toast("Recorrência removida desta transação."); return ctx.recarregarTudo().then(reabrir); }).catch((e) => ctx.toast(e.friendly, { tone: "error" })) });
-      } else {
-        lista.forEach((o) => itens.push({ render: (api) => h("div", { class: "menu__item menu__item--split" },
-          h("button", { type: "button", class: "menu__split-main", onClick: () => { api.fechar(); vincular(o); } },
-            h("span", { class: "kind-badge" }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: "menu__label" }, o.descricao), h("small", { class: "menu__hint" }, rotuloRecorrencia(o))),
-          novo ? null : h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Ver recorrência " + o.descricao, onClick: () => { api.fechar(); abrirRecorrencia(o.id); } }, icon("chevron-right", { size: 14 }))) }));
-        if (lista.length) itens.push({ separador: true });
+      const recorrente = !novo && d.tipo === "recorrente";
+      const ehOrig = recorrente && (!d.serieId || d.serieId === original.id);
+      const atualId = recorrente ? (ehOrig ? original.id : d.serieId) : (pendenteRec && pendenteRec.vincular ? pendenteRec.vincular.id : null);
+      const temRecorrencia = recorrente || !!pendenteRec;
+      // a origem de uma série não pode entrar em outra série (os membros dela ficariam órfãos)
+      const lista = origens().filter((o) => !ehOrig || o.id === original.id);
+      const itens = lista.map((o) => ({ render: (api) => h("div", { class: ["menu__item", "menu__item--split", o.id === atualId && "is-checked"] },
+        h("button", { type: "button", class: "menu__split-main", onClick: () => { api.fechar(); if (o.id !== atualId) vincular(o); } },
+          h("span", { class: "kind-badge" }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: "menu__label" }, o.descricao), h("small", { class: "menu__hint" }, rotuloRecorrencia(o))),
+        novo ? null : h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Ver recorrência " + o.descricao, onClick: () => { api.fechar(); abrirRecorrencia(o.id); } }, icon("chevron-right", { size: 14 }))) }));
+      if (temRecorrencia) itens.push({ label: "Sem recorrência", onClick: semRecorrencia });
+      // membro de uma série: "Nova recorrência" só depois de sair dela (Sem recorrência)
+      if (!recorrente || ehOrig) {
+        if (itens.length) itens.push({ separador: true });
         // parcelado: o valor da transação é o TOTAL da compra (o ZoZo divide pelas parcelas)
         itens.push({ icone: "mais", label: "Nova recorrência", onClick: () => ZoZo.modais.frequencia(ctx, novo ? null : original.id,
           novo ? { valor: d.valor, aoEscolher: (dados) => { pendenteRec = { nova: dados }; desenhar(); } } : { valor: d.valor, aoTerminar: reabrir }) });
       }
       ZoZo.menu.abrir(anchor, itens, { posicao: "esquerda", largura: 290, label: "Recorrência" });
+
+      function semRecorrencia() {
+        if (novo) { pendenteRec = null; desenhar(); return; }
+        const desfazer = () => ctx.bridge.request(A.desvincularRecorrencia, { id: original.id })
+          .then(() => { ctx.toast("Recorrência removida desta transação."); return ctx.recarregarTudo().then(reabrir); })
+          .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+        if (!ehOrig) return desfazer();
+        // origem: as parcelas futuras somem e as já lançadas deixam de fazer parte da série
+        ZoZo.feedback.confirmarExclusao("Remover recorrência?", "As parcelas e ocorrências futuras desta série serão excluídas. As transações já lançadas continuam, sem recorrência. Essa ação não pode ser desfeita.",
+          { confirmar: "Remover" }).then((ok) => ok && desfazer());
+      }
     }
     function vincular(o) {
       if (novo) { pendenteRec = { vincular: o }; desenhar(); return; }
@@ -308,7 +323,7 @@
           api.fechar(); const antes = d.perfilId; d.perfilId = x.id; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
         } }, UI.Tag(x.nome, x.cor, { class: "tag--upper" })),
       })).concat([
-        d.perfilId ? { label: "Sem perfil", onClick: () => { const antes = d.perfilId; d.perfilId = null; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir); } } : null,
+        // sem "Sem perfil": nas contas com Perfis toda transação tem perfil (regra do serviço)
         { separador: true }, { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => {
           const antes = d.perfilId; d.perfilId = np.id;
           ctx.loadData("perfis", A.getPerfis, null, { force: true }).catch(() => null).then(() => {
@@ -354,7 +369,7 @@
           ? h("button", { type: "button", class: "lp-chip-btn lp-rec", "aria-haspopup": "menu" }, h("span", { class: "kind-badge" }, "R"),
             pendenteRec.vincular ? pendenteRec.vincular.descricao : rotuloRecorrencia(Object.assign({}, pendenteRec.nova)))
           : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar recorrência", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
-      chipRec.addEventListener("click", () => (pendenteRec && novo ? ZoZo.menu.abrir(chipRec, [{ label: "Remover", perigo: true, onClick: () => { pendenteRec = null; desenhar(); } }], { posicao: "esquerda" }) : menuRecorrencia(chipRec)));
+      chipRec.addEventListener("click", () => menuRecorrencia(chipRec));
 
       const cat = cats.find((c) => c.id === d.categoriaId);
       const chipCat = cat ? h("button", { type: "button", class: "lp-chip-btn", "aria-haspopup": "menu" }, UI.CategoryLabel(cat, { pill: true }))
@@ -367,11 +382,11 @@
           h("div", { class: "lp-top__right" }, subtipo(), campoValor())),
         h("section", { class: "lp-props" },
           temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Categoria"),
-            h("div", { class: "lp-pilula" }, chipCat, cat ? seta(cat.nome, { categorias: [cat.id] }) : null)) : null,
+            h("div", { class: "lp-pilula" }, chipCat, cat ? seta(cat.nome, () => ZoZo.categoriasShared.abrirDetalhe(cat, ctx, { voltar: voltarParaCa })) : null)) : null,
           comPerfis ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Perfil"),
-            h("div", { class: "lp-pilula" }, campoPerfil(), perfilAtual() ? seta(perfilAtual().nome, { perfis: [d.perfilId] }) : null)) : null,
+            h("div", { class: "lp-pilula" }, campoPerfil(), perfilAtual() ? seta(perfilAtual().nome, () => ZoZo.perfilShared.abrirDetalhe(perfilAtual(), ctx, { voltar: voltarParaCa })) : null)) : null,
           temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Recorrência"),
-            h("div", { class: "lp-pilula" }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", { recorrencias: [recAtual.id || d.serieId] }) : null)) : null,
+            h("div", { class: "lp-pilula" }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
           // Divisão (lançamento rachado entre perfis)
           comPerfis && !novo && d.divisao ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
             h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },

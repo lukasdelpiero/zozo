@@ -323,9 +323,9 @@
     else ZoZo.format.definirMoeda(m);
   });
 
-  // Campos de valor: milhar com ponto e centavos com vírgula enquanto digita (12000 → 12.000; ao sair, 12.000,00)
+  // Campos de valor: os dígitos entram pelos centavos, como numa maquininha (1200 → 12,00; 120000 → 1.200,00)
   const campoValor = (t) => t instanceof HTMLInputElement && t.inputMode === "decimal" && !t.dataset.semMascara && !t.readOnly;
-  document.addEventListener("input", (e) => { if (campoValor(e.target)) ZoZo.format.mascararValor(e.target, e.data); }, true);
+  document.addEventListener("input", (e) => { if (campoValor(e.target)) ZoZo.format.mascararValor(e.target, e.data, e.inputType); }, true);
   document.addEventListener("focusout", (e) => { if (campoValor(e.target)) ZoZo.format.completarValor(e.target); }, true);
 
   ZoZo.ctx = ctx;

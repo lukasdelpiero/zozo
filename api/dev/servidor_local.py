@@ -59,6 +59,7 @@ def _segredo_local():
 CONFIG = {
     "SEGREDO": _segredo_local(),
     "RECURSOS_AVANCADOS": os.environ.get("ZOZO_DEV_RECURSOS", ""),
+    "RECURSOS_CAMBIO": os.environ.get("ZOZO_DEV_RECURSOS_CAMBIO", ""),
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 }
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno

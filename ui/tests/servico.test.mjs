@@ -141,3 +141,25 @@ test("multicâmbio: transferir leva a série inteira e troca conta/categoria pel
   assert.equal(await saldo(t, conta.id), 1000);                                    // a conta em Real recebeu o valor de volta
   assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 0);
 });
+
+test("multicâmbio: transferir entre moedas só com o recurso liberado", async () => {
+  const t = carregar({ recursos: { perfis: false, boleto: false, pix: false, cambio: false } });
+  const x = (await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "X", valor: 10, tipo: "regular" } })).lancamento;
+  await t.req(t.A.updateConfig, { multicambio: true });
+  await t.req(t.A.updateConfig, { moeda: "EUR" });
+  await assert.rejects(t.req(t.A.transferirMoeda, { ids: [x.id] }), (e) => e.code === "FEATURE_UNAVAILABLE");
+  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 0);
+});
+
+test("categoria com transação não sai do orçamento; sem transação, sai", async () => {
+  const t = carregar();
+  const usada = (await t.req(t.A.createCategoria, { categoria: { nome: "Usada", reservado: 100 } })).categoria;
+  const livre = (await t.req(t.A.createCategoria, { categoria: { nome: "Livre", reservado: 100 } })).categoria;
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "x", valor: 5, tipo: "regular", categoriaId: usada.id } });
+  const cats = (await t.req(t.A.getCategorias, {})).categorias;
+  assert.deepEqual([cats.find((c) => c.id === usada.id).usada, cats.find((c) => c.id === livre.id).usada], [true, false]);
+  await assert.rejects(t.req(t.A.updateCategoria, { id: usada.id, status: "excluida" }), (e) => e.code === "CATEGORY_IN_USE");
+  await assert.rejects(t.req(t.A.updateCategoria, { id: usada.id, categoria: { nome: "Usada", status: "excluida" } }), (e) => e.code === "CATEGORY_IN_USE");
+  await t.req(t.A.updateCategoria, { id: livre.id, status: "excluida" });
+  assert.equal((await t.req(t.A.getCategorias, {})).categorias.find((c) => c.id === livre.id).status, "excluida");
+});

@@ -83,13 +83,7 @@
       const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: ZoZo.regras.limiteNome, classe: "dv__name",
         aoSalvar: (v) => { parte.descricao = v; } });
       const dataBtn = h("button", { type: "button", class: "dv__date" }, dataCurta(parte.data));
-      dataBtn.addEventListener("click", () => {
-        const inp = h("input", { type: "date", class: "dv__date-input", value: parte.data, "aria-label": "Data" });
-        dataBtn.replaceWith(inp); inp.focus(); try { inp.showPicker(); } catch (e) { /* sem showPicker */ }
-        const fim = () => { if (/^\d{4}-\d{2}-\d{2}$/.test(inp.value)) parte.data = inp.value; desenhar(); };
-        inp.addEventListener("blur", fim);
-        inp.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === "Escape") inp.blur(); });
-      });
+      dataBtn.addEventListener("click", () => ZoZo.calendario.abrir(dataBtn, parte.data, (v) => { parte.data = v; desenhar(); }, { rotulo: "Data da parte " + (i + 1) }));
       const catBtn = h("button", { type: "button", class: "dv__pill", "aria-haspopup": "menu", "aria-label": "Categoria" }, pillCategoria(parte.categoriaId));
       catBtn.addEventListener("click", () => menuCategoria(catBtn, parte));
       const perfBtn = h("button", { type: "button", class: "dv__pill", "aria-haspopup": "menu", "aria-label": "Perfil" }, pillPerfil(parte.perfilId));

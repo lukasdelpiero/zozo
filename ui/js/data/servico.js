@@ -49,6 +49,7 @@
   const pixLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.pix());
   const boletoLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.boleto());
   const ehDemo = () => !!(ZoZo.recursos && ZoZo.recursos.demo());
+  const cambioLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.cambio && ZoZo.recursos.cambio());
   function exigir(liberado) { if (!liberado) throw erro("FEATURE_UNAVAILABLE"); }
   /** Demonstração: além do que foi gerado, só 1 perfil, conta, cartão, categoria, lançamento e recorrência */
   const LIMITE_DEMO = 1;
@@ -617,7 +618,9 @@
 
   function getCategorias(d) {
     const mes = d && /^\d{4}-\d{2}$/.test(d.mes || "") ? d.mes : mesAtual();
+    const usadas = new Set(doc.lancamentos.map((l) => l.categoriaId).filter(Boolean));
     const categorias = doc.categorias.map((c) => Object.assign({}, c, {
+      usada: usadas.has(c.id),                                                   // tem transação (não pode sair do orçamento)
       gasto: r2(Math.max(gastoNoMes(c.id, mes), 0)),
       reservado: reservadoNoMes(c, mes),
       reservadoFixo: c.reservado || 0,
@@ -1011,6 +1014,9 @@
     [A.updateCategoria]: (d) => {
       const c = doc.categorias.find((x) => x.id === d.id);
       if (!c) throw erro("OPERATION_FAILED");
+      // Tirar do orçamento (Excluída) só categoria sem nenhuma transação: senão o histórico de gastos sumiria dos totais
+      const pedeExcluida = (d.categoria && d.categoria.status === "excluida") || d.status === "excluida";
+      if (pedeExcluida && c.status !== "excluida" && doc.lancamentos.some((l) => l.categoriaId === c.id)) throw erro("CATEGORY_IN_USE");
       if (d.categoria) Object.assign(c, lerCategoria(d.categoria));
       else if (d.cor) c.cor = cor(d.cor, c.cor);
       if (d.grupo !== undefined) c.grupo = texto(d.grupo, 60) || null;
@@ -1190,6 +1196,7 @@
     },
     /** Leva transações do Real para a moeda atual (o número fica igual: 200,00 R$ → 200,00 €; sem conversão) */
     [A.transferirMoeda]: (d) => {
+      exigir(cambioLiberado());
       const destino = moedaAtual();
       const ids = new Set(Array.isArray(d.ids) ? d.ids.slice(0, 5000) : []);
       if (destino === "BRL" || !ids.size) throw erro("OPERATION_FAILED");

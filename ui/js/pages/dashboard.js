@@ -136,7 +136,7 @@
       const cardGasto = d.gastoMensal ? Card("Gasto mensal", "Transações", () => ctx.navigate("lancamentos"), GastoMensal(d.gastoMensal)) : null;
 
       const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"),
-        ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, area: true, alturaGrafico: alturaGraficos(),
+        ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
           intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
