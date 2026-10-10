@@ -11,7 +11,7 @@
 
   const NAV = [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-    { id: "lancamentos", label: "Lançamentos", icon: "lancamentos" },
+    { id: "lancamentos", label: "Transações", icon: "lancamentos" },
     { id: "contas", label: "Contas", icon: "contas" },
     { id: "investimentos", label: "Investimentos", icon: "investimentos" },
     { id: "categorias", label: "Categorias", icon: "categorias" },
@@ -42,22 +42,25 @@
     const contasEl = h("div", { class: "sidebar__accounts", "aria-label": "Resumo das contas", role: "region", tabindex: "-1" });
     const footerEl = h("div", { class: "sidebar__footer" });
     const avisoEl = h("div", { class: "sidebar__aviso" });
+    const cambioEl = h("div", { class: "sidebar__cambio" });
 
     mount(el,
       h("div", { class: "sidebar__header" },
         h("img", { class: "sidebar__logo", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" })),
-      navEl, contasEl, avisoEl, footerEl);
+      navEl, contasEl, avisoEl, cambioEl, footerEl);
 
     let assinatura = null;
     function render(state) {
       const contas = state.data.contas && state.data.contas.contas;
       const usuario = state.session.user || {};
       const foto = state.data.config && state.data.config.foto;
-      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto].map((x) => (typeof x === "object" ? x : String(x)));
+      const cfg = state.data.config || {};
+      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto, String(!!cfg.multicambio), String(cfg.moeda)].map((x) => (typeof x === "object" ? x : String(x)));
       if (assinatura && sig.every((v, i) => v === assinatura[i])) return;
       assinatura = sig;
 
       mount(navEl, NAV.filter(visivel).map((n) => navItem(n, state.currentPage, ctx.navigate)));
+      mount(cambioEl, ZoZo.cambio.Seletor(ctx));            // Câmbio (só com o multicâmbio ligado)
       // Demonstração (modo local ou conta demo): nada é gravado
       mount(avisoEl, ZoZo.bridge.isDemo || ZoZo.recursos.demo()
         ? h("p", { class: "demo-badge", role: "note" }, icon("alerta", { size: 14 }),

@@ -25,7 +25,7 @@ preview_urls = false
 [observability]
 enabled = true
 
-# Interface (pasta gerada por: python montar_interface.py)
+# Interface (pasta gerada por: npm run build — Vite, na raiz do projeto)
 # Os arquivos são servidos direto pelo Cloudflare; só /api/* chega ao Python.
 [assets]
 directory = "./public"

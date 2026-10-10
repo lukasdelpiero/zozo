@@ -36,8 +36,8 @@
   function LaunchRow(l, opts) {
     const o = opts || {};
     const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
-    const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : null;
-    const marcaTitulo = { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita" }[marca] || "";
+    const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
+    const marcaTitulo = { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] || "";
     const compacto = (o.class || "").includes("compact");
     const resumo = !!o.resumo;
     const comPerfil = ZoZo.recursos.perfis();          // pílula de perfil só para contas com o recurso
@@ -91,9 +91,15 @@
 
   function CategoryGroupRow(grupo, opts) {
     const o = opts || {};
-    return h("div", { class: ["row", "category-row", "category-row--group", o.excluida && "category-row--excluded"] },
+    // A linha do grupo abre o painel do grupo (orçamento "não atribuído", desagrupar); a seta só abre/fecha
+    const abrir = (e) => { if (o.onClick && !e.target.closest(".category-row__caret")) o.onClick(); };
+    return h("div", { class: ["row", "category-row", "category-row--group", o.excluida && "category-row--excluded", o.onClick && "row--interactive", o.selected && "is-selected"],
+      role: o.onClick ? "button" : undefined, tabindex: o.onClick ? "0" : undefined, "aria-current": o.selected ? "true" : undefined,
+      "aria-label": o.onClick ? "Grupo " + grupo.nome : undefined,
+      onClick: abrir, onKeydown: (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); abrir(e); } } },
       h("span", { class: "category-row__lead" },
-        h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(!o.fechado), "aria-label": (o.fechado ? "Mostrar" : "Ocultar") + " categorias de " + grupo.nome, onClick: o.onToggle },
+        h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(!o.fechado), "aria-label": (o.fechado ? "Mostrar" : "Ocultar") + " categorias de " + grupo.nome,
+          onClick: (e) => { e.stopPropagation(); o.onToggle(); } },
           icon(o.fechado ? "chevron-right" : "chevron-down", { size: 14, stroke: 2.25 })),
         h("span", { class: "category-row__count" }, String(grupo.quantidade)),
         h("span", { class: "category-row__group-name" }, grupo.nome)),
@@ -175,7 +181,7 @@
         lista = h("div", { class: "pl-list" });
         secao.appendChild(lista);
       }
-      const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : null;
+      const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
       const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
       const marcado = marcados.has(l.id);
       lista.appendChild(h("div", { class: ["pl-row", marcado && "is-checked"], role: "button", tabindex: "0", "data-id": l.id,
@@ -187,7 +193,7 @@
           ZoZo.store.set({ ui: { selecionados: Array.from(atual) } });
         }, { label: "Selecionar " + l.descricao, class: "pl-row__check" }),
         h("span", { class: "pl-row__name" },
-          marca ? h("span", { class: "kind-badge", title: { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita" }[marca] }, marca) : null,
+          marca ? h("span", { class: "kind-badge", title: { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] }, marca) : null,
           h("span", { class: "pl-row__title" }, l.descricao),
           l.parcelaTotal ? h("span", { class: "launch-row__parcel" }, l.parcelaAtual + "/" + l.parcelaTotal) : null),
         l.categoria ? h("span", { class: "pl-row__cat", title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, l.categoria.icone || "•") : h("span"),

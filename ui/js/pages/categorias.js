@@ -15,8 +15,9 @@
     return F.mesAbrev(d.getMonth());
   }
 
-  /** Mantém a ordem original: grupos (na 1ª aparição) e categorias soltas */
-  function estruturar(categorias) {
+  /** Mantém a ordem original: grupos (na 1ª aparição) e categorias soltas.
+      infoGrupos (do serviço): "não atribuído" de cada grupo, que entra no orçamento do grupo */
+  function estruturar(categorias, infoGrupos) {
     const blocos = [];
     const grupos = new Map();
     categorias.forEach((c) => {
@@ -32,7 +33,9 @@
     // Totais do grupo = soma das categorias do grupo (seções 36 e 38)
     grupos.forEach((g) => {
       g.gasto = g.itens.reduce((s, c) => s + F.numero(c.gasto), 0);
-      g.reservado = g.itens.reduce((s, c) => s + F.numero(c.reservado), 0);
+      const info = (infoGrupos || {})[g.nome];
+      g.naoAtribuido = info && g.itens.some((c) => c.status === "regular") ? F.numero(info.naoAtribuido) : 0;
+      g.reservado = g.itens.reduce((s, c) => s + F.numero(c.reservado), 0) + g.naoAtribuido;
       g.quantidade = g.itens.length;
     });
     return blocos;
@@ -42,12 +45,14 @@
     const sel = state.selectedItem && state.selectedItem.tipo === "categoria" ? state.selectedItem.id : null;
     const fechados = state.ui.gruposFechados;
     const out = [];
-    estruturar(categorias).forEach((b) => {
+    const grupoSel = state.selectedItem && state.selectedItem.tipo === "grupo" ? state.selectedItem.id : null;
+    estruturar(categorias, (state.data.categorias || {}).grupos).forEach((b) => {
       const linha = (c, filho) => L.CategoryRow(c, { excluida, filho, selected: c.id === sel, onClick: () => abrirDetalhe(c, ctx) });
       if (b.tipo === "categoria") { out.push(linha(b.cat, false)); return; }
       const key = "cat:grp:" + (excluida ? "x:" : "r:") + b.nome;
       const fechado = !!fechados[key];
-      out.push(L.CategoryGroupRow(b, { excluida, fechado, onToggle: () => UI.alternarGrupo(key) }));
+      out.push(L.CategoryGroupRow(b, { excluida, fechado, onToggle: () => UI.alternarGrupo(key), selected: grupoSel === b.nome,
+        onClick: () => abrirGrupo(b.nome, ctx) }));
       if (!fechado) out.push(UI.corpoArvore(key, h("div", { class: "arvore-grupo" }, b.itens.map((c) => linha(c, true)))));
     });
     return out;
@@ -104,7 +109,7 @@
   function abrirDetalhe(cat, ctx, opts) {
     const mes = ZoZo.store.get().data.categorias.mes;
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir categoria?",
-      "A categoria “" + cat.nome + "” e o histórico de orçamentos dela serão apagados. Essa ação não pode ser desfeita. Os lançamentos dessa categoria serão movidos para “Outros”.")
+      "A categoria “" + cat.nome + "” e o histórico de orçamentos dela serão apagados. Essa ação não pode ser desfeita. As transações dessa categoria serão movidas para “Outros”.")
       .then((ok) => ok && ctx.bridge.request(A.deleteCategoria, { id: cat.id }).then(() => { ctx.detail.close({ silencioso: true }); ctx.toast("Categoria excluída."); return ctx.recarregarTudo(); })
         .catch((e) => ctx.toast(e.friendly, { tone: "error" })));
 
@@ -155,7 +160,7 @@
     pintarModo();
     valorOrc.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvarOrcamento(); } });
     const areaOrcamento = h("div", { class: "detail-hero__figure orc-area" }, modoBtn, rotuloMes,
-      h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, "R$"), valorOrc));
+      h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, F.simbolo()), valorOrc));
     if (editando) requestAnimationFrame(() => { valorOrc.focus(); valorOrc.select(); });
     function salvarOrcamento() {
       const v = F.parseMoeda(valorOrc.value);
@@ -213,13 +218,107 @@
             UI.ProgressBar(F.numero(cat.reservado) > 0 ? F.numero(cat.gasto) / F.numero(cat.reservado) : (F.numero(cat.gasto) > 0 ? 1 : 0), {
               tone: acima ? "over" : "ok", class: "progress--lg", label: acima ? "Gasto acima do orçamento" : "Gasto dentro do orçamento",
             })),
-          C.detalheSecao("Lançamentos do mês", listaEl));
+          C.detalheSecao("Transações do mês", listaEl));
         graficoMeses(ctx, cat.id, grafico);
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
           const itens = d.lancamentos.filter((l) => l.categoriaId === cat.id && (!mes || l.data.startsWith(mes)));
           mount(listaEl, itens.length
             ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
-            : UI.EmptyState("Nenhum lançamento nesta categoria no mês."));
+            : UI.EmptyState("Nenhuma transação nesta categoria no mês."));
+        }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
+      },
+    });
+  }
+
+  /* ---------- Painel do grupo de categorias ----------
+     Subcategorias = soma dos orçamentos das categorias do grupo (não editável aqui).
+     Não atribuído = orçamento do próprio grupo. Total do grupo = subcategorias + não atribuído.
+     Ao salvar o não atribuído, o que falta para uma categoria do grupo sair do vermelho no mês sai dele. */
+  function abrirGrupo(nome, ctx, opts) {
+    const o = opts || {};
+    const d = ZoZo.store.get().data.categorias || {};
+    const mes = d.mes || F.iso(new Date()).slice(0, 7);
+    const cats = (d.categorias || []).filter((c) => c.grupo === nome);
+    if (!cats.length) { ctx.detail.close({ silencioso: true }); return; }
+    const info = (d.grupos || {})[nome] || { naoAtribuido: 0, naoAtribuidoFixo: 0, porMes: false,
+      subcategorias: cats.filter((c) => c.status === "regular").reduce((s, c) => s + F.numero(c.reservado), 0) };
+    info.total = F.numero(info.subcategorias) + F.numero(info.naoAtribuido);
+    const gasto = cats.filter((c) => c.status === "regular").reduce((s, c) => s + F.numero(c.gasto), 0);
+    const editando = !!o.editando;
+    const reabrir = (extra) => ctx.recarregarTudo().then(() => abrirGrupo(nome, ctx, Object.assign({}, o, extra)));
+
+    let modo = info.porMes ? "mes" : "fixo";
+    const dt = F.parseData(mes + "-01");
+    const rotuloModo = () => (modo === "fixo" ? "Orçamento para todos os meses" : "Orçamento de " + F.mesNome(dt.getMonth()) + " " + dt.getFullYear());
+    const modoBtn = h("button", { type: "button", class: "orc-mode", "aria-haspopup": "menu" });
+    const valorNA = h("input", { type: "text", inputmode: "decimal", autocomplete: "off", class: "input orc-input", "aria-label": "Valor não atribuído" });
+    const pintarModo = () => {
+      mount(modoBtn, h("span", null, rotuloModo()), editando ? ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }) : null);
+      valorNA.value = F.moedaEditavel(modo === "fixo" ? info.naoAtribuidoFixo : (info.porMes ? info.naoAtribuidoBase : info.naoAtribuidoFixo));
+    };
+    if (editando) modoBtn.addEventListener("click", () => ZoZo.menu.abrir(modoBtn, [
+      { label: "Mesmo orçamento para todos os meses", check: modo === "fixo", onClick: () => { modo = "fixo"; pintarModo(); } },
+      { label: "Orçamento só deste mês", check: modo === "mes", onClick: () => { modo = "mes"; pintarModo(); } },
+    ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
+    pintarModo();
+    valorNA.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar(); } });
+    if (editando) requestAnimationFrame(() => { valorNA.focus(); valorNA.select(); });
+
+    function salvar() {
+      const v = F.parseMoeda(valorNA.value);
+      if (!(v >= 0)) { valorNA.setAttribute("aria-invalid", "true"); valorNA.focus(); return; }
+      ctx.bridge.request(A.updateGrupo, { nome, naoAtribuido: v, modo, mes }).then((r) => {
+        ctx.toast(r.coberto > 0 ? "Orçamento salvo. " + F.moeda(r.coberto) + " cobriram categorias acima do orçamento; " + F.moeda(r.restante) + " ficaram sem atribuir."
+          : "Orçamento do grupo salvo.", { duration: r.coberto > 0 ? 7000 : 3200 });
+        return reabrir({ editando: false });
+      }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+    }
+    function desagrupar() {
+      ZoZo.feedback.confirmarExclusao("Desagrupar categorias?", "As " + cats.length + " categorias de “" + nome + "” continuam existindo, só deixam de ficar juntas. O valor não atribuído do grupo é descartado.",
+        { confirmar: "Desagrupar", variante: "primary" })
+        .then((ok) => ok && ctx.bridge.request(A.desagruparCategorias, { nome }).then(() => {
+          ctx.detail.close({ silencioso: true }); ctx.toast("Categorias desagrupadas."); return ctx.recarregarTudo();
+        }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
+    }
+
+    const ordenadas = cats.slice().sort((a, b) => F.numero(b.gasto) - F.numero(a.gasto));
+    const figura = (rotulo, conteudo) => h("div", { class: "grupo-orc__item" }, h("span", { class: "grupo-orc__rotulo" }, rotulo), conteudo);
+    ctx.detail.open({
+      title: "Grupo de categorias",
+      selected: { tipo: "grupo", id: nome },
+      voltar: o.voltar,
+      botoes: editando
+        ? [{ label: "Cancelar", onClick: () => abrirGrupo(nome, ctx, Object.assign({}, o, { editando: false })) }, { label: "Salvar orçamento", primario: true, onClick: salvar }]
+        : (orcamentoAtivo() ? [{ label: "Editar orçamento", onClick: () => abrirGrupo(nome, ctx, Object.assign({}, o, { editando: true })) }] : []),
+      menu: [{ label: "Desagrupar categorias", onClick: desagrupar }],
+      render(body) {
+        const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
+        mount(body,
+          h("div", { class: "detail-hero grupo-hero" },
+            h("div", { class: "detail-hero__lead detail-hero__lead--stack" },
+              h("div", { class: "tag-row" }, ordenadas.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
+                ordenadas.length > 2 ? h("span", { class: "tag-more" }, "+" + (ordenadas.length - 2)) : null),
+              h("span", { class: "detail-hero__name" }, nome)),
+            orcamentoAtivo() ? h("div", { class: "grupo-orc" },
+              modoBtn,
+              h("div", { class: "grupo-orc__valores" },
+                figura("Subcategorias", h("span", { class: "grupo-orc__valor money" }, F.moeda(info.subcategorias))),
+                figura("Não atribuído", editando ? h("div", { class: "field__affix field__affix--sm" }, h("span", { class: "field__prefix" }, F.simbolo()), valorNA)
+                  : h("span", { class: "grupo-orc__valor money" }, F.moeda(info.naoAtribuido))))) : null),
+          orcamentoAtivo() ? C.detalheSecao(null,
+            C.detalheLinha("Orçamento total do grupo", F.moeda(info.total)),
+            C.detalheLinha("Gasto em " + mesAbrevDe(mes), F.moeda(gasto)),
+            UI.ProgressBar(info.total > 0 ? gasto / info.total : (gasto > 0 ? 1 : 0), { tone: gasto > info.total ? "over" : "ok", class: "progress--lg",
+              label: gasto > info.total ? "Gasto acima do orçamento do grupo" : "Gasto dentro do orçamento do grupo" })) : null,
+          C.detalheSecao("Categorias do grupo", h("div", { class: "list" },
+            ordenadas.map((c) => L.CategoryRow(c, { excluida: c.status === "excluida", onClick: () => abrirDetalhe(c, ctx, { voltar: () => abrirGrupo(nome, ctx, o) }) })))),
+          C.detalheSecao("Transações do mês", listaEl));
+        ctx.loadData("lancamentos", A.getLancamentos).then((dl) => {
+          const ids = new Set(cats.map((c) => c.id));
+          const itens = dl.lancamentos.filter((l) => ids.has(l.categoriaId) && l.data.startsWith(mes));
+          mount(listaEl, itens.length
+            ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
+            : UI.EmptyState("Nenhuma transação deste grupo no mês."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });
@@ -298,7 +397,7 @@
     return btn;
   }
 
-  ZoZo.categoriasShared = { abrirFormCategoria: (...a) => abrirFormCategoria(...a), abrirDetalhe: (...a) => abrirDetalhe(...a), estruturar: (c) => estruturar(c) };
+  ZoZo.categoriasShared = { abrirFormCategoria: (...a) => abrirFormCategoria(...a), abrirDetalhe: (...a) => abrirDetalhe(...a), estruturar: (c, g) => estruturar(c, g), abrirGrupo: (...a) => abrirGrupo(...a) };
 
   ZoZo.pages.categorias = {
     titulo: "Categorias",

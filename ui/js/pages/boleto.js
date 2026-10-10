@@ -294,9 +294,9 @@
       h("section", { class: "boleto-editor__section" },
         h("h3", { class: "boleto-editor__title" }, "Transações", contadorEl),
         listaEl),
-      secaoAjuste("Contribuições", st.contribuicoes, { chave: "contrib", rotulo: "Contribuição", adicionar: "Adicionar contribuição", prefixo: "R$", aceitaNegativo: false }),
-      secaoAjuste("Descontos", st.descontos, { chave: "desc", rotulo: "Desconto", adicionar: "Adicionar desconto", prefixo: "− R$", aceitaNegativo: false }),
-      secaoAjuste("Arredondamentos", st.arredondamentos, { chave: "arr", rotulo: "Arredondamento", adicionar: "Adicionar arredondamento", prefixo: "R$", aceitaNegativo: R().arredondamentoAceitaNegativo }),
+      secaoAjuste("Contribuições", st.contribuicoes, { chave: "contrib", rotulo: "Contribuição", adicionar: "Adicionar contribuição", prefixo: F.simbolo(), aceitaNegativo: false }),
+      secaoAjuste("Descontos", st.descontos, { chave: "desc", rotulo: "Desconto", adicionar: "Adicionar desconto", prefixo: "− " + F.simbolo(), aceitaNegativo: false }),
+      secaoAjuste("Arredondamentos", st.arredondamentos, { chave: "arr", rotulo: "Arredondamento", adicionar: "Adicionar arredondamento", prefixo: F.simbolo(), aceitaNegativo: R().arredondamentoAceitaNegativo }),
       h("section", { class: "boleto-editor__section boleto-editor__section--summary" }, resumoEl, avisoPix, copiarPix, imprimirBtn));
 
     const preview = h("div", { class: "boleto__preview" }, h("div", { class: "paper-scaler" }, docEl));

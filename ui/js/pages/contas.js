@@ -112,7 +112,7 @@
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, saldo: v }).then(() => { ctx.toast("Saldo atualizado."); return ctx.recarregarTudo(); }) })),
             conta.limite ? h("div", { class: "ph__extra" }, F.moeda(conta.limite) + " de limite") : null),
           graficoEl, filtrosEl,
-          C.detalheSecao("Lançamentos", listaEl));
+          C.detalheSecao("Transações", listaEl));
 
         ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r) => {
           serie = r.serie;
@@ -125,7 +125,7 @@
           const itens = d.lancamentos.filter((l) => l.contaId === conta.id).slice(0, 8);
           mount(listaEl, itens.length
             ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
-            : UI.EmptyState("Nenhum lançamento nesta conta."));
+            : UI.EmptyState("Nenhuma transação nesta conta."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
         void origem;
       },

@@ -979,3 +979,59 @@
 /* Desativar 2FA: código atual do aplicativo */
 .desativar2fa .codigo6 { margin-top: 16px; }
 .desativar2fa .p2fa__erro { text-align: center; }
+
+/* =============================================================
+   ZoZo 2.6 — Débito, Câmbio, grupos de categorias e seleção
+   ============================================================= */
+/* Painel da transação: seta → ao lado das pílulas e da conta (fora do botão) */
+.lp-pilula, .lp-account-linha { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.lp-account-linha .lp-account { min-width: 0; }
+.lp-ver { flex: none; width: 24px; height: 24px; color: var(--color-text-tertiary, var(--color-text-secondary)); opacity: .8; }
+.lp-ver:hover, .lp-ver:focus-visible { opacity: 1; color: var(--color-text-primary); }
+
+/* Parcelamento: prévia das parcelas */
+.parcelas__previa { margin-top: 6px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+
+/* Câmbio (menu lateral, acima da foto e da engrenagem) */
+.sidebar__cambio:empty { display: none; }
+.sidebar__cambio { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--sidebar-divider); }
+.cambio { display: grid; gap: 6px; }
+.cambio__titulo { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--sidebar-fg); opacity: .7; padding-left: 4px; }
+.cambio__opcoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.cambio__opcao { height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+.cambio__opcao:hover { background: var(--sidebar-hover); }
+.cambio__opcao.is-active { background: var(--sidebar-hover); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35); }
+.cambio__opcao:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.bandeira { display: block; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .12); }
+@media (max-width: 900px) {
+  .cambio__titulo { display: none; }
+  .cambio__opcoes { grid-template-columns: 1fr; }
+  .sidebar__cambio { padding: var(--space-2); }
+}
+/* Janela "Usar transações em …" */
+.cambio__aviso { margin: 0 0 var(--space-3); }
+.modal--cambio .zm__list { overflow-x: hidden; }
+.zm-lanc.cambio__item { cursor: pointer; grid-template-columns: 18px 52px minmax(0, 1fr) auto; margin: 0; padding: 0 8px; }
+.cambio__check { width: 16px; height: 16px; accent-color: var(--color-primary); }
+
+/* Grupo de categorias selecionável + painel do grupo */
+.category-row--group.row--interactive { cursor: pointer; }
+.category-row--group.is-selected { background: var(--color-surface-hover); box-shadow: inset 3px 0 0 var(--color-primary); }
+.grupo-hero { align-items: flex-start; }
+.grupo-orc { display: grid; justify-items: end; gap: 10px; }
+.grupo-orc__valores { display: grid; grid-auto-flow: column; gap: var(--space-5); }
+.grupo-orc__item { display: grid; justify-items: end; gap: 2px; }
+.grupo-orc__rotulo { font-size: var(--t-12, 12px); color: var(--color-text-secondary); }
+.grupo-orc__valor { font-size: var(--font-size-lg); font-weight: 600; }
+.grupo-orc .field__affix { width: 150px; }
+@container (max-width: 420px) {
+  .grupo-hero { flex-direction: column; }
+  .grupo-orc { justify-items: start; }
+  .grupo-orc__item { justify-items: start; }
+}
+
+/* Barra de seleção: sempre presa ao rodapé da área de trabalho (mesmo com poucas transações) */
+.page--lancamentos { min-height: 100%; display: flex; flex-direction: column; }
+.page--lancamentos > * { flex-shrink: 0; }
+.page--lancamentos > .selbar { position: sticky; bottom: var(--space-5); margin-top: auto; align-self: center; }
+.page--lancamentos > :has(+ .selbar) { margin-bottom: var(--space-5); }

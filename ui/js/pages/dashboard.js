@@ -1,7 +1,7 @@
 /* =============================================================
    ZoZo — Dashboard
    Saudação com foto · Gasto mensal · Patrimônio · Top categorias
-   Próximos lançamentos · Lançamentos recentes
+   Próximas transações · Transações recentes
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -15,7 +15,7 @@
 
   /** Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado */
   function topCategorias(cats, state, ctx) {
-    const blocos = ZoZo.categoriasShared.estruturar(cats)
+    const blocos = ZoZo.categoriasShared.estruturar(cats, ((state.data.dashboard || {}).categorias || {}).grupos)
       .map((b) => (b.tipo === "categoria" ? { ...b, gasto: F.numero(b.cat.gasto) } : b))
       .sort((a, b) => F.numero(b.gasto) - F.numero(a.gasto)).slice(0, 5);
     const abertos = state.ui.dashGruposAbertos || {};
@@ -133,7 +133,7 @@
       const hojeIso = F.iso(new Date());
 
       if (d.gastoMensal && state.data.config && state.data.config.orcamentoAtivo === false) d.gastoMensal = Object.assign({}, d.gastoMensal, { orcamento: 0 });
-      const cardGasto = d.gastoMensal ? Card("Gasto mensal", "Lançamentos", () => ctx.navigate("lancamentos"), GastoMensal(d.gastoMensal)) : null;
+      const cardGasto = d.gastoMensal ? Card("Gasto mensal", "Transações", () => ctx.navigate("lancamentos"), GastoMensal(d.gastoMensal)) : null;
 
       const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"),
         ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, area: true, alturaGrafico: alturaGraficos(),
@@ -144,16 +144,16 @@
         cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria.", { icon: "categorias" }));
 
       const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
-      const cardRec = Card("Próximos lançamentos", "Recorrências", () => ctx.navigate("recorrencias"),
+      const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"),
         recs.length
           ? h("div", { class: "list list--flush" }, recs.map((r) => L.RecurrenceRow(r, { class: "recurrence-row--compact", onClick: () => ctx.navigate("recorrencias") })))
-          : UI.EmptyState("Nenhum lançamento previsto para este mês.", { icon: "recorrencias" }));
+          : UI.EmptyState("Nenhuma transação prevista para este mês.", { icon: "recorrencias" }));
 
       const ultimos = d.ultimosLancamentos || [];
-      const cardLanc = Card("Lançamentos recentes", "Lançamentos", () => ctx.navigate("lancamentos"),
+      const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"),
         ultimos.length
           ? h("div", { class: "list list--flush" }, ultimos.map((l) => L.LaunchRow(l, { class: "launch-row--resumo", resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
-          : UI.EmptyState("Nenhum lançamento ainda."));
+          : UI.EmptyState("Nenhuma transação ainda."));
 
       // Grade: [Gasto mensal | Patrimônio] com a mesma altura; Recentes e Top categorias começam na mesma linha
       const area = (nome, el) => (el ? h("div", { class: "dash-area dash-area--" + nome }, el) : null);

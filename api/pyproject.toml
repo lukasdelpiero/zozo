@@ -1,9 +1,14 @@
 [project]
 name = "zozo-api"
-version = "2.5.0"
+version = "2.6.0"
 description = "ZoZo — API em Python (Cloudflare Python Workers + D1)"
 requires-python = ">=3.12"
 dependencies = []
 
 [dependency-groups]
-dev = ["workers-py"]
+dev = [
+    "fastapi==0.141.1",
+    "pydantic==2.13.5",
+    "starlette==1.7.0",
+    "workers-py",
+]

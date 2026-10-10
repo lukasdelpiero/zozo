@@ -252,6 +252,9 @@ def _mesma_origem(pedido):
         raise Falha(403, "FORBIDDEN")
 
 
+mesma_origem = _mesma_origem       # pública para o app FastAPI (app_fastapi.py), que confere CSRF antes de validar o corpo
+
+
 # ---------------- limites (bloqueio progressivo e contadores por IP) ----------------
 async def _limite(ctx, chave):
     return await ctx.banco.primeiro("SELECT falhas, ultima, bloqueado_ate FROM limites WHERE chave = ?", chave)

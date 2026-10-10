@@ -9,7 +9,7 @@
   "use strict";
 
   /** Identificação do programa */
-  ZoZo.sobre = Object.freeze({ versao: "2.5.0", autor: "Lukas Del Piero Barros" });
+  ZoZo.sobre = Object.freeze({ versao: "2.6.0", autor: "Lukas Del Piero Barros" });
 
   ZoZo.regras = {
     /** Máximo de caracteres do nome de lançamentos, contas, categorias e perfis (nomes longos aparecem cortados com "…") */
@@ -30,7 +30,7 @@
        * Como cada tipo de lançamento entra no "Total das transações".
        * +1 soma, -1 subtrai, 0 ignora. AJUSTAR conforme a regra definida.
        */
-      sinalPorTipo: { regular: 1, recorrente: 1, interno: 1, receita: -1, estorno: -1 },
+      sinalPorTipo: { regular: 1, recorrente: 1, interno: 1, receita: -1, estorno: -1, debito: 1 },
       /** Contribuições (nome + valor) somam ao total. Use -1 se devem abater. */
       sinalContribuicao: 1,
       /** Descontos sempre reduzem o total (seção 46.6) */
@@ -50,12 +50,12 @@
        * Como cada tipo de lançamento entra no "Gasto" da categoria no mês.
        * +1 soma, -1 subtrai, 0 ignora. AJUSTAR conforme a sua regra.
        */
-      sinalGastoPorTipo: { regular: 1, recorrente: 1, interno: 1, estorno: -1, receita: 0 },
+      sinalGastoPorTipo: { regular: 1, recorrente: 1, interno: 1, estorno: -1, receita: 0, debito: 1 },
     },
 
     /** Barra de informações de Lançamentos (com filtros ativos) */
     totais: {
-      gasto: { regular: 1, recorrente: 1, estorno: -1 },   // "Total gasto"
+      gasto: { regular: 1, recorrente: 1, estorno: -1, debito: 1 },   // "Total gasto"
       recebido: { receita: 1 },                           // "Total recebido"
     },
 

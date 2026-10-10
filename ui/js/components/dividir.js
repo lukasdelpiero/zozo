@@ -1,10 +1,10 @@
 /* =============================================================
-   ZoZo — Dividir lançamento entre perfis
+   ZoZo — Dividir transação entre perfis
    (ex.: conta rachada paga com um único cartão)
    ZoZo.dividir.abrir(lancamento, ctx, aoTerminar)
    Regras: mesma data do original · soma = valor original (100%) ·
    categoria e perfil em todas as partes · perfis sem repetição ·
-   nomes e categorias podem repetir · recorrentes não podem.
+   nomes e categorias podem repetir · recorrente: só a origem (cada parte vira uma série).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -96,7 +96,7 @@
       perfBtn.addEventListener("click", () => menuPerfil(perfBtn, parte));
       const valor = ZoZo.inline.dinheiro({ valor: parte.c / 100, rotulo: "Valor da parte " + (i + 1), classe: "dv__value",
         aoSalvar: (v) => { mudarParaPersonalizado(); parte.pctDef = undefined; parte.c = parte.cP = Math.round(v * 100); desenhar(); } });
-      const pctInput = h("input", { type: "text", inputmode: "decimal", class: "inline-input dv__pct", value: fmtPct(pct(parte.c, total)), "aria-label": "Percentual da parte " + (i + 1) });
+      const pctInput = h("input", { type: "text", inputmode: "decimal", class: "inline-input dv__pct", value: fmtPct(pct(parte.c, total)), "aria-label": "Percentual da parte " + (i + 1), "data-sem-mascara": "1" });
       pctInput.addEventListener("focus", () => { pctInput.value = String(Math.round(pct(parte.c, total) * 100) / 100).replace(".", ","); pctInput.select(); });
       pctInput.addEventListener("keydown", (e) => { if (e.key === "Enter") pctInput.blur(); });
       pctInput.addEventListener("blur", () => {
@@ -157,7 +157,7 @@
       if (partes.length < 2 && !original.divisao) erros.push("Adicione pelo menos duas partes.");
       if (soma !== total) erros.push("A soma das partes precisa ser 100% (" + F.moeda(total / 100) + "). Agora está em " + fmtPct(pct(soma, total)) + ".");
       if (partes.some((p) => p.c <= 0)) erros.push("Nenhuma parte pode ficar com valor zero.");
-      if (partes.some((p) => p.data !== data)) erros.push("Todas as partes precisam ter a data do lançamento original (" + dataCurta(data) + ").");
+      if (partes.some((p) => p.data !== data)) erros.push("Todas as partes precisam ter a data da transação original (" + dataCurta(data) + ").");
       if (partes.some((p) => !p.categoriaId)) erros.push("Escolha uma categoria para todas as partes.");
       if (partes.some((p) => !p.perfilId)) erros.push("Escolha um perfil para todas as partes.");
       else if (new Set(partes.map((p) => p.perfilId)).size !== partes.length) erros.push("Cada parte precisa de um perfil diferente.");
@@ -173,7 +173,7 @@
         h("span", { class: "dv__card-value" }, h("span", { class: "money" }, F.moeda(total / 100)))));
 
     ZoZo.modais.janela({
-      titulo: "Dividir lançamento",
+      titulo: "Dividir transação",
       classe: "modal--dividir",
       passo: (api) => {
         alternar = UI.Segmented([{ value: "igual", label: "Igualmente" }, { value: "personalizado", label: "Personalizado" }], modo,
@@ -185,7 +185,7 @@
           if (erros.length) { mount(erroEl, h("ul", null, erros.map((e) => h("li", null, e)))); return; }
           btn.disabled = true;
           ctx.bridge.request(A.dividirLancamento, { id: base.id, partes: partes.map((p) => ({ descricao: p.descricao, data: p.data, categoriaId: p.categoriaId, perfilId: p.perfilId, valor: p.c / 100 })) })
-            .then(() => { api.fechar(); ctx.toast(partes.length > 1 ? "Lançamento dividido." : "Divisão desfeita."); return ctx.recarregarTudo().then(() => aoTerminar && aoTerminar(base.id)); })
+            .then(() => { api.fechar(); ctx.toast(partes.length > 1 ? "Transação dividida." : "Divisão desfeita."); return ctx.recarregarTudo().then(() => aoTerminar && aoTerminar(base.id)); })
             .catch((e) => { btn.disabled = false; mount(erroEl, h("p", null, e.friendly)); });
         };
         mount(corpo, card, h("div", { class: "dv__connector", "aria-hidden": "true" }), h("div", { class: "dv__grid-line" }),

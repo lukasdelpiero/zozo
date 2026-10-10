@@ -3,9 +3,13 @@ ZoZo — servidor LOCAL de desenvolvimento (não é usado no Cloudflare)
 
     python api/dev/servidor_local.py            → http://127.0.0.1:8787
 
-Serve a interface (pasta ui) e a mesma API Python do Cloudflare, com um
-banco SQLite em api/dev/zozo-local.db. Login de verdade (cadastre uma conta);
-o servidor só aceita conexões do próprio computador (127.0.0.1).
+Serve a mesma API Python do Cloudflare, com um banco SQLite em
+api/dev/zozo-local.db, e a interface JÁ MONTADA (api/public, gerada por
+`npm run build`). Login de verdade (cadastre uma conta); o servidor só
+aceita conexões do próprio computador (127.0.0.1).
+
+Para mexer na interface com recarga instantânea: `npm run dev`
+(http://127.0.0.1:5173) com este servidor ligado — o Vite repassa /api/* para cá.
 
 Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_PORTA        porta (padrão 8787)
@@ -28,19 +32,19 @@ import urllib.request
 AQUI = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI.parent / "src"))
 sys.path.insert(0, str(AQUI))
-sys.path.insert(0, str(AQUI.parent))
 
-import montar_interface  # noqa: E402
+import json  # noqa: E402
+
 import nucleo  # noqa: E402
 from banco_sqlite import BancoSqlite, conectar  # noqa: E402
 
-# --publicado: serve api/public (o que vai para o Cloudflare, já empacotado) na porta 8788
-PUBLICADO = "--publicado" in sys.argv
-UI = (AQUI.parent / "public").resolve() if PUBLICADO else (AQUI.parent.parent / "ui").resolve()
+# Interface montada pelo Vite (npm run build): exatamente o que vai para o Cloudflare
+UI = (AQUI.parent / "public").resolve()
 BANCO = AQUI / "zozo-local.db"
 ARQ_SEGREDO = AQUI / ".segredo-local"            # gerado na 1ª execução (fora do git)
-PORTA = int(os.environ.get("ZOZO_DEV_PORTA", "8788" if "--publicado" in sys.argv else "8787"))
-HOSTS_LOCAIS = {f"127.0.0.1:{PORTA}", f"localhost:{PORTA}"}
+PORTA = int(os.environ.get("ZOZO_DEV_PORTA", "8787"))
+# 5173: servidor do Vite (npm run dev), que repassa /api/* para cá mantendo o Host
+HOSTS_LOCAIS = {f"{h}:{p}" for h in ("127.0.0.1", "localhost") for p in (PORTA, 5173)}
 
 # Chaves de TESTE públicas da Cloudflare (sempre aprovam): https://developers.cloudflare.com/turnstile/troubleshooting/testing/
 TURNSTILE_TESTE = ("1x00000000000000000000AA", "1x0000000000000000000000000000000AA")
@@ -63,8 +67,9 @@ if os.environ.get("ZOZO_DEV_GOOGLE_ID") and os.environ.get("ZOZO_DEV_GOOGLE_SECR
 if os.environ.get("ZOZO_DEV_TURNSTILE", "1") != "0":
     CONFIG["TURNSTILE_SITE_KEY"], CONFIG["TURNSTILE_SECRET"] = TURNSTILE_TESTE
 
-# Mesmos cabeçalhos que o Cloudflare envia com a interface (arquivo _headers)
-CABECALHOS_UI = dict(montar_interface.CABECALHOS_UI, **{"Cache-Control": "no-store"})
+# Mesmos cabeçalhos que o Cloudflare envia com a interface (fonte única: api/cabecalhos_ui.json)
+_JSON = json.loads((AQUI.parent / "cabecalhos_ui.json").read_text(encoding="utf-8"))
+CABECALHOS_UI = dict({k: v for k, v in _JSON.items() if not k.startswith("_")}, **{"Cache-Control": "no-store"})
 TIPOS = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
          ".html": "text/html; charset=utf-8", ".woff": "font/woff", ".png": "image/png"}
 
@@ -122,8 +127,9 @@ class Manipulador(http.server.BaseHTTPRequestHandler):
         if caminho == "/":
             caminho = "/index.html"
         alvo = (UI / caminho.lstrip("/")).resolve()
-        if UI not in alvo.parents or not alvo.is_file():          # impede sair da pasta ui
-            return self._enviar(404, {"Content-Type": "text/plain; charset=utf-8"}, b"nao encontrado")
+        if UI not in alvo.parents or not alvo.is_file():          # impede sair da pasta public
+            aviso = b"nao encontrado" if (UI / "index.html").is_file() else b"interface nao montada: rode  npm run build  (ou use  npm run dev)"
+            return self._enviar(404, {"Content-Type": "text/plain; charset=utf-8"}, aviso)
         tipo = TIPOS.get(alvo.suffix) or mimetypes.guess_type(alvo.name)[0] or "application/octet-stream"
         self._enviar(200, dict(CABECALHOS_UI, **{"Content-Type": tipo}), alvo.read_bytes())
 
@@ -154,7 +160,8 @@ class Manipulador(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORTA), Manipulador)
-    print(f"ZoZo (desenvolvimento): http://127.0.0.1:{PORTA}  ·  modo demonstração: http://127.0.0.1:{PORTA}/?mock=1  ·  Ctrl+C para parar")
+    print(f"ZoZo (desenvolvimento): API e interface montada em http://127.0.0.1:{PORTA}  ·  "
+          "com recarga instantânea: npm run dev (http://127.0.0.1:5173 ; demonstração: /?mock=1)  ·  Ctrl+C para parar")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

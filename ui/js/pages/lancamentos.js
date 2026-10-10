@@ -1,5 +1,5 @@
 /* =============================================================
-   ZoZo — Lançamentos (seções 14–17, 33)
+   ZoZo — Transações (seções 14–17, 33)
    Lista agrupada por mês e dia · filtros com chips · barra de
    informações · seleção múltipla com ações em lote · painel com
    visualização e edição (Grid Superior / Central / Inferior / Notas)
@@ -43,6 +43,7 @@
   const TIPOS_FILTRO = [
     { value: "receita", label: "Receita" },
     { value: "interno", label: "Transferência" },
+    { value: "debito", label: "Débito" },
     { value: "regular", label: "Regular" },
     { value: "recorrente", label: "Recorrente" },
   ];
@@ -192,7 +193,7 @@
   function barraInformacoes(itens) {
     const t = totais(itens);
     return h("div", { class: "info-bar", role: "status" },
-      h("span", { class: "info-bar__count" }, itens.length === 1 ? "1 lançamento" : itens.length + " lançamentos"),
+      h("span", { class: "info-bar__count" }, itens.length === 1 ? "1 transação" : itens.length + " transações"),
       h("span", { class: "info-bar__totals" },
         h("span", null, "Total gasto ", h("strong", { class: "money" }, F.moeda(t.gasto))),
         h("span", null, "Total recebido ", h("strong", { class: "money money--income" }, F.moeda(t.recebido))),
@@ -240,7 +241,7 @@
 
     const tipoBtn = botao("interno", "Tipo");
     tipoBtn.addEventListener("click", () => ZoZo.menu.abrir(tipoBtn, [
-      ["receita", "Receita"], ["interno", "Transferência"], ["regular", "Regular"],
+      ["receita", "Receita"], ["interno", "Transferência"], ["debito", "Débito"], ["regular", "Regular"],
     ].map(([v, t]) => ({ label: t, onClick: () => aplicar({ tipo: v }, "Tipo alterado.") })), { posicao: "acima", label: "Mudar tipo" }));
 
     const perfilBtn = ZoZo.recursos.perfis() ? botao("perfil", "Perfil") : null;      // só contas com o recurso de Perfis
@@ -253,21 +254,21 @@
 
     const maisBtn = h("button", { type: "button", class: "selbar__btn selbar__btn--icon", "aria-label": "Mais ações", "aria-haspopup": "menu" }, icon("opcoes", { size: 16 }));
     maisBtn.addEventListener("click", () => ZoZo.menu.abrir(maisBtn, [
-      { label: "Marcar todos", onClick: () => store.set({ ui: { selecionados: visiveis.map((l) => l.id) } }) },
-      { label: "Desmarcar todos", onClick: limpar },
+      { label: "Marcar todas", onClick: () => store.set({ ui: { selecionados: visiveis.map((l) => l.id) } }) },
+      { label: "Desmarcar todas", onClick: limpar },
       { separador: true },
       { label: "Excluir", perigo: true, onClick: () => {
-        ZoZo.feedback.confirmarExclusao(sel.length === 1 ? "Excluir lançamento?" : "Excluir lançamentos?",
-          sel.length === 1 ? "Tem certeza de que deseja excluir este lançamento?" : "Tem certeza de que deseja excluir estes " + sel.length + " lançamentos?")
+        ZoZo.feedback.confirmarExclusao(sel.length === 1 ? "Excluir transação?" : "Excluir transações?",
+          sel.length === 1 ? "Tem certeza de que deseja excluir esta transação?" : "Tem certeza de que deseja excluir estas " + sel.length + " transações?")
           .then((ok) => ok && ctx.bridge.request(A.deleteLancamentos, { ids: sel }).then(() => {
-            ctx.detail.close({ silencioso: true }); limpar(); ctx.toast("Lançamentos excluídos."); return aposAlterar(ctx);
+            ctx.detail.close({ silencioso: true }); limpar(); ctx.toast("Transações excluídas."); return aposAlterar(ctx);
           }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
       } },
     ], { posicao: "acima", label: "Mais ações", class: "menu--compacto" }));
 
-    return h("div", { class: "selbar", role: "toolbar", "aria-label": "Ações para os lançamentos selecionados" },
+    return h("div", { class: "selbar", role: "toolbar", "aria-label": "Ações para as transações selecionadas" },
       h("button", { type: "button", class: "selbar__btn selbar__btn--icon", "aria-label": "Fechar seleção", onClick: limpar }, icon("fechar", { size: 15 })),
-      h("span", { class: "selbar__count" }, sel.length === 1 ? "1 selecionado" : sel.length + " selecionados"),
+      h("span", { class: "selbar__count" }, sel.length === 1 ? "1 selecionada" : sel.length + " selecionadas"),
       h("span", { class: "selbar__sep", "aria-hidden": "true" }),
       categoriaBtn, tipoBtn, perfilBtn, maisBtn);
   }
@@ -277,7 +278,7 @@
   function acoes(ctx) {
     const st = store.get();
     const busca = h("input", {
-      type: "search", class: "topbar-search__input", placeholder: "Pesquisar", "aria-label": "Pesquisar lançamentos", value: st.ui.busca,
+      type: "search", class: "topbar-search__input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações", value: st.ui.busca,
       onInput: (e) => { clearTimeout(buscaTimer); const v = e.target.value; buscaTimer = setTimeout(() => store.set({ ui: { busca: v, selecionados: [] } }), 160); },
     });
     // Filtro ativo = algum filtro diferente do padrão (a pesquisa tem o próprio campo)
@@ -287,9 +288,9 @@
       "aria-haspopup": "menu", "aria-expanded": "false" }, icon("filtrar", { size: 16 }));
     filtroBtn.addEventListener("click", () => abrirMenuFiltros(filtroBtn, ctx, "direita"));
     return [
-      UI.IconButton("mais", "Novo lançamento", { onPrimary: true, onClick: () => abrirFormulario(null, ctx) }),
+      UI.IconButton("mais", "Nova transação", { onPrimary: true, onClick: () => abrirFormulario(null, ctx) }),
       ZoZo.recursos.boleto() ? UI.IconButton("boleto", "Criar fatura", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }) : null,
-      UI.IconButton("baixar-circulo", "Exportar lançamentos (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
+      UI.IconButton("baixar-circulo", "Exportar transações (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
       h("div", { class: "topbar-search topbar-search--larga" }, icon("pesquisar", { size: 15 }), busca, filtroBtn),
     ];
   }
@@ -301,14 +302,14 @@
       const st = store.get();
       const visiveis = aplicarFiltros((st.data.lancamentos && st.data.lancamentos.lancamentos) || [], st);
       store.set({ ui: { selecionados: marcar ? visiveis.map((l) => l.id) : [] } });
-    }, { label: "Selecionar todos os lançamentos", class: "topbar-check" });
+    }, { label: "Selecionar todas as transações", class: "topbar-check" });
     checkTodos = box.querySelector("input");
     return box;
   }
 
   /* ---------------- Página ---------------- */
   ZoZo.pages.lancamentos = {
-    titulo: "Lançamentos",
+    titulo: "Transações",
     topbar: acoes,
     prefixo,
     carregar(ctx, force) {
@@ -345,8 +346,8 @@
 
       if (!itens.length) {
         return C.pagina("page--lancamentos", topo, filtrando
-          ? UI.EmptyState("Nenhum lançamento encontrado com esses filtros.", { icon: "pesquisar", action: { label: "Limpar filtros", onClick: () => { store.set({ ui: { filtros: FILTROS_VAZIOS(), busca: "" } }); ctx.refreshTopbar(); } } })
-          : UI.EmptyState("Nenhum lançamento ainda.", { action: { label: "Novo lançamento", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
+          ? UI.EmptyState("Nenhuma transação encontrada com esses filtros.", { icon: "pesquisar", action: { label: "Limpar filtros", onClick: () => { store.set({ ui: { filtros: FILTROS_VAZIOS(), busca: "" } }); ctx.refreshTopbar(); } } })
+          : UI.EmptyState("Nenhuma transação ainda.", { action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
       }
 
       const linha = (l, comData) => L.LaunchRow(l, {

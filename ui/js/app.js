@@ -273,8 +273,8 @@
   });
   window.addEventListener("zozo:aviso-dados", (e) => {
     const textos = {
-      RESTORED_FROM_BACKUP: "O arquivo de dados estava danificado e foi recuperado do backup mais recente. Confira os últimos lançamentos.",
-      OLDER_VERSION: "Os dados recebidos do servidor são mais antigos do que a última versão vista neste navegador. Confira os últimos lançamentos antes de continuar.",
+      RESTORED_FROM_BACKUP: "O arquivo de dados estava danificado e foi recuperado do backup mais recente. Confira as últimas transações.",
+      OLDER_VERSION: "Os dados recebidos do servidor são mais antigos do que a última versão vista neste navegador. Confira as últimas transações antes de continuar.",
       DOCUMENT_MISSING: "Os dados desta conta não foram encontrados no servidor nem no backup. A conta abriu vazia e SÓ PARA LEITURA: peça a restauração do banco ou, para recomeçar do zero, use Configurações › Conta › Apagar todos os dados.",
       AUTOSAVE_FAILED: "As parcelas automáticas não foram salvas (sem conexão com o servidor). Elas serão criadas de novo na próxima vez.",
     };
@@ -312,6 +312,21 @@
     const app = document.getElementById("app");
     if (app) app.classList.toggle("sem-orcamento", !!(s.data.config && s.data.config.orcamentoAtivo === false));
   });
+
+  // Multicâmbio: a moeda gravada na conta vale ao entrar (símbolo R$, € ou $ e só os dados dela)
+  let moedaAplicada = "BRL";
+  store.subscribe((s) => {
+    const m = s.session.authenticated ? ((s.data.config && s.data.config.moeda) || "BRL") : "BRL";
+    if (m === moedaAplicada) return;
+    moedaAplicada = m;
+    if (s.session.authenticated && ctx.router) ZoZo.cambio.aplicarMoeda(ctx, m);
+    else ZoZo.format.definirMoeda(m);
+  });
+
+  // Campos de valor: milhar com ponto e centavos com vírgula enquanto digita (12000 → 12.000; ao sair, 12.000,00)
+  const campoValor = (t) => t instanceof HTMLInputElement && t.inputMode === "decimal" && !t.dataset.semMascara && !t.readOnly;
+  document.addEventListener("input", (e) => { if (campoValor(e.target)) ZoZo.format.mascararValor(e.target, e.data); }, true);
+  document.addEventListener("focusout", (e) => { if (campoValor(e.target)) ZoZo.format.completarValor(e.target); }, true);
 
   ZoZo.ctx = ctx;
 

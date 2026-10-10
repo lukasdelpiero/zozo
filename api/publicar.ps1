@@ -5,7 +5,7 @@
 #
 # No VS Code: Terminal › Executar Tarefa… › "ZoZo: publicar na prévia" / "ZoZo: publicar em produção".
 #
-# Passos: testes automáticos → segredos → monta a interface → (produção: ponto de restauração do banco)
+# Passos: testes automáticos (API + serviço de dados + tipos) → segredos → monta a interface (Vite) → (produção: ponto de restauração do banco)
 #         → migrações do banco → publica. Qualquer falha interrompe tudo. Produção pede confirmação.
 param(
   [Parameter(Mandatory = $true)][ValidateSet("previa", "producao")][string]$Ambiente
@@ -24,8 +24,17 @@ $endereco = if ($Ambiente -eq "previa") { "https://zozo-previa.zozo-finance-app.
 function Parar($mensagem) { Write-Host ""; Write-Host $mensagem -ForegroundColor Red; exit 1 }
 
 Write-Host "1/6 Testes automáticos..." -ForegroundColor Cyan
-python -m unittest discover -s tests
-if ($LASTEXITCODE -ne 0) { Parar "Testes falharam: nada foi publicado." }
+# uv run: usa o ambiente do projeto (grupo dev do pyproject.toml, com FastAPI/Pydantic para os testes da transição)
+uv run python -m unittest discover -s tests
+if ($LASTEXITCODE -ne 0) { Parar "Testes da API falharam: nada foi publicado." }
+Push-Location ..
+# Dependências da interface exatamente como no package-lock.json (sem scripts de instalação: .npmrc)
+if (-not (Test-Path "node_modules")) { npm ci; if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências da interface (npm ci)." } }
+npm test
+if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Testes do serviço de dados falharam: nada foi publicado." }
+npm run typecheck
+if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Erros de tipo (TypeScript): nada foi publicado." }
+Pop-Location
 
 if ($Ambiente -eq "producao") {
   $pendentes = git -C .. status --porcelain
@@ -65,9 +74,13 @@ if ($nomes -notcontains "RECURSOS_AVANCADOS") {
   Write-Host "   Para liberar a sua conta: npx wrangler secret put RECURSOS_AVANCADOS $($extra -join ' ')  (e-mails separados por vírgula)" -ForegroundColor Yellow
 }
 
-Write-Host "3/6 Montando a interface (api/public)..." -ForegroundColor Cyan
-python montar_interface.py
-if ($LASTEXITCODE -ne 0) { Parar "Falha ao montar a interface." }
+Write-Host "3/6 Montando a interface (Vite → api/public)..." -ForegroundColor Cyan
+Push-Location ..
+npm run build
+$falhou = $LASTEXITCODE -ne 0
+Pop-Location
+if ($falhou) { Parar "Falha ao montar a interface." }
+if (-not (Test-Path "public/_headers") -or (Get-ChildItem -Recurse public -Filter "*mock*")) { Parar "Interface montada sem os cabeçalhos de segurança ou com o modo de demonstração: nada foi publicado." }
 
 if ($Ambiente -eq "producao") {
   Write-Host "4/6 Ponto de restauração do banco (antes das migrações)..." -ForegroundColor Cyan

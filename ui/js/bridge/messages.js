@@ -75,6 +75,11 @@
 
     // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador)
     getBoletoData: "getBoletoData",
+
+    // Grupos de categorias e multicâmbio
+    updateGrupo: "updateGrupo",
+    desagruparCategorias: "desagruparCategorias",
+    transferirMoeda: "transferirMoeda",
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
@@ -94,9 +99,9 @@
     REGISTER_FAILED: "Não foi possível criar a conta com esse e-mail.",
     EMAIL_IN_USE: "Já existe uma conta com esse email.",
     STORAGE_UNAVAILABLE: "Não foi possível falar com o servidor do ZoZo. Verifique sua conexão e tente novamente.",
-    DOCUMENT_TOO_LARGE: "Seus dados passaram do limite de armazenamento. Remova a foto do perfil ou lançamentos antigos.",
+    DOCUMENT_TOO_LARGE: "Seus dados passaram do limite de armazenamento. Remova a foto do perfil ou transações antigas.",
     TIMEOUT: "Não foi possível concluir a operação.",
-    PROFILE_ARCHIVED: "Esse perfil está arquivado. Desarquive para usá-lo em novos lançamentos.",
+    PROFILE_ARCHIVED: "Esse perfil está arquivado. Desarquive para usá-lo em novas transações.",
     NAME_IN_USE: "Já existe um item com esse nome.",
     PIX_INVALID: "Confira a chave Pix (CPF, CNPJ, e-mail, celular com DDD ou chave aleatória), o nome e a cidade.",
     WRONG_PASSWORD: "Senha incorreta.",
@@ -114,6 +119,7 @@
     DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
+    DEBIT_ACCOUNT: "Débito precisa de uma conta (corrente, poupança…). Cartão de crédito não pode.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
   });
 

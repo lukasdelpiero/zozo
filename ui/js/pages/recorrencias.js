@@ -73,7 +73,7 @@
       { cancelar: "Manter recorrência", confirmar: "Excluir recorrência" })
       .then((ok) => ok && ctx.bridge.request(A.excluirRecorrencia, { serieId: r.serieId }).then(() => {
         ctx.detail.close({ silencioso: true });
-        ctx.toast("Recorrência excluída. Os lançamentos continuam em Lançamentos.");
+        ctx.toast("Recorrência excluída. As transações continuam em Transações.");
         return ctx.recarregarTudo();
       }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
 
@@ -108,7 +108,7 @@
             C.detalheLinha("Recorrência", r.recorrencia === "parcelada" ? "Parcelada" : (ZoZo.servico.FREQUENCIAS[r.recorrencia] || ZoZo.servico.FREQUENCIAS.mensal).texto),
             r.recorrencia === "parcelada" ? C.detalheLinha("Parcela", r.parcela + " de " + r.parcelaTotal) : null,
             ZoZo.servico.FREQUENCIAS[r.recorrencia] && ZoZo.servico.FREQUENCIAS[r.recorrencia].dias ? null : C.detalheLinha("Dia do mês", String(Number(r.data.slice(8, 10))))),
-          C.detalheSecao("Lançamentos", historico));
+          C.detalheSecao("Transações", historico));
 
         ctx.bridge.request(A.getSerieRecorrencia, { serieId: r.serieId }).then((d) => {
           const cs = getComputedStyle(document.documentElement);

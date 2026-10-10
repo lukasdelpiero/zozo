@@ -23,7 +23,16 @@
   const R = () => ZoZo.regras;
 
   const VERSAO = 1;
-  const TIPOS_LANCAMENTO = ["regular", "recorrente", "interno", "receita", "estorno"];
+  const TIPOS_LANCAMENTO = ["regular", "recorrente", "interno", "receita", "estorno", "debito"];
+  /* Multicâmbio: cada registro pertence a uma moeda (sem o campo = Real). Cada moeda é um "mundo"
+     separado dentro do MESMO documento cifrado: nada é convertido nem apagado ao trocar ou desativar. */
+  const MOEDAS = ["BRL", "EUR", "USD"];
+  const moedaDe = (x) => (x && MOEDAS.includes(x.moeda) ? x.moeda : "BRL");
+  function moedaAtual() {
+    if (!doc || !doc.config || !doc.config.multicambio) return "BRL";
+    return MOEDAS.includes(doc.config.moeda) ? doc.config.moeda : "BRL";
+  }
+  const chaveGrupo = (nome, moeda) => (moeda || moedaAtual()) + "|" + nome;
   const TIPOS_CONTA = ["cartao", "corrente", "poupanca", "investimento", "emprestimo", "outros"];
   const ATIVOS = ["corrente", "poupanca", "investimento", "outros"];
   const PASSIVOS = ["cartao", "emprestimo"];
@@ -97,7 +106,7 @@
 
   /* ---------------- documento ---------------- */
   function vazio() {
-    return { versao: VERSAO, perfis: [], contas: [], categorias: [], lancamentos: [], config: {}, meta: {} };
+    return { versao: VERSAO, perfis: [], contas: [], categorias: [], lancamentos: [], grupos: {}, config: {}, meta: {} };
   }
   const objeto = (x) => !!x && typeof x === "object" && !Array.isArray(x);
   function normalizar(d) {
@@ -119,6 +128,7 @@
       if (typeof l.valor !== "number" || !Number.isFinite(l.valor)) l.valor = 0;
     });
     if (!out.config || typeof out.config !== "object") out.config = {};
+    if (!objeto(out.grupos)) out.grupos = {};
     if (!out.meta || typeof out.meta !== "object") out.meta = {};
     out.lancamentos.forEach((l) => {
       if (l.recorrencia === "fixa") l.recorrencia = "mensal";                         // versão anterior
@@ -144,7 +154,7 @@
           somenteLeitura = !!(r && r.somenteLeitura);
           // Avisos do host: restaurado de backup / versão mais antiga do que a conhecida
           if (r && r.aviso) window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: r.aviso } }));
-          if (sincronizarParcelas() > 0) {
+          if (sincronizarParcelas() + sincronizarDebitos() > 0) {
             doc.meta.ultimaGravacao = new Date().toISOString();
             // grava pela mesma fila das alterações (nunca em paralelo com elas) e conta como gravação pendente
             pendentes += 1;
@@ -195,7 +205,7 @@
       if (somenteLeitura) throw erro("DOCUMENT_MISSING_LOCKED");
       const antes = JSON.stringify(doc);
       let resultado;
-      try { resultado = fn(doc); } catch (e) { doc = JSON.parse(antes); throw e; }
+      try { resultado = fn(doc); sincronizarDebitos(); } catch (e) { doc = JSON.parse(antes); throw e; }
       doc.meta.ultimaGravacao = new Date().toISOString();
       return ZoZo.bridge.requestHost(M.ACTIONS.saveUserData, { documento: doc })
         .then(() => resultado)
@@ -325,9 +335,16 @@
     const tipo = TIPOS_LANCAMENTO.includes(l.tipo) ? l.tipo : "regular";
     // valor em centavos: 0,001 vira 0,00 e é recusado (nunca grava um lançamento de R$ 0,00)
     if (!data || !descricao || !(r2(valor) > 0) || valor > 1e12) throw erro("OPERATION_FAILED");
+    const contaId = existe(doc.contas, l.contaId);
+    // Débito: sai do saldo de uma CONTA (cartão não pode)
+    const debito = tipo === "debito" || (tipo === "recorrente" && (l.debito === true || !!(atual && atual.debito)));
+    if (debito) {
+      const conta = doc.contas.find((c) => c.id === contaId);
+      if (!conta || conta.tipo === "cartao") throw erro("DEBIT_ACCOUNT");
+    }
     const out = {
       data, descricao, valor: r2(valor), tipo,
-      contaId: existe(doc.contas, l.contaId),
+      contaId,
       categoriaId: existe(doc.categorias, l.categoriaId),
       // Sem o recurso de Perfis: o perfil já gravado continua como estava (não é apagado nem alterado)
       perfilId: avancado() ? perfilPermitido(l.perfilId, atual) : (atual ? atual.perfilId || null : null),
@@ -348,6 +365,14 @@
       }
     }
     out.direcao = out.sentido;
+    if (debito) out.debito = true;
+    out.moeda = atual ? moedaDe(atual) : moedaAtual();
+    // Parcelamento pelo total: mantém o valor das parcelas seguintes enquanto o valor desta não mudar
+    if (atual && out.recorrencia === "parcelada" && atual.valorParcela && r2(atual.valor) === out.valor) {
+      out.valorParcela = atual.valorParcela;
+      if (atual.valorTotal) out.valorTotal = atual.valorTotal;
+    }
+    if (atual && atual.debitado) out.debitado = atual.debitado;                 // efeito no saldo (conciliado abaixo)
     // A competência acompanha a data quando o lançamento não é ocorrência de série
     if (!out.serieId) out.competencia = mesDe(data);
     return out;
@@ -390,15 +415,49 @@
         if ((o.ignorados || []).includes(mes)) continue;      // parcela excluída pelo usuário
         if (doc.lancamentos.some((l) => l.serieId === o.id && l.id !== o.id && l.competencia === mes)) continue;
         doc.lancamentos.push({
-          id: novoId("l"), data: dataNoMes(mes, dia), descricao: o.descricao, valor: o.valor, tipo: "recorrente",
+          id: novoId("l"), data: dataNoMes(mes, dia), descricao: o.descricao, valor: o.valorParcela || o.valor, tipo: "recorrente",
           contaId: o.contaId, categoriaId: o.categoriaId, perfilId: o.perfilId, notas: "",
           recorrencia: "parcelada", parcelaAtual: o.parcelaAtual + k, parcelaTotal: o.parcelaTotal,
-          serieId: o.id, competencia: mes, encerradaEm: null, automatico: true,
+          serieId: o.id, competencia: mes, encerradaEm: null, automatico: true, moeda: moedaDe(o),
+          debito: o.debito ? true : undefined,
+          divisao: undefined,
         });
         criadas += 1;
       }
     });
     return criadas;
+  }
+
+  /* ---------------- Débito: sai do saldo da conta ----------------
+     Cada débito com data até hoje tira o valor do saldo da conta. O efeito aplicado fica anotado no
+     lançamento (debitado = { contaId, valor }) e é conciliado depois de toda gravação e ao abrir os
+     dados: mudou valor, conta, tipo ou data → desfaz o efeito antigo e aplica o novo (nunca em dobro).
+     Excluir o lançamento devolve o valor (reverterDebito). Débito com data futura só sai no dia. */
+  const ehDebito = (l) => l.tipo === "debito" || (l.tipo === "recorrente" && l.debito === true);
+  function reverterDebito(l) {
+    if (!l.debitado) return false;
+    const c = doc.contas.find((x) => x.id === l.debitado.contaId);
+    if (c) registrarSaldo(c, r2(saldoAtual(c) + l.debitado.valor));
+    delete l.debitado;
+    return true;
+  }
+  function sincronizarDebitos() {
+    const hoje = hojeIso();
+    let n = 0;
+    doc.lancamentos.forEach((l) => {
+      const conta = l.contaId && doc.contas.find((c) => c.id === l.contaId && c.tipo !== "cartao");
+      const deve = ehDebito(l) && !!conta && !!l.data && l.data <= hoje;
+      if (l.debitado && (!deve || l.debitado.contaId !== l.contaId || l.debitado.valor !== l.valor)) { reverterDebito(l); n += 1; }
+      if (deve && !l.debitado) { registrarSaldo(conta, r2(saldoAtual(conta) - l.valor)); l.debitado = { contaId: conta.id, valor: l.valor }; n += 1; }
+    });
+    return n;
+  }
+
+  /** Parcelas pelo valor TOTAL da compra (em centavos): a 1ª parcela leva a sobra da divisão; a partir da 2ª, todas iguais */
+  function valoresParcelas(total, atual, qtd) {
+    const c = Math.round(total * 100);
+    const base = Math.floor(c / qtd);
+    return { primeira: (atual === 1 ? c - base * (qtd - 1) : base) / 100, demais: base / 100 };
   }
 
   /** Remove as parcelas futuras geradas automaticamente (e não editadas à mão) de uma série */
@@ -468,7 +527,7 @@
           recorrencia: o.recorrencia, parcela: dt.parcela || null, parcelaTotal: o.parcelaTotal,
           categoriaId: o.categoriaId,
           categoria: cat ? { nome: cat.nome, icone: cat.icone, cor: cat.cor } : null,
-          valor: lanc ? lanc.valor : o.valor,
+          valor: lanc ? lanc.valor : (dt.k > 0 && o.valorParcela ? o.valorParcela : o.valor),
           // Um lançamento com data futura é agendamento, não pagamento
           pago: R().recorrencias.pagoSomenteComLancamento ? !!lanc && lanc.data <= hoje : (!!lanc || data <= hoje),
           lancamentoId: lanc ? lanc.id : null,
@@ -503,7 +562,8 @@
       tipoRecorrencia: o.recorrencia === "parcelada" ? "Parcela " + (parcela || o.parcelaAtual) + "/" + o.parcelaTotal : (FREQUENCIAS[o.recorrencia] || FREQUENCIAS.mensal).rotulo,
       recorrencia: o.recorrencia, parcela, parcelaTotal: o.parcelaTotal, categoriaId: o.categoriaId,
       categoria: cat ? { nome: cat.nome, icone: cat.icone, cor: cat.cor } : null,
-      valor: o.valor, pago: false, lancamentoId: null, encerrada: !!o.encerradaEm, proxima: sufixo === "proxima",
+      valor: parcela && parcela !== o.parcelaAtual && o.valorParcela ? o.valorParcela : o.valor,
+      pago: false, lancamentoId: null, encerrada: !!o.encerradaEm, proxima: sufixo === "proxima",
     };
   }
 
@@ -534,6 +594,27 @@
     return c.orcamentos && c.orcamentos[mes] !== undefined ? c.orcamentos[mes] : (c.reservado || 0);
   }
 
+  /**
+   * Orçamento do grupo no mês. O "não atribuído" (fixo ou só do mês) cobre, na leitura, o que falta para
+   * cada categoria do grupo sair do vermelho (maior estouro primeiro); o que sobra continua sem atribuir.
+   * Calculado na hora (nada é gravado nas categorias): salvar de novo não cobre o mesmo estouro duas vezes
+   * e um gasto novo já é coberto. cats = categorias regulares do grupo com { id, gasto, reservado próprio }.
+   */
+  function infoGrupo(nome, mes, cats) {
+    const g = doc.grupos[chaveGrupo(nome)] || {};
+    const porMes = !!(g.orcamentos && g.orcamentos[mes] !== undefined);
+    const bruto = Number(porMes ? g.orcamentos[mes] : g.naoAtribuido);
+    const base = Number.isFinite(bruto) && bruto > 0 ? Math.round(bruto * 100) : 0;
+    let restante = Math.max(base, 0);
+    const cobertura = {};
+    cats.map((c) => ({ c, estouro: Math.round((c.gasto - c.reservado) * 100) }))
+      .filter((x) => x.estouro > 0).sort((a, b) => b.estouro - a.estouro)
+      .forEach((x) => { const t = Math.min(x.estouro, restante); if (t > 0) { cobertura[x.c.id] = t / 100; restante -= t; } });
+    const subcategorias = r2(cats.reduce((s, c) => s + c.reservado + (cobertura[c.id] || 0), 0));
+    return { nome, naoAtribuido: restante / 100, naoAtribuidoBase: base / 100, naoAtribuidoFixo: r2(g.naoAtribuido || 0), porMes,
+      coberto: r2((base - restante) / 100), cobertura, subcategorias, total: r2(subcategorias + restante / 100) };
+  }
+
   function getCategorias(d) {
     const mes = d && /^\d{4}-\d{2}$/.test(d.mes || "") ? d.mes : mesAtual();
     const categorias = doc.categorias.map((c) => Object.assign({}, c, {
@@ -543,10 +624,26 @@
       orcamentoPorMes: !!(c.orcamentos && Object.keys(c.orcamentos).length),
     }));
     const reg = categorias.filter((c) => c.status === "regular");
+    // Grupos: "não atribuído" (orçamento do grupo além das subcategorias) do mês; a parte que cobre
+    // o estouro de uma categoria passa a contar no "reservado" dela
+    const grupos = {};
+    reg.forEach((c) => {
+      if (!c.grupo || grupos[c.grupo]) return;
+      const info = infoGrupo(c.grupo, mes, reg.filter((x) => x.grupo === c.grupo));
+      Object.keys(info.cobertura).forEach((id) => {
+        const cat = reg.find((x) => x.id === id);
+        cat.reservado = r2(cat.reservado + info.cobertura[id]);
+        cat.coberturaGrupo = info.cobertura[id];
+      });
+      delete info.cobertura;
+      grupos[c.grupo] = info;
+    });
+    const naoAtribuido = Object.keys(grupos).reduce((s, g) => s + grupos[g].naoAtribuido, 0);
     return {
       mes,
-      resumo: { gasto: r2(reg.reduce((s, c) => s + c.gasto, 0)), reservado: r2(reg.reduce((s, c) => s + c.reservado, 0)) },
+      resumo: { gasto: r2(reg.reduce((s, c) => s + c.gasto, 0)), reservado: r2(reg.reduce((s, c) => s + c.reservado, 0) + naoAtribuido) },
       categorias,
+      grupos,
     };
   }
   function lerCategoria(e) {
@@ -612,7 +709,8 @@
       return { mes, perfis, resumo: { gasto: r2(ativos.reduce((s, p) => s + p.gasto, 0)), lancamentosMes } };
     },
     [A.getConfig]: () => ({ foto: doc.config.foto || null, ultimaGravacao: doc.meta.ultimaGravacao || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false,
-      pix: pixLiberado() && doc.config.pix ? Object.assign({}, doc.config.pix) : null }),
+      pix: pixLiberado() && doc.config.pix ? Object.assign({}, doc.config.pix) : null,
+      multicambio: !!doc.config.multicambio, moeda: moedaAtual(), moedasIniciadas: (doc.config.moedasIniciadas || ["BRL"]).slice() }),
     [A.getContaHistorico]: (d) => {
       const c = doc.contas.find((x) => x.id === d.id);
       if (!c) throw erro("LOAD_FAILED");
@@ -679,7 +777,7 @@
         .filter((l) => l.perfilId === d.perfilId && l.data.startsWith(prefixo) && naFatura.has(l.contaId))
         .sort((a, b) => a.data.localeCompare(b.data));
       // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
-      return { perfil, lancamentos, pix: pixLiberado() && doc.config.pix ? Object.assign({}, doc.config.pix) : null };
+      return { perfil, lancamentos, moeda: moedaAtual(), pix: pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null };
     },
   };
 
@@ -700,7 +798,6 @@
       const antigo = doc.lancamentos[i];
       const novo = Object.assign({ id: d.id }, lerLancamento(d.lancamento, antigo));
       if (antigo.divisao) {
-        if (novo.tipo === "recorrente") throw erro("SPLIT_INVALID");     // parte de divisão não vira recorrente
         novo.divisao = antigo.divisao;
         // Partes de uma divisão têm sempre a mesma data
         if (novo.data !== antigo.data) doc.lancamentos.forEach((l) => { if (l.divisao && l.divisao.id === antigo.divisao.id) l.data = novo.data; });
@@ -723,6 +820,7 @@
       if (!alvo) throw erro("OPERATION_FAILED");
       // Excluir a origem: parcelas futuras automáticas saem; pagamentos já registrados ficam
       encerrarSerieDe(alvo);
+      reverterDebito(alvo);                                                   // débito excluído devolve o valor à conta
       doc.lancamentos = doc.lancamentos.filter((l) => l.id !== d.id);
       if (alvo.divisao) ajustarDivisao(alvo.divisao.id);
       return { id: d.id };
@@ -747,8 +845,9 @@
         id: novoId("l"), data: dataValida(d.data) || hoje, descricao: o.descricao, valor, tipo: "recorrente",
         contaId: o.contaId, categoriaId: o.categoriaId, perfilId: o.perfilId, notas: "",
         recorrencia: o.recorrencia, parcelaAtual: oc.parcela, parcelaTotal: o.parcelaTotal || null,
-        serieId: o.id, competencia: mes, ocorrencia: oc.chave, encerradaEm: null,
+        serieId: o.id, competencia: mes, ocorrencia: oc.chave, encerradaEm: null, moeda: moedaDe(o),
       };
+      if (o.debito) l.debito = true;
       doc.lancamentos.push(l);
       return { lancamentoId: l.id };
     },
@@ -756,15 +855,29 @@
     [A.tornarRecorrente]: (d) => {
       conferirLimiteDemo("recorrencia");
       const l = doc.lancamentos.find((x) => x.id === d.id);
-      if (l && l.divisao) throw erro("SPLIT_INVALID");                      // lançamento dividido não vira recorrente
       if (!l || (l.serieId && l.serieId !== l.id && !String(l.serieId).startsWith("removida:"))) throw erro("OPERATION_FAILED");
       const rec = recorrenciaValida(d.recorrencia);
+      let pa = null, pt = null;
       if (rec === "parcelada") {
-        const pa = inteiro(d.parcelaAtual), pt = inteiro(d.parcelaTotal);
+        pa = inteiro(d.parcelaAtual); pt = inteiro(d.parcelaTotal);
         if (!(pa >= 1 && pt >= 2 && pa <= pt && pt <= 999)) throw erro("OPERATION_FAILED");
-        Object.assign(l, { parcelaAtual: pa, parcelaTotal: pt });
-      } else Object.assign(l, { parcelaAtual: null, parcelaTotal: null });
-      Object.assign(l, { tipo: "recorrente", recorrencia: rec, serieId: null, competencia: mesDe(l.data), encerradaEm: null, sentido: null });
+      }
+      // Lançamento dividido: todas as partes viram recorrentes (cada parte é uma série, com o perfil dela)
+      const alvos = l.divisao ? doc.lancamentos.filter((x) => x.divisao && x.divisao.id === l.divisao.id) : [l];
+      const total = numero(d.valorTotal);
+      const eraDebito = l.tipo === "debito" || !!l.debito;                   // débito recorrente continua saindo da conta
+      alvos.forEach((x) => {
+        Object.assign(x, { parcelaAtual: pa, parcelaTotal: pt, tipo: "recorrente", recorrencia: rec, serieId: null, competencia: mesDe(x.data),
+          encerradaEm: null, sentido: null, direcao: null });
+        if (eraDebito) x.debito = true;
+        delete x.valorParcela; delete x.valorTotal;
+        // Parcelado pelo valor total da compra (só lançamento não dividido): 141,00 em 7x → 20,16 + 6 × 20,14
+        if (rec === "parcelada" && !l.divisao && total > 0 && total < 1e12) {
+          const v = valoresParcelas(total, pa, pt);
+          if (!(v.demais > 0)) throw erro("OPERATION_FAILED");
+          x.valor = v.primeira; x.valorParcela = v.demais; x.valorTotal = r2(total);
+        }
+      });
       sincronizarParcelas();
       contarDemo("recorrencia");
       return { serieId: l.id };
@@ -799,7 +912,9 @@
     [A.dividirLancamento]: (d) => {
       exigir(avancado());                                                     // divisão é entre perfis
       const base = doc.lancamentos.find((l) => l.id === d.id);
-      if (!base || base.tipo === "recorrente") throw erro("SPLIT_INVALID");
+      // Recorrente: só a ORIGEM da série pode ser dividida (cada parte passa a ser uma série com o seu perfil)
+      if (!base || (base.tipo === "recorrente" && !ehOrigem(base))) throw erro("SPLIT_INVALID");
+      const recorrente = base.tipo === "recorrente";
       const membros = base.divisao ? doc.lancamentos.filter((l) => l.divisao && l.divisao.id === base.divisao.id) : [base];
       const total = base.divisao ? base.divisao.total : base.valor;
       const partes = Array.isArray(d.partes) ? d.partes : [];
@@ -813,9 +928,16 @@
       if (partes.some((p) => !p.categoriaId || !doc.categorias.some((c) => c.id === p.categoriaId))) throw erro("SPLIT_INVALID");
 
       const grupo = (base.divisao && base.divisao.id) || novoId("d");
+      if (recorrente) {
+        // as parcelas futuras automáticas das séries atuais saem e são refeitas por parte, com o novo valor
+        membros.forEach((m) => { if (ehOrigem(m)) { removerParcelasFuturas(m.id); if (m !== base) desligarSerie(m.id); } });
+      }
+      membros.forEach((m) => { if (m !== base) reverterDebito(m); });
       doc.lancamentos = doc.lancamentos.filter((l) => l === base || !membros.includes(l));
       partes.forEach((p, i) => {
         const alvo = i === 0 ? base : Object.assign({}, base, { id: novoId("l") });
+        if (i > 0) { delete alvo.debitado; if (recorrente) alvo.serieId = null; }
+        delete alvo.valorParcela; delete alvo.valorTotal;
         Object.assign(alvo, {
           descricao: texto(p.descricao, NOME()) || base.descricao, valor: centavos[i] / 100, data: base.data,
           categoriaId: p.categoriaId, perfilId: p.perfilId,
@@ -824,6 +946,7 @@
         if (i > 0) doc.lancamentos.push(alvo);
       });
       if (partes.length === 1) delete base.divisao;
+      if (recorrente) sincronizarParcelas();
       return { id: base.id, grupo };
     },
 
@@ -850,7 +973,7 @@
       const tipoDemo = e.tipo === "cartao" ? "cartao" : "conta";
       conferirLimiteDemo(tipoDemo);
       const c = { id: novoId("c"), nome: e.nome, tipo: e.tipo, ultimos4Digitos: e.ultimos4Digitos, cor: e.cor, tipoInvestimento: e.tipoInvestimento,
-        instituicao: e.instituicao, limite: e.limite, fechamento: e.fechamento, vencimento: e.vencimento, historico: [] };
+        instituicao: e.instituicao, limite: e.limite, fechamento: e.fechamento, vencimento: e.vencimento, historico: [], moeda: moedaAtual() };
       registrarSaldo(c, e.saldo);
       doc.contas.push(c);
       contarDemo(tipoDemo);
@@ -880,7 +1003,7 @@
     /* Categorias */
     [A.createCategoria]: (d) => {
       conferirLimiteDemo("categoria");
-      const c = Object.assign({ id: novoId("k") }, lerCategoria(d.categoria));
+      const c = Object.assign({ id: novoId("k") }, lerCategoria(d.categoria), { moeda: moedaAtual() });
       doc.categorias.push(c);
       contarDemo("categoria");
       return { categoria: c };
@@ -907,9 +1030,9 @@
       if (!alvo) throw erro("OPERATION_FAILED");
       doc.categorias = doc.categorias.filter((c) => c.id !== d.id);
       const temLancamentos = doc.lancamentos.some((l) => l.categoriaId === d.id);
-      let outros = doc.categorias.find((c) => c.nome.toLowerCase() === "outros");
+      let outros = doc.categorias.find((c) => c.nome.toLowerCase() === "outros" && moedaDe(c) === moedaDe(alvo));
       if (temLancamentos && !outros && alvo.nome.toLowerCase() !== "outros") {
-        outros = { id: novoId("k"), nome: "Outros", icone: "📦", cor: "#6078a9", grupo: null, reservado: 0, status: "regular" };
+        outros = { id: novoId("k"), nome: "Outros", icone: "📦", cor: "#6078a9", grupo: null, reservado: 0, status: "regular", moeda: moedaDe(alvo) };
         doc.categorias.push(outros);
       }
       doc.lancamentos.forEach((l) => { if (l.categoriaId === d.id) l.categoriaId = outros ? outros.id : null; });
@@ -918,10 +1041,43 @@
     [A.createCategoriasSugeridas]: () => {
       if (ehDemo()) throw erro("DEMO_LIMIT");                                 // cria várias de uma vez
       (R().categoriasSugeridas || []).forEach((s) => {
-        if (doc.categorias.some((c) => c.nome.toLowerCase() === s.nome.toLowerCase())) return;
-        doc.categorias.push(Object.assign({ id: novoId("k") }, lerCategoria(s)));
+        if (doc.categorias.some((c) => moedaDe(c) === moedaAtual() && c.nome.toLowerCase() === s.nome.toLowerCase())) return;
+        doc.categorias.push(Object.assign({ id: novoId("k") }, lerCategoria(s), { moeda: moedaAtual() }));
       });
       return { total: doc.categorias.length };
+    },
+
+    /* Grupos de categorias */
+    /**
+     * Define o "não atribuído" do grupo. Se uma categoria do grupo já passou do orçamento no mês, o que
+     * falta para ela sair do vermelho vem do não atribuído (maior estouro primeiro); o resto fica no grupo.
+     * Ex.: A 2.000 (gastou 2.500), B 1.000 (gastou 2.000), não atribuído 4.000 → A +500, B +1.000, sobra 2.500.
+     */
+    [A.updateGrupo]: (d) => {
+      const nome = texto(d.nome, 60);
+      const cats = doc.categorias.filter((c) => moedaDe(c) === moedaAtual() && c.grupo === nome);
+      if (!nome || !cats.length) throw erro("OPERATION_FAILED");
+      const v = numero(d.naoAtribuido);
+      if (!(v >= 0) || v > 1e12) throw erro("OPERATION_FAILED");
+      const mes = /^\d{4}-\d{2}$/.test(d.mes || "") ? d.mes : mesAtual();
+      // Grava só o valor do grupo; a cobertura dos estouros é calculada na leitura (infoGrupo)
+      const chave = chaveGrupo(nome);
+      const g = Object.assign({ naoAtribuido: 0, orcamentos: {} }, doc.grupos[chave]);
+      g.orcamentos = Object.assign({}, g.orcamentos);
+      if (d.modo === "mes") g.orcamentos[mes] = r2(v);
+      else { g.naoAtribuido = r2(v); delete g.orcamentos[mes]; }
+      doc.grupos[chave] = g;
+      const info = infoGrupo(nome, mes, cats.filter((c) => c.status === "regular")
+        .map((c) => ({ id: c.id, gasto: r2(Math.max(gastoNoMes(c.id, mes), 0)), reservado: reservadoNoMes(c, mes) })));
+      return { coberto: info.coberto, restante: info.naoAtribuido };
+    },
+    [A.desagruparCategorias]: (d) => {
+      const nome = texto(d.nome, 60);
+      const cats = doc.categorias.filter((c) => moedaDe(c) === moedaAtual() && c.grupo === nome);
+      if (!nome || !cats.length) throw erro("OPERATION_FAILED");
+      cats.forEach((c) => { c.grupo = null; });
+      delete doc.grupos[chaveGrupo(nome)];
+      return { desagrupadas: cats.length };
     },
 
     /* Perfis */
@@ -929,8 +1085,8 @@
       exigir(avancado());
       conferirLimiteDemo("perfil");
       const e = lerPerfil(d.perfil);
-      if (doc.perfis.some((p) => p.nome.toLowerCase() === e.nome.toLowerCase())) throw erro("NAME_IN_USE");
-      const p = Object.assign({ id: novoId("p") }, e);
+      if (doc.perfis.some((p) => moedaDe(p) === moedaAtual() && p.nome.toLowerCase() === e.nome.toLowerCase())) throw erro("NAME_IN_USE");
+      const p = Object.assign({ id: novoId("p") }, e, { moeda: moedaAtual() });
       doc.perfis.push(p);
       contarDemo("perfil");
       return { perfil: p };
@@ -986,7 +1142,7 @@
       const ids = new Set(Array.isArray(d.ids) ? d.ids : []);
       const antes = doc.lancamentos.length;
       const grupos = new Set();
-      doc.lancamentos.filter((l) => ids.has(l.id)).forEach((l) => { encerrarSerieDe(l); if (l.divisao) grupos.add(l.divisao.id); });
+      doc.lancamentos.filter((l) => ids.has(l.id)).forEach((l) => { encerrarSerieDe(l); reverterDebito(l); if (l.divisao) grupos.add(l.divisao.id); });
       doc.lancamentos = doc.lancamentos.filter((l) => !ids.has(l.id));
       grupos.forEach(ajustarDivisao);
       return { excluidos: antes - doc.lancamentos.length };
@@ -1009,6 +1165,18 @@
         doc.config.foto = d.foto;
       }
       if (typeof d.orcamentoAtivo === "boolean") doc.config.orcamentoAtivo = d.orcamentoAtivo;
+      let primeiraVez = false;
+      if (typeof d.multicambio === "boolean") {
+        doc.config.multicambio = d.multicambio;
+        if (!d.multicambio) doc.config.moeda = "BRL";             // desativado: tudo volta ao Real (nada é apagado)
+      }
+      if (d.moeda !== undefined) {
+        if (!MOEDAS.includes(d.moeda) || !doc.config.multicambio) throw erro("OPERATION_FAILED");
+        const iniciadas = doc.config.moedasIniciadas || ["BRL"];
+        primeiraVez = !iniciadas.includes(d.moeda);
+        if (primeiraVez) doc.config.moedasIniciadas = iniciadas.concat(d.moeda);
+        doc.config.moeda = d.moeda;
+      }
       if (d.pix !== undefined) exigir(pixLiberado());
       if (d.pix === null) delete doc.config.pix;
       else if (d.pix && typeof d.pix === "object") {
@@ -1017,7 +1185,45 @@
         if (!chave || !nome || !cidade) throw erro("PIX_INVALID");
         doc.config.pix = { chave, nome, cidade };
       }
-      return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false, pix: pixLiberado() ? doc.config.pix || null : null };
+      return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false, pix: pixLiberado() ? doc.config.pix || null : null,
+        multicambio: !!doc.config.multicambio, moeda: moedaAtual(), primeiraVez };
+    },
+    /** Leva transações do Real para a moeda atual (o número fica igual: 200,00 R$ → 200,00 €; sem conversão) */
+    [A.transferirMoeda]: (d) => {
+      const destino = moedaAtual();
+      const ids = new Set(Array.isArray(d.ids) ? d.ids.slice(0, 5000) : []);
+      if (destino === "BRL" || !ids.size) throw erro("OPERATION_FAILED");
+      // A série inteira (parcelas/recorrência) e a divisão inteira vão juntas: nada fica metade em cada moeda
+      const series = new Set(), divisoes = new Set();
+      doc.lancamentos.forEach((l) => {
+        if (!ids.has(l.id) || moedaDe(l) === destino) return;
+        if (l.tipo === "recorrente") series.add(l.serieId || l.id);
+        if (l.divisao) divisoes.add(l.divisao.id);
+      });
+      const mover = doc.lancamentos.filter((l) => moedaDe(l) !== destino && (ids.has(l.id) || series.has(l.id) ||
+        (l.serieId && series.has(l.serieId)) || (l.divisao && divisoes.has(l.divisao.id))));
+      // Conta, categoria e perfil passam a ser os da moeda de destino: o de mesmo nome, ou uma cópia
+      // (conta copiada começa com saldo 0 — o saldo pertence à outra moeda). Débito sai da conta nova
+      // (sincronizarDebitos devolve o valor à conta antiga e debita a nova).
+      const mapa = {};
+      const equivalente = (lista, prefixo, id, copiar) => {
+        if (!id) return id;
+        const atual = lista.find((x) => x.id === id);
+        if (!atual || moedaDe(atual) === destino) return id;
+        if (mapa[id]) return mapa[id];
+        const igual = lista.find((x) => moedaDe(x) === destino && x.nome === atual.nome && (prefixo !== "c" || x.tipo === atual.tipo));
+        const alvo = igual || Object.assign({}, atual, copiar(atual), { id: novoId(prefixo), moeda: destino });
+        if (!igual) lista.push(alvo);
+        mapa[id] = alvo.id;
+        return alvo.id;
+      };
+      mover.forEach((l) => {
+        l.moeda = destino;
+        l.contaId = equivalente(doc.contas, "c", l.contaId, () => ({ saldo: 0, historico: [] }));
+        l.categoriaId = equivalente(doc.categorias, "k", l.categoriaId, () => ({ orcamentos: {} }));
+        l.perfilId = equivalente(doc.perfis, "p", l.perfilId, () => ({}));
+      });
+      return { transferidos: mover.length };
     },
   };
 
@@ -1030,10 +1236,24 @@
     return new M.BridgeError("INTERNAL_ERROR", M.FRIENDLY.OPERATION_FAILED.replace(/\.$/, "") + " (código INTERNAL_ERROR).");
   }
 
+  /** Os dados de UMA moeda (as leituras só enxergam o "mundo" da moeda escolhida) */
+  function visao(real) {
+    const m = moedaAtual();
+    const daMoeda = (lista) => lista.filter((x) => moedaDe(x) === m);
+    return Object.assign({}, real, {
+      perfis: daMoeda(real.perfis), contas: daMoeda(real.contas), categorias: daMoeda(real.categorias), lancamentos: daMoeda(real.lancamentos),
+    });
+  }
+  function lerNaMoeda(action, d) {
+    const real = doc;
+    doc = visao(real);
+    try { return clone(LEITURAS[action](d)); } finally { doc = real; }
+  }
+
   function handle(action, data) {
     const d = data || {};
     if (action in LEITURAS) {
-      return fila.then(() => garantirCarregado()).then(() => clone(LEITURAS[action](d))).catch((e) => { throw amigavel(e); });
+      return fila.then(() => garantirCarregado()).then(() => (action === A.getConfig ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
     }
     if (action in ESCRITAS) {
       return alterar(() => clone(ESCRITAS[action](d))).catch((e) => { throw amigavel(e); });

@@ -1,7 +1,7 @@
 /* =============================================================
    ZoZo — Janelas modais de criação
    Nova categoria · Criar novo grupo · Nova conta ·
-   Nova recorrência (lançamento → frequência → parcelas) ·
+   Nova recorrência (transação → frequência → parcelas) ·
    Confirmar com senha
    ============================================================= */
 (function (ZoZo) {
@@ -51,8 +51,8 @@
   }
 
   /** Toggle com fundo roxo (cor da barra superior) */
-  function Interruptor(rotulo, ligado, aoMudar) {
-    const input = h("input", { type: "checkbox", class: "toggle__input", role: "switch" });
+  function Interruptor(rotulo, ligado, aoMudar, nomeAcessivel) {
+    const input = h("input", { type: "checkbox", class: "toggle__input", role: "switch", "aria-label": rotulo ? undefined : nomeAcessivel });
     input.checked = !!ligado;
     input.addEventListener("change", () => aoMudar(input.checked));
     return h("label", { class: "toggle toggle--linha" }, h("span", { class: "toggle__label" }, rotulo), input, h("span", { class: "toggle__track", "aria-hidden": "true" }, h("span", { class: "toggle__thumb" })));
@@ -60,7 +60,7 @@
 
   function campoDinheiro(valor, placeholder) {
     const input = UI.Input({ inputmode: "decimal", placeholder: placeholder || "0,00", value: valor ? F.moedaEditavel(valor) : "" });
-    return { input, el: h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, "R$"), input), ler: () => F.parseMoeda(input.value) };
+    return { input, el: h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, F.simbolo()), input), ler: () => F.parseMoeda(input.value) };
   }
 
   /* ---------------- Nova categoria ---------------- */
@@ -239,7 +239,7 @@
   ];
 
   /** Passo "Confirmar frequência" (e, se parcelado, "Parcelas"). aoConfirmar({recorrencia, parcelaAtual, parcelaTotal}) */
-  function passoFrequencia(aoConfirmar, voltar) {
+  function passoFrequencia(aoConfirmar, voltar, valorInicial) {
     let escolha = "mensal";
     return function passo(api) {
       const lista = h("div", { class: "freq-list", role: "radiogroup", "aria-label": "Frequência" },
@@ -260,31 +260,53 @@
         botoes: [
           { label: voltar ? "Voltar" : "Cancelar", onClick: () => (voltar ? voltar(api) : api.fechar()) },
           { label: escolha === "parcelada" ? "Próximo" : "Criar", primario: true, ref: (b) => { botaoAvancar = b; },
-            onClick: (btn) => (escolha === "parcelada" ? api.ir(passoParcelas(aoConfirmar, () => api.ir(passo))) : aoConfirmar({ recorrencia: escolha }, api, btn)) },
+            onClick: (btn) => (escolha === "parcelada" ? api.ir(passoParcelas(aoConfirmar, () => api.ir(passo), valorInicial)) : aoConfirmar({ recorrencia: escolha }, api, btn)) },
         ],
       };
     };
   }
 
-  function passoParcelas(aoConfirmar, voltar) {
+  /** Mesma divisão do serviço de dados: a 1ª parcela leva a sobra dos centavos; da 2ª em diante, todas iguais */
+  function previaParcelas(total, atual, qtd) {
+    const c = Math.round(total * 100), base = Math.floor(c / qtd);
+    if (!(base > 0)) return null;
+    const primeira = atual === 1 ? c - base * (qtd - 1) : base;
+    const restantes = qtd - atual + 1;
+    if (primeira === base) return restantes + " × " + F.moeda(base / 100) + (atual > 1 ? " (da " + atual + "ª à " + qtd + "ª)" : "");
+    return "1ª parcela " + F.moeda(primeira / 100) + " + " + (qtd - 1) + " × " + F.moeda(base / 100);
+  }
+
+  function passoParcelas(aoConfirmar, voltar, valorInicial) {
     return (api) => {
+      const total = UI.Input({ inputmode: "decimal", placeholder: "0,00", value: valorInicial > 0 ? F.moedaEditavel(valorInicial) : "" });
       const ini = UI.Input({ type: "number", inputmode: "numeric", placeholder: "1" });
       const fim = UI.Input({ type: "number", inputmode: "numeric", placeholder: "10" });
       [ini, fim].forEach((i) => { i.min = "1"; i.step = "1"; i.addEventListener("keydown", (e) => { if ([".", ",", "e", "-", "+"].includes(e.key)) e.preventDefault(); }); });
-      ini.dataset.autofocus = "";
+      (valorInicial > 0 ? ini : total).dataset.autofocus = "";
+      const previa = h("p", { class: "field__hint parcelas__previa", "aria-live": "polite" });
       const erro = h("p", { class: "form-error", role: "alert" });
+      const ler = () => ({ v: F.parseMoeda(total.value), a: Number(ini.value), b: Number(fim.value) });
+      const atualizar = () => {
+        const { v, a, b } = ler();
+        previa.textContent = v > 0 && Number.isInteger(a) && Number.isInteger(b) && a >= 1 && b >= 2 && a <= b && b <= 999 ? (previaParcelas(v, a, b) || "") : "";
+      };
+      [total, ini, fim].forEach((i) => i.addEventListener("input", atualizar));
       return {
         titulo: "Parcelas",
         corpo: h("div", { class: "zm__form" },
-          h("div", { class: "form-row form-row--2" }, UI.Field("Parcela inicial", ini), UI.Field("Parcela final", fim)),
-          h("p", { class: "field__hint" }, "Ex.: compra em 10x já na 3ª parcela → inicial 3, final 10. As parcelas seguintes são criadas automaticamente."),
+          UI.Field("Valor total da compra", h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, F.simbolo()), total)),
+          h("div", { class: "form-row form-row--2" }, UI.Field("Parcela atual", ini), UI.Field("Total de parcelas", fim)),
+          previa,
+          h("p", { class: "field__hint" }, "O ZoZo divide o total pelas parcelas. Ex.: " + F.moeda(141) + " em 7x → 1ª de " + F.moeda(20.16) + " e 6 de " + F.moeda(20.14) + ". Já na 3ª de 10? Atual 3, total 10: as seguintes são criadas sozinhas."),
           erro),
         botoes: [
           { label: "Voltar", onClick: () => voltar() },
           { label: "Criar", primario: true, onClick: (btn) => {
-            const a = Number(ini.value), b = Number(fim.value);
-            if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 1 && b >= 2 && a <= b && b <= 999)) { erro.textContent = "Use números inteiros: inicial a partir de 1 e final maior ou igual à inicial."; return; }
-            aoConfirmar({ recorrencia: "parcelada", parcelaAtual: a, parcelaTotal: b }, api, btn);
+            const { v, a, b } = ler();
+            if (!(v > 0 && v < 1e12)) { erro.textContent = "Informe o valor total da compra."; total.focus(); return; }
+            if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 1 && b >= 2 && a <= b && b <= 999)) { erro.textContent = "Use números inteiros: parcela atual a partir de 1 e total maior ou igual à atual."; return; }
+            if (!previaParcelas(v, a, b)) { erro.textContent = "O valor é pequeno demais para esse número de parcelas."; return; }
+            aoConfirmar({ recorrencia: "parcelada", parcelaAtual: a, parcelaTotal: b, valorTotal: v }, api, btn);
           } },
         ],
       };
@@ -307,7 +329,7 @@
     janela({
       titulo: "Confirmar frequência",
       classe: "modal--recorrencia",
-      passo: passoFrequencia(o.aoEscolher ? (dados, api) => { api.fechar(); o.aoEscolher(dados); } : tornarRecorrente(ctx, lancamentoId, o.aoTerminar)),
+      passo: passoFrequencia(o.aoEscolher ? (dados, api) => { api.fechar(); o.aoEscolher(dados); } : tornarRecorrente(ctx, lancamentoId, o.aoTerminar), null, o.valor),
     });
   }
 
@@ -317,7 +339,7 @@
       const passoLista = (api) => {
         let termo = "";
         const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar lançamentos" });
+        const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
         busca.dataset.autofocus = "";
         const lista = h("div", { class: "zm__list" });
         const desenhar = () => {
@@ -325,12 +347,12 @@
           mount(lista, itens.length ? itens.map((l) => {
             const marca = l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : null;
             const verde = l.tipo === "receita" || l.tipo === "estorno" || (l.tipo === "interno" && l.sentido === "entrada");
-            return h("button", { type: "button", class: "zm-lanc", onClick: () => api.ir(passoFrequencia(tornarRecorrente(ctx, l.id, () => ctx.navigate("recorrencias")), () => api.ir(passoLista))) },
+            return h("button", { type: "button", class: "zm-lanc", onClick: () => api.ir(passoFrequencia(tornarRecorrente(ctx, l.id, () => ctx.navigate("recorrencias")), () => api.ir(passoLista), l.valor)) },
               h("span", { class: "zm-lanc__data" }, F.dataCurta(l.data)),
               h("span", { class: "zm-lanc__nome" }, marca ? h("span", { class: "kind-badge" }, marca) : null, h("span", null, l.descricao)),
               l.categoria ? h("span", { class: "zm-lanc__cat", style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") }, title: l.categoria.nome }, l.categoria.icone || "•") : h("span"),
               h("span", { class: ["zm-lanc__valor", "money", verde && "money--income"] }, F.moeda(l.valor)));
-          }) : h("p", { class: "menu__empty" }, "Nenhum lançamento encontrado."));
+          }) : h("p", { class: "menu__empty" }, "Nenhuma transação encontrada."));
         };
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         desenhar();

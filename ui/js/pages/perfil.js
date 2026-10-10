@@ -87,18 +87,18 @@
                   aoSalvar: (v) => ctx.bridge.request(A.updatePerfil, { id: p.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) })),
               p.arquivado ? h("span", { class: "status-chip status-chip--pending" }, "Arquivado") : null),
             h("div", { class: "detail-hero__figure" },
-              h("span", { class: "detail-hero__label" }, "Lançamentos"),
+              h("span", { class: "detail-hero__label" }, "Transações"),
               h("span", { class: "detail-hero__value" }, String(p.quantidade || 0)))),
           C.detalheSecao(null,
             C.detalheLinha("Gasto em " + mesAbrev(), F.moeda(p.gasto || 0)),
-            p.arquivado ? h("p", { class: "field__hint" }, "Perfil arquivado: continua nos lançamentos e nos totais, mas não pode ser usado em novos lançamentos.") : null),
-          C.detalheSecao("Últimos lançamentos", listaEl,
+            p.arquivado ? h("p", { class: "field__hint" }, "Perfil arquivado: continua nas transações e nos totais, mas não pode ser usado em novas transações.") : null),
+          C.detalheSecao("Últimas transações", listaEl,
             h("div", { class: "detail-actions detail-actions--end" }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
           const itens = d.lancamentos.filter((l) => l.perfilId === p.id).slice(0, 10);
           mount(listaEl, itens.length
             ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
-            : UI.EmptyState("Nenhum lançamento com este perfil."));
+            : UI.EmptyState("Nenhuma transação com este perfil."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });
@@ -116,7 +116,7 @@
       AvatarPerfil(p),
       h("span", { class: "profile-row__text" },
         h("span", { class: "profile-row__name" }, p.nome),
-        h("span", { class: "profile-row__count" }, p.quantidade === 1 ? "1 lançamento" : (p.quantidade || 0) + " lançamentos")),
+        h("span", { class: "profile-row__count" }, p.quantidade === 1 ? "1 transação" : (p.quantidade || 0) + " transações")),
       h("span", { class: "profile-row__value money" }, F.moeda(p.gasto || 0)));
   }
 
@@ -136,7 +136,7 @@
       const sel = state.selectedItem && state.selectedItem.tipo === "perfil" ? state.selectedItem.id : null;
 
       if (!perfis.length) {
-        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada lançamento (ex.: Casa, Mãe)" + (ZoZo.recursos.boleto() ? " e são usados na fatura." : "."),
+        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada transação (ex.: Casa, Mãe)" + (ZoZo.recursos.boleto() ? " e são usados na fatura." : "."),
           { icon: "perfil", action: { label: "Novo perfil", icon: "mais", onClick: () => ZoZo.modais.novoPerfil(ctx, {}) } }));
       }
 
@@ -144,7 +144,7 @@
         C.cardResumoDonut({
           ariaLabel: "Gastos do mês por perfil",
           esquerda: { valor: d.resumo ? d.resumo.gasto : 0, label: "gasto em " + mesAbrev(d.mes) },
-          direita: { texto: String(d.resumo ? d.resumo.lancamentosMes : 0), label: "lançamentos em " + mesAbrev(d.mes) },
+          direita: { texto: String(d.resumo ? d.resumo.lancamentosMes : 0), label: "transações em " + mesAbrev(d.mes) },
           segmentos: ativos.map((p) => ({ label: p.nome, cor: p.cor, valor: p.gasto })),
         }),
         UI.Section({ key: "perfil:lista", title: "Perfis" },
@@ -191,8 +191,8 @@
       foto && /^data:image\/jpeg;base64,/.test(foto) ? h("img", { src: foto, alt: "" }) : iniciais);
   }
 
-  /** CSV dos lançamentos (separador ";" para o Excel em português) */
-  function gerarCsv(lancamentos) {
+  /** CSV das transações (separador ";" para o Excel em português). Multicâmbio: coluna Moeda (só a moeda escolhida) */
+  function gerarCsv(lancamentos, moeda) {
     // Texto: aspas duplicadas e proteção contra fórmulas (=, +, -, @, tab, CR — inclusive após espaços)
     const texto = (v) => {
       let t = String(v === null || v === undefined ? "" : v);
@@ -202,16 +202,15 @@
     // Número: sempre gerado aqui (nunca vem do usuário), fica numérico no Excel
     const numero = (v) => v.toFixed(2).replace(".", ",");
     const entra = (l) => ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
-    const tipos = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", estorno: "Estorno" };
+    const tipos = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno" };
     const freq = ZoZo.servico.FREQUENCIAS;
     const comPerfil = ZoZo.recursos.perfis();             // coluna Perfil só para contas com o recurso
-    const linhas = [["Data", "Nome", "Valor", "Tipo", "Conta", "Categoria"].concat(comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
+    const linhas = [["Data", "Nome", "Valor"].concat(moeda ? ["Moeda"] : [], ["Tipo", "Conta", "Categoria"], comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
     lancamentos.slice().sort((a, b) => a.data.localeCompare(b.data)).forEach((l) => {
       const recorrencia = l.tipo !== "recorrente" ? "" : l.recorrencia === "parcelada" ? "Parcelada" : (freq[l.recorrencia] || freq.mensal).rotulo;
       linhas.push([
         texto(F.parseData(l.data).toLocaleDateString("pt-BR")), texto(l.descricao), numero((entra(l) ? 1 : -1) * F.numero(l.valor)),
-        texto(tipos[l.tipo] || l.tipo), texto(l.nomeConta), texto(l.categoria ? l.categoria.nome : ""),
-      ].concat(comPerfil ? [texto(l.perfil ? l.perfil.nome : "")] : [], [
+      ].concat(moeda ? [moeda] : [], [texto(tipos[l.tipo] || l.tipo), texto(l.nomeConta), texto(l.categoria ? l.categoria.nome : "")], comPerfil ? [texto(l.perfil ? l.perfil.nome : "")] : [], [
         texto(recorrencia), texto(l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : ""), texto(l.notas),
       ]).join(";"));
     });
@@ -222,8 +221,10 @@
   function exportarCsv(ctx, botao) {
     botao.disabled = true;
     ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
-      const conteudo = gerarCsv(d.lancamentos || []);
-      const nome = "ZoZo-lancamentos-" + F.iso(new Date()) + ".csv";
+      const cfg = store.get().data.config || {};
+      const moeda = cfg.multicambio ? (["BRL", "EUR", "USD"].includes(cfg.moeda) ? cfg.moeda : "BRL") : null;
+      const conteudo = gerarCsv(d.lancamentos || [], moeda);
+      const nome = "ZoZo-transacoes-" + (moeda ? moeda + "-" : "") + F.iso(new Date()) + ".csv";
       const url = URL.createObjectURL(new Blob([conteudo], { type: "text/csv;charset=utf-8" }));
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();
@@ -404,20 +405,26 @@
 
       let conteudo;
       if (abaConfig === "sobre") {
+        // 1ª tela em Tailwind CSS (classes tw:, ver src/estilos.css); as outras abas ainda usam css/
+        const linha = (titulo, valor) => h("div", { class: "tw:flex tw:items-center tw:justify-between tw:gap-(--space-5) tw:py-2.5" },
+          h("span", { class: "tw:text-(length:--t-15) tw:font-[450] tw:text-zz-text" }, titulo),
+          h("span", { class: "tw:text-(length:--t-13) tw:font-[550] tw:text-zz-secondary" }, valor));
         conteudo = [
-          h("h3", { class: "cfg-section" }, "Sobre"),
-          linhaConfig("Versão", null, h("span", { class: "cfg-readonly" }, "ZoZo v" + ZoZo.sobre.versao)),
-          linhaConfig("Autor", null, h("span", { class: "cfg-readonly" }, ZoZo.sobre.autor)),
+          h("h3", { class: "tw:m-0 tw:mb-(--space-2) tw:pb-(--space-2) tw:border-b tw:border-zz-border tw:text-(length:--t-15) tw:font-[550]" }, "Sobre"),
+          linha("Versão", "ZoZo v" + ZoZo.sobre.versao),
+          linha("Autor", ZoZo.sobre.autor),
         ];
       } else if (abaConfig === "geral") {
         conteudo = [
           h("h3", { class: "cfg-section" }, "Orçamento"),
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
-              .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })))),
+              .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar orçamento")),
           // Pix das faturas: só contas com o recurso
           ZoZo.recursos.pix() ? h("h3", { class: "cfg-section" }, "Pix das faturas") : null,
           ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
+          h("h3", { class: "cfg-section" }, "Multicâmbio"),
+          ZoZo.cambio.SecaoConfig(ctx, cfg),
           h("h3", { class: "cfg-section" }, "Armazenamento"),
           linhaConfig(
             ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador."
@@ -453,7 +460,7 @@
             .finally(() => { btn.disabled = false; });
         };
         const apagarDados = () => ZoZo.modais.confirmarComSenha({ titulo: "Apagar todos os dados?", botao: "Apagar dados",
-          mensagem: "Lançamentos, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
+          mensagem: "Transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
           .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha })).then(() => {
             ZoZo.servico.reset();
             // Filtros, seleção e preferências apontavam para itens que não existem mais
@@ -489,8 +496,8 @@
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
           h("h3", { class: "cfg-section" }, "Ações"),
-          linhaConfig("Exportar todos os lançamentos", "Baixe seus dados em um arquivo CSV", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
-          demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove lançamentos, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
+          linhaConfig("Exportar todas as transações", "Baixe seus dados em um arquivo CSV", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
+          demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
         ];
       }

@@ -44,7 +44,7 @@
       const input = UI.Input({ name: campo.nome, inputmode: "decimal", placeholder: "0,00", value: valor === undefined || valor === null || valor === "" ? "" : F.moedaEditavel(valor) });
       if (F.numero(valor) < 0) input.value = "-" + input.value;
       input.addEventListener("input", aoMudar);
-      return { el: input, ler: () => F.parseMoeda(input.value), foco: input, input, prefixo: "R$" };
+      return { el: input, ler: () => F.parseMoeda(input.value), foco: input, input, prefixo: F.simbolo() };
     }
     const input = UI.Input({
       name: campo.nome, value: valor || "",

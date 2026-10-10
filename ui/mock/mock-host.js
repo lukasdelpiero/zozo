@@ -8,7 +8,7 @@
 
    Atenção: tudo fica no localStorage, SEM criptografia e SEM
    servidor. Serve apenas para testar a interface; a pasta mock é
-   removida na publicação (api/montar_interface.py).
+   fora do build (vite.config.ts: módulo virtual:zozo-mock vazio).
 
    Conta de prévia: definida em mock/credenciais.local.js (arquivo seu,
    fora do git — veja o LEIA-ME). Sem ele, não há conta pronta.

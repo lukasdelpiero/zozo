@@ -8,8 +8,12 @@ Só traduz entre o Cloudflare e o núcleo (nucleo.py):
 A interface (pasta public) é servida pelo próprio Cloudflare (assets);
 este código só recebe os caminhos /api/*.
 Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
+  API_FASTAPI = "1"  → transição: os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py)
+                       antes do núcleo. Desligado por padrão; ligar primeiro só na prévia, depois de
+                       mover fastapi/pydantic para [project].dependencies (pyproject.toml).
 Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS
 """
+import json
 from urllib.parse import urlencode
 
 from pyodide.ffi import to_js
@@ -82,10 +86,37 @@ def _metodo(request):
     return str(getattr(m, "value", m)).upper()
 
 
+def _config(env):
+    return {k: str(getattr(env, k, "") or "") for k in _CONFIG}
+
+
+_APP_FASTAPI = None
+
+
+def _app_fastapi():
+    """App FastAPI (transição). None se o pacote não estiver no Worker: segue o caminho atual."""
+    global _APP_FASTAPI
+    if _APP_FASTAPI is None:
+        try:
+            from app_fastapi import criar_app       # noqa: PLC0415 — só carrega quando ligado
+        except ImportError:
+            print(json.dumps({"evento": "fastapi_indisponivel"}))
+            _APP_FASTAPI = False
+        else:
+            _APP_FASTAPI = criar_app(lambda req: {"banco": BancoD1(req.scope["env"].DB), "servicos": Servicos(),
+                                                  "config": _config(req.scope["env"])})
+    return _APP_FASTAPI or None
+
+
 class Default(WorkerEntrypoint):
     async def fetch(self, request):
         env = self.env
-        config = {k: str(getattr(env, k, "") or "") for k in _CONFIG}
+        if str(getattr(env, "API_FASTAPI", "") or "") == "1":
+            app = _app_fastapi()
+            if app is not None:
+                import asgi                          # noqa: PLC0415 — adaptador ASGI do Python Workers
+                return await asgi.fetch(app, request.js_object, env)
+        config = _config(env)
         cab = _cabecalhos(request)
         metodo = _metodo(request)
 

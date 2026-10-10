@@ -1,17 +1,30 @@
 # ZoZo
 
-**Versão 2.5.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.6.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
 | Camada | Tecnologia |
 |---|---|
-| Front-end | HTML, CSS e JavaScript (pasta `ui`) |
-| Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`) |
+| Front-end | **Vite + TypeScript + Tailwind CSS** (em transição; pasta `ui`) — módulos ainda em JavaScript convivem com os já convertidos |
+| Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`); transição para **FastAPI + Pydantic** iniciada (`app_fastapi.py`, desligada no Cloudflare) |
 | Dados | **Cloudflare D1** (banco SQL) — só dados cifrados |
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.6.0
+
+- **Lançamentos agora se chamam Transações** em toda a interface (menu, títulos, avisos, CSV `ZoZo-transacoes-….csv`).
+- **Novo tipo Débito** (Regular, Transferência, Receita, Débito): só saída, sai do saldo da conta escolhida (cartão não vale), com Categoria e Recorrência. Editar valor/conta/data ajusta o saldo; excluir devolve; data futura só debita no dia.
+- **Conta editável** depois de criada, em qualquer tipo; **seta →** ao lado da conta e das pílulas (categoria, perfil, recorrência) abre as transações filtradas.
+- **Parcelamento pelo valor total:** 141,00 em 7× a partir da 1ª parcela → 20,16 + 6 × 20,14; divisão exata → todas iguais; começando na 2ª ou depois → todas iguais (20,14). Prévia das parcelas na janela.
+- **Dividido + recorrente:** dá para dividir uma recorrente (cada parte vira uma série) e tornar recorrente uma transação dividida.
+- **Grupos de categorias:** clique no grupo → painel com **Subcategorias** (soma dos orçamentos), **Não atribuído** (orçamento do grupo, fixo ou só do mês) e **Desagrupar categorias**. O não atribuído cobre, na hora, o que falta para cada categoria do grupo sair do vermelho (maior estouro primeiro); o resto continua sem atribuir. Ex.: A 2.000 (gastou 2.500), B 1.000 (gastou 2.000), não atribuído 4.000 → A recebe 500, B 1.000, sobram 2.500; total do grupo 7.000.
+- **Multicâmbio** (Configurações › Geral): Real, Euro e Dólar, cada um com as próprias transações, contas, cartões, categorias, perfis, recorrências, orçamentos e faturas — sem conversão. Grade **Câmbio** com bandeiras no menu. Na 1ª vez numa moeda, oferece levar transações (a série inteira de parcelas/recorrência vai junto; conta/categoria/perfil são recriados na moeda, conta nova com saldo zero). Desativar guarda tudo e volta ao Real. CSV com coluna Moeda.
+- **Campos de valor** com milhar e centavos enquanto digita (12000 → 12.000; ao sair, 12.000,00).
+- **Correções:** categoria criada no meio de uma transação aparece e já fica escolhida; trocar o tipo redesenha o painel; a barra de seleção fica presa ao rodapé mesmo com poucas transações.
+- **Base técnica:** interface montada pelo **Vite** (substitui o `montar_interface.py`), primeiros módulos em **TypeScript** (`format`, `pix`), **Tailwind CSS** com prefixo `tw:` (1ª tela: Configurações › Sobre), cabeçalhos de segurança numa fonte única (`api/cabecalhos_ui.json`), dependências com versão fixa e sem scripts de instalação (`.npmrc`). Back-end: app **FastAPI** com validação **Pydantic** estrita na frente do núcleo, testado e ainda desligado no Cloudflare. Plano de e-mails (confirmação, recuperação, avisos): [docs/PLANO-EMAIL.md](docs/PLANO-EMAIL.md).
 
 ## Novidades da versão 2.5.0
 
@@ -75,38 +88,45 @@ ZoZo/
 ├── CLAUDE.md                 ← instruções para o Claude Code (inclui docs/SEGURANCA.md)
 ├── docs/SEGURANCA.md         ← padrão de segurança
 ├── docs/AMBIENTE-DE-TESTES.md ← configurar, publicar e acessar a prévia (passo a passo)
-├── ui/                       ← front-end (HTML/CSS/JS)
-│   ├── index.html
+├── package.json · package-lock.json · .npmrc   ← interface: Vite, TypeScript, Tailwind (versões fixas)
+├── vite.config.ts            ← build (api/public + _headers; a demonstração nunca entra)
+├── tsconfig.json
+├── ui/                       ← front-end
+│   ├── index.html            só carrega src/main.ts
+│   ├── src/                  main.ts (ordem dos módulos) · estilos.css (CSS atual em camada + Tailwind) · globais.d.ts (tipos)
+│   ├── public/assets/img/    imagens usadas pelo JS (copiadas como estão)
+│   ├── assets/fonts/         fontes (entram no build com hash)
 │   ├── css/                  tokens · base · layout · components · pages · tipografia · print
 │   ├── js/
-│   │   ├── core/             dom (sem innerHTML) · icons · format (pt-BR) · state
+│   │   ├── core/             dom (sem innerHTML) · icons · format.ts (pt-BR) · state
 │   │   ├── config/regras.js  regras configuráveis (inclui limiteNome = 50)
 │   │   ├── data/servico.js   regras de dados (lançamentos, parcelas, recorrências…)
-│   │   ├── data/pix.js       Pix copia e cola / QR (BR Code do BACEN)
+│   │   ├── data/pix.ts       Pix copia e cola / QR (BR Code do BACEN)
 │   │   ├── data/demo.js      dados sorteados da conta de demonstração
 │   │   ├── bridge/           messages.js (contrato) · host-web.js (criptografia + API) · transporte.js
-│   │   ├── components/       … · verificacao.js (CAPTCHA, código de 6 dígitos, QR code)
-│   │   ├── vendor/           qrcode-generator.js (MIT, versão e integridade no cabeçalho)
+│   │   ├── components/       … · verificacao.js (CAPTCHA, código de 6 dígitos, QR code — qrcode-generator do npm) · cambio.js
 │   │   ├── pages/ · router.js · app.js
-│   └── mock/                 modo demonstração (não é publicado)
+│   ├── tests/                testes do serviço de dados (node --test)
+│   └── mock/                 modo demonstração (só no npm run dev; nunca no build)
 └── api/                      ← back-end (Python 3)
     ├── src/entry.py          ponto de entrada no Cloudflare (D1, fetch, cookies)
     ├── src/nucleo.py         rotas, sessões, bloqueio progressivo, prova de senha
     ├── src/totp.py           2FA (TOTP RFC 6238) e cifra do segredo do 2FA
     ├── src/google.py         "Continuar com Google" (OpenID Connect + PKCE)
+    ├── src/app_fastapi.py    transição: FastAPI + Pydantic na frente do núcleo (desligado: API_FASTAPI)
     ├── migracoes/            tabelas do banco (aplicadas em ordem, uma vez)
     ├── wrangler.toml         produção + prévia
     ├── publicar.ps1          testes → interface → migrações → publicação
-    ├── montar_interface.py   gera api/public a partir de ui/
+    ├── cabecalhos_ui.json    cabeçalhos de segurança da interface (build e servidor local)
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/test_api.py     63 testes automáticos da API
+    └── tests/                test_api.py (63) · test_fastapi.py (8)
 ```
 
 ## Ambientes e publicação
 
 | Ambiente | Endereço | Banco | Quem acessa |
 |---|---|---|---|
-| **Local** | http://127.0.0.1:8787 | `api/dev/zozo-local.db` | só o seu computador |
+| **Local** | http://127.0.0.1:5173 (Vite) · http://127.0.0.1:8787 (API + interface montada) | `api/dev/zozo-local.db` | só o seu computador |
 | **Prévia** | https://zozo-previa.zozo-finance-app.workers.dev | `zozo-previa` | testes (aberta, banco separado) |
 | **Produção** | https://usezozo.com.br · https://zozo.zozo-finance-app.workers.dev | `zozo` | usuários (cadastro aberto, com CAPTCHA) |
 
@@ -117,7 +137,7 @@ Fluxo recomendado: **mudar → testar no local → publicar na prévia → testa
 .\api\publicar.ps1 producao    # pede confirmação
 ```
 
-O script roda os testes, monta a interface, aplica as migrações do banco e publica; qualquer falha interrompe.
+O script roda os testes (API, serviço de dados e tipos), monta a interface com o Vite, aplica as migrações do banco e publica; qualquer falha interrompe. Requer Node.js (npm) e uv.
 
 **Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO` e `npx wrangler secret put TURNSTILE_SECRET` (acrescente `--env previa` para a prévia). **Sem `TURNSTILE_SECRET` a produção não é publicada** (a chave pública está no `wrangler.toml`; sem a secreta, cadastro e login com CAPTCHA seriam recusados). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
 
@@ -138,14 +158,15 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 
 ## Testar no seu computador
 
-- **Testes automáticos da API:** `python -m unittest discover -s api/tests -v`
-- **Aplicativo completo com a API Python:** `python api/dev/servidor_local.py` e abra http://127.0.0.1:8787 (cadastre uma conta; o CAPTCHA usa as chaves de teste da Cloudflare, que sempre aprovam).
-- **Modo demonstração (só interface, dados no navegador):** http://127.0.0.1:8787/?mock=1 ou abra `ui/index.html`. A conta é definida por você:
+- **Primeira vez:** `npm ci` na pasta `ZoZo` (instala Vite, TypeScript e Tailwind nas versões do `package-lock.json`).
+- **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados) · `npm run typecheck` (TypeScript).
+- **Aplicativo completo com a API Python:** `python api/dev/servidor_local.py` (http://127.0.0.1:8787, serve a interface montada por `npm run build`). Para mexer na interface: `npm run dev` → http://127.0.0.1:5173 (recarga instantânea; repassa `/api/*` para o servidor Python). Cadastre uma conta; o CAPTCHA usa as chaves de teste da Cloudflare, que sempre aprovam.
+- **Modo demonstração (só interface, dados no navegador):** `npm run dev` e abra http://127.0.0.1:5173/?mock=1. A conta é definida por você:
   1. No VS Code, em `ui/mock/`, copie `credenciais.exemplo.js` para **`credenciais.local.js`** (botão direito › Copiar / Colar e renomeie).
   2. Troque `TROQUE-ESTA-SENHA` pela sua senha (mínimo de 8 caracteres) e salve.
   3. Entre com **insight@usezozo.com.br** e essa senha.
 
-  O `credenciais.local.js` está no `.gitignore` (não vai para o GitHub) e a pasta `mock` nunca é publicada.
+  O `credenciais.local.js` está no `.gitignore` (não vai para o GitHub) e a pasta `mock` nunca é publicada. Se o arquivo tiver erro de digitação, o `npm run dev` avisa e segue sem a conta de prévia.
 
 ## Segurança
 
@@ -175,7 +196,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 
 ### Pontos em aberto (documentados, não escondidos)
 
-- **Sem envio de e-mail** (o ZoZo não tem provedor de e-mail): não há aviso por e-mail no bloqueio de 24 h nem confirmação do e-mail no cadastro. Com o cadastro aberto, alguém pode criar uma conta com um e-mail que não é dele (os dados de ninguém ficam expostos, mas o dono real não conseguiria usar aquele e-mail).
+- **Sem envio de e-mail** (o ZoZo não tem provedor de e-mail; plano em [docs/PLANO-EMAIL.md](docs/PLANO-EMAIL.md)): não há aviso por e-mail no bloqueio de 24 h nem confirmação do e-mail no cadastro. Com o cadastro aberto, alguém pode criar uma conta com um e-mail que não é dele (os dados de ninguém ficam expostos, mas o dono real não conseguiria usar aquele e-mail).
 - **Cadastro revela se o e-mail já tem conta** ("Já existe uma conta com esse e-mail"): inevitável sem confirmação por e-mail.
 - **Argon2id** (recomendado pela OWASP) não existe no navegador sem biblioteca extra; usamos PBKDF2-SHA256 com 600.000 iterações (mínimo atual da OWASP para PBKDF2).
 - **Domínio próprio:** `usezozo.com.br` já aponta para o ZoZo; regras de WAF/limite na borda devem deixar `/api/*` sem desafio (veja acima).
@@ -189,10 +210,10 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 
 ## Funcionalidades
 
-- **Dashboard:** foto, saudação, Gasto mensal (curva do mês × orçamento), Patrimônio, Top categorias, Próximos lançamentos, Lançamentos recentes.
-- **Lançamentos:** agrupados por mês e dia, ícones R (recorrente) e P (parcelado), tags de categoria e perfil, pesquisa, filtros, seleção com ações em lote; painel com histórico e edição.
-- **Parcelas automáticas**, **Recorrências** (semanal a anual ou parcelada), **Dividir lançamento** entre perfis.
-- **Contas e Investimentos**, **Categorias** (com orçamento fixo ou por mês), **Perfis** (com boleto por perfil e Pix — só contas liberadas).
+- **Dashboard:** foto, saudação, Gasto mensal (curva do mês × orçamento), Patrimônio, Top categorias, Próximas transações, Transações recentes.
+- **Transações:** agrupadas por mês e dia, ícones R (recorrente), P (parcelado), T (transferência), I (receita) e D (débito), tags de categoria e perfil, pesquisa, filtros, seleção com ações em lote; painel com histórico e edição.
+- **Parcelas automáticas** (pelo valor total), **Recorrências** (semanal a anual ou parcelada), **Dividir transação** entre perfis, **Multicâmbio** (Real, Euro, Dólar).
+- **Contas e Investimentos**, **Categorias** (com orçamento fixo ou por mês e grupos com valor não atribuído), **Perfis** (com boleto por perfil e Pix — só contas liberadas).
 - **Configurações:** orçamento, armazenamento e última gravação; foto, nome, alterar senha, **2FA**, exportar CSV, apagar dados, sair, excluir conta.
 
 ## Regras configuráveis (`ui/js/config/regras.js`)

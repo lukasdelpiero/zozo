@@ -12,3 +12,6 @@ api/dev/.segredo-local
 ui/mock/credenciais.local.js
 .dev.vars
 api/restauracao.log
+
+# interface (Vite/TypeScript)
+node_modules/

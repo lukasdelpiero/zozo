@@ -1,0 +1,40 @@
+/* =============================================================
+   ZoZo — estilos (CSS atual + Tailwind CSS, uma tela por vez)
+   ------------------------------------------------------------
+   • O CSS atual (pasta css/) entra na camada "legado", a de MENOR
+     prioridade: as telas antigas ficam iguais e, numa tela migrada,
+     as classes do Tailwind sempre vencem as regras antigas.
+   • Prefixo "tw:" em todas as classes (ex.: tw:flex, tw:text-sm):
+     nunca colide com as classes atuais (.row, .btn, .page…).
+   • Sem o "preflight" (reset do Tailwind): o base.css continua valendo.
+   • Cores e medidas vêm dos tokens do ZoZo (css/tokens.css), não da
+     paleta padrão do Tailwind: tw:bg-zz-primary, tw:text-zz-secondary…
+   • Telas já migradas: Configurações › Sobre.
+   ============================================================= */
+@layer legado, theme, base, components, utilities;
+@import "../css/tokens.css" layer(legado);
+@import "../css/base.css" layer(legado);
+@import "../css/layout.css" layer(legado);
+@import "../css/components.css" layer(legado);
+@import "../css/pages.css" layer(legado);
+@import "../css/tipografia.css" layer(legado);
+@import "../css/print.css" layer(legado);
+@import "tailwindcss/theme.css" layer(theme) prefix(tw);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(tw);
+
+/* Onde procurar classes tw: (só os arquivos da interface) */
+@source "../js";
+@source "../index.html";
+@source not "../mock";
+
+@theme inline {
+  --color-zz-primary: var(--color-primary);
+  --color-zz-surface: var(--color-surface);
+  --color-zz-surface-hover: var(--color-surface-hover);
+  --color-zz-border: var(--color-border);
+  --color-zz-text: var(--color-text-primary);
+  --color-zz-secondary: var(--color-text-secondary);
+  --radius-zz-sm: var(--radius-small);
+  --radius-zz-md: var(--radius-medium);
+  --font-zz: var(--font-family, inherit);
+}

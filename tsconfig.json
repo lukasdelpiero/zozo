@@ -1,0 +1,20 @@
+{
+  // Transição para TypeScript: os módulos convertidos (.ts) são verificados com "strict";
+  // os que ainda são .js entram no pacote pelo Vite, mas ainda não são verificados (checkJs: false).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "strict": true,
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["ui/src/**/*.ts", "ui/js/**/*.ts"]
+}

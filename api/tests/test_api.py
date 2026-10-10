@@ -849,6 +849,7 @@ class TesteDemo(Base):
 class TesteMigracoes(unittest.TestCase):
     def test_0005_confirma_contas_existentes(self):
         con = sqlite3.connect(":memory:", isolation_level=None)
+        self.addCleanup(con.close)
         con.execute("PRAGMA foreign_keys = ON")
         for nome in ("0001_inicial.sql", "0002_sessoes_2fa.sql", "0003_conta_demo.sql", "0004_envelope_fora_do_banco.sql"):
             con.executescript((MIGRACOES / nome).read_text(encoding="utf-8"))
@@ -860,6 +861,7 @@ class TesteMigracoes(unittest.TestCase):
 
     def test_0004_apaga_envelopes_antigos(self):
         con = sqlite3.connect(":memory:", isolation_level=None)
+        self.addCleanup(con.close)
         con.execute("PRAGMA foreign_keys = ON")
         for nome in ("0001_inicial.sql", "0002_sessoes_2fa.sql", "0003_conta_demo.sql"):
             con.executescript((MIGRACOES / nome).read_text(encoding="utf-8"))
@@ -870,12 +872,14 @@ class TesteMigracoes(unittest.TestCase):
 
     def test_reaplicar_nao_faz_nada(self):
         con = conectar()
+        self.addCleanup(con.close)
         aplicar_migracoes(con)
         aplicar_migracoes(con)
         self.assertEqual(con.execute("SELECT count(*) FROM d1_migrations").fetchone()[0], len(list(MIGRACOES.glob("*.sql"))))
 
     def test_0002_preserva_conta_e_documento_de_producao(self):
         con = sqlite3.connect(":memory:", isolation_level=None)
+        self.addCleanup(con.close)
         con.row_factory = sqlite3.Row
         con.execute("PRAGMA foreign_keys = ON")
         con.executescript((MIGRACOES / "0001_inicial.sql").read_text(encoding="utf-8"))
