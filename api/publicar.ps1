@@ -31,9 +31,16 @@ uv run python -m unittest discover -s tests
 if ($LASTEXITCODE -ne 0) { Parar "Testes da API falharam: nada foi publicado." }
 Push-Location ..
 # Dependências da interface exatamente como no package-lock.json (sem scripts de instalação: .npmrc)
-# Sempre do zero, exatamente como no package-lock.json: um node_modules antigo nunca entra na publicação
-npm ci
-if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências da interface (npm ci)." }
+# Exatamente como no package-lock.json (versão e integridade de cada pacote). Se o node_modules já confere,
+# não reinstala — no Windows, arquivos em uso (ex.: "npm run dev" aberto) impediriam o npm ci de apagá-lo.
+node scripts/deps-em-dia.mjs
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "   Dependências diferentes do package-lock.json: reinstalando (npm ci)..." -ForegroundColor Gray
+  npm ci
+  if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências da interface (npm ci). Se apareceu EPERM, feche o 'npm run dev' (e a tarefa 'ZoZo: interface (Vite)' do VS Code) e publique de novo." }
+} else {
+  Write-Host "   Dependências conferem com o package-lock.json." -ForegroundColor Gray
+}
 npm test
 if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Testes do serviço de dados falharam: nada foi publicado." }
 npm run typecheck
