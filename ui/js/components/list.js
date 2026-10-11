@@ -138,7 +138,30 @@
       h("span", { class: "account-row__value money" }, F.moeda(c.valor)));
   }
 
-  /* ---------- Categoria (seções 35–39) ---------- */
+  /* ---------- Categoria (seções 35–39) ----------
+     Visual em Tailwind (tw:). category-row* são ganchos; a bolinha, a seta e o contador
+     (category-row__dot / __caret / __count) continuam no CSS antigo porque o Dashboard (Top categorias)
+     também os usa. Colunas por largura da área: a barra sai em ≤ 620 px e o reservado em ≤ 420 px. */
+  const CR = {
+    linha: "tw:grid tw:items-center tw:gap-4 tw:w-full tw:min-h-(--row-height) tw:px-4 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-inherit tw:text-left "
+      + "tw:text-[15px] tw:focus-visible:outline-offset-[-2px] tw:grid-cols-[minmax(8em,1.4fr)_112px_minmax(80px,2fr)_104px] "
+      + "tw:area620:grid-cols-[minmax(0,1fr)_auto_auto] tw:area420:grid-cols-[minmax(0,1fr)_auto]",
+    interativa: "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
+    normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
+    selecionada: "tw:bg-zz-primary-soft",
+    grupoSelecionado: "tw:bg-zz-surface-hover tw:hover:bg-zz-primary-soft",
+    grupo: "tw:font-medium tw:cursor-pointer",
+    lead: "tw:flex tw:items-center tw:gap-2.5 tw:min-w-0",
+    // categoria dentro de um grupo: recuada, com a linha vertical do grupo à esquerda
+    leadFilho: "tw:relative tw:pl-[30px] tw:before:content-[''] tw:before:absolute tw:before:left-2.5 tw:before:-top-2.5 tw:before:-bottom-2.5 "
+      + "tw:before:border-l tw:before:border-zz-border",
+    gasto: "tw:[justify-self:end] tw:text-[15px] tw:font-[620]",
+    barra: "tw:area620:hidden tw:sem-orcamento:invisible",
+    reservado: "tw:text-left tw:text-[15px] tw:font-[620] tw:area420:hidden tw:sem-orcamento:invisible",
+    contadorExcluido: "tw:bg-zz-warning-soft tw:text-zz-warning-text",
+    nomeGrupo: "tw:text-[15px] tw:font-[450]",
+    nomeGrupoBotao: "tw:min-w-0 tw:p-0 tw:[border:0] tw:bg-transparent tw:text-inherit tw:text-left tw:cursor-pointer",
+  };
   function barraCategoria(gasto, reservado) {
     const acima = F.numero(gasto) > F.numero(reservado);
     const ratio = F.numero(reservado) > 0 ? F.numero(gasto) / F.numero(reservado) : (F.numero(gasto) > 0 ? 1 : 0);
@@ -147,13 +170,19 @@
 
   function CategoryRow(cat, opts) {
     const o = opts || {};
-    return rowBase(["category-row", o.excluida && "category-row--excluded", o.filho && "category-row--child"].filter(Boolean).join(" "), Object.assign({ id: cat.id }, o),
-      h("span", { class: "category-row__lead" },
+    return h(o.onClick ? "button" : "div", {
+      type: o.onClick ? "button" : undefined,
+      class: ["category-row", CR.linha, o.selected ? CR.selecionada : CR.normal, o.onClick && CR.interativa],
+      onClick: o.onClick,
+      "aria-current": o.selected ? "true" : undefined,
+      "data-id": cat.id,
+    },
+      h("span", { class: [CR.lead, o.filho && CR.leadFilho] },
         o.pill ? null : h("span", { class: "category-row__dot", style: { background: F.cor(cat.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
         UI.CategoryLabel(cat, { pill: !!o.pill })),
-      h("span", { class: "category-row__spent money" }, F.moeda(cat.gasto)),
-      o.excluida ? null : h("span", { class: "category-row__bar" }, barraCategoria(cat.gasto, cat.reservado)),
-      o.excluida ? null : h("span", { class: "category-row__reserved money" }, F.moeda(cat.reservado)));
+      h("span", { class: ["money", CR.gasto] }, F.moeda(cat.gasto)),
+      o.excluida ? null : h("span", { class: CR.barra }, barraCategoria(cat.gasto, cat.reservado)),
+      o.excluida ? null : h("span", { class: ["money", CR.reservado, "tw:text-zz-secondary"] }, F.moeda(cat.reservado)));
   }
 
   function CategoryGroupRow(grupo, opts) {
@@ -163,20 +192,19 @@
     // (antes a linha inteira era role="button" com a seta dentro: controle dentro de controle, inacessível).
     const abrir = (e) => { if (o.onClick && !e.target.closest(".category-row__caret, .category-row__group-name")) o.onClick(); };
     const nome = o.onClick
-      ? h("button", { type: "button", class: "category-row__group-name tw:min-w-0 tw:p-0 tw:[border:0] tw:bg-transparent tw:text-inherit tw:text-left tw:cursor-pointer",
+      ? h("button", { type: "button", class: ["category-row__group-name", CR.nomeGrupo, CR.nomeGrupoBotao],
         "aria-current": o.selected ? "true" : undefined, onClick: (e) => { e.stopPropagation(); o.onClick(); } }, grupo.nome)
-      : h("span", { class: "category-row__group-name" }, grupo.nome);
-    return h("div", { class: ["row", "category-row", "category-row--group", o.excluida && "category-row--excluded", o.onClick && "row--interactive", o.selected && "is-selected"],
-      onClick: abrir },
-      h("span", { class: "category-row__lead" },
+      : h("span", { class: ["category-row__group-name", CR.nomeGrupo] }, grupo.nome);
+    return h("div", { class: ["category-row", CR.linha, CR.grupo, o.selected ? CR.grupoSelecionado : CR.normal, o.onClick && CR.interativa], onClick: abrir },
+      h("span", { class: CR.lead },
         h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(!o.fechado), "aria-label": (o.fechado ? "Mostrar" : "Ocultar") + " categorias de " + grupo.nome,
           onClick: (e) => { e.stopPropagation(); o.onToggle(); } },
           icon(o.fechado ? "chevron-right" : "chevron-down", { size: 14, stroke: 2.25 })),
-        h("span", { class: "category-row__count" }, String(grupo.quantidade)),
+        h("span", { class: ["category-row__count", o.excluida && CR.contadorExcluido] }, String(grupo.quantidade)),
         nome),
-      h("span", { class: "category-row__spent money" }, F.moeda(grupo.gasto)),
-      o.excluida ? null : h("span", { class: "category-row__bar" }, barraCategoria(grupo.gasto, grupo.reservado)),
-      o.excluida ? null : h("span", { class: "category-row__reserved money" }, F.moeda(grupo.reservado)));
+      h("span", { class: ["money", CR.gasto] }, F.moeda(grupo.gasto)),
+      o.excluida ? null : h("span", { class: CR.barra }, barraCategoria(grupo.gasto, grupo.reservado)),
+      o.excluida ? null : h("span", { class: ["money", CR.reservado, "tw:text-zz-text"] }, F.moeda(grupo.reservado)));
   }
 
   /* ---------- Recorrência (seção 42) ---------- */

@@ -1,5 +1,10 @@
 /* =============================================================
    ZoZo — Categorias (seções 34–40)
+   Visual em Tailwind (tabela T abaixo; as linhas estão em components/list.js).
+   Continuam no CSS antigo só as peças compartilhadas com outras telas: seção,
+   cartão de resumo com a rosca, cabeçalho do painel (detail-hero), pílula da
+   categoria, barra de progresso e a árvore do grupo (também no Dashboard).
+   page--categorias fica como gancho (resumo com o orçamento desligado).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -9,6 +14,48 @@
   const C = ZoZo.pagesComum;
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
+
+  /* ---------------- Visual (Tailwind; classes escritas por inteiro) ---------------- */
+  const COLUNA = "tw:text-[13px] tw:font-[620] tw:uppercase tw:tracking-[0.04em] tw:text-zz-muted tw:area420:hidden";
+  const ORCAMENTO_INPUT = "tw:h-10 tw:text-[17px] tw:font-semibold";
+  const T = {
+    lista: "tw:flex tw:flex-col tw:mb-2",
+    // GASTO (à direita) e RESERVADO (à esquerda) alinhados com as colunas das linhas
+    cabecalho: "tw:grid tw:grid-cols-[minmax(0,1fr)_112px_minmax(120px,2.2fr)_104px] tw:gap-4 tw:px-4",
+    cabecalhoLead: "tw:-ml-4",
+    colGasto: COLUNA + " tw:text-right",
+    colEspaco: COLUNA,
+    colReservado: COLUNA + " tw:text-left tw:area460:hidden",
+    vazioInicio: "tw:min-h-[280px]",
+    subtitulo: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
+    // pílulas das categorias + "+N" no topo dos painéis de grupo e de "todas"
+    leadPilha: "tw:flex-col tw:items-start tw:gap-1.5",
+    pilulas: "tw:flex tw:flex-wrap tw:items-center tw:gap-1.5",
+    mais: "tw:inline-grid tw:place-items-center tw:h-[22px] tw:px-2 tw:py-0 tw:[border:0] tw:rounded-(--radius-pill) tw:bg-(--color-neutral-soft) "
+      + "tw:text-(--color-neutral) tw:text-[11px] tw:font-semibold tw:cursor-pointer tw:hover:bg-zz-primary-soft tw:hover:text-zz-primary "
+      + "tw:[&.is-open]:bg-zz-primary-soft tw:[&.is-open]:text-zz-primary",
+    // editar orçamento no painel
+    orcArea: "tw:gap-1.5",
+    orcModo: "tw:inline-flex tw:items-center tw:gap-1.5 tw:h-7 tw:px-2.5 tw:py-0 tw:border tw:border-zz-border tw:rounded-lg tw:bg-zz-surface "
+      + "tw:text-[13px] tw:font-medium tw:hover:border-zz-border-strong",
+    orcValor: "tw:w-[170px]",
+    orcInput: ORCAMENTO_INPUT,
+    // painel do grupo
+    grupoHero: "tw:items-start tw:area420:flex-col",
+    grupoOrc: "tw:grid tw:justify-items-end tw:gap-2.5 tw:area420:justify-items-start",
+    grupoValores: "tw:grid tw:grid-flow-col tw:gap-5",
+    grupoItem: "tw:grid tw:justify-items-end tw:gap-0.5 tw:area420:justify-items-start",
+    grupoRotulo: "tw:text-[12px] tw:text-zz-secondary",
+    grupoValor: "money tw:text-[17px] tw:font-semibold",
+    grupoCampo: "tw:w-[150px]",
+    // tabela "Todas as categorias regulares"
+    tabela: "tw:flex tw:flex-col",
+    tabelaLinha: "tw:grid tw:grid-cols-[minmax(0,1.4fr)_1fr_1fr_1fr] tw:gap-2 tw:items-center tw:min-h-[34px] tw:px-2 tw:py-0 tw:[border:0] "
+      + "tw:rounded-lg tw:bg-transparent tw:text-left tw:text-[13px]",
+    tabelaLinhaBotao: "tw:hover:bg-zz-surface-hover",
+    tabelaCab: "tw:text-zz-secondary tw:font-semibold",
+    tabelaNome: "tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden tw:whitespace-nowrap tw:text-ellipsis",
+  };
 
   function mesAbrevDe(mesIso) {
     const d = F.parseData((mesIso || "") + "-01") || new Date();
@@ -145,9 +192,9 @@
     const editando = !!(opts && opts.editandoOrcamento);
     const mesAtualIso = mes || F.iso(new Date()).slice(0, 7);
     let modo = cat.orcamentoPorMes ? "mes" : "fixo";
-    const valorOrc = UI.Input({ inputmode: "decimal", value: F.moedaEditavel(cat.reservado || 0), class: "orc-input", "aria-label": "Valor do orçamento" });
+    const valorOrc = UI.Input({ inputmode: "decimal", value: F.moedaEditavel(cat.reservado || 0), class: T.orcInput, "aria-label": "Valor do orçamento" });
     const rotuloMes = h("span", { class: "detail-hero__label" });
-    const modoBtn = h("button", { type: "button", class: "orc-mode", "aria-haspopup": "menu" });
+    const modoBtn = h("button", { type: "button", class: T.orcModo, "aria-haspopup": "menu" });
     const pintarModo = () => {
       ZoZo.dom.mount(modoBtn, h("span", null, modo === "fixo" ? "Orçamento mensal fixo" : "Orçamentos por mês"), ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }));
       const dt = F.parseData(mesAtualIso + "-01");
@@ -160,8 +207,8 @@
     ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
     pintarModo();
     valorOrc.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvarOrcamento(); } });
-    const areaOrcamento = h("div", { class: "detail-hero__figure orc-area" }, modoBtn, rotuloMes,
-      h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, F.simbolo()), valorOrc));
+    const areaOrcamento = h("div", { class: ["detail-hero__figure", T.orcArea] }, modoBtn, rotuloMes,
+      h("div", { class: ["field__affix", T.orcValor] }, h("span", { class: "field__prefix" }, F.simbolo()), valorOrc));
     if (editando) requestAnimationFrame(() => { valorOrc.focus(); valorOrc.select(); });
     function salvarOrcamento() {
       const v = F.parseMoeda(valorOrc.value);
@@ -209,7 +256,7 @@
                 ZoZo.inline.corDot(cat.cor, (c) => alterar({ cor: c }, "Cor alterada.")),
                 ZoZo.modais.seletorIcone(cat.icone, (e) => alterar({ icone: e }, "Ícone alterado."))),
               ZoZo.inline.texto({ valor: cat.nome, rotulo: "Nome da categoria", max: ZoZo.regras.limiteNome, aoSalvar: (v) => alterar({ nome: v }, "Nome alterado.") }),
-              cat.grupo ? h("span", { class: "detail-hero__sub" }, cat.grupo) : null),
+              cat.grupo ? h("span", { class: T.subtitulo }, cat.grupo) : null),
             editando ? areaOrcamento : h("div", { class: "detail-hero__figure" },
               h("span", { class: "detail-hero__label" }, "Gasto em " + mesAbrevDe(mes)),
               h("span", { class: "detail-hero__value money" }, F.moeda(cat.gasto)),
@@ -252,8 +299,8 @@
     let modo = info.porMes ? "mes" : "fixo";
     const dt = F.parseData(mes + "-01");
     const rotuloModo = () => (modo === "fixo" ? "Orçamento para todos os meses" : "Orçamento de " + F.mesNome(dt.getMonth()) + " " + dt.getFullYear());
-    const modoBtn = h("button", { type: "button", class: "orc-mode", "aria-haspopup": "menu" });
-    const valorNA = h("input", { type: "text", inputmode: "decimal", autocomplete: "off", class: "input orc-input", "aria-label": "Valor não atribuído" });
+    const modoBtn = h("button", { type: "button", class: T.orcModo, "aria-haspopup": "menu" });
+    const valorNA = h("input", { type: "text", inputmode: "decimal", autocomplete: "off", class: ["input", T.orcInput], "aria-label": "Valor não atribuído" });
     const pintarModo = () => {
       mount(modoBtn, h("span", null, rotuloModo()), editando ? ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }) : null);
       valorNA.value = F.moedaEditavel(modo === "fixo" ? info.naoAtribuidoFixo : (info.porMes ? info.naoAtribuidoBase : info.naoAtribuidoFixo));
@@ -284,7 +331,7 @@
     }
 
     const ordenadas = cats.slice().sort((a, b) => F.numero(b.gasto) - F.numero(a.gasto));
-    const figura = (rotulo, conteudo) => h("div", { class: "grupo-orc__item" }, h("span", { class: "grupo-orc__rotulo" }, rotulo), conteudo);
+    const figura = (rotulo, conteudo) => h("div", { class: T.grupoItem }, h("span", { class: T.grupoRotulo }, rotulo), conteudo);
     ctx.detail.open({
       title: "Grupo de categorias",
       selected: { tipo: "grupo", id: nome },
@@ -296,23 +343,23 @@
       render(body) {
         const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
         mount(body,
-          h("div", { class: "detail-hero grupo-hero" },
-            h("div", { class: "detail-hero__lead detail-hero__lead--stack" },
-              h("div", { class: "tag-row" }, ordenadas.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
+          h("div", { class: ["detail-hero", T.grupoHero] },
+            h("div", { class: ["detail-hero__lead", T.leadPilha] },
+              h("div", { class: T.pilulas }, ordenadas.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
                 maisCategorias(ordenadas, 2)),
               h("span", { class: "detail-hero__name" }, nome)),
-            orcamentoAtivo() ? h("div", { class: "grupo-orc" },
+            orcamentoAtivo() ? h("div", { class: T.grupoOrc },
               modoBtn,
-              h("div", { class: "grupo-orc__valores" },
-                figura("Subcategorias", h("span", { class: "grupo-orc__valor money" }, F.moeda(info.subcategorias))),
-                figura("Não atribuído", editando ? h("div", { class: "field__affix field__affix--sm" }, h("span", { class: "field__prefix" }, F.simbolo()), valorNA)
-                  : h("span", { class: "grupo-orc__valor money" }, F.moeda(info.naoAtribuido))))) : null),
+              h("div", { class: T.grupoValores },
+                figura("Subcategorias", h("span", { class: T.grupoValor }, F.moeda(info.subcategorias))),
+                figura("Não atribuído", editando ? h("div", { class: ["field__affix", "field__affix--sm", T.grupoCampo] }, h("span", { class: "field__prefix" }, F.simbolo()), valorNA)
+                  : h("span", { class: T.grupoValor }, F.moeda(info.naoAtribuido))))) : null),
           orcamentoAtivo() ? C.detalheSecao(null,
             C.detalheLinha("Orçamento total do grupo", F.moeda(info.total)),
             C.detalheLinha("Gasto em " + mesAbrevDe(mes), F.moeda(gasto)),
             UI.ProgressBar(info.total > 0 ? gasto / info.total : (gasto > 0 ? 1 : 0), { tone: gasto > info.total ? "over" : "ok", class: "progress--lg",
               label: gasto > info.total ? "Gasto acima do orçamento do grupo" : "Gasto dentro do orçamento do grupo" })) : null,
-          C.detalheSecao("Categorias do grupo", h("div", { class: "list" },
+          C.detalheSecao("Categorias do grupo", h("div", { class: "tw:flex tw:flex-col" },
             ordenadas.map((c) => L.CategoryRow(c, { excluida: c.status === "excluida", onClick: () => abrirDetalhe(c, ctx, { voltar: () => abrirGrupo(nome, ctx, o) }) })))),
           C.detalheSecao("Transações do mês", listaEl));
         ctx.loadData("lancamentos", A.getLancamentos).then((dl) => {
@@ -329,7 +376,7 @@
   /** "+N": abre a lista (só leitura) das categorias que não couberam nas pílulas */
   function maisCategorias(lista, visiveis) {
     if (lista.length <= visiveis) return null;
-    const btn = h("button", { type: "button", class: "tag-more tag-more--btn", "aria-haspopup": "menu",
+    const btn = h("button", { type: "button", class: T.mais, "aria-haspopup": "menu",
       "aria-label": "Ver as outras " + (lista.length - visiveis) + " categorias" }, "+" + (lista.length - visiveis));
     btn.addEventListener("click", () => ZoZo.menu.abrir(btn, lista.map((c) => ({
       render: () => h("div", { class: "menu__item menu__item--estatico", role: "menuitem", "aria-disabled": "true" }, UI.CategoryLabel(c, { pill: true })),
@@ -349,8 +396,8 @@
         const tags = regulares.slice().sort((a, b) => b.gasto - a.gasto);
         mount(body,
           h("div", { class: "detail-hero" },
-            h("div", { class: "detail-hero__lead detail-hero__lead--stack" },
-              h("div", { class: "tag-row" }, tags.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
+            h("div", { class: ["detail-hero__lead", T.leadPilha] },
+              h("div", { class: T.pilulas }, tags.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
                 maisCategorias(tags, 2)),
               h("span", { class: "detail-hero__name" }, "Todas as categorias regulares")),
             h("div", { class: "detail-hero__figure" },
@@ -359,14 +406,14 @@
               resumoGasto(d.resumo.gasto, d.resumo.reservado))),
           grafico,
           C.detalheSecao(null,
-            h("div", { class: "cat-table", role: "table", "aria-label": "Categorias regulares" },
-              h("div", { class: "cat-table__row cat-table__row--head", role: "row" },
-                h("span", { role: "columnheader" }, "Categoria"), h("span", { role: "columnheader" }, "Gasto"),
-                h("span", { role: "columnheader" }, "Orçamento"), h("span", { role: "columnheader" }, "Restante")),
+            h("div", { class: T.tabela, role: "table", "aria-label": "Categorias regulares" },
+              h("div", { class: [T.tabelaLinha, T.tabelaCab], role: "row" },
+                h("span", { role: "columnheader" }, "Categoria"), h("span", { role: "columnheader", class: "tw:text-right" }, "Gasto"),
+                h("span", { role: "columnheader", class: "tw:text-right" }, "Orçamento"), h("span", { role: "columnheader", class: "tw:text-right" }, "Restante")),
               regulares.map((c) => {
                 const resto = F.numero(c.reservado) - F.numero(c.gasto);
-                return h("button", { type: "button", class: "cat-table__row", role: "row", onClick: () => abrirDetalhe(c, ctx) },
-                  h("span", { class: "cat-table__name", role: "cell" }, h("span", { class: "category-row__dot", style: { background: F.cor(c.cor, "var(--palette-16)") } }), h("span", null, (c.icone || "") + " " + c.nome)),
+                return h("button", { type: "button", class: [T.tabelaLinha, T.tabelaLinhaBotao], role: "row", onClick: () => abrirDetalhe(c, ctx) },
+                  h("span", { class: T.tabelaNome, role: "cell" }, h("span", { class: "category-row__dot", style: { background: F.cor(c.cor, "var(--palette-16)") } }), h("span", null, (c.icone || "") + " " + c.nome)),
                   h("span", { class: "money", role: "cell" }, F.moeda(c.gasto)),
                   h("span", { class: "money", role: "cell" }, F.moeda(c.reservado)),
                   h("span", { class: ["money", resto < 0 && "money--negative"], role: "cell" }, (resto < 0 ? "−" : "") + F.moeda(resto)));
@@ -428,7 +475,7 @@
       const excluidas = todas.filter((c) => c.status === "excluida");
 
       if (!todas.length) {
-        return C.pagina("page--categorias", h("div", { class: "empty empty--onboarding" },
+        return C.pagina("page--categorias", h("div", { class: ["empty", T.vazioInicio] },
           ZoZo.icons.icon("categorias", { size: 22, class: "empty__icon" }),
           h("p", { class: "empty__text" }, "Nenhuma categoria cadastrada."),
           h("div", { class: "detail-actions" },
@@ -448,11 +495,11 @@
           segmentos: regulares.map((c) => ({ label: c.nome, cor: c.cor, valor: c.gasto })),
           onClick: () => abrirTodas(ctx),
         }),
-        UI.Section({ key: "cat:regulares", title: "Categorias regulares", class: "section--cat-cols",
-          aside: [h("span", { class: "cat-col cat-col--gasto" }, "Gasto"), h("span", { class: "cat-col cat-col--sp" }), h("span", { class: "cat-col cat-col--res" }, "Reservado")] },
-          regulares.length ? h("div", { class: "list" }, linhas(regulares, false, state, ctx)) : UI.EmptyState("Nenhuma categoria regular.", { icon: "categorias" })),
+        UI.Section({ key: "cat:regulares", title: "Categorias regulares", classeCabecalho: T.cabecalho, classeLead: T.cabecalhoLead,
+          aside: [h("span", { class: T.colGasto }, "Gasto"), h("span", { class: T.colEspaco }), h("span", { class: T.colReservado }, "Reservado")] },
+          regulares.length ? h("div", { class: T.lista }, linhas(regulares, false, state, ctx)) : UI.EmptyState("Nenhuma categoria regular.", { icon: "categorias" })),
         UI.Section({ key: "cat:excluidas", title: "Categorias excluídas" },
-          excluidas.length ? h("div", { class: "list" }, linhas(excluidas, true, state, ctx)) : UI.EmptyState("Nenhuma categoria excluída.", { icon: "categorias" })));
+          excluidas.length ? h("div", { class: T.lista }, linhas(excluidas, true, state, ctx)) : UI.EmptyState("Nenhuma categoria excluída.", { icon: "categorias" })));
     },
   };
 })(window.ZoZo);

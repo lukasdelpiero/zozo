@@ -714,7 +714,6 @@
 .cfg-alerta { color: var(--color-warning-text); }
 
 /* Orçamento desativado: some barras e valores de orçamento */
-#app.sem-orcamento .category-row__bar, #app.sem-orcamento .category-row__reserved { visibility: hidden; }
 #app.sem-orcamento .page--categorias .summary__figure--left { visibility: hidden; }
 .modal--novo-perfil .color-picker { width: 100%; grid-template-columns: repeat(8, 1fr); }
 .modal--novo-perfil .color-picker__swatch { width: 100%; height: 36px; }

@@ -284,8 +284,8 @@
     const corpoId = uid("secao");
     const toggle = () => { if (o.key) alternarGrupo(o.key); };
     return h("section", { class: ["section", fechado && "is-collapsed", o.class] },
-      h("header", { class: "section__header" },
-        h("div", { class: "section__lead" },
+      h("header", { class: ["section__header", o.classeCabecalho] },
+        h("div", { class: ["section__lead", o.classeLead] },
           h("button", { type: "button", class: "section__toggle", "aria-expanded": String(!fechado), "aria-controls": corpoId, onClick: toggle },
             icon("chevron-down", { size: 14, class: "section__caret", stroke: 2.25 }),
             h("h2", { class: "section__title" }, o.title)),

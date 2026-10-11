@@ -11,7 +11,8 @@
      paleta padrão do Tailwind: tw:bg-zz-primary, tw:text-zz-secondary…
    • Telas já migradas: Configurações › Sobre; Login/Cadastro/2FA/
      confirmação de e-mail (components/auth.js); Transações
-     (pages/lancamentos.js) e a linha de transação (components/list.js).
+     (pages/lancamentos.js) e a linha de transação (components/list.js);
+     Categorias (pages/categorias.js, CategoryRow/CategoryGroupRow).
    • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
      "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
    • Cuidado ao migrar: utilitário vence o legado também em :focus,
@@ -64,6 +65,8 @@
 @custom-variant area460 (@container (max-width: 460px));
 @custom-variant area420 (@container (max-width: 420px));
 @custom-variant area340 (@container (max-width: 340px));
+/* Orçamento desligado nas Configurações (#app.sem-orcamento): barras e valores de orçamento somem */
+@custom-variant sem-orcamento (&:where(#app.sem-orcamento *));
 
 /* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás).
    Os atrasos (40/70 ms) fazem o conteúdo entrar em sequência. */

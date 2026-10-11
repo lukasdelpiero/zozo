@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.1.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.1.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,10 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.1.1
+
+- **Categorias em Tailwind CSS:** página (colunas Gasto/Reservado, listas, grupos), linhas de categoria e de grupo e os painéis (categoria, grupo, "todas as categorias", edição de orçamento). Visual idêntico, conferido elemento a elemento em 4 larguras e 9 situações (inclusive orçamento desligado); ~75 linhas de CSS antigo a menos. Continuam no CSS antigo só as peças que outras telas também usam (bolinha, seta e contador da categoria, árvore do grupo, resumo com a rosca).
 
 ## Novidades da versão 3.1.0
 

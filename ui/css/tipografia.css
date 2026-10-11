@@ -65,17 +65,7 @@
 .account-row__pct, .account-row .pct { font-size: var(--t-13); font-weight: 550; }
 .account-row__value { font-size: var(--t-15); font-weight: 550; }
 
-.cat-label__name, .category-row__group-name { font-size: var(--t-15); font-weight: 450; }
-.category-row__spent, .category-row__reserved { font-size: var(--t-15); font-weight: 620; }
-/* GASTO (à direita) e RESERVADO (à esquerda) na linha de "Categorias regulares" */
-.section--cat-cols > .section__header {
-  display: grid; grid-template-columns: minmax(0, 1fr) 112px minmax(120px, 2.2fr) 104px;
-  gap: var(--space-4); padding: 0 var(--space-4);     /* mesmo recuo das linhas → colunas alinhadas */
-}
-.section--cat-cols > .section__header > .section__lead { margin-left: calc(-1 * var(--space-4)); }
-.cat-col { font-size: var(--t-13); font-weight: 620; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
-.cat-col--gasto { text-align: right; }
-.cat-col--res { text-align: left; }
+.cat-label__name { font-size: var(--t-15); font-weight: 450; }
 
 /* ================= Recorrências ================= */
 .recurrence-row { grid-template-columns: 52px minmax(0, 1fr) minmax(140px, 220px) 120px; gap: var(--space-3); }
@@ -111,7 +101,6 @@
 .detail .hero-edit .inline-input { font-size: var(--t-20); font-weight: 550; }
 .detail .detail-hero__label { font-size: var(--t-15); font-weight: 620; }
 .detail .detail-hero__value { font-size: var(--t-20); font-weight: 550; }
-.detail .detail-hero__sub { font-size: var(--t-15); font-weight: 450; }
 
 /* Lançamento */
 .lp-top__left { gap: 2px; }
@@ -208,7 +197,7 @@
 .row, .btn, .icon-btn, .nav-item, .filter-tabs__item, .segmented__item,
 .lp-date, .lp-account, .lp-sub, .inline-input, .lp-name, .lp-value, .lp-notes,
 .topbar-search, .topbar-search__filter, .detail__textbtn, .tipo-select, .menu-toggle,
-.cfg-danger-btn, .orc-mode, .icon-pick, .input, .select, .textarea, .zm__search { border-radius: 8px; }
+.cfg-danger-btn, .icon-pick, .input, .select, .textarea, .zm__search { border-radius: 8px; }
 .pl-row { border-radius: 0; }
 .card, .chart-card, .summary-card { border-radius: 20px; }              /* cards da área principal */
 .menu { border-radius: 12px; }                                          /* menus e submenus */
@@ -437,15 +426,11 @@
 /* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
 .recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
 .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(0, max-content) 120px; }
-/* Categorias: a barra cede espaço ao nome */
-.category-row { grid-template-columns: minmax(8em, 1.4fr) 112px minmax(80px, 2fr) 104px; }
 /* Área estreita (≤ 620px). As regras equivalentes em components.css nunca valiam: pages.css e este
    arquivo carregam depois e redefiniam as grades com a mesma especificidade. Por isso ficam aqui, no fim. */
 @container (max-width: 620px) {
   .recurrence-row:not(.recurrence-row--compact), .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 52px minmax(0, 1fr) 110px; }
   .recurrence-row:not(.recurrence-row--compact) .recurrence-row__category { display: none; }
-  .category-row { grid-template-columns: minmax(0, 1fr) auto auto; }
-  .category-row > .category-row__bar { display: none; }
   .account-row { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 2px; }
   .account-row .account-icon { grid-row: span 2; }
   .account-row__info { grid-row: span 2; }
@@ -464,8 +449,6 @@
 }
 @container (max-width: 420px) {
   .recurrence-row__desc > .recurrence-row__type { display: none; }
-  .category-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .category-row > .category-row__reserved { display: none; }
   .allocation-row { grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) 56px; }
 }
 /* Resumos no topo das páginas (Contas, Categorias, Recorrências) em área estreita: valores menores e empilhados */
@@ -474,9 +457,7 @@
   .chart-card__value { font-size: var(--font-size-lg); }
   .summary { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
   .summary__value { font-size: var(--font-size-lg); }
-  .cat-col--res { display: none; }
 }
-@container (max-width: 420px) { .section--cat-cols .cat-col { display: none; } }
 
 /* =============================================================
    2FA, CAPTCHA e código de 6 dígitos
@@ -850,21 +831,6 @@
 .zm-lanc.cambio__item { cursor: pointer; grid-template-columns: 18px 52px minmax(0, 1fr) auto; margin: 0; padding: 0 8px; }
 .cambio__check { width: 16px; height: 16px; accent-color: var(--color-primary); }
 
-/* Grupo de categorias selecionável + painel do grupo */
-.category-row--group.row--interactive { cursor: pointer; }
-.category-row--group.is-selected { background: var(--color-surface-hover); }
-.grupo-hero { align-items: flex-start; }
-.grupo-orc { display: grid; justify-items: end; gap: 10px; }
-.grupo-orc__valores { display: grid; grid-auto-flow: column; gap: var(--space-5); }
-.grupo-orc__item { display: grid; justify-items: end; gap: 2px; }
-.grupo-orc__rotulo { font-size: var(--t-12, 12px); color: var(--color-text-secondary); }
-.grupo-orc__valor { font-size: var(--font-size-lg); font-weight: 600; }
-.grupo-orc .field__affix { width: 150px; }
-@container (max-width: 420px) {
-  .grupo-hero { flex-direction: column; }
-  .grupo-orc { justify-items: start; }
-  .grupo-orc__item { justify-items: start; }
-}
 
 /* =============================================================
    ZoZo 2.7
@@ -896,8 +862,6 @@
 .menu__item--estatico:hover { background: none; }
 
 /* "+N" das categorias do grupo: clicável */
-.tag-more--btn { border: 0; cursor: pointer; font-family: inherit; }
-.tag-more--btn:hover, .tag-more--btn.is-open { background: var(--color-primary-soft); color: var(--color-primary); }
 
 /* Parcelas: valor total só para leitura (é o valor da transação) */
 .input--leitura, .input--leitura:hover, .input--leitura:focus { background: var(--color-background); color: var(--color-text-secondary); cursor: default; box-shadow: none; }
