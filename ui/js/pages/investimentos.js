@@ -76,7 +76,7 @@
               subtitulo: "Investimento", selected: c.id === sel,
               onClick: () => ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos"),
             })))
-            : UI.EmptyState("Nenhuma conta de investimento. Adicione em Contas, no botão +.", { icon: "investimentos" })),
+            : UI.EmptyState("Nenhuma conta de investimento cadastrada.", { icon: "investimentos" })),
         UI.Section({ key: "inv:alocacoes", title: "Alocações" },
           inv.alocacoes && inv.alocacoes.length
             ? h("div", { class: "list" }, inv.alocacoes.map(L.AllocationRow))

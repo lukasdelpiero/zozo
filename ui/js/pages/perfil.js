@@ -138,7 +138,7 @@
       const sel = state.selectedItem && state.selectedItem.tipo === "perfil" ? state.selectedItem.id : null;
 
       if (!perfis.length) {
-        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado. Perfis identificam a quem pertence cada transação (ex.: Casa, Mãe)" + (ZoZo.recursos.boleto() ? " e são usados na fatura." : "."),
+        return C.pagina("page--perfil", UI.EmptyState("Nenhum perfil cadastrado.",
           { icon: "perfil", action: { label: "Novo perfil", icon: "mais", onClick: () => ZoZo.modais.novoPerfil(ctx, {}) } }));
       }
 
@@ -359,31 +359,75 @@
 
   /* ---------------- Pix das faturas (fica no documento cifrado) ---------------- */
   const mascarar = (c) => (/^\d{11}$/.test(c) ? "***." + c.slice(3, 6) + "." + c.slice(6, 9) + "-**"
-    : /^\d{14}$/.test(c) ? c.slice(0, 2) + ".***.***/" + c.slice(8, 12) + "-**" : c.replace(/^(.{3}).*(@.*)$/, "$1***$2"));
+    : /^\+55\d{11}$/.test(c) ? "+55 (" + c.slice(3, 5) + ") *****-" + c.slice(10) : c.replace(/^(.{3}).*(@.*)$/, "$1***$2"));
+
+  /* Chave Pix: tipo escolhido (CPF · Celular · E-mail), máscara enquanto digita e validação antes de salvar.
+     A mesma regra vale no serviço de dados (ZoZo.pix.normalizarChave / nomeValido). */
+  const TIPOS_CHAVE = {
+    cpf: { rotulo: "CPF", ph: "000.000.000-00", modo: "numeric",
+      formatar: (v) => { const d = v.replace(/\D/g, "").slice(0, 11); return d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2"); },
+      ler: (v) => v.replace(/\D/g, "") },
+    celular: { rotulo: "Celular", ph: "+55 (00) 90000-0000", modo: "numeric",
+      formatar: (v) => {
+        const d = v.replace(/^\+55\s*/, "").replace(/\D/g, "").slice(0, 11);
+        if (!d) return "";
+        return "+55 (" + d.slice(0, 2) + (d.length > 2 ? ") " + d.slice(2, 7) : "") + (d.length > 7 ? "-" + d.slice(7) : "");
+      },
+      ler: (v) => "+55" + v.replace(/^\+55\s*/, "").replace(/\D/g, "") },
+    email: { rotulo: "E-mail", ph: "nome@exemplo.com", modo: "email", formatar: (v) => v.replace(/\s/g, "").toLowerCase(), ler: (v) => v.trim().toLowerCase() },
+  };
+  const tipoDaChave = (c) => (!c ? "cpf" : c.includes("@") ? "email" : c.startsWith("+") ? "celular" : "cpf");
 
   function SecaoPix(ctx, cfg, u) {
     const pix = cfg.pix || null;
-    const entrada = (ph, valor, max, rotulo) => { const i = h("input", { class: "input input--sm", placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo }); return i; };
-    const chave = entrada("CPF, telefone ou e-mail", "", 77, "Chave Pix");
-    const nome = entrada("Nome do recebedor", pix ? pix.nome : (u.nomeUsuario || ""), 25, "Nome do recebedor");
+    let tipo = tipoDaChave(pix && pix.chave);
+    const entrada = (ph, valor, max, rotulo) => h("input", { class: "input input--sm", placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo });
+    const chave = entrada("", "", 77, "Chave Pix");
+    const nome = entrada("Nome do recebedor", pix ? pix.nome : String(u.nomeUsuario || "").replace(/[^\p{L} ]/gu, "").slice(0, 25), 25, "Nome do recebedor");
     const cidade = entrada("Cidade", pix ? pix.cidade : "", 15, "Cidade do recebedor");
+    const erro = h("p", { class: "cfg-pix__erro", role: "alert" });
+    const tipoSel = UI.Select(Object.keys(TIPOS_CHAVE).map((k) => ({ value: k, label: TIPOS_CHAVE[k].rotulo })), { value: tipo, ariaLabel: "Tipo de chave Pix", class: "select--sm" });
+    const aplicarTipo = () => { const t = TIPOS_CHAVE[tipo]; chave.placeholder = t.ph; chave.inputMode = t.modo; chave.value = t.formatar(chave.value); };
+    tipoSel.addEventListener("change", () => { tipo = tipoSel.value; chave.value = ""; erro.textContent = ""; aplicarTipo(); });
+    // só números no CPF/celular (letras e símbolos somem ao digitar); nome só com letras e espaços
+    chave.addEventListener("input", () => { chave.value = TIPOS_CHAVE[tipo].formatar(chave.value); erro.textContent = ""; });
+    nome.addEventListener("input", () => { nome.value = nome.value.replace(/[^\p{L} ]/gu, "").replace(/^ +/, "").replace(/ {2,}/g, " "); erro.textContent = ""; });
+    aplicarTipo();
+
+    const validar = () => {
+      const P = ZoZo.pix;
+      let valor = pix && pix.chave;
+      if (chave.value.trim()) {
+        valor = TIPOS_CHAVE[tipo].ler(chave.value);
+        if (tipo === "cpf" && !(valor.length === 11 && P.cpfValido(valor))) return "CPF inválido: confira os 11 números (os dois últimos são de verificação).";
+        if (tipo === "celular" && !P.celularValido(valor.slice(3))) return "Celular inválido: use um DDD do Brasil e um número que comece com 9.";
+        if (tipo === "email" && !P.normalizarChave(valor)) return "E-mail inválido.";
+      }
+      if (!valor) return "Informe a chave Pix.";
+      if (!P.nomeValido(nome.value)) return "Nome do recebedor: use só letras.";
+      if (!cidade.value.trim()) return "Informe a cidade.";
+      return { chave: valor };
+    };
     const salvar = (btn) => {
+      const r = validar();
+      if (typeof r === "string") { erro.textContent = r; return; }
       btn.disabled = true;
-      ctx.bridge.request(A.updateConfig, { pix: { chave: chave.value || (pix && pix.chave), nome: nome.value, cidade: cidade.value } })
-        .then(() => { chave.value = ""; ctx.toast("Chave Pix salva. O QR code aparece nas faturas."); return ctx.loadData("config", A.getConfig, null, { force: true }); })
-        .catch((e) => ctx.toast(e.friendly, { tone: "error" }))
+      ctx.bridge.request(A.updateConfig, { pix: { chave: r.chave, nome: nome.value.trim(), cidade: cidade.value } })
+        .then(() => { chave.value = ""; return ctx.loadData("config", A.getConfig, null, { force: true }); })
+        .catch((e) => { erro.textContent = e.friendly; })
         .finally(() => { btn.disabled = false; });
     };
     return h("div", { class: "cfg-row cfg-row--bloco" },
       h("div", { class: "cfg-row__text" },
         h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
         h("span", { class: "cfg-row__sub" }, "Definir chave Pix para o QRCode.")),
-      // chave · nome · cidade · [Remover] Salvar — tudo numa linha
-      h("div", { class: "cfg-pix" }, chave, nome, cidade,
+      // tipo · chave · nome · cidade · [Remover] Salvar — tudo numa linha
+      h("div", { class: "cfg-pix" }, tipoSel, chave, nome, cidade,
         h("div", { class: "cfg-pix__acoes" },
           pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
-            .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => ctx.toast(e.friendly, { tone: "error" })) }) : null,
-          UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) }))));
+            .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => { erro.textContent = e.friendly; }) }) : null,
+          UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) }))),
+      erro);
   }
 
   /* ---------------- Configurações: Geral | Conta ---------------- */
@@ -507,7 +551,7 @@
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
           h("h3", { class: "cfg-section" }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + ({ BRL: "Real", EUR: "Euro", USD: "Dólar" }[cfg.moeda] || "Real") : "Exportar todas as transações",
-            "Baixe seus dados em um arquivo CSV (o arquivo não é criptografado" + (cfg.multicambio ? "; só a moeda escolhida no menu" : "") + ")", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
+            "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : ""), UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
         ];

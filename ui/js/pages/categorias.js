@@ -431,7 +431,6 @@
         return C.pagina("page--categorias", h("div", { class: "empty empty--onboarding" },
           ZoZo.icons.icon("categorias", { size: 22, class: "empty__icon" }),
           h("p", { class: "empty__text" }, "Nenhuma categoria cadastrada."),
-          h("p", { class: "empty__hint" }, "Crie as suas ou comece com uma lista sugerida que você pode editar depois."),
           h("div", { class: "detail-actions" },
             UI.Button("Criar categorias sugeridas", { variant: "primary", icon: "categorias", onClick: (e) => {
               e.currentTarget.disabled = true;

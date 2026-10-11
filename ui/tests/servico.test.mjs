@@ -220,3 +220,77 @@ test("multicâmbio: lista transações das outras moedas e traz de volta para o 
   await t.req(t.A.transferirMoeda, { ids: [a.id] });                         // de volta ao Real
   assert.deepEqual((await t.req(t.A.getLancamentos)).lancamentos.map((l) => l.descricao), ["A"]);
 });
+
+test("divisão de uma ocorrência recorrente já lançada: só aquele mês, partes na mesma série", async () => {
+  const t = carregar();
+  const p1 = (await t.req(t.A.createPerfil, { perfil: { nome: "Casa" } })).perfil;
+  const p2 = (await t.req(t.A.createPerfil, { perfil: { nome: "Mãe" } })).perfil;
+  const k = (await t.req(t.A.createCategoria, { categoria: { nome: "TV" } })).categoria;
+  const o = (await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "TV", valor: 90, tipo: "regular", categoriaId: k.id, perfilId: p1.id } })).lancamento;
+  await t.req(t.A.tornarRecorrente, { id: o.id, recorrencia: "parcelada", parcelaAtual: 1, parcelaTotal: 3 });
+  const membro = (await t.req(t.A.getLancamentos)).lancamentos.find((l) => l.descricao === "TV" && l.parcelaAtual === 2);
+  await t.req(t.A.dividirLancamento, { id: membro.id, partes: [
+    { valor: 60, data: membro.data, categoriaId: k.id, perfilId: p1.id }, { valor: 30, data: membro.data, categoriaId: k.id, perfilId: p2.id }] });
+  const tvs = (await t.req(t.A.getLancamentos)).lancamentos.filter((l) => l.descricao === "TV");
+  assert.equal(tvs.length, 4);                                                   // 1ª, 2ª (em duas partes) e 3ª
+  const partes = tvs.filter((l) => l.parcelaAtual === 2);
+  assert.deepEqual(partes.map((l) => l.valor).sort((a, b) => a - b), [30, 60]);
+  assert.ok(partes.every((l) => l.serieId === o.id && l.tipo === "recorrente"));
+  assert.equal(tvs.find((l) => l.parcelaAtual === 3).valor, 90);                // o mês seguinte não muda
+});
+
+test("ação em lote: tipo Débito só para transações em conta (não cartão)", async () => {
+  const t = carregar();
+  const conta = (await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 100 } })).conta;
+  const cartao = (await t.req(t.A.createConta, { conta: { nome: "Nubank", tipo: "cartao", saldo: 0 } })).conta;
+  const a = (await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "a", valor: 10, tipo: "regular", contaId: conta.id } })).lancamento;
+  const b = (await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "b", valor: 10, tipo: "regular", contaId: cartao.id } })).lancamento;
+  await assert.rejects(t.req(t.A.updateLancamentosEmLote, { ids: [a.id, b.id], tipo: "debito" }), (e) => e.code === "DEBIT_ACCOUNT");
+  await t.req(t.A.updateLancamentosEmLote, { ids: [a.id], tipo: "debito" });
+  assert.equal((await t.req(t.A.getContas)).contas.find((c) => c.id === conta.id).valor, 90);
+});
+
+test("cartão: fechamento e vencimento juntos, para todos os meses ou só um mês", async () => {
+  const t = carregar();
+  const c = (await t.req(t.A.createConta, { conta: { nome: "Nubank", tipo: "cartao", saldo: 0, fechamento: 3, vencimento: 10 } })).conta;
+  for (const ruim of [{ fechamento: 5 }, { vencimento: 12 }, { fechamento: 0, vencimento: 12 }, { fechamento: "5a", vencimento: 12 }, { fechamento: 5, vencimento: 32 }]) {
+    await assert.rejects(t.req(t.A.updateCicloCartao, Object.assign({ id: c.id, modo: "fixo" }, ruim)), (e) => e.code === "CARD_CYCLE_INVALID");
+  }
+  const mes = hoje().slice(0, 7);
+  await t.req(t.A.updateCicloCartao, { id: c.id, fechamento: 25, vencimento: 5, modo: "mes", mes });
+  let conta = (await t.req(t.A.getContas)).contas.find((x) => x.id === c.id);
+  assert.deepEqual([conta.cicloAtual.fechamento, conta.cicloAtual.vencimento, conta.cicloAtual.soEsteMes, conta.fechamento], [25, 5, true, 3]);
+  await t.req(t.A.updateCicloCartao, { id: c.id, fechamento: 7, vencimento: 15, modo: "fixo" });   // todos os meses: tira a exceção
+  conta = (await t.req(t.A.getContas)).contas.find((x) => x.id === c.id);
+  assert.deepEqual([conta.cicloAtual.fechamento, conta.cicloAtual.vencimento, conta.cicloAtual.soEsteMes], [7, 15, false]);
+  const corrente = (await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 0 } })).conta;
+  await assert.rejects(t.req(t.A.updateCicloCartao, { id: corrente.id, fechamento: 1, vencimento: 2, modo: "fixo" }), (e) => e.code === "OPERATION_FAILED");
+});
+
+test("multicâmbio: Enviar transações da moeda escolhida para outra (destino explícito)", async () => {
+  const t = carregar();
+  const a = (await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "A", valor: 10, tipo: "regular" } })).lancamento;
+  await t.req(t.A.updateConfig, { multicambio: true });
+  await t.req(t.A.transferirMoeda, { ids: [a.id], destino: "EUR" });              // está em Real e envia para Euro
+  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 0);
+  await assert.rejects(t.req(t.A.transferirMoeda, { ids: [a.id], destino: "XYZ" }), (e) => e.code === "OPERATION_FAILED");
+  await t.req(t.A.updateConfig, { moeda: "EUR" });
+  assert.deepEqual((await t.req(t.A.getLancamentos)).lancamentos.map((l) => l.descricao), ["A"]);
+});
+
+test("Pix: só CPF válido, celular com DDD do Brasil começando por 9, e-mail; nome só com letras", async () => {
+  const t = carregar();
+  const P = t.Z.pix;
+  assert.equal(P.normalizarChave("529.982.247-25"), "52998224725");
+  assert.equal(P.normalizarChave("529.982.247-24"), null);                        // dígito verificador errado
+  assert.equal(P.normalizarChave("+55 (11) 98765-4321"), "+5511987654321");
+  assert.equal(P.normalizarChave("+55 (11) 88765-4321"), null);                   // sem o 9
+  assert.equal(P.normalizarChave("+55 (20) 98765-4321"), null);                   // DDD 20 não existe
+  assert.equal(P.normalizarChave("11987654321"), null);                           // número solto não é chave
+  assert.equal(P.normalizarChave("12.345.678/0001-95"), null);                    // CNPJ: sem suporte
+  assert.equal(P.normalizarChave("Nome@Exemplo.com"), "nome@exemplo.com");
+  assert.ok(P.nomeValido("João da Silva"));
+  for (const ruim of ["João2", "Ana!", " ", "", "a  b"]) assert.ok(!P.nomeValido(ruim), ruim);
+  await assert.rejects(t.req(t.A.updateConfig, { pix: { chave: "52998224725", nome: "Loja 1", cidade: "SP" } }), (e) => e.code === "PIX_INVALID");
+  await t.req(t.A.updateConfig, { pix: { chave: "52998224725", nome: "Joana", cidade: "SP" } });
+});

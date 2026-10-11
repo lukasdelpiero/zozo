@@ -353,7 +353,7 @@
       if (!itens.length) {
         return C.pagina(pagina, topo, filtrando
           ? UI.EmptyState("Nenhuma transação encontrada com esses filtros.", { icon: "pesquisar", action: { label: "Limpar filtros", onClick: () => { store.set({ ui: { filtros: FILTROS_VAZIOS(), busca: "" } }); ctx.refreshTopbar(); } } })
-          : UI.EmptyState("Nenhuma transação ainda.", { action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
+          : UI.EmptyState("Nenhuma transação cadastrada.", { action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
       }
 
       const linha = (l, comData) => L.LaunchRow(l, {

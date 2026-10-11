@@ -77,7 +77,9 @@
     container.appendChild(holder);
     container.appendChild(tooltip);
 
-    let svg = null, animado = !o.animar;
+    // Animação de entrada: o progresso sobrevive a redesenhos (ex.: a barra de rolagem aparece e muda a
+    // largura no meio da animação) — antes, o redesenho pulava direto para o fim e o gráfico parecia sem animação
+    let svg = null, iniciada = !o.animar, progresso = o.animar ? 0 : 1, clipAtual = null;
     function draw() {
       const W = Math.max(160, holder.clientWidth);
       const H = o.height;
@@ -129,7 +131,8 @@
 
       // Conteúdo revelado da esquerda para a direita
       const clipId = "zz-clip-" + (++seq);
-      const clipRect = s("rect", { x: 0, y: 0, width: animado ? W : 0, height: H });
+      const clipRect = s("rect", { x: 0, y: 0, width: W * progresso, height: H });
+      clipAtual = { rect: clipRect, W };
       svg.appendChild(s("defs", null, s("clipPath", { id: clipId }, clipRect)));
       const g = s("g", { "clip-path": `url(#${clipId})` });
       svg.appendChild(g);
@@ -226,9 +229,9 @@
       area.addEventListener("mouseleave", esconder);
       holder.appendChild(svg);
 
-      if (!animado && holder.isConnected && holder.clientWidth) {
-        animado = true;
-        animar(parseFloat(css("--duration-chart")) || 900, (p) => clipRect.setAttribute("width", W * p));
+      if (!iniciada && holder.isConnected && holder.clientWidth) {
+        iniciada = true;
+        animar(parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; clipAtual.rect.setAttribute("width", clipAtual.W * p); });
       }
     }
 
@@ -316,7 +319,7 @@
     container.appendChild(holder);
     container.appendChild(tooltip);
 
-    function draw(animarAgora) {
+    function draw() {
       clear(holder);
       const W = Math.max(160, holder.clientWidth), H = o.height;
       const m = { t: 14, r: 64, b: 34, l: 8 };
@@ -357,18 +360,23 @@
         etiqueta(svg, W - 2, ly, F.moeda(o.limite));
       }
       holder.appendChild(svg);
-      const pintar = (p) => rects.forEach((r) => { const a = r.altura * p; r.el.setAttribute("y", m.t + ih - a); r.el.setAttribute("height", a); });
-      if (animarAgora) animar(parseFloat(css("--duration-chart")) || 900, pintar); else pintar(1);
+      pintarAtual = (p) => rects.forEach((r) => { const a = r.altura * p; r.el.setAttribute("y", m.t + ih - a); r.el.setAttribute("height", a); });
+      pintarAtual(progresso);
+      if (!iniciada) {
+        iniciada = true;
+        animar(parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; pintarAtual(p); });
+      }
     }
 
-    let primeira = ZoZo.charts.permitirAnimacao !== false;
+    // Mesmo cuidado do gráfico de linha: um redesenho no meio da animação continua de onde parou
+    let iniciada = ZoZo.charts.permitirAnimacao === false, progresso = iniciada ? 1 : 0, pintarAtual = () => {};
     let conectado = false;
     const ro = new ResizeObserver(() => {
       // saiu da tela depois de ter aparecido (troca de página/painel): para de observar
       if (!holder.isConnected) { if (conectado) ro.disconnect(); return; }
       conectado = true;
       if (!holder.clientWidth) return;
-      draw(primeira); primeira = false;
+      draw();
     });
     ro.observe(holder);
     return { destroy() { ro.disconnect(); } };

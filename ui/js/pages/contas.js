@@ -63,6 +63,53 @@
   }
 
   /* ---------- Painel de detalhes de uma conta ---------- */
+  /**
+   * Cartão de crédito: fechamento e vencimento — para todos os meses ou só para um mês.
+   * Os DOIS são obrigatórios (não dá para mudar só um); a mesma regra vale no serviço de dados.
+   */
+  function editarCiclo(conta, ctx, aoSalvar) {
+    const hoje = new Date();
+    const meses = Array.from({ length: 13 }, (_, i) => { const d = new Date(hoje.getFullYear(), hoje.getMonth() + i - 1, 1); return F.iso(d).slice(0, 7); });
+    let modo = "fixo", mes = meses[1];
+    const ciclo = (m) => (conta.ciclos && conta.ciclos[m]) || { fechamento: conta.fechamento, vencimento: conta.vencimento };
+    ZoZo.modais.janela({
+      titulo: "Fechamento e vencimento",
+      classe: "modal--nova-conta",
+      passo: function passo(api) {
+        const diaInput = (rotulo, valor) => { const i = UI.Input({ type: "number", inputmode: "numeric", placeholder: "1 a 31", value: valor || "" }); i.min = "1"; i.max = "31"; i.setAttribute("aria-label", rotulo); return i; };
+        const atual = ciclo(modo === "mes" ? mes : null);
+        const fech = diaInput("Dia do fechamento", atual.fechamento), venc = diaInput("Dia do vencimento", atual.vencimento);
+        const erro = h("p", { class: "form-error", role: "alert" });
+        let salvarBtn = null;
+        const valido = (v) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
+        const conferir = () => { if (salvarBtn) salvarBtn.disabled = !(valido(fech.value) && valido(venc.value)); };
+        [fech, venc].forEach((i) => i.addEventListener("input", () => { erro.textContent = ""; conferir(); }));
+        const mesSel = modo === "mes" ? UI.Select(meses.map((m) => ({ value: m, label: F.mesAno(m + "-01") })), { value: mes, ariaLabel: "Mês" }) : null;
+        if (mesSel) mesSel.addEventListener("change", () => { mes = mesSel.value; api.ir(passo); });
+        return {
+          titulo: "Fechamento e vencimento",
+          corpo: h("div", { class: "zm__form" },
+            UI.Segmented([{ value: "fixo", label: "Todos os meses" }, { value: "mes", label: "Só um mês" }], modo, (v) => { modo = v; api.ir(passo); },
+              { label: "Vale para", class: "segmented--pilulas" }),
+            mesSel ? UI.Field("Mês", mesSel) : null,
+            h("div", { class: "form-row form-row--2" }, UI.Field("Fechamento (dia)", fech), UI.Field("Vencimento (dia)", venc)),
+            h("p", { class: "field__hint" }, "Fechamento e vencimento são alterados juntos."),
+            erro),
+          botoes: [
+            { label: "Cancelar", onClick: () => api.fechar() },
+            { label: "Salvar", primario: true, ref: (b) => { salvarBtn = b; conferir(); }, onClick: (btn) => {
+              if (!(valido(fech.value) && valido(venc.value))) { erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
+              btn.disabled = true;
+              ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: fech.value.trim(), vencimento: venc.value.trim(), modo, mes: modo === "mes" ? mes : undefined })
+                .then((r) => { api.fechar(); return ctx.recarregarTudo().then(() => aoSalvar && aoSalvar(r.conta)); })
+                .catch((e) => { erro.textContent = e.friendly; btn.disabled = false; });
+            } },
+          ],
+        };
+      },
+    });
+  }
+
   function abrirDetalheConta(conta, ctx, origem, opts) {
     let intervalo = conta.tipo === "investimento" ? "1M" : "3M";
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir conta?", "Tem certeza de que deseja excluir esta conta?")
@@ -74,9 +121,11 @@
       return ctx.recarregarTudo();
     }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
     ctx.detail.open({
-      title: conta.tipo === "investimento" ? "Investimento" : (L.SUBTITULO_CONTA[conta.tipo] ? "Conta " + L.SUBTITULO_CONTA[conta.tipo].toLowerCase() : "Conta"),
+      title: conta.tipo === "investimento" ? "Investimento" : conta.tipo === "cartao" ? "Cartão de crédito"
+        : (L.SUBTITULO_CONTA[conta.tipo] ? "Conta " + L.SUBTITULO_CONTA[conta.tipo].toLowerCase() : "Conta"),
       selected: { tipo: "conta", id: conta.id },
       voltar: opts && opts.voltar,
+      botoes: conta.tipo === "cartao" ? [{ label: "Editar fechamento", onClick: () => editarCiclo(conta, ctx, (c) => abrirDetalheConta(Object.assign({}, conta, c), ctx, origem, opts)) }] : [],
       menu: [
         { label: conta.oculta ? "Mostrar conta" : "Ocultar conta", onClick: ocultar },
         { separador: true },
@@ -110,7 +159,10 @@
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) }),
               ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: "ph__value",
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, saldo: v }).then(() => { ctx.toast("Saldo atualizado."); return ctx.recarregarTudo(); }) })),
-            conta.limite ? h("div", { class: "ph__extra" }, F.moeda(conta.limite) + " de limite") : null),
+            conta.limite ? h("div", { class: "ph__extra" }, F.moeda(conta.limite) + " de limite") : null,
+            // cartão: fechamento e vencimento do mês atual (de todos os meses ou definidos só para este mês)
+            conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: "ph__extra" },
+              "Fecha dia " + conta.cicloAtual.fechamento + " · vence dia " + conta.cicloAtual.vencimento + (conta.cicloAtual.soEsteMes ? " (só neste mês)" : "")) : null),
           graficoEl, filtrosEl,
           C.detalheSecao("Transações", listaEl));
 

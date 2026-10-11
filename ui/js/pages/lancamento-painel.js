@@ -192,8 +192,6 @@
       const opcoes = regular ? [["regular", "Despesa"], ["estorno", "Estorno"]] : [["saida", "Saída"], ["entrada", "Entrada"]];
       const atual = regular ? d.tipo : d.sentido;
       const rotulo = (opcoes.find(([v]) => v === atual) || opcoes[0])[1];
-      // Regular já criado: Despesa/Estorno não muda (regra)
-      if (regular && !novo) return h("span", { class: "lp-sub lp-sub--fixo" }, rotulo);
       const btn = h("button", { type: "button", class: "lp-sub", "aria-haspopup": "menu" }, rotulo, icon("chevron-down", { size: 13, stroke: 2.25 }));
       btn.addEventListener("click", () => ZoZo.menu.abrir(btn, opcoes.map(([v, t]) => ({
         label: t, check: v === atual,
@@ -317,7 +315,7 @@
       ctx.loadData("recorrencias", A.getRecorrencias, null, { force: true }).then((r) => {
         const oc = (r.recorrencias || []).concat(r.proximas || [], r.arquivadas || []).find((x) => x.serieId === serieId);
         if (oc) ZoZo.recorrenciasShared.abrirDetalhe(oc, ctx, { voltar: voltarParaCa });
-        else ctx.toast("Esta recorrência não tem ocorrência neste mês.");
+        else ctx.toast("Esta recorrência não tem ocorrência neste mês.", { tone: "aviso" });
       });
     }
 
@@ -395,10 +393,12 @@
             h("div", { class: "lp-pilula" }, campoPerfil(), perfilAtual() ? seta(perfilAtual().nome, () => ZoZo.perfilShared.abrirDetalhe(perfilAtual(), ctx, { voltar: voltarParaCa })) : null)) : null,
           temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Recorrência"),
             h("div", { class: "lp-pilula" }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
-          // Divisão (lançamento rachado entre perfis)
-          comPerfis && !novo && d.divisao ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
-            h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },
-              icon("dividir", { size: 14 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")) : null),
+          // Divisão entre perfis: rachada → resumo; senão "+ Adicionar divisão" (também em recorrentes já criadas)
+          podeDividir ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
+            d.divisao
+              ? h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },
+                icon("dividir", { size: 14 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")
+              : h("button", { type: "button", class: "lp-add-divisao", onClick: abrirDivisao }, icon("mais", { size: 14 }), "Adicionar divisão")) : null),
         h("section", { class: "lp-notes-wrap" }, campoNotas()),
         statusEl,
         historico());
@@ -437,9 +437,9 @@
     };
 
     const abrirDivisao = () => ZoZo.dividir.abrir(original, ctx, (id) => abrir({ id }, ctx, opts));
-    // Dividir: transação comum ou a ORIGEM de uma recorrência (cada parte vira uma série com o seu perfil)
-    const ehOrigemRec = d.tipo === "recorrente" && (!d.serieId || d.serieId === d.id);
-    const podeDividir = comPerfis && !novo && (d.tipo !== "recorrente" || ehOrigemRec);
+    // Dividir: qualquer transação já criada — inclusive recorrente (origem: uma série por parte;
+    // ocorrência já lançada: divide só aquele mês, as partes continuam na série)
+    const podeDividir = comPerfis && !novo;
 
     ctx.detail.open({
       tituloNode: tituloBtn,
@@ -448,7 +448,6 @@
       voltar: opts.voltar || null,
       botoes: novo ? [{ label: "Criar", icone: "check", primario: true, onClick: (e) => criar(e.currentTarget) }]
         : podeDividir && d.divisao ? [{ label: "Editar divisão", icone: "dividir", onClick: abrirDivisao, classe: "detail__textbtn--split" }] : [],
-      acoes: podeDividir && !d.divisao ? [{ icone: "dividir", rotulo: "Dividir transação", onClick: abrirDivisao }] : [],
       menu: novo ? null : [{ label: "Excluir transação", perigo: true, onClick: excluir }],
       render(body) { desenhar(); mount(body, corpo); },
     });

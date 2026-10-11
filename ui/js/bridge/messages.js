@@ -45,6 +45,7 @@
     // Cadastros
     createConta: "createConta",
     updateConta: "updateConta",
+    updateCicloCartao: "updateCicloCartao",
     deleteConta: "deleteConta",
     createCategoria: "createCategoria",
     updateCategoria: "updateCategoria",
@@ -105,7 +106,7 @@
     TIMEOUT: "Não foi possível concluir a operação.",
     PROFILE_ARCHIVED: "Esse perfil está arquivado. Desarquive para usá-lo em novas transações.",
     NAME_IN_USE: "Já existe um item com esse nome.",
-    PIX_INVALID: "Confira a chave Pix (CPF, telefone com DDD ou e-mail), o nome e a cidade.",
+    PIX_INVALID: "Confira a chave Pix (CPF válido, celular com DDD do Brasil começando por 9 ou e-mail), o nome (só letras) e a cidade.",
     WRONG_PASSWORD: "Senha incorreta.",
     WEAK_PASSWORD: "Use uma senha com pelo menos 8 caracteres.",
     TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
@@ -122,6 +123,7 @@
     DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
+    CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     DEBIT_ACCOUNT: "Débito precisa de uma conta (corrente, poupança…). Cartão de crédito não pode.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
   });

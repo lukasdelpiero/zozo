@@ -330,9 +330,12 @@
 /* =============================================================
    Seletor de emojis (emoji-mart; cores e cantos dentro de src/emoji-picker.ts)
    ============================================================= */
-.menu--emoji { padding: 0; overflow: hidden; max-height: none; border-radius: 12px; }
-.menu--emoji em-emoji-picker { display: flex; }
-.emoji-carregando { display: grid; place-items: center; width: 340px; height: 240px; }
+.emoji-pop em-emoji-picker { display: flex; }
+/* Camada do seletor (uma instância sempre montada): escondida até abrir */
+.emoji-pop { position: fixed; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-popover);
+  overflow: hidden; z-index: 400; visibility: hidden; opacity: 0; pointer-events: none;
+  transform: translateY(-4px); transition: opacity 120ms var(--easing), transform 120ms var(--easing), visibility 0s linear 120ms; }
+.emoji-pop.is-aberto { visibility: visible; opacity: 1; pointer-events: auto; transform: none; transition: opacity 120ms var(--easing), transform 120ms var(--easing); }
 
 /* =============================================================
    Paleta de cores: quadrado aumenta ao passar o mouse; selecionado
@@ -481,7 +484,9 @@
 
 /* Linhas com nome + conta: o nome tem prioridade, a conta encolhe primeiro (com "…") */
 .launch-row__desc > .launch-row__title { flex: 0 1 auto; min-width: 3em; }
-.launch-row__desc > .launch-row__account { flex: 0 8 auto; min-width: min(5em, 20%); overflow: hidden; text-overflow: ellipsis; }
+.launch-row__conta { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 8 auto; min-width: 0; overflow: hidden; }
+.launch-row__conta .launch-row__account { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kind-badge--vazio { visibility: hidden; }
 /* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
 .recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
 .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(0, max-content) 120px; }
@@ -519,7 +524,7 @@
 }
 /* Lista muito estreita: conta e dígitos saem e o nome do lançamento fica com o espaço */
 @container (max-width: 420px) {
-  .launch-row__desc > .launch-row__account, .launch-row__desc > .launch-row__digits { display: none; }
+  .launch-row__desc > .launch-row__conta { display: none; }
 }
 @container (max-width: 420px) {
   .recurrence-row__desc > .recurrence-row__type { display: none; }
@@ -602,7 +607,10 @@
 .boleto-editor__pix:empty { display: none; }
 .boleto-editor__section--summary .btn[hidden] { display: none; }
 /* Configurações › Pix */
-.cfg-pix { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.7fr) auto; gap: 8px; width: 100%; align-items: center; }
+.cfg-pix { display: grid; grid-template-columns: 104px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.7fr) auto; gap: 8px; width: 100%; align-items: center; }
+.cfg-pix .select { height: 32px; min-width: 0; }
+.cfg-pix__erro { margin: 6px 0 0; font-size: var(--t-13); color: var(--color-danger); }
+.cfg-pix__erro:empty { display: none; }
 .cfg-pix__acoes { display: flex; gap: 8px; justify-content: flex-end; }
 @container (max-width: 560px) { .cfg-pix { grid-template-columns: minmax(0, 1fr); } }
 .cfg-row.cfg-row--bloco { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -1123,3 +1131,36 @@
   .lp--entrar, .lp--entrar *, .page--entrar > *, .page--entrar .dash-layout > *, .auth__card--entrar, .auth__card--entrar *,
   .auth__card--frente > *, .auth__card--tras > * { animation: none !important; }
 }
+
+/* =============================================================
+   ZoZo 2.9
+   ============================================================= */
+/* Avisos que explicam por que algo não aconteceu (as confirmações de sucesso não aparecem mais) */
+.toast--aviso .toast__icon { color: #ffb36b; }
+
+/* Aviso laranja (mesmo estilo do aviso de demonstração do menu) */
+.aviso-laranja { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 var(--space-3); padding: 8px 12px; border-radius: 8px;
+  background: #fff1e3; color: #e8730c; font-size: var(--t-13); font-weight: 550; line-height: 1.4; }
+.aviso-laranja .icon { flex: none; margin-top: 1px; }
+
+/* Transferir entre moedas: Enviar | Importar e a moeda no canto inferior esquerdo */
+.cambio__modo { display: flex; justify-content: center; margin-bottom: var(--space-3); }
+.zm__footer-esquerda { margin-right: auto; }
+.cambio__moeda { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Botões de alternar (ex.: Poupança | Corrente): centralizados, com o fundo cinza só do tamanho deles */
+.segmented--pilulas { display: inline-grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(104px, max-content);
+  width: max-content; max-width: 100%; justify-self: center; align-self: center; margin-left: auto; margin-right: auto; }
+.zm__form > .segmented--pilulas { display: grid; }
+
+/* Investimentos › alocação: sem o ícone; a barra começa mais à esquerda */
+.allocation-row { grid-template-columns: minmax(96px, max-content) minmax(120px, 1fr) 64px; column-gap: var(--space-4); }
+
+/* Ícone da categoria (editar): o fundo do hover centralizado no emoji */
+.icon-pick { padding: 0; line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", var(--font-family); }
+.hero-edit .icon-pick { display: inline-grid; place-items: center; }
+
+/* Painel da transação: "+ Adicionar divisão" */
+.lp-add-divisao { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 1px solid var(--color-border);
+  border-radius: 8px; background: var(--color-surface); color: var(--color-text-primary); font: inherit; font-size: var(--t-13); font-weight: 550; cursor: pointer; }
+.lp-add-divisao:hover { background: var(--color-surface-hover); border-color: var(--color-border-strong); }

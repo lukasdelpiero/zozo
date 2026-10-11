@@ -4,7 +4,7 @@
    ZoZo.dividir.abrir(lancamento, ctx, aoTerminar)
    Regras: mesma data do original · soma = valor original (100%) ·
    categoria e perfil em todas as partes · perfis sem repetição ·
-   nomes e categorias podem repetir · recorrente: só a origem (cada parte vira uma série).
+   nomes e categorias podem repetir · recorrente: origem → uma série por parte; ocorrência → só aquele mês.
    ============================================================= */
 (function (ZoZo) {
   "use strict";

@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.8.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.9.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,18 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.9.0
+
+- **Divisão em recorrentes já criadas:** "+ Adicionar divisão" no painel de qualquer transação. Na origem da série, cada parte vira uma série; numa ocorrência já lançada, divide só aquele mês (as partes continuam na série).
+- **Regular: Despesa ou Estorno** também ao editar.
+- **Gráficos:** a animação de entrada continua se o gráfico for redesenhado no meio (ex.: a barra de rolagem aparece) — antes pulava direto para o fim.
+- **Pix:** escolha CPF, Celular ou E-mail; CPF com máscara 000.000.000-00 e dígitos verificadores conferidos; celular +55 (00) 90000-0000 só com DDD do Brasil e começando por 9; nome só com letras. Regras também no serviço de dados. CNPJ e chave aleatória sem suporte.
+- **Cartão de crédito:** painel com o título "Cartão de crédito" e **Editar fechamento** — fechamento e vencimento juntos (nunca só um), para todos os meses ou só para um mês.
+- **Transferir entre moedas:** Enviar | Importar, a outra moeda no botão do canto inferior esquerdo (com menu) e aviso laranja "O valor numérico não será convertido, apenas a moeda será alterada."
+- **Emojis instantâneos:** um único seletor fica pronto desde que o app abre (abre em ~8 ms).
+- **Avisos no canto da tela:** as confirmações de sucesso não aparecem mais; erros e avisos continuam.
+- **Ajustes:** conta e 4 dígitos juntos e nomes alinhados em Transações; alternadores da janela de conta centralizados; alocação de Investimentos sem ícone e com a barra maior; textos de listas vazias; CSV sem a observação; hover do ícone da categoria centralizado; ação em lote "Tipo → Débito" funcionando (só para transações em conta).
 
 ## Novidades da versão 2.8.0
 

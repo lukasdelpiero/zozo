@@ -50,6 +50,8 @@ declare global {
     novoTxid(): string;
     crc16(texto: string): string;
     cpfValido(c: string): boolean;
+    celularValido(digitos: string): boolean;
+    nomeValido(nome: unknown): boolean;
   }
 
   interface ZoZoGlobal {

@@ -141,7 +141,7 @@
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
       const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"),
-        cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria.", { icon: "categorias" }));
+        cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria cadastrada.", { icon: "categorias" }));
 
       const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
       const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"),
@@ -153,7 +153,7 @@
       const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"),
         ultimos.length
           ? h("div", { class: "list list--flush" }, ultimos.map((l) => L.LaunchRow(l, { class: "launch-row--resumo", resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
-          : UI.EmptyState("Nenhuma transação ainda."));
+          : UI.EmptyState("Nenhuma transação cadastrada."));
 
       // Grade: [Gasto mensal | Patrimônio] com a mesma altura; Recentes e Top categorias começam na mesma linha
       const area = (nome, el) => (el ? h("div", { class: "dash-area dash-area--" + nome }, el) : null);

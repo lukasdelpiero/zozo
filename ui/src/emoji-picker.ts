@@ -99,38 +99,109 @@ function carregar() {
   return carregando;
 }
 
+/* ---------------- Uma instância só, sempre montada ----------------
+   O emoji-mart desenha tudo ao entrar na página; tirar e pôr de volta o deixa sem observadores.
+   Por isso existe UM seletor, criado quando o app abre, numa camada flutuante escondida:
+   abrir = só posicionar e mostrar (instantâneo). */
+let camada: HTMLElement | null = null;
+let seletor: Picker | null = null;
+let folhaAtual: CSSStyleSheet | null = null;
+let aoEscolherAtual: ((emoji: string) => void) | null = null;
+let fecharAtual: (() => void) | null = null;
+let preparando: Promise<void> | null = null;
+
+function preparar(): Promise<void> {
+  if (preparando) return preparando;
+  preparando = carregar().then(({ Picker }) => {
+    camada = document.createElement("div");
+    camada.className = "emoji-pop";             // sem a classe "menu": senão o Esc das janelas acharia um menu aberto
+    camada.setAttribute("role", "dialog");
+    camada.setAttribute("aria-label", "Escolher emoji");
+    camada.setAttribute("aria-hidden", "true");
+    seletor = new Picker({
+      locale: "pt", set: "native", theme: "light", autoFocus: false,
+      previewPosition: "none", skinTonePosition: "none", navPosition: "top", searchPosition: "sticky",
+      perLine: 8, emojiButtonSize: 36, emojiSize: 22, maxFrequentRows: 2,
+      onEmojiSelect: (e: { native: string }) => { const cb = aoEscolherAtual; fechar(); if (cb) cb(e.native); },
+    });
+    camada.appendChild(seletor);
+    document.body.appendChild(camada);
+    folhaAtual = new CSSStyleSheet();
+    const raiz = seletor.shadowRoot;
+    if (raiz) raiz.adoptedStyleSheets = [...raiz.adoptedStyleSheets, folhaAtual];
+  });
+  preparando.catch(() => { preparando = null; });
+  return preparando;
+}
+
 /** Destaca o emoji atual (o valor vem dos dados do usuário: sempre escapado) */
-function destacarAtual(picker: Picker, atual?: string) {
-  const raiz = picker.shadowRoot;
-  if (!raiz || !atual) return;
-  const folha = new CSSStyleSheet();
-  folha.replaceSync(`.category button[aria-label="${CSS.escape(atual)}"] .background { opacity: 1; background-color: rgba(105, 72, 216, 0.28); }`);
-  raiz.adoptedStyleSheets = [...raiz.adoptedStyleSheets, folha];
+function destacarAtual(atual?: string) {
+  if (!folhaAtual) return;
+  folhaAtual.replaceSync(atual ? `.category button[aria-label="${CSS.escape(atual)}"] .background { opacity: 1; background-color: rgba(105, 72, 216, 0.28); }` : "");
+}
+
+/** Limpa a pesquisa e volta ao topo (a mesma instância é reaproveitada) */
+function reiniciar() {
+  const raiz = seletor && seletor.shadowRoot;
+  if (!raiz) return;
+  const busca = raiz.querySelector("input");
+  if (busca && busca.value) { busca.value = ""; busca.dispatchEvent(new Event("input", { bubbles: true, composed: true })); }
+  const rolagem = raiz.querySelector(".scroll");
+  if (rolagem) rolagem.scrollTop = 0;
+}
+
+function posicionar(anchor: HTMLElement) {
+  if (!camada) return;
+  const r = anchor.getBoundingClientRect();
+  const w = camada.offsetWidth || 340, hgt = camada.offsetHeight || 380, margem = 8;
+  const abaixo = r.bottom + 6 + hgt <= innerHeight - margem || r.top - 6 - hgt < margem;
+  const top = abaixo ? Math.min(r.bottom + 6, innerHeight - hgt - margem) : r.top - 6 - hgt;
+  const left = Math.max(margem, Math.min(r.left, innerWidth - w - margem));
+  camada.style.top = Math.max(margem, top) + "px";
+  camada.style.left = left + "px";
+}
+
+function fechar() {
+  if (fecharAtual) { const f = fecharAtual; fecharAtual = null; f(); }
 }
 
 function abrir(anchor: HTMLElement, opts?: { atual?: string; aoEscolher?: (emoji: string) => void; posicao?: string }) {
   const o = opts || {};
-  const ZoZo = window.ZoZo;
-  ZoZo.menu.abrir(anchor, { largura: 340, render(el: HTMLElement, api: { fechar(): void }) {
-    const espera = ZoZo.dom.h("div", { class: "emoji-carregando" }, ZoZo.dom.h("span", { class: "spinner", "aria-hidden": "true" }));
-    ZoZo.dom.mount(el, espera);
-    carregar().then(({ Picker }) => {
-      if (!el.isConnected) return;
-      const picker = new Picker({
-        locale: "pt", set: "native", theme: "light", autoFocus: true,
-        previewPosition: "none", skinTonePosition: "none", navPosition: "top", searchPosition: "sticky",
-        perLine: 8, emojiButtonSize: 36, emojiSize: 22, maxFrequentRows: 2,
-        onEmojiSelect: (e: { native: string }) => { api.fechar(); if (o.aoEscolher) o.aoEscolher(e.native); },
-      });
-      picker.classList.add("emoji-mart");
-      ZoZo.dom.mount(el, picker);
-      destacarAtual(picker, o.atual);              // a raiz (shadow) já existe: o construtor a cria
-    }).catch(() => ZoZo.dom.mount(el, ZoZo.dom.h("p", { class: "menu__empty" }, "Não foi possível abrir os emojis. Tente de novo.")));
-  } }, { posicao: o.posicao || "esquerda", largura: 340, label: "Escolher emoji", focar: false, class: "menu--emoji" });
+  const mostrar = () => {
+    if (!camada || !anchor.isConnected) return;
+    fechar();
+    aoEscolherAtual = o.aoEscolher || null;
+    destacarAtual(o.atual);
+    reiniciar();
+    posicionar(anchor);
+    camada.classList.add("is-aberto");
+    camada.setAttribute("aria-hidden", "false");
+    anchor.setAttribute("aria-expanded", "true");
+    const raiz = seletor && seletor.shadowRoot;
+    const busca = raiz && raiz.querySelector("input");
+    if (busca) (busca as HTMLInputElement).focus();
+    // fecha: clique fora, Esc (sem fechar a janela de trás), rolagem/redimensionamento da página
+    const fora = (e: Event) => { if (camada && !camada.contains(e.target as Node) && e.target !== anchor) fechar(); };
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(); anchor.focus(); } };
+    const mudou = () => fechar();
+    document.addEventListener("mousedown", fora, true);
+    document.addEventListener("keydown", tecla, true);
+    window.addEventListener("resize", mudou);
+    fecharAtual = () => {
+      document.removeEventListener("mousedown", fora, true);
+      document.removeEventListener("keydown", tecla, true);
+      window.removeEventListener("resize", mudou);
+      aoEscolherAtual = null;
+      anchor.setAttribute("aria-expanded", "false");
+      if (camada) { camada.classList.remove("is-aberto"); camada.setAttribute("aria-hidden", "true"); }
+    };
+  };
+  if (camada) mostrar();
+  else preparar().then(mostrar).catch(() => window.ZoZo.feedback.toast("Não foi possível abrir os emojis. Tente de novo.", { tone: "error" }));
 }
 
-window.ZoZo.emojiPicker = { abrir, carregar };
+window.ZoZo.emojiPicker = { abrir, carregar: preparar, fechar };
 
-// Pré-carrega quando o navegador estiver ocioso: a 1ª abertura já é instantânea
+// Prepara logo depois que o app abre (fora do caminho do primeiro desenho): a 1ª abertura já é instantânea
 const ocioso = (window as unknown as { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-if (ocioso) ocioso(() => { void carregar(); }, { timeout: 8000 }); else setTimeout(() => { void carregar(); }, 4000);
+if (ocioso) ocioso(() => { void preparar(); }, { timeout: 2000 }); else setTimeout(() => { void preparar(); }, 1500);

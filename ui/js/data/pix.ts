@@ -17,37 +17,44 @@
   "use strict";
 
   /* ---------------- chave Pix (formatos do DICT/BACEN) ---------------- */
-  // CPF: só pontuação de formatação é removida ("12a3" não vira "123"). CNPJ: sem suporte por enquanto.
+  // CPF: só pontuação de formatação é removida ("12a3" não vira "123"). CNPJ e chave aleatória: sem suporte por enquanto.
   const semFormatacao = (t: unknown): string => String(t || "").replace(/[\s.\-/]/g, "");
   function cpfValido(c: string): boolean {
     if (!/^\d{11}$/.test(c) || /^(\d)\1{10}$/.test(c)) return false;
     const dv = (n: number) => { let s = 0; for (let i = 0; i < n; i++) s += Number(c[i]) * (n + 1 - i); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
     return dv(9) === Number(c[9]) && dv(10) === Number(c[10]);
   }
-  /** CNPJ numérico ou alfanumérico (só para RECUSAR: chave CNPJ ainda não é aceita) */
-  function cnpjValido(c: string): boolean {
-    if (!/^[0-9A-Z]{12}\d{2}$/.test(c) || /^(\d)\1{13}$/.test(c)) return false;
-    const v = (ch: string) => ch.charCodeAt(0) - 48;
-    const dv = (n: number) => { const pesos = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]; let s = 0; for (let i = 0; i < n; i++) s += v(c[i]) * pesos[i]; const r = s % 11; return r < 2 ? 0 : 11 - r; };
-    return dv(12) === Number(c[12]) && dv(13) === Number(c[13]);
-  }
   // E-mail no formato aceito pelo DICT: só ASCII, até 77 caracteres
   const EMAIL_DICT = /^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
-  /** Normaliza a chave no formato do DICT (CPF só dígitos, celular +55…, e-mail minúsculo, aleatória). CNPJ → null. null se inválida. */
+  /** DDDs válidos no Brasil (Anatel) */
+  const DDDS = new Set([11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 24, 27, 28, 31, 32, 33, 34, 35, 37, 38, 41, 42, 43, 44, 45, 46,
+    47, 48, 49, 51, 53, 54, 55, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 73, 74, 75, 77, 79, 81, 82, 83, 84, 85, 86, 87, 88, 89,
+    91, 92, 93, 94, 95, 96, 97, 98, 99]);
+  /** Celular brasileiro: 11 dígitos = DDD do Brasil + 9 + 8 dígitos */
+  function celularValido(d: string): boolean {
+    return /^\d{11}$/.test(d) && DDDS.has(Number(d.slice(0, 2))) && d[2] === "9";
+  }
+  /** Nome do recebedor: só letras (com acento) e espaços simples entre as palavras */
+  function nomeValido(t: unknown): boolean {
+    const s = String(t || "").trim();
+    return s.length > 0 && s.length <= 25 && /^\p{L}+( \p{L}+)*$/u.test(s);
+  }
+
+  /**
+   * Chave aceita: CPF (11 dígitos com dígitos verificadores corretos), celular (+55 + DDD do Brasil + 9…)
+   * ou e-mail. CNPJ e chave aleatória: sem suporte por enquanto. Devolve no formato do DICT, ou null.
+   */
   function normalizarChave(texto: unknown): string | null {
     const t = String(texto || "").trim();
     if (!t) return null;
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) return t.toLowerCase();       // aleatória (EVP)
     if (t.includes("@")) { const e = t.toLowerCase(); return e.length <= 77 && EMAIL_DICT.test(e) ? e : null; }
     if (t.startsWith("+")) {                                                                                          // celular +55
       const tel = t.replace(/[\s()\-]/g, "");
-      return /^\+55\d{10,11}$/.test(tel) ? tel : null;
+      return /^\+55\d{11}$/.test(tel) && celularValido(tel.slice(3)) ? tel : null;
     }
-    const d = semFormatacao(t).toUpperCase();
+    const d = semFormatacao(t);
     if (/^\d{11}$/.test(d) && cpfValido(d)) return d;
-    if (cnpjValido(d)) return null;                                                                                     // CNPJ: sem suporte por enquanto
-    if (/^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$/.test(t)) return "+55" + t.replace(/\D/g, "");                                   // celular sem +55
     return null;
   }
 
@@ -92,6 +99,6 @@
     return corpo + crc16(corpo);
   }
 
-  const api: ZoZoPix = { payload, normalizarChave, novoTxid, crc16, cpfValido };
+  const api: ZoZoPix = { payload, normalizarChave, novoTxid, crc16, cpfValido, celularValido, nomeValido };
   ZoZo.pix = api;
 })(window.ZoZo);

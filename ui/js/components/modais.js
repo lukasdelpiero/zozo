@@ -16,7 +16,7 @@
 
   /**
    * Janela modal com conteúdo trocável (passos).
-   * abrir({ titulo, classe, passo(api) → { titulo?, corpo: node, botoes: [{label, primario, perigo, onClick, desabilitado}] } })
+   * abrir({ titulo, classe, passo(api) → { titulo?, corpo: node, rodapeEsquerda?: node, botoes: [{label, primario, perigo, onClick, desabilitado}] } })
    */
   function janela(cfg) {
     const corpoEl = h("div", { class: "zm__body" });
@@ -30,7 +30,7 @@
         const tituloEl = area.closest(".modal") && area.closest(".modal").querySelector(".modal__title");
         if (p.titulo && tituloEl) tituloEl.textContent = p.titulo;
         mount(corpoEl, p.corpo);
-        mount(rodapeEl, (p.botoes || []).map((b) => {
+        mount(rodapeEl, p.rodapeEsquerda ? h("div", { class: "zm__footer-esquerda" }, p.rodapeEsquerda) : null, (p.botoes || []).map((b) => {
           const btn = UI.Button(b.label, { variant: b.primario ? "primary" : b.perigo ? "danger" : "secondary", onClick: () => b.onClick(btn), disabled: b.desabilitado });
           if (b.ref) b.ref(btn);
           return btn;

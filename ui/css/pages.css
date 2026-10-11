@@ -184,7 +184,6 @@
 
 .allocation-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 2fr) 72px; min-height: 48px; }
 .allocation-row__lead { display: flex; align-items: center; gap: 10px; }
-.allocation-row__icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--color-background); font-size: 14px; }
 .allocation-row__pct { justify-self: end; font-variant-numeric: lining-nums proportional-nums; font-weight: var(--font-weight-medium); }
 
 .category-row {

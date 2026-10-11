@@ -71,13 +71,91 @@
     })).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
-  /** Botão de Transações: trazer, a qualquer momento, transações de outras moedas para a moeda escolhida */
+  /**
+   * Botão de Transações: transferir entre moedas a qualquer momento.
+   *  • Importar: traz transações da outra moeda para a escolhida no menu.
+   *  • Enviar: manda transações da moeda escolhida para a outra.
+   * A "outra" moeda fica no botão do canto inferior esquerdo (menu com as duas opções).
+   */
   function abrirTransferencia(ctx) {
-    const destino = MOEDAS.find((m) => m.codigo === (config().moeda || "BRL"));
-    return ctx.bridge.request(A.getLancamentosOutrasMoedas).then((r) => {
-      if (!r.lancamentos.length) { ctx.toast("Não há transações em outras moedas para trazer para " + destino.nome + "."); return; }
-      oferecerTransferencia(ctx, r.lancamentos, destino, {});
-    }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+    const atual = MOEDAS.find((m) => m.codigo === (config().moeda || "BRL"));
+    const outras = MOEDAS.filter((m) => m.codigo !== atual.codigo);
+    let modo = "importar", outra = outras[0];
+    let lista = null, termo = "", carga = 0;
+    const marcadas = new Set();
+    const norm = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    ZoZo.modais.janela({
+      titulo: "Transferir entre moedas",
+      classe: "modal--recorrencia modal--cambio",
+      passo: function passo(api) {
+        const descricao = h("p", { class: "modal__text cambio__aviso" });
+        const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
+        const itensEl = h("div", { class: "zm__list" });
+        const alternar = h("div", { class: "cambio__modo" });
+        const moedaBtn = h("button", { type: "button", class: "btn btn--secondary btn--sm cambio__moeda", "aria-haspopup": "menu" });
+        let botao = null;
+        const contar = () => { if (botao) botao.disabled = !marcadas.size; };
+        const origem = () => (modo === "importar" ? outra : atual);
+        const destino = () => (modo === "importar" ? atual : outra);
+
+        function desenharTopo() {
+          mount(alternar, UI.Segmented([{ value: "enviar", label: "Enviar" }, { value: "importar", label: "Importar" }], modo,
+            (v) => { if (v === modo) return; modo = v; recarregar(); }, { label: "Enviar ou importar", class: "segmented--pilulas" }));
+          descricao.textContent = modo === "importar"
+            ? "Selecione as transações em " + outra.nome + " que deseja importar para " + atual.nome + "."
+            : "Selecione as transações em " + atual.nome + " que deseja enviar para " + outra.nome + ".";
+          mount(moedaBtn, h("span", { class: "btn__label" }, outra.nome), ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }));
+        }
+        function desenharLista() {
+          if (!lista) { mount(itensEl, UI.Skeleton(4, { short: true })); return; }
+          const itens = lista.filter((l) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
+          mount(itensEl, itens.length ? itens.map((l) => {
+            const cb = h("input", { type: "checkbox", class: "cambio__check", "aria-label": "Transferir " + l.descricao });
+            cb.checked = marcadas.has(l.id);
+            cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
+            return h("label", { class: "zm-lanc cambio__item" }, cb,
+              h("span", { class: "zm-lanc__data", title: F.dataExtenso(l.data) }, F.dataCurta(l.data)),
+              h("span", { class: "zm-lanc__nome" }, h("span", null, l.descricao)),
+              h("span", { class: "zm-lanc__valor money" }, origem().simbolo + " " + F.moedaEditavel(l.valor)));
+          }) : h("p", { class: "menu__empty" }, "Nenhuma transação em " + origem().nome + "."));
+        }
+        function recarregar() {
+          lista = null; marcadas.clear(); contar(); desenharTopo(); desenharLista();
+          const minha = ++carga;
+          const pedido = modo === "importar"
+            ? ctx.bridge.request(A.getLancamentosOutrasMoedas).then((r) => r.lancamentos.filter((l) => l.moeda === outra.codigo))
+            : ctx.bridge.request(A.getLancamentos).then((r) => (r.lancamentos || []).slice().sort((a, b) => b.data.localeCompare(a.data)));
+          pedido.then((ls) => { if (minha === carga) { lista = ls; desenharLista(); } })
+            .catch((e) => { if (minha === carga) mount(itensEl, UI.ErrorState(e.friendly)); });
+        }
+        moedaBtn.addEventListener("click", () => ZoZo.menu.abrir(moedaBtn, outras.map((m) => ({
+          label: m.nome + " (" + m.simbolo + ")", check: m.codigo === outra.codigo,
+          onClick: () => { if (m.codigo !== outra.codigo) { outra = m; recarregar(); } },
+        })), { posicao: "acima", checkEsquerda: true, label: "Outra moeda", largura: 200 }));
+        busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenharLista(); });
+        recarregar();
+
+        return {
+          titulo: "Transferir entre moedas",
+          corpo: h("div", { class: "zm__pick" },
+            descricao,
+            h("p", { class: "aviso-laranja", role: "note" }, ZoZo.icons.icon("alerta", { size: 14 }), "O valor numérico não será convertido, apenas a moeda será alterada."),
+            alternar,
+            h("div", { class: "zm__search" }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
+          rodapeEsquerda: moedaBtn,
+          botoes: [
+            { label: "Cancelar", onClick: () => api.fechar() },
+            { label: "Transferir", primario: true, desabilitado: true, ref: (b) => { botao = b; contar(); }, onClick: (btn) => {
+              btn.disabled = true;
+              ctx.bridge.request(A.transferirMoeda, { ids: Array.from(marcadas), destino: destino().codigo }).then(() => {
+                api.fechar();
+                return ctx.recarregarTudo();
+              }).catch((e) => { btn.disabled = false; ctx.toast(e.friendly, { tone: "error" }); });
+            } },
+          ],
+        };
+      },
+    });
   }
   const disponivelTransferir = () => ligado() && ZoZo.recursos.cambio();
 

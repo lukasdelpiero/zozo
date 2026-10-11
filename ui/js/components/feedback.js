@@ -12,9 +12,12 @@
     const o = opts || {};
     const root = document.getElementById("toast-root");
     if (!root) return;
-    const tone = o.tone || "default"; // default | success | error
+    const tone = o.tone || "default"; // default | success | aviso | error
+    // Confirmações de ação ("Transação criada.", "Salvo"…) não aparecem: a própria tela já mostra o resultado.
+    // Só erros e avisos que explicam por que algo NÃO aconteceu.
+    if (tone !== "error" && tone !== "aviso") return;
     const el = h("div", { class: ["toast", "toast--" + tone], role: tone === "error" ? "alert" : "status" },
-      icon(tone === "error" ? "alerta" : "check", { size: 16, class: "toast__icon" }),
+      icon(tone === "error" || tone === "aviso" ? "alerta" : "check", { size: 16, class: "toast__icon" }),
       h("span", { class: "toast__text" }, mensagem));
     root.appendChild(el);
     requestAnimationFrame(() => el.classList.add("is-visible"));

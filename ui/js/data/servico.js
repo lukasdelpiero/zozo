@@ -265,10 +265,17 @@
     if (anterior === null || anterior === undefined || anterior === 0) return 0;
     return r2(((atual - anterior) / Math.abs(anterior)) * 100);
   }
+  /** Fechamento e vencimento de um cartão num mês: o do mês (se definido só para ele) ou o de todos os meses */
+  function cicloDoCartao(c, mes) {
+    const m = c.ciclos && c.ciclos[mes];
+    return m ? { fechamento: m.fechamento, vencimento: m.vencimento, soEsteMes: true }
+      : { fechamento: c.fechamento || null, vencimento: c.vencimento || null, soEsteMes: false };
+  }
   function contaPublica(c) {
     return {
       id: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", tipo: c.tipo, tipoInvestimento: c.tipoInvestimento || "", oculta: !!c.oculta,
       cor: c.cor, instituicao: c.instituicao || "", limite: c.limite || null, fechamento: c.fechamento || null, vencimento: c.vencimento || null,
+      ciclos: c.tipo === "cartao" && c.ciclos ? Object.assign({}, c.ciclos) : {}, cicloAtual: c.tipo === "cartao" ? cicloDoCartao(c, mesAtual()) : null,
       valor: saldoAtual(c), variacaoPercentual: variacao(saldoAtual(c), saldoEm(c, fimMesAnterior())),
     };
   }
@@ -945,9 +952,10 @@
     [A.dividirLancamento]: (d) => {
       exigir(avancado());                                                     // divisão é entre perfis
       const base = doc.lancamentos.find((l) => l.id === d.id);
-      // Recorrente: só a ORIGEM da série pode ser dividida (cada parte passa a ser uma série com o seu perfil)
-      if (!base || (base.tipo === "recorrente" && !ehOrigem(base))) throw erro("SPLIT_INVALID");
-      const recorrente = base.tipo === "recorrente";
+      // Recorrente: a ORIGEM da série vira uma série por parte (cada uma com o seu perfil). Uma OCORRÊNCIA já
+      // lançada (membro da série) divide só aquele mês: todas as partes continuam na mesma série e competência.
+      if (!base) throw erro("SPLIT_INVALID");
+      const recorrente = base.tipo === "recorrente" && ehOrigem(base);
       const membros = base.divisao ? doc.lancamentos.filter((l) => l.divisao && l.divisao.id === base.divisao.id) : [base];
       const total = base.divisao ? base.divisao.total : base.valor;
       const partes = Array.isArray(d.partes) ? d.partes : [];
@@ -1010,6 +1018,25 @@
       registrarSaldo(c, e.saldo);
       doc.contas.push(c);
       contarDemo(tipoDemo);
+      return { conta: contaPublica(c) };
+    },
+    /**
+     * Cartão de crédito: fechamento E vencimento juntos (nunca só um), para todos os meses ("fixo") ou só para
+     * um mês ("mes"). "Todos os meses" substitui também as exceções por mês.
+     */
+    [A.updateCicloCartao]: (d) => {
+      const c = doc.contas.find((x) => x.id === d.id);
+      if (!c || c.tipo !== "cartao") throw erro("OPERATION_FAILED");
+      const dia = (v) => { const n = /^\d{1,2}$/.test(String(v).trim()) ? Number(v) : NaN; return n >= 1 && n <= 31 ? n : null; };
+      const fechamento = dia(d.fechamento), vencimento = dia(d.vencimento);
+      if (!fechamento || !vencimento) throw erro("CARD_CYCLE_INVALID");
+      if (d.modo === "mes") {
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(d.mes || "")) throw erro("CARD_CYCLE_INVALID");
+        c.ciclos = Object.assign({}, c.ciclos || {}, { [d.mes]: { fechamento, vencimento } });
+      } else {
+        c.fechamento = fechamento; c.vencimento = vencimento;
+        delete c.ciclos;
+      }
       return { conta: contaPublica(c) };
     },
     [A.updateConta]: (d) => {
@@ -1157,12 +1184,14 @@
     [A.updateLancamentosEmLote]: (d) => {
       const ids = Array.isArray(d.ids) ? d.ids : [];
       if (!ids.length) throw erro("OPERATION_FAILED");
-      const tipo = d.tipo !== undefined ? (["regular", "interno", "receita", "estorno"].includes(d.tipo) ? d.tipo : null) : undefined;
+      const tipo = d.tipo !== undefined ? (["regular", "interno", "receita", "estorno", "debito"].includes(d.tipo) ? d.tipo : null) : undefined;
       let categoriaId;
       if (d.categoriaId !== undefined) categoriaId = existe(doc.categorias, d.categoriaId);
       if (d.tipo !== undefined && !tipo) throw erro("OPERATION_FAILED");
       let perfilId;
       if (d.perfilId !== undefined) { exigir(avancado()); perfilId = d.perfilId ? perfilPermitido(d.perfilId, null) : null; }
+      // Débito sai de uma conta: nenhuma das escolhidas pode estar num cartão (ou sem conta)
+      if (tipo === "debito" && doc.lancamentos.some((l) => ids.includes(l.id) && !doc.contas.some((c) => c.id === l.contaId && c.tipo !== "cartao"))) throw erro("DEBIT_ACCOUNT");
       let n = 0;
       doc.lancamentos.forEach((l) => {
         if (!ids.includes(l.id)) return;
@@ -1218,7 +1247,7 @@
       else if (d.pix && typeof d.pix === "object") {
         const chave = ZoZo.pix.normalizarChave(d.pix.chave);
         const nome = texto(d.pix.nome, 25), cidade = texto(d.pix.cidade, 15);
-        if (!chave || !nome || !cidade) throw erro("PIX_INVALID");
+        if (!chave || !ZoZo.pix.nomeValido(nome) || !cidade) throw erro("PIX_INVALID");      // nome: só letras
         doc.config.pix = { chave, nome, cidade };
       }
       return { foto: doc.config.foto || null, orcamentoAtivo: doc.config.orcamentoAtivo !== false, pix: pixLiberado() ? doc.config.pix || null : null,
@@ -1227,7 +1256,9 @@
     /** Leva transações do Real para a moeda atual (o número fica igual: 200,00 R$ → 200,00 €; sem conversão) */
     [A.transferirMoeda]: (d) => {
       exigir(cambioLiberado());
-      const destino = moedaAtual();
+      // destino: a moeda informada (Enviar) ou a escolhida no menu (Importar / 1ª vez numa moeda)
+      if (d.destino !== undefined && !MOEDAS.includes(d.destino)) throw erro("OPERATION_FAILED");
+      const destino = d.destino || moedaAtual();
       const ids = new Set(Array.isArray(d.ids) ? d.ids.slice(0, 5000) : []);
       if (!doc.config.multicambio || !ids.size) throw erro("OPERATION_FAILED");     // destino: a moeda escolhida (inclusive o Real)
       // Unidade indivisível: a série inteira (parcelas/recorrência) E a divisão inteira, de forma TRANSITIVA

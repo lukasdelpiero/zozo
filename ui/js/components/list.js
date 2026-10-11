@@ -46,11 +46,15 @@
       h("span", { class: "launch-row__desc" },
         // data primeiro (largura fixa) para os nomes alinharem com ou sem a letra T/R/I/P
         o.mostrarData || compacto || resumo ? h("span", { class: "launch-row__date" }, F.dataCurta(l.data)) : null,
-        marca && !compacto && !resumo ? h("span", { class: "kind-badge", title: marcaTitulo, "aria-label": marcaTitulo }, marca) : null,
+        // letra (R/P/T/I/D) ou um espaço do mesmo tamanho: os nomes ficam todos alinhados
+        compacto || resumo ? null : marca ? h("span", { class: "kind-badge", title: marcaTitulo, "aria-label": marcaTitulo }, marca)
+          : h("span", { class: "kind-badge kind-badge--vazio", "aria-hidden": "true" }),
         h("span", { class: "launch-row__title" }, l.descricao),
         l.parcelaTotal ? h("span", { class: "launch-row__parcel", title: "Parcela " + l.parcelaAtual + " de " + l.parcelaTotal }, l.parcelaAtual + "/" + l.parcelaTotal) : null,
-        l.nomeConta && !compacto && !resumo ? h("span", { class: "launch-row__account" }, l.nomeConta) : null,
-        l.ultimos4Digitos && !compacto && !resumo ? h("span", { class: "launch-row__digits" }, l.ultimos4Digitos) : null),
+        // conta e 4 dígitos juntos ("Itaú 4821"): o nome encurta com "…" se faltar espaço
+        (l.nomeConta || l.ultimos4Digitos) && !compacto && !resumo ? h("span", { class: "launch-row__conta" },
+          l.nomeConta ? h("span", { class: "launch-row__account" }, l.nomeConta) : null,
+          l.ultimos4Digitos ? h("span", { class: "launch-row__digits" }, l.ultimos4Digitos) : null) : null),
       compacto ? null : h("span", { class: "launch-row__category" }, UI.CategoryLabel(l.categoria, { pill: true })),
       compacto || !comPerfil ? null : h("span", { class: "launch-row__profile" }, UI.Tag(l.perfil && l.perfil.nome, l.perfil && l.perfil.cor, { class: "tag--upper" })),
       h("span", { class: ["launch-row__value", "money", verde && "money--income"] }, F.moeda(l.valor)));
@@ -127,9 +131,7 @@
   /* ---------- Alocação (seção 25) ---------- */
   function AllocationRow(a) {
     return h("div", { class: "row allocation-row" },
-      h("span", { class: "allocation-row__lead" },
-        h("span", { class: "allocation-row__icon", "aria-hidden": "true" }, a.icone || "•"),
-        h("span", null, a.tipoInvestimento)),
+      h("span", { class: "allocation-row__lead" }, h("span", null, a.tipoInvestimento)),
       h("span", { class: "allocation-row__bar" }, UI.ProgressBar(F.numero(a.percentual) / 100, { tone: "allocation", label: a.tipoInvestimento })),
       h("span", { class: "allocation-row__pct" }, F.percentual(a.percentual)));
   }
