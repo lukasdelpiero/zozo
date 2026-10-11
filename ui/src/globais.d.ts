@@ -24,6 +24,64 @@ declare global {
     id(prefixo?: string): string;
   }
 
+  /** js/core/state.ts — estado central (os dados de cada tela ainda são `any`: vêm de módulos em JS) */
+  type RecursoConta = "perfis" | "boleto" | "pix" | "cambio";
+  interface UsuarioSessao {
+    nomeUsuario?: string;
+    email?: string;
+    doisFatores?: boolean;
+    demo?: boolean;
+    recursos?: Partial<Record<RecursoConta, boolean>>;
+  }
+  interface SessaoEstado {
+    status: "loading" | "login" | "register" | "2fa" | "authenticated";
+    authenticated: boolean;
+    user: UsuarioSessao | null;
+    storageAvailable: boolean | null;
+  }
+  interface EstadoUi {
+    filtros: Record<string, unknown> | null;
+    selecionados: string[];
+    invExcluidas: string[];
+    busca: string;
+    intervaloContas: string;
+    intervaloPatrimonio: string;
+    intervaloInvestimentos: string;
+    gruposFechados: Record<string, boolean>;
+    [outro: string]: unknown;
+  }
+  interface EstadoZoZo {
+    session: SessaoEstado;
+    currentPage: string;
+    selectedItem: { tipo: string; id: string } | null;
+    detailPanelOpen: boolean;
+    data: Record<string, any>;
+    loading: Record<string, boolean>;
+    errors: Record<string, string | null>;
+    stale: Record<string, boolean>;
+    ui: EstadoUi;
+  }
+  /** set() mescla o 1º e o 2º nível: { ui: { busca: "x" } } muda só ui.busca */
+  type ParcialEstado = { [K in keyof EstadoZoZo]?: EstadoZoZo[K] extends Record<string, unknown> ? Partial<EstadoZoZo[K]> : EstadoZoZo[K] };
+  type OuvinteEstado = (atual: EstadoZoZo, anterior: EstadoZoZo) => void;
+  interface ZoZoStore {
+    get(): EstadoZoZo;
+    set(patch: ParcialEstado | ((s: EstadoZoZo) => ParcialEstado | null | undefined)): void;
+    subscribe(fn: OuvinteEstado): () => boolean;
+    reset(): void;
+  }
+  interface ZoZoRecursos {
+    perfis(): boolean;
+    boleto(): boolean;
+    pix(): boolean;
+    cambio(): boolean;
+    demo(): boolean;
+  }
+  interface ZoZoLog {
+    info(...a: unknown[]): void;
+    error(...a: unknown[]): void;
+  }
+
   /** js/core/format.ts */
   interface ZoZoFormat {
     MESES: string[];
@@ -69,6 +127,9 @@ declare global {
 
   interface ZoZoGlobal {
     dom: ZoZoDom;
+    store: ZoZoStore;
+    recursos: ZoZoRecursos;
+    log: ZoZoLog;
     format: ZoZoFormat;
     pix: ZoZoPix;
     // módulos ainda em JavaScript

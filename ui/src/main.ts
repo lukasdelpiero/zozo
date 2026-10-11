@@ -13,7 +13,7 @@ import "./estilos.css";
 import "../js/core/dom.ts";
 import "../js/core/icons.js";
 import "../js/core/format.ts";
-import "../js/core/state.js";
+import "../js/core/state.ts";
 import "../js/config/regras.js";
 
 // Bridge: contrato de mensagens

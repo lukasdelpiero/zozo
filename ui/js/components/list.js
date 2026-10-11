@@ -36,6 +36,8 @@
      Visual em Tailwind (tw:). Duas variantes: "pagina" (Transações: de ponta a ponta, com caixa de
      seleção, letra do tipo e conta) e "resumo" (Dashboard: com a data, sem caixa, letra e conta).
      As colunas saem conforme a largura da ÁREA (tw:area620 etc.: container queries), não da tela.
+     A caixa de seleção NÃO fica dentro do <button> da linha (controle dentro de controle é HTML
+     inválido e some para leitores de tela): ela vem antes, sobreposta à 1ª coluna, que fica vazia.
      launch-row e launch-row__* são só ganchos (JS/testes), sem CSS. */
   const NUMEROS = "tw:[font-variant-numeric:lining-nums_proportional-nums]";
   const LR = {
@@ -63,11 +65,12 @@
     },
     // fundo conforme o estado: normal (realce ao passar o mouse), clicada (fina linha roxa junto ao menu),
     // marcada (roxo claro) e marcada + clicada
-    normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
+    normal: "tw:bg-transparent tw:group-hover/linha:bg-zz-surface-hover",
     clicada: "tw:bg-zz-surface-hover tw:shadow-[inset_3px_0_0_var(--color-primary)]",
     marcada: "tw:bg-zz-primary-soft",
     marcadaClicada: "tw:bg-zz-primary-soft tw:shadow-[inset_3px_0_0_var(--color-primary)]",
-    caixa: "tw:[transition:opacity_var(--duration-fast)]",
+    // caixa sobre a 1ª coluna (18 px), centrada na altura da linha
+    caixa: "tw:absolute tw:left-0 tw:inset-y-0 tw:w-[18px] tw:flex tw:items-center tw:[transition:opacity_var(--duration-fast)]",
     caixaApagada: "tw:opacity-55 tw:group-hover/linha:opacity-100 tw:focus-within:opacity-100",
     desc: "tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     data: "tw:flex-none tw:w-[52px] tw:text-zz-secondary " + NUMEROS,
@@ -92,14 +95,14 @@
     const V = resumo ? LR.resumo : LR.pagina;
     const comPerfil = ZoZo.recursos.perfis();          // pílula de perfil só para contas com o recurso
     const estado = o.marcado ? (o.selected ? LR.marcadaClicada : LR.marcada) : o.selected ? LR.clicada : LR.normal;
-    return h(o.onClick ? "button" : "div", {
+    const linha = h(o.onClick ? "button" : "div", {
       type: o.onClick ? "button" : undefined,
       class: ["launch-row", LR.base, V.linha, comPerfil ? V.grade : V.gradeSemPerfil, estado, o.onClick && LR.interativa],
       onClick: o.onClick,
       "aria-current": o.selected ? "true" : undefined,
       "data-id": l.id,
     },
-      resumo ? null : (o.onMarcar ? UI.Checkbox(o.marcado, o.onMarcar, { label: "Selecionar " + l.descricao, class: [LR.caixa, o.marcado ? "tw:opacity-100" : LR.caixaApagada].join(" ") }) : h("span")),
+      resumo ? null : h("span", { "aria-hidden": "true" }),             // coluna da caixa de seleção
       h("span", { class: ["launch-row__desc", LR.desc] },
         // data primeiro (largura fixa) para os nomes alinharem com ou sem a letra T/R/I/P
         o.mostrarData || resumo ? h("span", { class: [LR.data, V.data] }, F.dataCurta(l.data)) : null,
@@ -114,6 +117,10 @@
       h("span", { class: ["launch-row__category", LR.etiqueta, V.categoria] }, UI.CategoryLabel(l.categoria, { pill: true })),
       comPerfil ? h("span", { class: ["launch-row__profile", LR.etiqueta, V.perfil] }, UI.Tag(l.perfil && l.perfil.nome, l.perfil && l.perfil.cor, { class: "tag--upper" })) : null,
       h("span", { class: ["launch-row__value", "money", verde && "money--income", LR.valor] }, F.moeda(l.valor)));
+    if (resumo || !o.onMarcar) return linha;
+    // caixa + linha num envoltório: passar o mouse em qualquer parte realça a linha e mostra a caixa
+    const caixa = UI.Checkbox(o.marcado, o.onMarcar, { label: "Selecionar " + l.descricao, class: [LR.caixa, o.marcado ? "tw:opacity-100" : LR.caixaApagada].join(" ") });
+    return h("div", { class: "tw:relative tw:flex tw:flex-col tw:group/linha", "data-linha": "" }, caixa, linha);
   }
 
   /* ---------- Conta (seções 19–22, 24) ---------- */
@@ -151,18 +158,22 @@
 
   function CategoryGroupRow(grupo, opts) {
     const o = opts || {};
-    // A linha do grupo abre o painel do grupo (orçamento "não atribuído", desagrupar); a seta só abre/fecha
-    const abrir = (e) => { if (o.onClick && !e.target.closest(".category-row__caret")) o.onClick(); };
+    // A linha do grupo abre o painel do grupo (orçamento "não atribuído", desagrupar); a seta só abre/fecha.
+    // Teclado e leitor de tela: o NOME é o botão que abre o painel e a seta é outro botão, lado a lado
+    // (antes a linha inteira era role="button" com a seta dentro: controle dentro de controle, inacessível).
+    const abrir = (e) => { if (o.onClick && !e.target.closest(".category-row__caret, .category-row__group-name")) o.onClick(); };
+    const nome = o.onClick
+      ? h("button", { type: "button", class: "category-row__group-name tw:min-w-0 tw:p-0 tw:[border:0] tw:bg-transparent tw:text-inherit tw:text-left tw:cursor-pointer",
+        "aria-current": o.selected ? "true" : undefined, onClick: (e) => { e.stopPropagation(); o.onClick(); } }, grupo.nome)
+      : h("span", { class: "category-row__group-name" }, grupo.nome);
     return h("div", { class: ["row", "category-row", "category-row--group", o.excluida && "category-row--excluded", o.onClick && "row--interactive", o.selected && "is-selected"],
-      role: o.onClick ? "button" : undefined, tabindex: o.onClick ? "0" : undefined, "aria-current": o.selected ? "true" : undefined,
-      "aria-label": o.onClick ? "Grupo " + grupo.nome : undefined,
-      onClick: abrir, onKeydown: (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); abrir(e); } } },
+      onClick: abrir },
       h("span", { class: "category-row__lead" },
         h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(!o.fechado), "aria-label": (o.fechado ? "Mostrar" : "Ocultar") + " categorias de " + grupo.nome,
           onClick: (e) => { e.stopPropagation(); o.onToggle(); } },
           icon(o.fechado ? "chevron-right" : "chevron-down", { size: 14, stroke: 2.25 })),
         h("span", { class: "category-row__count" }, String(grupo.quantidade)),
-        h("span", { class: "category-row__group-name" }, grupo.nome)),
+        nome),
       h("span", { class: "category-row__spent money" }, F.moeda(grupo.gasto)),
       o.excluida ? null : h("span", { class: "category-row__bar" }, barraCategoria(grupo.gasto, grupo.reservado)),
       o.excluida ? null : h("span", { class: "category-row__reserved money" }, F.moeda(grupo.reservado)));
