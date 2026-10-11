@@ -10,7 +10,8 @@
    • Cores e medidas vêm dos tokens do ZoZo (css/tokens.css), não da
      paleta padrão do Tailwind: tw:bg-zz-primary, tw:text-zz-secondary…
    • Telas já migradas: Configurações › Sobre; Login/Cadastro/2FA/
-     confirmação de e-mail (components/auth.js).
+     confirmação de e-mail (components/auth.js); Transações
+     (pages/lancamentos.js) e a linha de transação (components/list.js).
    • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
      "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
    • Cuidado ao migrar: utilitário vence o legado também em :focus,
@@ -42,7 +43,9 @@
   --color-zz-secondary: var(--color-text-secondary);
   --color-zz-muted: var(--color-text-muted);
   --color-zz-positive: var(--color-positive);
+  --color-zz-primary-soft: var(--color-primary-soft);
   --color-zz-primary-softer: var(--color-primary-softer);
+  --color-zz-border-strong: var(--color-border-strong);
   --color-zz-warning-soft: var(--color-warning-soft);
   --color-zz-warning-text: var(--color-warning-text);
   --radius-zz-sm: var(--radius-small);
@@ -53,6 +56,14 @@
 /* Telas do ZoZo: celular (≤ 640 px) e janela baixa no computador — mesmos cortes do CSS legado */
 @custom-variant celular (@media (max-width: 640px));
 @custom-variant tela-baixa (@media (max-height: 640px) and (min-width: 641px));
+/* Menu lateral vira gaveta (≤ 600 px) */
+@custom-variant gaveta (@media (max-width: 600px));
+/* Largura da ÁREA (não da tela): .main, .detail__body e .dash-area são containers. Ex.: com o painel
+   aberto a lista fica estreita mesmo num monitor grande — as colunas saem conforme o espaço real. */
+@custom-variant area620 (@container (max-width: 620px));
+@custom-variant area460 (@container (max-width: 460px));
+@custom-variant area420 (@container (max-width: 420px));
+@custom-variant area340 (@container (max-width: 340px));
 
 /* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás).
    Os atrasos (40/70 ms) fazem o conteúdo entrar em sequência. */
@@ -69,4 +80,14 @@
   @keyframes zz-auth-logo { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
   @keyframes zz-auth-frente { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
   @keyframes zz-auth-tras { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+
+  /* Transações: barra de seleção sobe; a lista entra suave quando a pesquisa muda (meses em sequência) */
+  --animate-zz-selbar: zz-selbar 280ms var(--easing) both;
+  --animate-zz-busca: zz-busca 220ms var(--easing) both;
+  --animate-zz-busca-30: zz-busca 220ms var(--easing) 30ms both;
+  --animate-zz-busca-60: zz-busca 220ms var(--easing) 60ms both;
+  --animate-zz-chips: zz-chips 280ms var(--easing);
+  @keyframes zz-selbar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-busca { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-chips { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 }

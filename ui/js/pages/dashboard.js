@@ -152,7 +152,7 @@
       const ultimos = d.ultimosLancamentos || [];
       const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"),
         ultimos.length
-          ? h("div", { class: "list list--flush" }, ultimos.map((l) => L.LaunchRow(l, { class: "launch-row--resumo", resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
+          ? h("div", { class: "list list--flush" }, ultimos.map((l) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
           : UI.EmptyState("Nenhuma transação cadastrada."));
 
       // Grade: [Gasto mensal | Patrimônio] com a mesma altura; Recentes e Top categorias começam na mesma linha

@@ -28,8 +28,14 @@
       const entradaAgora = entrada;
       entrada = false;
       ZoZo.charts.permitirAnimacao = animar;          // gráficos só animam ao entrar na página
+      // redesenho logo após entrar com gráfico já na tela: os gráficos novos continuam a animação em curso
+      // (só a desta entrada: ao entrar na página o início anterior é esquecido)
+      if (entradaAgora) ZoZo.charts.ultimoInicio = null;
+      const tinhaGrafico = !entradaAgora && !!mainEl.querySelector(".line-chart__svg, .donut");
+      ZoZo.charts.continuarDe = animar && tinhaGrafico ? ZoZo.charts.ultimoInicio : null;
       const conteudo = page.render(state, ctx);
       ZoZo.charts.permitirAnimacao = true;
+      ZoZo.charts.continuarDe = null;
       if (animar && conteudo.classList) {
         conteudo.classList.add("page--entrar");
         if (!entradaAgora && desdeEntrada < 800) {

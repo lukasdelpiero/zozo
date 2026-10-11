@@ -32,9 +32,8 @@
 .dash-area--patrimonio .summary__value, .dash-area--patrimonio .chart-card__value { font-size: var(--t-15); font-weight: 550; }
 .pct, .pct__value { font-size: var(--t-13); font-weight: 550; }
 .filter-tabs__item { font-size: var(--t-13); font-weight: 620; }
-.dash-area--recentes .launch-row__date, .dash-area--recentes .launch-row__title,
 .dash-area--proximos .recurrence-row__date, .dash-area--proximos .recurrence-row__title { font-size: var(--t-15); font-weight: 450; }
-.dash-area--recentes .launch-row__value, .dash-area--proximos .recurrence-row__value { font-size: var(--t-15); font-weight: 620; }
+.dash-area--proximos .recurrence-row__value { font-size: var(--t-15); font-weight: 620; }
 
 /* Top categorias: [bolinha|seta] [ícone|quantidade] nome ...... gasto  reservado */
 .top-cats { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--space-5)); }
@@ -55,14 +54,8 @@
 .top-cat--child .top-cat__icon { margin-left: 18px; }
 .top-cat--child .top-cat__name { padding-left: 18px; }
 
-/* ================= Lançamentos ================= */
-.day-group__title { font-size: var(--t-13); font-weight: 620; }
-.month-group__title, .month-group__total { font-size: var(--t-20); font-weight: 620; }
-.launch-row__title { font-size: var(--t-15); font-weight: 450; }
-.launch-row .cat-pill, .launch-row .tag--upper, .recurrence-row .cat-pill { font-size: var(--t-11); font-weight: 620; }
-.launch-row__value { font-size: var(--t-15); font-weight: 620; }
-/* Ordenado por valor: data com largura fixa antes da letra e do nome */
-.launch-row__date { flex: none; width: 52px; color: var(--color-text-secondary); }
+/* ================= Recorrências ================= */
+.recurrence-row .cat-pill { font-size: var(--t-11); font-weight: 620; }
 
 /* ================= Contas e Investimentos ================= */
 .section__title { font-size: var(--t-15); font-weight: 620; }
@@ -196,11 +189,11 @@
 :root { --gap-lista: calc(0.25rem * 4); }   /* 1rem */
 
 /* Data → primeiro lançamento do dia */
-.day-group__title, .pl-day { padding: 12px 0 0; margin: 0 0 var(--gap-lista); line-height: 1.2; }
+.pl-day { padding: 12px 0 0; margin: 0 0 var(--gap-lista); line-height: 1.2; }
 /* Último lançamento → início do mês seguinte */
-.month-group + .month-group, .pl-month + .pl-month { margin-top: var(--gap-lista); }
+.pl-month + .pl-month { margin-top: var(--gap-lista); }
 /* Cabeçalho do mês igual nos dois lugares */
-.month-group__head, .pl-month__head { padding: var(--space-2) 0 0; }
+.pl-month__head { padding: var(--space-2) 0 0; }
 .pl-month__title, .pl-month__total { font-size: var(--t-20); font-weight: 620; }
 .pl-month__total .money { font-weight: 620; }
 /* Linhas com a mesma altura */
@@ -212,11 +205,11 @@
 :root { --radius-small: 8px; --radius-medium: 12px; --radius-large: 20px; }
 /* linhas, botões, selecionados e destaques: 8px
    (exceto lançamentos da página Lançamentos e das listas do painel, que vão de borda a borda) */
-.row, .btn, .icon-btn, .nav-item, .filter-tabs__item, .segmented__item, .selbar__btn,
+.row, .btn, .icon-btn, .nav-item, .filter-tabs__item, .segmented__item,
 .lp-date, .lp-account, .lp-sub, .inline-input, .lp-name, .lp-value, .lp-notes,
 .topbar-search, .topbar-search__filter, .detail__textbtn, .tipo-select, .menu-toggle,
 .cfg-danger-btn, .orc-mode, .icon-pick, .input, .select, .textarea, .zm__search { border-radius: 8px; }
-.page--lancamentos .launch-row, .pl-row { border-radius: 0; }
+.pl-row { border-radius: 0; }
 .card, .chart-card, .summary-card { border-radius: 20px; }              /* cards da área principal */
 .menu { border-radius: 12px; }                                          /* menus e submenus */
 .modal { border-radius: 16px; }                                         /* janelas modais */
@@ -413,18 +406,12 @@
    O nome tem prioridade; etiquetas e colunas secundárias encolhem e saem antes dele. */
 .dash-area .recurrence-row.recurrence-row--compact { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) auto; }
 .dash-area .recurrence-row--compact .recurrence-row__category { min-width: 0; max-width: 140px; }
-.dash-area .launch-row--resumo .launch-row__profile { max-width: 140px; }
 @container (max-width: 460px) {
-  .dash-area .launch-row.launch-row--resumo { grid-template-columns: minmax(0, 1fr) minmax(0, max-content) auto; }
-  .dash-area .launch-row--resumo .launch-row__profile { display: none; }
-  .dash-area .launch-row--resumo .launch-row__category { max-width: 96px; }
   .dash-area .top-cat { grid-template-columns: 16px 26px minmax(0, 1fr) auto auto; }
   .dash-area .recurrence-row.recurrence-row--compact { grid-template-columns: 48px minmax(0, 1fr) minmax(0, max-content) auto; }
   .dash-area .recurrence-row--compact .recurrence-row__category { max-width: 104px; }
 }
 @container (max-width: 340px) {
-  .dash-area .launch-row.launch-row--resumo { grid-template-columns: minmax(0, 1fr) auto; }
-  .dash-area .launch-row--resumo .launch-row__category { display: none; }
   .dash-area .top-cat { grid-template-columns: 16px 26px minmax(0, 1fr) auto; }
   .dash-area .top-cat__reserved { display: none; }
   .dash-area .recurrence-row.recurrence-row--compact { grid-template-columns: 48px minmax(0, 1fr) auto; }
@@ -442,15 +429,11 @@
 .ph__top > .status-chip { flex: none; }
 
 /* Listas: etiquetas de categoria/perfil têm largura máxima — o nome do lançamento nunca é espremido até sumir */
-.launch-row__category, .launch-row__profile, .recurrence-row__category { max-width: 180px; }
-.launch-row__category > *, .launch-row__profile > *, .recurrence-row__category > * { min-width: 0; max-width: 100%; }
+.recurrence-row__category { max-width: 180px; }
+.recurrence-row__category > * { min-width: 0; max-width: 100%; }
 /* Nome editável no painel: "…" quando não está em edição */
 .lp-name, .ph__name, .inline-input { text-overflow: ellipsis; }
 
-/* Linhas com nome + conta: o nome tem prioridade, a conta encolhe primeiro (com "…") */
-.launch-row__desc > .launch-row__title { flex: 0 1 auto; min-width: 3em; }
-.launch-row__conta { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 8 auto; min-width: 0; overflow: hidden; }
-.launch-row__conta .launch-row__account { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
 .recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
 .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(0, max-content) 120px; }
@@ -459,9 +442,6 @@
 /* Área estreita (≤ 620px). As regras equivalentes em components.css nunca valiam: pages.css e este
    arquivo carregam depois e redefiniam as grades com a mesma especificidade. Por isso ficam aqui, no fim. */
 @container (max-width: 620px) {
-  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) { grid-template-columns: 18px minmax(0, 1fr) minmax(0, max-content) 96px; }
-  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) .launch-row__category { display: none; }
-  .launch-row__profile { max-width: 110px; }
   .recurrence-row:not(.recurrence-row--compact), .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 52px minmax(0, 1fr) 110px; }
   .recurrence-row:not(.recurrence-row--compact) .recurrence-row__category { display: none; }
   .category-row { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -472,10 +452,6 @@
   .account-row__value { grid-column: 3; grid-row: 1; }
   .account-row__pct { grid-column: 3; grid-row: 2; }
 }
-@container (max-width: 420px) {
-  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) { grid-template-columns: 18px minmax(0, 1fr) 96px; }
-  .launch-row:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) .launch-row__profile { display: none; }
-}
 
 /* Telas pequenas: o painel escondido fora da tela e a busca larga não podem alargar a página */
 .workspace { overflow-x: clip; }
@@ -485,10 +461,6 @@
   .topbar-search--larga { width: auto; flex: 1 1 auto; }
   .topbar__actions { flex: 1 1 auto; }
   .topbar__actions .topbar-search__input { min-width: 0; width: 100%; }
-}
-/* Lista muito estreita: conta e dígitos saem e o nome do lançamento fica com o espaço */
-@container (max-width: 420px) {
-  .launch-row__desc > .launch-row__conta { display: none; }
 }
 @container (max-width: 420px) {
   .recurrence-row__desc > .recurrence-row__type { display: none; }
@@ -661,15 +633,6 @@
 }
 @media (prefers-reduced-motion: reduce) { .menu-toggle { transition: none; } }
 
-/* ---------- Contas sem o recurso de Perfis: a linha do lançamento não tem a coluna do perfil ---------- */
-.launch-row.launch-row--sem-perfil:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) {
-  grid-template-columns: 18px minmax(0, 1fr) minmax(0, max-content) 112px;
-}
-.launch-row--sem-perfil.launch-row--resumo { grid-template-columns: minmax(110px, 1fr) minmax(0, max-content) auto; }
-@container (max-width: 620px) {
-  .launch-row.launch-row--sem-perfil:not(.launch-row--resumo):not(.launch-row--compact):not(.launch-row--painel) { grid-template-columns: 18px minmax(0, 1fr) 96px; }
-}
-
 /* ---------- Perfis: linha igual à de Contas, com ícone redondo na cor do perfil e a inicial ---------- */
 .profile-row { grid-template-columns: 36px minmax(0, 1fr) auto; min-height: var(--row-height-tall); column-gap: var(--space-3); }
 .profile-avatar { font-size: var(--t-15); font-weight: 620; line-height: 1; text-transform: uppercase; user-select: none; }
@@ -798,12 +761,6 @@
   .modal, .modal--nova-conta, .modal--nova-categoria, .modal--novo-perfil { width: 100%; max-width: 100%; }
   .modal__footer, .zm__footer { justify-content: center; flex-wrap: wrap; }
   .modal__footer > .btn { flex: 1 1 0; min-width: 0; max-width: 220px; }
-
-  /* Barra de seleção (checkbox): só ícones, tudo alinhado numa linha */
-  .selbar { width: auto; max-width: calc(100% - 8px); margin-left: auto; margin-right: auto; flex-wrap: nowrap; justify-content: center; }
-  .selbar__btn { width: 34px; height: 34px; padding: 0; justify-content: center; flex: none; }
-  .selbar__txt { display: none; }
-  .selbar__count { padding: 0 6px; }
 }
 
 /* =============================================================
@@ -909,12 +866,6 @@
   .grupo-orc__item { justify-items: start; }
 }
 
-/* Barra de seleção: sempre presa ao rodapé da área de trabalho (mesmo com poucas transações) */
-.page--lancamentos { min-height: 100%; display: flex; flex-direction: column; }
-.page--lancamentos > * { flex-shrink: 0; }
-.page--lancamentos > .selbar { position: sticky; bottom: var(--space-5); margin-top: auto; align-self: center; }
-.page--lancamentos > :has(+ .selbar) { margin-bottom: var(--space-5); }
-
 /* =============================================================
    ZoZo 2.7
    ============================================================= */
@@ -978,13 +929,6 @@
 .cal-campo { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; }
 .cal-campo .icon { color: var(--color-text-secondary); flex: none; }
 
-/* Transações: a lista entra suave quando a pesquisa muda */
-.lanc--busca .month-group, .lanc--busca .empty { animation: busca-in 220ms var(--easing) both; }
-.lanc--busca .month-group:nth-of-type(2) { animation-delay: 30ms; }
-.lanc--busca .month-group:nth-of-type(n+3) { animation-delay: 60ms; }
-@keyframes busca-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .lanc--busca .month-group, .lanc--busca .empty { animation: none; } }
-
 /* Barra de rolagem do menu lateral: trilho na cor do menu (o polegar continua o do sistema, claro) */
 .sidebar, .sidebar * { scrollbar-color: rgba(255, 255, 255, 0.45) var(--sidebar-bg); }
 
@@ -1008,7 +952,9 @@
 .page--entrar .dash-layout > :nth-child(2) { animation-delay: 50ms; }
 .page--entrar .dash-layout > :nth-child(3) { animation-delay: 100ms; }
 .page--entrar .dash-layout > :nth-child(n+4) { animation-delay: 150ms; }
-.page--lancamentos.page--entrar > .selbar { animation: selbar-in var(--duration-medium) var(--easing) both; }
+/* Blocos com gráfico só deslizam (sem esmaecer): o gráfico começa a se desenhar já visível, como antes da 2.8 */
+.page--entrar > :has(.line-chart, .donut), .page--entrar .dash-layout > :has(.line-chart, .donut) { animation-name: bloco-desliza; }
+@keyframes bloco-desliza { from { transform: translateY(10px); } to { transform: none; } }
 @keyframes bloco-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {

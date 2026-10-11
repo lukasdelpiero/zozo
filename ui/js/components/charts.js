@@ -22,10 +22,14 @@
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
   let seq = 0;
 
-  /** Anima de 0 a 1 em "dur" ms chamando passo(p) */
-  function animar(dur, passo) {
+  /**
+   * Anima de 0 a 1 em "dur" ms chamando passo(p), contando a partir de "inicio" (performance.now()).
+   * Começa na hora — como antes da 2.8: o gráfico se desenha enquanto a página entra.
+   */
+  function animar(dur, passo, inicio) {
     if (reduzir()) { passo(1); return; }
-    const ini = performance.now();
+    const ini = inicio || performance.now();
+    ZoZo.charts.ultimoInicio = ini;
     const frame = (agora) => {
       const t = Math.max(0, Math.min(1, (agora - ini) / dur));
       passo(easeOut(t));
@@ -35,19 +39,20 @@
   }
 
   /**
-   * Espera a entrada da página/cartão terminar antes de animar o gráfico: as páginas entram com um
-   * "fade" em sequência e, sem esperar, o gráfico se desenhava enquanto o cartão ainda estava
-   * transparente — parecia não ter animação. Teto de 900 ms (nunca fica preso).
+   * Início da animação de um gráfico novo: null = quando ele começar a se desenhar. Quando a página é
+   * redesenhada logo depois de entrar (chegaram dados novos) e já havia gráfico na tela, o router
+   * informa em continuarDe o início da animação anterior — o gráfico novo CONTINUA de onde o antigo
+   * estava, sem recomeçar do zero.
    */
-  function depoisDaEntrada(el) {
-    const fim = [];
-    for (let e = el; e && e !== document.body; e = e.parentElement) {
-      if (!e.getAnimations) continue;
-      e.getAnimations().forEach((a) => { if (a.playState === "running" || a.playState === "pending") fim.push(a.finished.catch(() => null)); });
-    }
-    return fim.length ? Promise.race([Promise.all(fim), new Promise((r) => setTimeout(r, 900))]) : Promise.resolve();
+  const inicioAnimacao = () => ZoZo.charts.continuarDe || null;
+  /** Ponto da animação em que um gráfico que CONTINUA já nasce desenhado (evita um quadro vazio) */
+  const progressoInicial = (inicio) => (!inicio ? 0 : reduzir() ? 1 : easeOut(Math.max(0, Math.min(1, (performance.now() - inicio) / duracao()))));
+  /** --duration-chart em ms. O build minifica "900ms" para ".9s": ler só o número dava 0,9 ms (animação instantânea) */
+  function duracao() {
+    const v = css("--duration-chart"), n = parseFloat(v);
+    if (!(n > 0)) return 900;
+    return /ms$/i.test(v) ? n : /s$/i.test(v) ? n * 1000 : n;
   }
-  function animarDepoisDaEntrada(el, dur, passo) { depoisDaEntrada(el).then(() => animar(dur, passo)); }
 
   /** Executa fn uma vez quando o elemento estiver conectado e com tamanho */
   function quandoVisivel(el, fn) {
@@ -94,7 +99,8 @@
 
     // Animação de entrada: o progresso sobrevive a redesenhos (ex.: a barra de rolagem aparece e muda a
     // largura no meio da animação) — antes, o redesenho pulava direto para o fim e o gráfico parecia sem animação
-    let svg = null, iniciada = !o.animar, progresso = o.animar ? 0 : 1, clipAtual = null;
+    const inicio = o.animar ? inicioAnimacao() : 0;
+    let svg = null, iniciada = !o.animar, progresso = o.animar ? progressoInicial(inicio) : 1, clipAtual = null;
     function draw() {
       const W = Math.max(160, holder.clientWidth);
       const H = o.height;
@@ -246,7 +252,7 @@
 
       if (!iniciada && holder.isConnected && holder.clientWidth) {
         iniciada = true;
-        animarDepoisDaEntrada(holder, parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; clipAtual.rect.setAttribute("width", clipAtual.W * p); });
+        animar(duracao(), (p) => { progresso = p; clipAtual.rect.setAttribute("width", clipAtual.W * p); }, inicio);
       }
     }
 
@@ -320,7 +326,7 @@
       });
     };
     if (ZoZo.charts.permitirAnimacao === false) pintar(1);
-    else quandoVisivel(container, () => animarDepoisDaEntrada(container, parseFloat(css("--duration-chart")) || 900, pintar));
+    else { const inicio = inicioAnimacao(); pintar(progressoInicial(inicio)); quandoVisivel(container, () => animar(duracao(), pintar, inicio)); }
     return svg;
   }
 
@@ -379,12 +385,14 @@
       pintarAtual(progresso);
       if (!iniciada) {
         iniciada = true;
-        animarDepoisDaEntrada(holder, parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; pintarAtual(p); });
+        animar(duracao(), (p) => { progresso = p; pintarAtual(p); }, inicio);
       }
     }
 
     // Mesmo cuidado do gráfico de linha: um redesenho no meio da animação continua de onde parou
-    let iniciada = ZoZo.charts.permitirAnimacao === false, progresso = iniciada ? 1 : 0, pintarAtual = () => {};
+    let iniciada = ZoZo.charts.permitirAnimacao === false, pintarAtual = () => {};
+    const inicio = iniciada ? 0 : inicioAnimacao();
+    let progresso = iniciada ? 1 : progressoInicial(inicio);
     let conectado = false;
     const ro = new ResizeObserver(() => {
       // saiu da tela depois de ter aparecido (troca de página/painel): para de observar
@@ -397,5 +405,5 @@
     return { destroy() { ro.disconnect(); } };
   }
 
-  ZoZo.charts = { renderLineChart, renderDonutChart, renderBarChart, permitirAnimacao: true };
+  ZoZo.charts = { renderLineChart, renderDonutChart, renderBarChart, permitirAnimacao: true, continuarDe: null, ultimoInicio: null };
 })(window.ZoZo);

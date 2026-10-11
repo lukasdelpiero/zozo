@@ -32,31 +32,88 @@
   }
 
   /* ---------- Lançamento (seção 15) ----------
-     [☐] [R|P] Descrição  conta 1234 ........ [CATEGORIA] [PERFIL]  R$ 0,00 */
+     [☐] [R|P] Descrição  conta 1234 ........ [CATEGORIA] [PERFIL]  R$ 0,00
+     Visual em Tailwind (tw:). Duas variantes: "pagina" (Transações: de ponta a ponta, com caixa de
+     seleção, letra do tipo e conta) e "resumo" (Dashboard: com a data, sem caixa, letra e conta).
+     As colunas saem conforme a largura da ÁREA (tw:area620 etc.: container queries), não da tela.
+     launch-row e launch-row__* são só ganchos (JS/testes), sem CSS. */
+  const NUMEROS = "tw:[font-variant-numeric:lining-nums_proportional-nums]";
+  const LR = {
+    base: "tw:group/linha tw:grid tw:items-center tw:min-h-(--row-height) tw:py-0 tw:[border:0] tw:text-inherit tw:text-left tw:text-[15px] "
+      + "tw:focus-visible:outline-offset-[-2px]",
+    interativa: "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
+    pagina: {
+      linha: "tw:w-auto tw:-mx-(--page-gutter) tw:px-(--page-gutter) tw:gap-3 tw:rounded-none",
+      grade: "tw:grid-cols-[18px_minmax(0,1fr)_minmax(0,max-content)_minmax(84px,max-content)_112px] "
+        + "tw:area620:grid-cols-[18px_minmax(0,1fr)_minmax(0,max-content)_96px] tw:area420:grid-cols-[18px_minmax(0,1fr)_96px]",
+      gradeSemPerfil: "tw:grid-cols-[18px_minmax(0,1fr)_minmax(0,max-content)_112px] tw:area620:grid-cols-[18px_minmax(0,1fr)_96px]",
+      data: "tw:min-w-[46px] tw:text-[13px]",
+      categoria: "tw:overflow-hidden tw:max-w-[180px] tw:area620:hidden",
+      perfil: "tw:max-w-[180px] tw:area620:max-w-[110px] tw:area420:hidden",
+    },
+    resumo: {
+      linha: "tw:w-full tw:px-2 tw:gap-2 tw:rounded-lg",
+      grade: "tw:grid-cols-[minmax(110px,1fr)_minmax(0,max-content)_minmax(0,max-content)_auto] "
+        + "tw:area460:grid-cols-[minmax(0,1fr)_minmax(0,max-content)_auto] tw:area340:grid-cols-[minmax(0,1fr)_auto]",
+      gradeSemPerfil: "tw:grid-cols-[minmax(110px,1fr)_minmax(0,max-content)_auto] "
+        + "tw:area460:grid-cols-[minmax(0,1fr)_minmax(0,max-content)_auto] tw:area340:grid-cols-[minmax(0,1fr)_auto]",
+      data: "tw:min-w-[44px] tw:text-[15px] tw:font-[450]",
+      categoria: "tw:overflow-hidden tw:max-w-[120px] tw:area460:max-w-[96px] tw:area340:hidden",
+      perfil: "tw:max-w-[140px] tw:area460:hidden",
+    },
+    // fundo conforme o estado: normal (realce ao passar o mouse), clicada (fina linha roxa junto ao menu),
+    // marcada (roxo claro) e marcada + clicada
+    normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
+    clicada: "tw:bg-zz-surface-hover tw:shadow-[inset_3px_0_0_var(--color-primary)]",
+    marcada: "tw:bg-zz-primary-soft",
+    marcadaClicada: "tw:bg-zz-primary-soft tw:shadow-[inset_3px_0_0_var(--color-primary)]",
+    caixa: "tw:[transition:opacity_var(--duration-fast)]",
+    caixaApagada: "tw:opacity-55 tw:group-hover/linha:opacity-100 tw:focus-within:opacity-100",
+    desc: "tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
+    data: "tw:flex-none tw:w-[52px] tw:text-zz-secondary " + NUMEROS,
+    letra: "tw:self-center tw:flex-none",
+    titulo: "tw:flex-[0_1_auto] tw:min-w-[3em] tw:overflow-hidden tw:text-ellipsis tw:text-zz-text tw:text-[15px] tw:font-[450]",
+    parcela: "tw:flex-none tw:py-px tw:px-1.5 tw:rounded-md tw:bg-(--color-neutral-soft) tw:text-(--color-neutral) tw:text-[11.5px] tw:font-semibold " + NUMEROS,
+    conta: "tw:inline-flex tw:items-baseline tw:gap-1.5 tw:flex-[0_8_auto] tw:min-w-0 tw:overflow-hidden tw:area420:hidden",
+    contaNome: "tw:flex-none tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:text-zz-muted",
+    contaDigitos: "tw:flex-none tw:text-zz-muted " + NUMEROS,
+    // etiquetas de categoria/perfil têm largura máxima: o nome do lançamento nunca é espremido até sumir
+    etiqueta: "tw:min-w-0 tw:flex tw:justify-end tw:*:min-w-0 tw:*:max-w-full "
+      + "tw:[&_.cat-pill]:text-[11px] tw:[&_.cat-pill]:font-[620] tw:[&_.tag--upper]:text-[11px] tw:[&_.tag--upper]:font-[620]",
+    valor: "tw:[justify-self:end] tw:text-[15px] tw:font-[620]",
+  };
+
   function LaunchRow(l, opts) {
     const o = opts || {};
     const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
     const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
     const marcaTitulo = { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] || "";
-    const compacto = (o.class || "").includes("compact");
     const resumo = !!o.resumo;
+    const V = resumo ? LR.resumo : LR.pagina;
     const comPerfil = ZoZo.recursos.perfis();          // pílula de perfil só para contas com o recurso
-    return rowBase(["launch-row", o.marcado && "is-checked", !comPerfil && "launch-row--sem-perfil"].filter(Boolean).join(" "), Object.assign({ id: l.id }, o),
-      compacto || resumo ? null : (o.onMarcar ? UI.Checkbox(o.marcado, o.onMarcar, { label: "Selecionar " + l.descricao, class: "launch-row__check" }) : h("span")),
-      h("span", { class: "launch-row__desc" },
+    const estado = o.marcado ? (o.selected ? LR.marcadaClicada : LR.marcada) : o.selected ? LR.clicada : LR.normal;
+    return h(o.onClick ? "button" : "div", {
+      type: o.onClick ? "button" : undefined,
+      class: ["launch-row", LR.base, V.linha, comPerfil ? V.grade : V.gradeSemPerfil, estado, o.onClick && LR.interativa],
+      onClick: o.onClick,
+      "aria-current": o.selected ? "true" : undefined,
+      "data-id": l.id,
+    },
+      resumo ? null : (o.onMarcar ? UI.Checkbox(o.marcado, o.onMarcar, { label: "Selecionar " + l.descricao, class: [LR.caixa, o.marcado ? "tw:opacity-100" : LR.caixaApagada].join(" ") }) : h("span")),
+      h("span", { class: ["launch-row__desc", LR.desc] },
         // data primeiro (largura fixa) para os nomes alinharem com ou sem a letra T/R/I/P
-        o.mostrarData || compacto || resumo ? h("span", { class: "launch-row__date" }, F.dataCurta(l.data)) : null,
+        o.mostrarData || resumo ? h("span", { class: [LR.data, V.data] }, F.dataCurta(l.data)) : null,
         // letra (R/P/T/I/D) só quando existe: a Regular começa logo ao lado da caixa de seleção
-        marca && !compacto && !resumo ? h("span", { class: "kind-badge", title: marcaTitulo, "aria-label": marcaTitulo }, marca) : null,
-        h("span", { class: "launch-row__title" }, l.descricao),
-        l.parcelaTotal ? h("span", { class: "launch-row__parcel", title: "Parcela " + l.parcelaAtual + " de " + l.parcelaTotal }, l.parcelaAtual + "/" + l.parcelaTotal) : null,
+        marca && !resumo ? h("span", { class: ["kind-badge", LR.letra], title: marcaTitulo, "aria-label": marcaTitulo }, marca) : null,
+        h("span", { class: ["launch-row__title", LR.titulo] }, l.descricao),
+        l.parcelaTotal ? h("span", { class: LR.parcela, title: "Parcela " + l.parcelaAtual + " de " + l.parcelaTotal }, l.parcelaAtual + "/" + l.parcelaTotal) : null,
         // conta e 4 dígitos juntos ("Itaú 4821"): o nome encurta com "…" se faltar espaço
-        (l.nomeConta || l.ultimos4Digitos) && !compacto && !resumo ? h("span", { class: "launch-row__conta" },
-          l.nomeConta ? h("span", { class: "launch-row__account" }, l.nomeConta) : null,
-          l.ultimos4Digitos ? h("span", { class: "launch-row__digits" }, l.ultimos4Digitos) : null) : null),
-      compacto ? null : h("span", { class: "launch-row__category" }, UI.CategoryLabel(l.categoria, { pill: true })),
-      compacto || !comPerfil ? null : h("span", { class: "launch-row__profile" }, UI.Tag(l.perfil && l.perfil.nome, l.perfil && l.perfil.cor, { class: "tag--upper" })),
-      h("span", { class: ["launch-row__value", "money", verde && "money--income"] }, F.moeda(l.valor)));
+        (l.nomeConta || l.ultimos4Digitos) && !resumo ? h("span", { class: LR.conta },
+          l.nomeConta ? h("span", { class: LR.contaNome }, l.nomeConta) : null,
+          l.ultimos4Digitos ? h("span", { class: LR.contaDigitos }, l.ultimos4Digitos) : null) : null),
+      h("span", { class: ["launch-row__category", LR.etiqueta, V.categoria] }, UI.CategoryLabel(l.categoria, { pill: true })),
+      comPerfil ? h("span", { class: ["launch-row__profile", LR.etiqueta, V.perfil] }, UI.Tag(l.perfil && l.perfil.nome, l.perfil && l.perfil.cor, { class: "tag--upper" })) : null,
+      h("span", { class: ["launch-row__value", "money", verde && "money--income", LR.valor] }, F.moeda(l.valor)));
   }
 
   /* ---------- Conta (seções 19–22, 24) ---------- */

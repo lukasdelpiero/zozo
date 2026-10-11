@@ -3,6 +3,9 @@
    Lista agrupada por mês e dia · filtros com chips · barra de
    informações · seleção múltipla com ações em lote · painel com
    visualização e edição (Grid Superior / Central / Inferior / Notas)
+   Visual em Tailwind (tabela T abaixo; a linha da transação está em
+   components/list.js). Classes sem tw: que sobraram são ganchos
+   (selbar: impressão; page--lancamentos: página atual).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -14,6 +17,50 @@
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
   const store = ZoZo.store;
+
+  /* ---------------- Visual (Tailwind; classes escritas por inteiro) ---------------- */
+  const BOTAO_SELBAR = "tw:inline-flex tw:items-center tw:gap-1.5 tw:h-8 tw:py-0 tw:border tw:border-zz-border tw:rounded-lg tw:bg-zz-surface "
+    + "tw:text-[13px] tw:font-medium tw:hover:bg-zz-surface-hover tw:gaveta:size-[34px] tw:gaveta:p-0 tw:gaveta:justify-center tw:gaveta:flex-none";
+  const TITULO_MES = "tw:text-[20px] tw:font-[620] tw:tracking-[-0.01em]";
+  const T = {
+    // a barra de seleção fica presa ao rodapé da área (mesmo com poucas transações)
+    pagina: "page--lancamentos tw:flex tw:flex-col tw:min-h-full tw:*:shrink-0 tw:[&>:has(+.selbar)]:mb-5",
+    info: "tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-x-5 tw:gap-y-2 tw:min-h-11 tw:py-2 tw:px-(--page-gutter) "
+      + "tw:-mt-5 tw:-mx-(--page-gutter) tw:mb-4 tw:border-b tw:border-b-zz-border tw:bg-zz-surface tw:text-[13px] tw:text-zz-secondary",
+    infoQtd: "tw:font-semibold tw:text-zz-text",
+    infoTotais: "tw:flex tw:flex-wrap tw:justify-end tw:gap-x-5 tw:gap-y-2",
+    infoValor: "tw:ml-1 tw:text-zz-text",
+    // os chips surgem suaves; na entrada da página valem as animações da própria página
+    chips: "tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:mb-3 tw:[:not(.page--entrar)>&]:animate-zz-chips tw:motion-reduce:animate-none",
+    chip: "tw:inline-flex tw:items-center tw:gap-0.5 tw:h-7 tw:pl-2.5 tw:pr-1 tw:max-w-[360px] tw:border tw:border-zz-border-strong "
+      + "tw:rounded-(--radius-pill) tw:bg-zz-surface tw:text-[13px]",
+    chipRotulo: "tw:flex-none tw:text-zz-secondary",
+    chipValor: "tw:font-medium tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
+    chipRemover: "tw:grid tw:place-items-center tw:size-[22px] tw:ml-1 tw:flex-none tw:[border:0] tw:rounded-[50%] tw:bg-transparent "
+      + "tw:text-zz-secondary tw:hover:bg-zz-surface-hover tw:hover:text-zz-text",
+    adicionar: "tw:inline-flex tw:items-center tw:gap-1.5 tw:h-7 tw:px-3 tw:py-0 tw:border tw:border-dashed tw:border-zz-border-strong "
+      + "tw:rounded-(--radius-pill) tw:bg-transparent tw:text-zz-secondary tw:text-[13px] tw:hover:text-zz-primary tw:hover:border-zz-primary",
+    mesSeguinte: "tw:mt-4",
+    mesCab: "tw:flex tw:items-baseline tw:justify-between tw:gap-4 tw:pt-2",
+    mesTitulo: "tw:p-0 " + TITULO_MES,
+    mesTituloSolto: "tw:pt-2 tw:px-4 tw:pb-1 " + TITULO_MES,          // "Ordenado por valor" (sem total ao lado)
+    mesTotal: "money " + TITULO_MES,
+    // data do dia fica presa no topo enquanto a lista rola
+    dia: "tw:sticky tw:top-0 tw:z-2 tw:pt-3 tw:mb-4 tw:leading-[1.2] tw:bg-(--color-background) tw:text-zz-secondary tw:text-[13px] "
+      + "tw:font-[620] tw:tracking-normal tw:normal-case",
+    lista: "tw:flex tw:flex-col",
+    // a lista entra suave quando a pesquisa muda (meses em sequência)
+    busca: ["tw:animate-zz-busca tw:motion-reduce:animate-none", "tw:animate-zz-busca-30 tw:motion-reduce:animate-none",
+      "tw:animate-zz-busca-60 tw:motion-reduce:animate-none"],
+    selbar: "selbar tw:sticky tw:bottom-5 tw:z-5 tw:flex tw:items-center tw:gap-1 tw:w-max tw:max-w-full tw:mt-auto tw:mx-auto tw:mb-0 "
+      + "tw:self-center tw:p-[5px] tw:border tw:border-zz-border tw:rounded-xl tw:bg-zz-surface tw:shadow-(--shadow-popover) "
+      + "tw:animate-zz-selbar tw:motion-reduce:animate-none tw:gaveta:w-auto tw:gaveta:max-w-[calc(100%-8px)] tw:gaveta:flex-nowrap tw:gaveta:justify-center",
+    selbarBtn: BOTAO_SELBAR + " tw:px-3",
+    selbarIcone: BOTAO_SELBAR + " tw:w-8 tw:px-0 tw:justify-center",
+    selbarTxt: "tw:gaveta:hidden",
+    selbarQtd: "tw:pl-1 tw:pr-2.5 tw:text-[13px] tw:font-semibold tw:whitespace-nowrap tw:gaveta:px-1.5",
+    selbarSep: "tw:w-px tw:h-[22px] tw:mx-1 tw:bg-zz-border",
+  };
 
 
   /* ---------------- Filtros ---------------- */
@@ -173,9 +220,9 @@
     const recs = (st.data.recorrencias && st.data.recorrencias.recorrencias) || [];
     const nomes = (ids, lista, campo) => ids.map((id) => { const x = lista.find((y) => (y.id || y.serieId) === id); return x ? x[campo || "nome"] : "—"; }).join(", ");
     const chips = [];
-    const chip = (rotulo, valor, limpar) => chips.push(h("span", { class: "filter-chip" },
-      h("span", { class: "filter-chip__label" }, rotulo + ": "), h("span", { class: "filter-chip__value" }, valor),
-      h("button", { type: "button", class: "filter-chip__remove", "aria-label": "Remover filtro " + rotulo, onClick: limpar }, icon("fechar", { size: 12, stroke: 2.25 }))));
+    const chip = (rotulo, valor, limpar) => chips.push(h("span", { class: T.chip },
+      h("span", { class: T.chipRotulo }, rotulo + ": "), h("span", { class: T.chipValor }, valor),
+      h("button", { type: "button", class: T.chipRemover, "aria-label": "Remover filtro " + rotulo, onClick: limpar }, icon("fechar", { size: 12, stroke: 2.25 }))));
     if (f.contas.length) chip("Conta", nomes(f.contas, contas), () => setFiltros({ contas: [] }, ctx));
     if (f.categorias.length) chip("Categoria", nomes(f.categorias, cats), () => setFiltros({ categorias: [] }, ctx));
     if (f.statusCategoria !== "ambos") chip("Categorias", f.statusCategoria === "excluidas" ? "Excluídas" : "Regulares", () => setFiltros({ statusCategoria: "ambos" }, ctx));
@@ -185,19 +232,21 @@
     if (f.tipos.length) chip("Tipo", f.tipos.map((t) => (TIPOS_FILTRO.find((x) => x.value === t) || {}).label).join(", "), () => setFiltros({ tipos: [] }, ctx));
     if (f.ordem !== "data-desc") chip("Ordem", (ORDENS.find((o) => o.value === f.ordem) || {}).grupo + " · " + (ORDENS.find((o) => o.value === f.ordem) || {}).label, () => setFiltros({ ordem: "data-desc" }, ctx));
     if ((st.ui.busca || "").trim()) chip("Pesquisa", st.ui.busca.trim(), () => { store.set({ ui: { busca: "" } }); ctx.refreshTopbar(); });
-    const add = h("button", { type: "button", class: "filter-add", "aria-haspopup": "dialog" }, icon("mais", { size: 14 }), h("span", null, "Adicionar filtro"));
+    const add = h("button", { type: "button", class: T.adicionar, "aria-haspopup": "dialog" }, icon("mais", { size: 14 }), h("span", null, "Adicionar filtro"));
     add.addEventListener("click", () => abrirMenuFiltros(add, ctx, "esquerda"));
-    return h("div", { class: "filter-chips" }, chips, add);
+    return h("div", { class: T.chips }, chips, add);
   }
 
   function barraInformacoes(itens) {
     const t = totais(itens);
-    return h("div", { class: "info-bar", role: "status" },
-      h("span", { class: "info-bar__count" }, itens.length === 1 ? "1 transação" : itens.length + " transações"),
-      h("span", { class: "info-bar__totals" },
-        h("span", null, "Total gasto ", h("strong", { class: "money" }, F.moeda(t.gasto))),
-        h("span", null, "Total recebido ", h("strong", { class: "money money--income" }, F.moeda(t.recebido))),
-        h("span", null, "Saldo líquido ", h("strong", { class: ["money", t.liquido < 0 ? "money--negative" : "money--income"] }, (t.liquido < 0 ? "−" : "") + F.moeda(t.liquido)))));
+    // valores na cor do texto; só o saldo negativo fica vermelho
+    const valor = (v, negativo) => h("strong", { class: ["money", T.infoValor, negativo && "money--negative"] }, v);
+    return h("div", { class: T.info, role: "status" },
+      h("span", { class: T.infoQtd }, itens.length === 1 ? "1 transação" : itens.length + " transações"),
+      h("span", { class: T.infoTotais },
+        h("span", null, "Total gasto ", valor(F.moeda(t.gasto))),
+        h("span", null, "Total recebido ", valor(F.moeda(t.recebido))),
+        h("span", null, "Saldo líquido ", valor((t.liquido < 0 ? "−" : "") + F.moeda(t.liquido), t.liquido < 0))));
   }
 
   /* ---------------- Datas dos grupos ---------------- */
@@ -220,8 +269,8 @@
       .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
 
     // no celular só o ícone aparece (o nome continua no aria-label)
-    const botao = (icone, texto) => h("button", { type: "button", class: "selbar__btn", "aria-haspopup": "menu", "aria-label": texto, title: texto },
-      icon(icone, { size: 15 }), h("span", { class: "selbar__txt" }, texto));
+    const botao = (icone, texto) => h("button", { type: "button", class: T.selbarBtn, "aria-haspopup": "menu", "aria-label": texto, title: texto },
+      icon(icone, { size: 15 }), h("span", { class: T.selbarTxt }, texto));
 
     const categoriaBtn = botao("categorias", "Categoria");
     categoriaBtn.addEventListener("click", () => {
@@ -229,14 +278,19 @@
       ZoZo.menu.abrir(categoriaBtn, { largura: 250, render(el, api) {
         let termo = "";
         const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const lista = h("div", { class: "menu__list" });
+        const lista = h("div", { class: "menu__list menu__list--scroll" });
         const busca = h("input", { type: "search", class: "menu__search-input", placeholder: "Pesquisar categoria", "aria-label": "Pesquisar categoria" });
         const desenhar = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) =>
           h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); aplicar({ categoriaId: c.id }, "Categoria definida."); } }, UI.CategoryLabel(c, { pill: true }))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
-        mount(el, h("div", { class: "menu__search" }, icon("pesquisar", { size: 14 }), busca), lista);
+        // + Nova categoria (como nos outros menus de categoria): já é aplicada às selecionadas
+        const nova = h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar();
+          ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => aplicar({ categoriaId: c.id }, "Categoria criada e definida.") }); } },
+          icon("mais", { size: 16, class: "menu__icon" }), h("span", { class: "menu__label" }, "Nova categoria"));
+        mount(el, h("div", { class: "menu__search" }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: "menu__sep" }), nova);
         desenhar();
-      } }, { posicao: "acima", largura: 250, label: "Definir categoria" });
+        requestAnimationFrame(() => busca.focus());
+      } }, { posicao: "acima", largura: 250, label: "Definir categoria", focar: false });
     });
 
     const tipoBtn = botao("interno", "Tipo");
@@ -248,11 +302,11 @@
     if (perfilBtn) perfilBtn.addEventListener("click", () => {
       const perfis = ((store.get().data.perfis && store.get().data.perfis.perfis) || []).filter((p) => !p.arquivado);
       ZoZo.menu.abrir(perfilBtn, perfis.map((p) => ({ render: (api) => h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); aplicar({ perfilId: p.id }, "Perfil definido."); } }, UI.Tag(p.nome, p.cor, { class: "tag--upper" })) }))
-        .concat([{ label: "Sem perfil", onClick: () => aplicar({ perfilId: null }, "Perfil removido.") }, { separador: true },
+        .concat([{ separador: true },
           { icone: "mais", label: "Criar novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => aplicar({ perfilId: np.id }, "Perfil criado e definido.") }) }]), { posicao: "acima", label: "Definir perfil" });
     });
 
-    const maisBtn = h("button", { type: "button", class: "selbar__btn selbar__btn--icon", "aria-label": "Mais ações", "aria-haspopup": "menu" }, icon("opcoes", { size: 16 }));
+    const maisBtn = h("button", { type: "button", class: T.selbarIcone, "aria-label": "Mais ações", "aria-haspopup": "menu" }, icon("opcoes", { size: 16 }));
     maisBtn.addEventListener("click", () => ZoZo.menu.abrir(maisBtn, [
       { label: "Marcar todas", onClick: () => store.set({ ui: { selecionados: visiveis.map((l) => l.id) } }) },
       { label: "Desmarcar todas", onClick: limpar },
@@ -266,10 +320,10 @@
       } },
     ], { posicao: "acima", label: "Mais ações", class: "menu--compacto" }));
 
-    return h("div", { class: "selbar", role: "toolbar", "aria-label": "Ações para as transações selecionadas" },
-      h("button", { type: "button", class: "selbar__btn selbar__btn--icon", "aria-label": "Fechar seleção", onClick: limpar }, icon("fechar", { size: 15 })),
-      h("span", { class: "selbar__count" }, sel.length === 1 ? "1 selecionada" : sel.length + " selecionadas"),
-      h("span", { class: "selbar__sep", "aria-hidden": "true" }),
+    return h("div", { class: T.selbar, role: "toolbar", "aria-label": "Ações para as transações selecionadas" },
+      h("button", { type: "button", class: T.selbarIcone, "aria-label": "Fechar seleção", onClick: limpar }, icon("fechar", { size: 15 })),
+      h("span", { class: T.selbarQtd }, sel.length === 1 ? "1 selecionada" : sel.length + " selecionadas"),
+      h("span", { class: T.selbarSep, "aria-hidden": "true" }),
       categoriaBtn, tipoBtn, perfilBtn, maisBtn);
   }
 
@@ -327,12 +381,13 @@
     deps: (s) => [s.data.lancamentos, s.data.perfis, s.data.categorias, s.errors.lancamentos, s.errors.perfis, s.ui.filtros, s.ui.busca, s.ui.selecionados, s.selectedItem],
     render(state, ctx) {
       const espera = C.estadoCarregamento(state, ["lancamentos", "perfis"], () => this.carregar(ctx, true), { skeleton: UI.Skeleton(10) });
-      if (espera) return C.pagina("page--lancamentos", espera);
+      if (espera) return C.pagina(T.pagina, espera);
 
       const todos = state.data.lancamentos.lancamentos || [];
       const itens = aplicarFiltros(todos, state);
       const termoAtual = normalizar(state.ui.busca).trim();
-      const pagina = "page--lancamentos" + (ultimaBusca !== null && termoAtual !== ultimaBusca ? " lanc--busca" : "");
+      const animarBusca = ultimaBusca !== null && termoAtual !== ultimaBusca;
+      const anim = (i) => (animarBusca ? T.busca[Math.min(i, 2)] : null);
       ultimaBusca = termoAtual;
       const filtrando = temFiltro(state);
       const selId = state.selectedItem && state.selectedItem.tipo === "lancamento" ? state.selectedItem.id : null;
@@ -351,9 +406,9 @@
       const topo = filtrando ? [barraInformacoes(itens), chipsFiltros(state, ctx)] : null;
 
       if (!itens.length) {
-        return C.pagina(pagina, topo, filtrando
-          ? UI.EmptyState("Nenhuma transação encontrada com esses filtros.", { icon: "pesquisar", action: { label: "Limpar filtros", onClick: () => { store.set({ ui: { filtros: FILTROS_VAZIOS(), busca: "" } }); ctx.refreshTopbar(); } } })
-          : UI.EmptyState("Nenhuma transação cadastrada.", { action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
+        return C.pagina(T.pagina, topo, filtrando
+          ? UI.EmptyState("Nenhuma transação encontrada com esses filtros.", { icon: "pesquisar", class: anim(0), action: { label: "Limpar filtros", onClick: () => { store.set({ ui: { filtros: FILTROS_VAZIOS(), busca: "" } }); ctx.refreshTopbar(); } } })
+          : UI.EmptyState("Nenhuma transação cadastrada.", { class: anim(0), action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
       }
 
       const linha = (l, comData) => L.LaunchRow(l, {
@@ -366,9 +421,9 @@
 
       const blocos = [];
       if (filtros().ordem.startsWith("valor")) {
-        blocos.push(h("section", { class: "month-group" },
-          h("h2", { class: "month-group__title" }, "Ordenado por valor"),
-          h("div", { class: "list" }, itens.map((l) => linha(l, true)))));
+        blocos.push(h("section", { class: anim(0) },
+          h("h2", { class: T.mesTituloSolto }, "Ordenado por valor"),
+          h("div", { class: T.lista }, itens.map((l) => linha(l, true)))));
       } else {
         let mesAtual = null, diaAtual = null, secao = null, lista = null;
         itens.forEach((l) => {
@@ -377,23 +432,23 @@
             mesAtual = mes; diaAtual = null;
             // Total gasto do mês (mesma regra da barra de informações) à direita
             const doMes = itens.filter((x) => x.data.slice(0, 7) === mes);
-            secao = h("section", { class: "month-group" },
-              h("header", { class: "month-group__head" },
-                h("h2", { class: "month-group__title" }, F.mesAno(mes + "-01")),
-                h("span", { class: "month-group__total money", title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto))));
+            secao = h("section", { class: [blocos.length && T.mesSeguinte, anim(blocos.length)] },
+              h("header", { class: T.mesCab },
+                h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),
+                h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto))));
             blocos.push(secao);
           }
           if (l.data !== diaAtual) {
             diaAtual = l.data;
-            secao.appendChild(h("h3", { class: "day-group__title" }, rotuloDia(l.data)));
-            lista = h("div", { class: "list" });
+            secao.appendChild(h("h3", { class: T.dia }, rotuloDia(l.data)));
+            lista = h("div", { class: T.lista });
             secao.appendChild(lista);
           }
           lista.appendChild(linha(l, false));
         });
       }
 
-      return C.pagina(pagina, topo, blocos, barraSelecao(state, ctx, itens));
+      return C.pagina(T.pagina, topo, blocos, barraSelecao(state, ctx, itens));
     },
     selecionar(sel, ctx) {
       const l = (store.get().data.lancamentos.lancamentos || []).find((x) => x.id === sel.id);
