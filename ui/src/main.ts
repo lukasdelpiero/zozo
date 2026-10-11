@@ -10,7 +10,7 @@
 import "./estilos.css";
 
 // Núcleo
-import "../js/core/dom.js";
+import "../js/core/dom.ts";
 import "../js/core/icons.js";
 import "../js/core/format.ts";
 import "../js/core/state.js";

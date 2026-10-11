@@ -11,6 +11,19 @@ export {};
 declare global {
   type CodigoMoeda = "BRL" | "EUR" | "USD";
 
+  /** js/core/dom.ts — filhos aceitos por h()/s()/mount(): nós, textos, números e listas (null/false somem) */
+  type FilhoDom = Node | string | number | boolean | null | undefined | FilhoDom[];
+  /** Propriedades: atributos, class (texto ou lista), text, dataset, style (objeto), on… (função), ref, value */
+  type PropsDom = Record<string, unknown> | null | undefined;
+  interface ZoZoDom {
+    h(tag: string, props?: PropsDom, ...filhos: FilhoDom[]): HTMLElement;
+    s(tag: string, props?: PropsDom, ...filhos: FilhoDom[]): SVGElement;
+    clear<T extends Node | null | undefined>(el: T): T;
+    mount<T extends Node>(el: T, ...filhos: FilhoDom[]): T;
+    append(pai: Node, filho: FilhoDom): void;
+    id(prefixo?: string): string;
+  }
+
   /** js/core/format.ts */
   interface ZoZoFormat {
     MESES: string[];
@@ -55,6 +68,7 @@ declare global {
   }
 
   interface ZoZoGlobal {
+    dom: ZoZoDom;
     format: ZoZoFormat;
     pix: ZoZoPix;
     // módulos ainda em JavaScript

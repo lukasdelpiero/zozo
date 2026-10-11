@@ -15,22 +15,6 @@
   --t-24: 1.5rem;      /* 24px — Gasto mensal */
 }
 
-/* ================= Login ================= */
-.auth__title { font-size: 28px; font-weight: 550; color: #1b2a4a; margin: 0 0 var(--space-5); letter-spacing: -0.01em; }
-.auth__form { width: min(400px, 100%); display: flex; flex-direction: column; gap: 14px; }
-.auth__stack { display: flex; flex-direction: column; gap: 10px; }
-.auth .input, .auth__input { height: 44px; border-radius: 12px; font-size: var(--t-16); font-weight: 450; background: #f4f6f8; border: 1px solid #e3e6eb; }
-.auth .input::placeholder { font-size: var(--t-16); font-weight: 450; color: var(--color-text-muted); }
-.auth .input:focus { background: var(--color-surface); border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
-.auth__btn, .auth .btn--block { height: 44px; border-radius: 12px; font-size: var(--t-15); font-weight: 650; margin-top: 6px; }
-.auth__error { min-height: 0; margin: 0; text-align: center; font-size: var(--t-13); font-weight: 450; color: var(--color-text-primary); }
-.auth__error:empty { display: none; }
-.auth__switch { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; margin-top: 6px; border: 0; padding: 0; font-size: var(--t-15); font-weight: 450; color: var(--color-text-secondary); }
-.auth__link { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--color-text-primary); cursor: pointer; }
-.auth__link:hover { text-decoration: underline; text-underline-offset: 2px; }
-.auth__demo { margin-top: var(--space-4); font-size: var(--t-13); color: var(--color-text-muted); text-align: center; }
-.auth .field__label { display: none; }
-
 /* ================= Títulos das páginas (barra superior) ================= */
 .topbar__title { font-size: var(--t-15); font-weight: 620; }
 
@@ -223,24 +207,6 @@
 .pl-row { min-height: var(--row-height); }
 
 /* =============================================================
-   Login com geometria fixa: mesma caixa, logo, título, primeiro
-   campo e botão no mesmo lugar em todas as etapas
-   ============================================================= */
-.auth__card {
-  width: min(580px, 100%); height: 575px; min-height: 0;
-  justify-content: flex-start; padding: 88px 90px 40px;
-  overflow: hidden;
-}
-.auth__icon { flex: none; width: 56px; height: 56px; margin: 0 0 18px; }
-.auth__title { flex: none; height: 34px; line-height: 34px; margin: 0 0 28px; white-space: nowrap; }
-.auth__form { gap: 14px; }
-/* área dos campos reserva espaço para dois campos (cadastro) → botão sempre na mesma altura */
-.auth__fields { display: flex; flex-direction: column; gap: 10px; min-height: calc(44px * 2 + 10px); }
-.auth__btn { margin-top: 0; }
-.auth__warning { position: absolute; left: 24px; right: 24px; bottom: 16px; }
-.auth__card { position: relative; }
-
-/* =============================================================
    Arredondamentos
    ============================================================= */
 :root { --radius-small: 8px; --radius-medium: 12px; --radius-large: 20px; }
@@ -259,7 +225,6 @@
 .color-picker--4 .color-picker__swatch:nth-child(4) { border-top-right-radius: 8px; }
 .color-picker--4 .color-picker__swatch:nth-child(13) { border-bottom-left-radius: 8px; }
 .color-picker--4 .color-picker__swatch:nth-child(16) { border-bottom-right-radius: 8px; }
-.auth .input, .auth__btn { border-radius: 12px; }                       /* login: 12px (especificação) */
 
 /* Botão Excluir nas janelas modais */
 .modal .btn--danger { background: #ff1a1a; border-color: #ff1a1a; color: #fff; }
@@ -556,13 +521,6 @@
 .codigo6.is-erro .codigo6__caixa { border-color: var(--color-danger); }
 .codigo6.is-ocupado { opacity: 0.6; }
 
-/* Login: "Autentique sua conta" */
-.auth__title.auth2fa__titulo { font-size: 1.5rem; font-weight: 550; margin-bottom: 8px; height: auto; line-height: 1.3; white-space: normal; }
-.auth2fa { gap: 22px; }
-.auth2fa__sub { margin: 0 0 6px; text-align: center; font-size: 0.9375rem; font-weight: 450; color: var(--color-text-primary); }
-.auth2fa__erro { margin: 0; text-align: center; font-size: 0.9375rem; font-weight: 450; color: var(--color-text-primary); }
-.auth2fa__erro:empty { display: none; }
-
 /* CAPTCHA (Turnstile) */
 .captcha { display: flex; justify-content: center; min-height: 65px; }
 
@@ -614,49 +572,6 @@
 @container (max-width: 560px) { .cfg-pix { grid-template-columns: minmax(0, 1fr); } }
 .cfg-row.cfg-row--bloco { flex-direction: column; align-items: stretch; gap: 8px; }
 
-/* =============================================================
-   Login: tela inicial (Continuar com e-mail | Continuar com Google)
-   ============================================================= */
-/* Logo com sombra suave (como a do Copilot) */
-.auth__icon { border-radius: 14px; filter: drop-shadow(0 6px 14px rgba(15, 39, 66, 0.14)) drop-shadow(0 1px 2px rgba(15, 39, 66, 0.10)); }
-.auth__icon--selo { display: grid; place-items: center; background: var(--botao-roxo); color: #fff; font-size: 28px; font-weight: 700; }
-.auth__inicio { gap: 14px; }
-.auth__opcoes { display: flex; flex-direction: column; gap: 12px; min-height: calc(46px * 2 + 12px); justify-content: center; }
-.auth__opcao {
-  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-  width: 100%; height: 46px; padding: 0 16px; border-radius: 10px;
-  font: inherit; font-size: var(--t-15); font-weight: 620; cursor: pointer;
-  transition: filter 120ms ease, box-shadow 120ms ease, transform 60ms ease;
-}
-.auth__opcao:active { transform: translateY(1px); }
-.auth__opcao:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-/* E-mail: roxo com gradiente vertical sutil */
-.auth__opcao--email {
-  border: 0; color: #fff;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 78%, white) 0%, var(--color-primary) 100%);
-  box-shadow: 0 1px 2px rgba(15, 39, 66, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-.auth__opcao--email:hover { filter: brightness(1.06); }
-/* Google: branco com gradiente vertical sutil */
-.auth__opcao--google {
-  color: #1f1f1f; border: 1px solid #dadce0;
-  background: linear-gradient(180deg, #ffffff 0%, #f1f3f4 100%);
-  box-shadow: 0 1px 2px rgba(15, 39, 66, 0.08);
-}
-.auth__opcao--google:hover { box-shadow: 0 2px 6px rgba(15, 39, 66, 0.12); }
-.auth__g { flex: none; }
-/* Ao clicar em Google: logo, "Continuar com Google" e carregando */
-.auth__indo-google { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.auth__indo-google .auth__g { width: 28px; height: 28px; }
-.auth__indo-texto { margin: 0; font-size: var(--t-15); font-weight: 550; color: var(--color-text-primary); }
-.auth__nota { margin: 0 0 4px; font-size: var(--t-13); color: var(--color-text-secondary); text-align: center; }
-/* Aviso de servidor indisponível: centralizado no rodapé do cartão, sem quebrar errado */
-.auth__card .auth__warning {
-  position: absolute; left: 50%; right: auto; bottom: 18px; transform: translateX(-50%);
-  width: min(400px, calc(100% - 48px)); margin: 0; justify-content: center; align-items: center; text-align: left;
-  font-size: var(--t-13); line-height: 1.4;
-}
-.auth__card .auth__warning .icon { flex: none; margin: 0; }
 /* Campos de senha pequenos (Configurações) com o botão de mostrar */
 .input-with-action--sm { flex: 1 1 0; min-width: 0; }
 .input-with-action--sm .input { width: 100%; padding-right: 34px; }
@@ -722,13 +637,11 @@
   --botao-roxo-hover: linear-gradient(180deg, #7458EA 0%, #5F3FCF 100%);
   --sidebar-bg: #6948D8;
 }
-.btn--primary, .auth__opcao--email, .detail__textbtn--primary {
+.btn--primary, .detail__textbtn--primary {
   background: var(--botao-roxo); background-color: #6948D8; border-color: transparent; color: #fff;
 }
-.btn--primary:hover:not(:disabled), .auth__opcao--email:hover, .detail__textbtn--primary:hover { background: var(--botao-roxo-hover); filter: none; }
-.btn--primary:active:not(:disabled), .auth__opcao--email:active { background: linear-gradient(180deg, #6948D8 0%, #5A3BC4 100%); }
-/* Logo nova (Z roxo sobre branco): mesma sombra suave do Copilot */
-.auth__icon { border-radius: 10px; filter: none; box-shadow: 0 6px 16px rgba(15, 39, 66, 0.12), 0 1px 3px rgba(15, 39, 66, 0.10); }
+.btn--primary:hover:not(:disabled), .detail__textbtn--primary:hover { background: var(--botao-roxo-hover); filter: none; }
+.btn--primary:active:not(:disabled) { background: linear-gradient(180deg, #6948D8 0%, #5A3BC4 100%); }
 .sidebar__logo { width: 28px; height: 28px; border-radius: 5px; flex: none; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.25); }
 .sidebar__header { justify-content: space-between; }
 @media (max-width: 900px) { .sidebar__logo { display: none; } }
@@ -772,23 +685,6 @@
   .cfg-row--bloco .cfg-password > .btn { align-self: flex-end; }
 }
 .cfg-nota { margin: 4px 0 8px; font-size: var(--t-13); color: var(--color-text-secondary); }
-
-/* ---------- Login: a etapa do código 2FA usa a mesma caixa, o mesmo título e as mesmas posições ---------- */
-.auth__title.auth2fa__titulo { font-size: 28px; font-weight: 550; height: 34px; line-height: 34px; margin: 0 0 28px; white-space: nowrap; }
-.auth2fa { gap: 18px; }
-.auth2fa__sub { margin: 0; }
-.auth2fa .codigo6 { gap: 8px; }
-.auth2fa .codigo6__caixa { width: min(52px, calc((100% - 40px) / 6)); height: 52px; }
-/* Telas estreitas (celular): a caixa acompanha a largura e a altura do conteúdo */
-@media (max-width: 640px) {
-  .auth__center { padding: 16px; }
-  .auth__card { height: auto; min-height: 0; padding: 48px 24px 32px; }
-  .auth__title, .auth__title.auth2fa__titulo { font-size: 24px; white-space: normal; height: auto; line-height: 1.25; }
-  .auth__warning, .auth__card .auth__warning { position: static; transform: none; width: 100%; margin-top: 16px; }
-}
-@media (max-height: 640px) and (min-width: 641px) {
-  .auth__card { height: auto; min-height: 0; padding-top: 48px; padding-bottom: 32px; }
-}
 
 /* ---------- Dashboard no computador: cabe na tela, sem rolagem (classe posta por dashboard.js
    quando há duas colunas e altura suficiente; as listas mostram só as linhas inteiras que cabem) ---------- */
@@ -861,11 +757,6 @@
 .boleto-list__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .boleto-list__parcel { color: var(--color-text-secondary); font-variant-numeric: lining-nums tabular-nums; }
 .boleto__header { background: #6948D8; }
-
-/* ---------- Login: espera ("Entrando no ZoZo" / "Preparando sua conta...") ---------- */
-.auth__card--espera { align-items: center; }
-.auth__espera-texto { white-space: normal; height: auto; margin-bottom: 28px; text-align: center; }
-.auth__espera-spinner { width: 30px; height: 30px; border-width: 3px; }
 
 /* =============================================================
    Celular (até 600 px)
@@ -1120,21 +1011,8 @@
 .page--lancamentos.page--entrar > .selbar { animation: selbar-in var(--duration-medium) var(--easing) both; }
 @keyframes bloco-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-/* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás) */
-.auth__card--entrar { animation: auth-card-in 480ms cubic-bezier(.2, .8, .2, 1) both; }
-.auth__card--entrar .auth__icon { animation: auth-logo-in 560ms cubic-bezier(.2, .8, .2, 1) both 80ms; }
-.auth__card--frente > :not(.auth__icon), .auth__card--tras > :not(.auth__icon) { animation: auth-frente 320ms var(--easing) both; }
-.auth__card--tras > :not(.auth__icon) { animation-name: auth-tras; }
-.auth__card--frente > :nth-child(3), .auth__card--tras > :nth-child(3) { animation-delay: 40ms; }
-.auth__card--frente > :nth-child(n+4), .auth__card--tras > :nth-child(n+4) { animation-delay: 70ms; }
-@keyframes auth-card-in { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
-@keyframes auth-logo-in { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
-@keyframes auth-frente { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
-@keyframes auth-tras { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
-
 @media (prefers-reduced-motion: reduce) {
-  .lp--entrar, .lp--entrar *, .page--entrar > *, .page--entrar .dash-layout > *, .auth__card--entrar, .auth__card--entrar *,
-  .auth__card--frente > *, .auth__card--tras > * { animation: none !important; }
+  .lp--entrar, .lp--entrar *, .page--entrar > *, .page--entrar .dash-layout > * { animation: none !important; }
 }
 
 /* =============================================================
@@ -1194,15 +1072,3 @@
   .select option::checkmark { order: 1; margin-left: auto; color: var(--color-primary); }
 }
 
-/* ---- Confirmação de e-mail (3.0) ---- */
-.auth__ok {
-  display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px;
-  font-size: var(--t-13); font-weight: 520; color: var(--color-positive); text-align: center;
-}
-.auth__ok svg { flex: none; }
-.auth__texto { margin: 0; font-size: var(--t-15); line-height: 1.5; color: var(--color-text-primary); text-align: center; overflow-wrap: anywhere; }
-.auth__texto strong { font-weight: 620; }
-.auth__texto--suave { color: var(--color-text-secondary); font-size: var(--t-13); }
-.auth__espera-email { min-height: 1.4em; margin: 0; font-size: var(--t-13); color: var(--color-text-secondary); text-align: center; }
-.auth__espera-email:empty { min-height: 0; }
-.auth__opcao:disabled { cursor: default; filter: saturate(0.4) opacity(0.7); transform: none; }

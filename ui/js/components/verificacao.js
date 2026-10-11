@@ -54,7 +54,7 @@
   function CampoCodigo(cfg) {
     const c = cfg || {};
     const caixas = Array.from({ length: 6 }, (_, i) => h("input", {
-      type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: "1", class: "codigo6__caixa",
+      type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: "1", class: ["codigo6__caixa", c.classeCaixa],
       autocomplete: i === 0 ? "one-time-code" : "off", "aria-label": "Dígito " + (i + 1) + " de 6",
     }));
     const el = h("div", { class: "codigo6", role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);

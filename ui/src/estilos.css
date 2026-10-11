@@ -9,7 +9,13 @@
    • Sem o "preflight" (reset do Tailwind): o base.css continua valendo.
    • Cores e medidas vêm dos tokens do ZoZo (css/tokens.css), não da
      paleta padrão do Tailwind: tw:bg-zz-primary, tw:text-zz-secondary…
-   • Telas já migradas: Configurações › Sobre.
+   • Telas já migradas: Configurações › Sobre; Login/Cadastro/2FA/
+     confirmação de e-mail (components/auth.js).
+   • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
+     "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
+   • Cuidado ao migrar: utilitário vence o legado também em :focus,
+     :hover etc. — quem troca a cor da borda de um .input precisa
+     repetir a cor do foco (tw:focus:border-zz-primary).
    ============================================================= */
 @layer legado, theme, base, components, utilities;
 @import "../css/tokens.css" layer(legado);
@@ -34,7 +40,33 @@
   --color-zz-border: var(--color-border);
   --color-zz-text: var(--color-text-primary);
   --color-zz-secondary: var(--color-text-secondary);
+  --color-zz-muted: var(--color-text-muted);
+  --color-zz-positive: var(--color-positive);
+  --color-zz-primary-softer: var(--color-primary-softer);
+  --color-zz-warning-soft: var(--color-warning-soft);
+  --color-zz-warning-text: var(--color-warning-text);
   --radius-zz-sm: var(--radius-small);
   --radius-zz-md: var(--radius-medium);
   --font-zz: var(--font-family, inherit);
+}
+
+/* Telas do ZoZo: celular (≤ 640 px) e janela baixa no computador — mesmos cortes do CSS legado */
+@custom-variant celular (@media (max-width: 640px));
+@custom-variant tela-baixa (@media (max-height: 640px) and (min-width: 641px));
+
+/* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás).
+   Os atrasos (40/70 ms) fazem o conteúdo entrar em sequência. */
+@theme {
+  --animate-zz-auth-cartao: zz-auth-cartao 480ms cubic-bezier(.2, .8, .2, 1) both;
+  --animate-zz-auth-logo: zz-auth-logo 560ms cubic-bezier(.2, .8, .2, 1) 80ms both;
+  --animate-zz-auth-frente: zz-auth-frente 320ms var(--easing) both;
+  --animate-zz-auth-frente-40: zz-auth-frente 320ms var(--easing) 40ms both;
+  --animate-zz-auth-frente-70: zz-auth-frente 320ms var(--easing) 70ms both;
+  --animate-zz-auth-tras: zz-auth-tras 320ms var(--easing) both;
+  --animate-zz-auth-tras-40: zz-auth-tras 320ms var(--easing) 40ms both;
+  --animate-zz-auth-tras-70: zz-auth-tras 320ms var(--easing) 70ms both;
+  @keyframes zz-auth-cartao { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+  @keyframes zz-auth-logo { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+  @keyframes zz-auth-frente { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-auth-tras { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
 }
