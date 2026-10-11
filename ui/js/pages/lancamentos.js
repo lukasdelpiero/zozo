@@ -320,11 +320,26 @@
       } },
     ], { posicao: "acima", label: "Mais ações", class: "menu--compacto" }));
 
-    return h("div", { class: T.selbar, role: "toolbar", "aria-label": "Ações para as transações selecionadas" },
+    const barra = h("div", { class: T.selbar, role: "toolbar", "aria-label": "Ações para as transações selecionadas", onKeydown: navegarBarra },
       h("button", { type: "button", class: T.selbarIcone, "aria-label": "Fechar seleção", onClick: limpar }, icon("fechar", { size: 15 })),
       h("span", { class: T.selbarQtd }, sel.length === 1 ? "1 selecionada" : sel.length + " selecionadas"),
       h("span", { class: T.selbarSep, "aria-hidden": "true" }),
       categoriaBtn, tipoBtn, perfilBtn, maisBtn);
+    // barra de ferramentas (padrão ARIA): uma única parada no Tab; setas, Home e End andam entre os botões
+    barra.querySelectorAll("button").forEach((b, i) => b.setAttribute("tabindex", i === 0 ? "0" : "-1"));
+    return barra;
+  }
+
+  function navegarBarra(e) {
+    const botoes = Array.from(e.currentTarget.querySelectorAll(":scope > button"));
+    const i = botoes.indexOf(document.activeElement);
+    if (i < 0) return;
+    const alvo = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: botoes.length - 1 }[e.key];
+    if (alvo === undefined) return;
+    e.preventDefault();
+    const proximo = botoes[(alvo + botoes.length) % botoes.length];
+    botoes.forEach((b) => b.setAttribute("tabindex", b === proximo ? "0" : "-1"));
+    proximo.focus();
   }
 
   /* ---------------- Ações da barra superior ---------------- */
@@ -426,12 +441,15 @@
           h("div", { class: T.lista }, itens.map((l) => linha(l, true)))));
       } else {
         let mesAtual = null, diaAtual = null, secao = null, lista = null;
+        // transações de cada mês numa única passada (antes: a lista inteira era filtrada de novo a cada mês)
+        const porMes = new Map();
+        itens.forEach((x) => { const m = x.data.slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(x); });
         itens.forEach((l) => {
           const mes = l.data.slice(0, 7);
           if (mes !== mesAtual) {
             mesAtual = mes; diaAtual = null;
             // Total gasto do mês (mesma regra da barra de informações) à direita
-            const doMes = itens.filter((x) => x.data.slice(0, 7) === mes);
+            const doMes = porMes.get(mes);
             secao = h("section", { class: [blocos.length && T.mesSeguinte, anim(blocos.length)] },
               h("header", { class: T.mesCab },
                 h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),

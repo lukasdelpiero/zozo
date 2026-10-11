@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.0.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.1.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,14 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.1.0
+
+- **Gráficos animados de novo:** a causa era o build, que reescrevia a duração "900ms" como ".9s" — o código lia 0,9 ms e a animação acontecia num piscar. Os gráficos voltam a se desenhar junto com a entrada da página, como antes da 2.8; o cartão do gráfico só desliza (não esmaece) e, se a página se redesenha logo depois de abrir, o gráfico continua de onde estava.
+- **Transações em Tailwind CSS:** página, barra de informações, filtros, meses e dias, barra de seleção e a linha da transação (também a do Dashboard). Visual idêntico, conferido elemento a elemento em computador, tablet e celular; ~195 linhas de CSS antigo e duas variantes que não eram usadas saíram.
+- **Barra de seleção:** sem "Sem perfil"; o menu de categoria ganhou "+ Nova categoria" (criada e já aplicada às selecionadas) e rolagem. Pelo teclado, a barra é uma parada só no Tab e as setas andam entre os botões.
+- **Acessibilidade:** a caixa de seleção saiu de dentro do botão da linha e o nome do grupo de categorias virou um botão próprio ao lado da seta (antes, controle dentro de controle: leitores de tela não alcançavam a caixa nem a seta).
+- **Por dentro:** estado central em TypeScript; total do mês calculado numa passada só (listas longas).
 
 ## Novidades da versão 3.0.0
 

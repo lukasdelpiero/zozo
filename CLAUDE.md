@@ -19,7 +19,7 @@ O padrão obrigatório está em @docs/SEGURANCA.md — leia antes de mexer em lo
 - Testes do serviço de dados (navegador): `npm test` · Tipos: `npm run typecheck`
 - Interface com recarga instantânea: `npm run dev` → http://127.0.0.1:5173 (demonstração: `/?mock=1`)
 - API local + interface montada: `npm run build` e `python api/dev/servidor_local.py` → http://127.0.0.1:8787
-- Interface: Vite + TypeScript + Tailwind CSS (prefixo `tw:`, sem preflight; CSS antigo na camada `legado`). Migre uma tela por vez; módulo convertido = `.ts` + tipo em `ui/src/globais.d.ts`. Já migrados: Configurações › Sobre e o login (`components/auth.js`). Classes `tw:` sempre escritas por inteiro (nada de montar o nome); ao migrar, confira o resultado comparando estilos calculados antes/depois.
+- Interface: Vite + TypeScript + Tailwind CSS (prefixo `tw:`, sem preflight; CSS antigo na camada `legado`). Migre uma tela por vez; módulo convertido = `.ts` + tipo em `ui/src/globais.d.ts`. Já migrados: Configurações › Sobre, o login (`components/auth.js`) e Transações (`pages/lancamentos.js` + `LaunchRow` em `components/list.js`). Colunas por largura da área: variantes `tw:area620/460/420/340` (container queries). Classes `tw:` sempre escritas por inteiro (nada de montar o nome); ao migrar, confira o resultado comparando estilos calculados antes/depois.
 - E-mail no servidor local: `ZOZO_DEV_EMAIL=console` (mostra os e-mails no terminal) e `ZOZO_DEV_BANCO=<arquivo>` (banco descartável).
 - Back-end: transição para FastAPI + Pydantic em `api/src/app_fastapi.py` (desligado no Cloudflare; o núcleo continua dono das regras).
 - Publicar na **prévia** (testes): `.\api\publicar.ps1 previa`
