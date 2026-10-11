@@ -119,9 +119,17 @@
    */
   function normalizar(d) {
     const problemas = [];
+    if (d !== null && d !== undefined && !objeto(d)) problemas.push("DOCUMENTO_INVALIDO");
     const out = Object.assign(vazio(), objeto(d) ? d : {});
-    // Itens que não são registros (null, número, texto) não carregam dado nenhum: saem; os demais ganham os campos mínimos
-    ["perfis", "contas", "categorias", "lancamentos"].forEach((k) => { out[k] = Array.isArray(out[k]) ? out[k].filter(objeto) : []; });
+    // Coleção ausente (documento de versão anterior) = vazia. Coleção com tipo errado ou item que não é registro
+    // NÃO é descartada em silêncio: a tela mostra o que der, mas nada é gravado (o original fica no servidor).
+    ["perfis", "contas", "categorias", "lancamentos"].forEach((k) => {
+      const bruto = objeto(d) ? d[k] : undefined;
+      if (bruto !== undefined && bruto !== null && !Array.isArray(bruto)) problemas.push("COLECAO_INVALIDA:" + k);
+      const lista = Array.isArray(bruto) ? bruto : [];
+      if (lista.some((x) => !objeto(x))) problemas.push("ITEM_INVALIDO:" + k);
+      out[k] = lista.filter(objeto);
+    });
     const prefixo = { perfis: "p", contas: "c", categorias: "k", lancamentos: "l" };
     Object.keys(prefixo).forEach((k) => {
       const vistos = new Set();
@@ -132,11 +140,17 @@
       });
     });
     out.contas.forEach((c) => {
-      c.historico = Array.isArray(c.historico) ? c.historico.filter((p) => objeto(p) && typeof p.data === "string" && Number.isFinite(p.saldo)) : [];
+      // Histórico de saldo: é a base do saldo da conta. Texto numérico "125.00" = migração conhecida; o resto é problema.
+      if (c.historico !== undefined && !Array.isArray(c.historico)) problemas.push("HISTORICO_INVALIDO");
+      const hist = Array.isArray(c.historico) ? c.historico : [];
+      hist.forEach((p) => { if (objeto(p) && typeof p.saldo === "string" && /^\s*-?\d{1,13}(\.\d{1,2})?\s*$/.test(p.saldo)) p.saldo = Number(p.saldo); });
+      const validos = hist.filter((p) => objeto(p) && typeof p.data === "string" && /^\d{4}-\d{2}-\d{2}/.test(p.data) && Number.isFinite(p.saldo));
+      if (validos.length !== hist.length) problemas.push("HISTORICO_INVALIDO");
+      c.historico = validos;
       if (typeof c.nome !== "string") c.nome = String(c.nome || "Conta");
     });
     out.lancamentos.forEach((l) => {
-      if (typeof l.data !== "string") l.data = "";
+      if (typeof l.data !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(l.data)) { problemas.push("DATA_INVALIDA"); l.data = typeof l.data === "string" ? l.data : ""; }
       if (typeof l.descricao !== "string") l.descricao = String(l.descricao || "");
       if (typeof l.valor === "string" && /^\s*\d{1,13}(\.\d{1,2})?\s*$/.test(l.valor)) l.valor = Number(l.valor);   // migração conhecida
       if (typeof l.valor !== "number" || !Number.isFinite(l.valor)) { problemas.push("VALOR_INVALIDO"); l.valorInvalido = true; l.valor = 0; }

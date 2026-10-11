@@ -11,6 +11,8 @@
     // Sessão / armazenamento
     getSession: "getSession",
     registerUser: "registerUser",
+    confirmarEmail: "confirmarEmail",
+    reenviarConfirmacao: "reenviarConfirmacao",
     login: "login",
     verificar2FA: "verificar2FA",
     logout: "logout",
@@ -123,6 +125,8 @@
     DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
+    EMAIL_NOT_CONFIRMED: "Confirme seu e-mail antes de entrar: abra o link que enviamos para a sua caixa de entrada.",
+    TOKEN_INVALID: "Este link de confirmação é inválido ou já venceu. Entre com seu e-mail e senha para receber um novo.",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     DEBIT_ACCOUNT: "Débito precisa de uma conta (corrente, poupança…). Cartão de crédito não pode.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",

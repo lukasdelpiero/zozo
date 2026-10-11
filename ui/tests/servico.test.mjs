@@ -294,3 +294,24 @@ test("Pix: só CPF válido, celular com DDD do Brasil começando por 9, e-mail; 
   await assert.rejects(t.req(t.A.updateConfig, { pix: { chave: "52998224725", nome: "Loja 1", cidade: "SP" } }), (e) => e.code === "PIX_INVALID");
   await t.req(t.A.updateConfig, { pix: { chave: "52998224725", nome: "Joana", cidade: "SP" } });
 });
+
+test("estrutura inválida no documento não é descartada ao gravar (auditoria A01)", async () => {
+  const base = { versao: 1, perfis: [], contas: [], categorias: [], grupos: {}, config: {}, meta: {}, lancamentos: [] };
+  const casos = {
+    colecaoObjeto: Object.assign({}, base, { lancamentos: { l1: { id: "l1", valor: 125, data: "2026-10-11", tipo: "regular", descricao: "x" } } }),
+    itemNulo: Object.assign({}, base, { lancamentos: [null, { id: "l1", valor: 1, data: "2026-10-11", tipo: "regular", descricao: "x" }] }),
+    historicoTexto: Object.assign({}, base, { contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", historico: [{ data: "2026-10-11", saldo: "abc" }] }] }),
+    historicoNaoLista: Object.assign({}, base, { contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", historico: { a: 1 } }] }),
+    dataInvalida: Object.assign({}, base, { lancamentos: [{ id: "l1", valor: 1, data: 20261011, tipo: "regular", descricao: "x" }] }),
+  };
+  for (const [nome, documento] of Object.entries(casos)) {
+    const t = carregar({ documento: JSON.parse(JSON.stringify(documento)) });
+    await assert.rejects(t.req(t.A.createPerfil, { perfil: { nome: "X" } }), (e) => e.code === "DOCUMENT_INVALID_LOCKED", nome);
+    assert.equal(t.salvos.length, 0, nome);
+    assert.deepEqual(t.documento(), documento, nome);                       // original intacto
+  }
+  // migração conhecida: saldo em texto numérico vira número, sem bloquear
+  const ok = carregar({ documento: Object.assign({}, base, { contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", historico: [{ data: "2026-10-11", saldo: "125.00" }] }] }) });
+  await ok.req(ok.A.createPerfil, { perfil: { nome: "X" } });
+  assert.equal(ok.salvos[0].contas[0].historico[0].saldo, 125);
+});

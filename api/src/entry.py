@@ -11,7 +11,8 @@ Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
   API_FASTAPI = "1"  → transição: os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py)
                        antes do núcleo. Desligado por padrão; ligar primeiro só na prévia, depois de
                        mover fastapi/pydantic para [project].dependencies (pyproject.toml).
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO, RESEND_API_KEY
+Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 """
 import json
 from urllib.parse import urlencode
@@ -26,7 +27,8 @@ try:                                  # Pyodide recente representa o null do JS 
 except ImportError:                   # pragma: no cover
     _JSNULL = None
 
-_CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO")
+_CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO",
+           "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA")
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 
@@ -74,6 +76,10 @@ class Servicos:
         r = await fetch(url, method="POST", body=urlencode(campos),
                         headers={"Content-Type": "application/x-www-form-urlencoded"})
         return int(r.status), await r.text()
+
+    async def http_post_json(self, url, cabecalhos, corpo):
+        r = await fetch(url, method="POST", body=corpo, headers=dict(cabecalhos))
+        return int(r.status), (await r.text())[:2000]          # resposta do Resend: só o começo interessa
 
 
 def _cabecalhos(request):

@@ -19,7 +19,7 @@ e configuração de cada pedido (entry.py no Worker; os testes, em memória).
 """
 import json
 import secrets
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any, Callable, Literal
 
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
@@ -38,6 +38,8 @@ Versao = Annotated[int, Field(ge=0, lt=nucleo.MAX_VERSAO)]
 Conteudo = Annotated[str, StringConstraints(min_length=4, max_length=nucleo.LIMITE_CONTEUDO)]
 Turnstile = Annotated[str, StringConstraints(max_length=2048)]
 Codigo = Annotated[str, StringConstraints(max_length=16)]
+Kdf = Literal["pbkdf2", "argon2id-1"]
+TokenEmail = Annotated[str, StringConstraints(min_length=20, max_length=100, pattern=r"^[A-Za-z0-9_-]+$")]
 
 
 class Modelo(BaseModel):
@@ -51,6 +53,7 @@ class Cadastro(Modelo):
     sal: Sal
     iteracoes: Iteracoes
     prova: Prova
+    kdf: Kdf | None = None
     turnstile: Turnstile | None = None
 
 
@@ -77,12 +80,23 @@ class NovaSenha(Documento):
     sal: Sal
     iteracoes: Iteracoes
     prova: Prova
+    kdf: Kdf | None = None
+
+
+class ConfirmarEmail(Modelo):
+    token: TokenEmail
+
+
+class ReenviarEmail(Modelo):
+    email: Email
 
 
 MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/conta"): Cadastro,
     ("POST", "/api/sessao"): Entrada,
     ("POST", "/api/sessao/2fa"): CodigoDoisFatores,
+    ("POST", "/api/email/confirmar"): ConfirmarEmail,
+    ("POST", "/api/email/reenviar"): ReenviarEmail,
     ("PUT", "/api/conta/nome"): NovoNome,
     ("PUT", "/api/conta/senha"): NovaSenha,
     ("PUT", "/api/documento"): Documento,

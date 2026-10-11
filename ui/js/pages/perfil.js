@@ -279,7 +279,7 @@
     const chaveTexto = h("code", { class: "p2fa__chave" }, "");
     let chave = "";
     const copiar = h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Copiar chave de configuração", title: "Copiar",
-      onClick: () => navigator.clipboard.writeText(chave).then(() => ctx.toast("Chave copiada."), () => ctx.toast("Não foi possível copiar.", { tone: "error" })) },
+      onClick: (e) => { const b = e.currentTarget; navigator.clipboard.writeText(chave).then(() => UI.confirmarNoBotao(b, "Chave copiada"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } },
       icon("copiar", { size: 15 }));
     const campo = V.CampoCodigo({
       rotulo: "Código de 6 dígitos do aplicativo 2FA",
@@ -388,10 +388,13 @@
     const erro = h("p", { class: "cfg-pix__erro", role: "alert" });
     const tipoSel = UI.Select(Object.keys(TIPOS_CHAVE).map((k) => ({ value: k, label: TIPOS_CHAVE[k].rotulo })), { value: tipo, ariaLabel: "Tipo de chave Pix", class: "select--sm" });
     const aplicarTipo = () => { const t = TIPOS_CHAVE[tipo]; chave.placeholder = t.ph; chave.inputMode = t.modo; chave.value = t.formatar(chave.value); };
-    tipoSel.addEventListener("change", () => { tipo = tipoSel.value; chave.value = ""; erro.textContent = ""; aplicarTipo(); });
+    tipoSel.addEventListener("change", () => { tipo = tipoSel.value; chave.value = ""; erro.textContent = ""; aplicarTipo(); atualizarBotao(); });
     // só números no CPF/celular (letras e símbolos somem ao digitar); nome só com letras e espaços
-    chave.addEventListener("input", () => { chave.value = TIPOS_CHAVE[tipo].formatar(chave.value); erro.textContent = ""; });
-    nome.addEventListener("input", () => { nome.value = nome.value.replace(/[^\p{L} ]/gu, "").replace(/^ +/, "").replace(/ {2,}/g, " "); erro.textContent = ""; });
+    chave.addEventListener("input", () => { chave.value = TIPOS_CHAVE[tipo].formatar(chave.value); erro.textContent = ""; atualizarBotao(); });
+    nome.addEventListener("input", () => { nome.value = nome.value.replace(/[^\p{L} ]/gu, "").replace(/^ +/, "").replace(/ {2,}/g, " "); erro.textContent = ""; atualizarBotao(); });
+    cidade.addEventListener("input", () => { erro.textContent = ""; atualizarBotao(); });
+    // Ao sair de um campo, mostra o motivo (o botão já fica inativo enquanto algo estiver inválido)
+    [chave, nome, cidade].forEach((c) => c.addEventListener("blur", () => { const r = validar(); erro.textContent = typeof r === "string" && c.value.trim() ? r : ""; }));
     aplicarTipo();
 
     const validar = () => {
@@ -408,6 +411,9 @@
       if (!cidade.value.trim()) return "Informe a cidade.";
       return { chave: valor };
     };
+    // Salvar só fica ativo com TODOS os campos válidos (sem precisar enviar para descobrir o erro)
+    const salvarBtn = UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) });
+    function atualizarBotao() { salvarBtn.disabled = typeof validar() === "string"; }
     const salvar = (btn) => {
       const r = validar();
       if (typeof r === "string") { erro.textContent = r; return; }
@@ -415,8 +421,9 @@
       ctx.bridge.request(A.updateConfig, { pix: { chave: r.chave, nome: nome.value.trim(), cidade: cidade.value } })
         .then(() => { chave.value = ""; return ctx.loadData("config", A.getConfig, null, { force: true }); })
         .catch((e) => { erro.textContent = e.friendly; })
-        .finally(() => { btn.disabled = false; });
+        .finally(() => { atualizarBotao(); });
     };
+    atualizarBotao();
     return h("div", { class: "cfg-row cfg-row--bloco" },
       h("div", { class: "cfg-row__text" },
         h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
@@ -426,7 +433,7 @@
         h("div", { class: "cfg-pix__acoes" },
           pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
             .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => { erro.textContent = e.friendly; }) }) : null,
-          UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) }))),
+          salvarBtn)),
       erro);
   }
 

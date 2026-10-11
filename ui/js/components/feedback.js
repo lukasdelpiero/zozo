@@ -27,7 +27,20 @@
     }, o.duration || 3200);
   }
 
-  /* ---------- Modal ---------- */
+  /* ---------- Modal ----------
+     Enquanto houver janela aberta, o resto da tela fica "inert" (sem foco, cliques nem leitor de tela),
+     como na fatura. Janelas empilhadas: o estado anterior volta quando a última fecha. */
+  let abertas = 0, inertAntes = null;
+  const FUNDO = ["auth-root", "shell", "boleto-root"];
+  function isolarFundo(abrir) {
+    if (abrir && abertas++ === 0) {
+      inertAntes = FUNDO.map((id) => { const el = document.getElementById(id); return el ? el.inert : false; });
+      FUNDO.forEach((id) => { const el = document.getElementById(id); if (el) el.inert = true; });
+    } else if (!abrir && abertas > 0 && --abertas === 0 && inertAntes) {
+      FUNDO.forEach((id, i) => { const el = document.getElementById(id); if (el) el.inert = inertAntes[i]; });
+      inertAntes = null;
+    }
+  }
   function modal(opts) {
     const o = opts || {};
     const root = document.getElementById("modal-root");
@@ -38,6 +51,7 @@
     const fechar = (resultado) => {
       if (fechado) return;
       fechado = true;
+      isolarFundo(false);
       overlay.classList.remove("is-visible");
       document.removeEventListener("keydown", tecla, true);
       setTimeout(() => overlay.remove(), 180);
@@ -58,7 +72,8 @@
       // Só a janela do topo responde (janelas empilhadas)
       if (overlay.parentNode && overlay !== overlay.parentNode.lastElementChild) return;
       // Com um menu suspenso aberto, o Esc fecha só o menu (não a janela e o que estava sendo editado)
-      if (e.key === "Escape" && document.querySelector(".menu")) return;
+      // Camada por cima aberta (menu ou seletor de emoji): o Esc fecha só ela, não a janela de trás
+      if (e.key === "Escape" && document.querySelector(".menu, .emoji-pop.is-aberto")) return;
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(false); }
       if (e.key === "Tab") {
         // só o que dá para focar de verdade (visível e habilitado)
@@ -72,6 +87,7 @@
     };
     document.addEventListener("keydown", tecla, true);
     root.appendChild(overlay);
+    isolarFundo(true);
     requestAnimationFrame(() => {
       overlay.classList.add("is-visible");
       const alvo = dialog.querySelector("[data-autofocus]") || dialog.querySelector(".modal__footer button");

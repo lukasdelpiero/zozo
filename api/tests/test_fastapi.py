@@ -190,7 +190,8 @@ class TesteFastAPI(unittest.TestCase):
                 self.assertEqual(self.api("GET", caminho)[0], 404)
 
     def test_toda_rota_com_corpo_tem_modelo(self):
-        com_corpo = {("POST", "/api/conta"), ("POST", "/api/sessao"), ("POST", "/api/sessao/2fa")} | {
+        com_corpo = {("POST", "/api/conta"), ("POST", "/api/sessao"), ("POST", "/api/sessao/2fa"),
+                     ("POST", "/api/email/confirmar"), ("POST", "/api/email/reenviar")} | {
             (m, c) for m, c in nucleo._PROTEGIDAS if m in ("POST", "PUT") and c not in nucleo._SEM_CORPO}
         self.assertEqual(com_corpo, set(app_fastapi.MODELOS))
 

@@ -13,9 +13,11 @@ Para mexer na interface com recarga instantânea: `npm run dev`
 
 Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_PORTA        porta (padrão 8787)
+  ZOZO_DEV_BANCO        outro arquivo SQLite (ex.: um banco descartável para testes)
   ZOZO_DEV_RECURSOS     e-mails com Perfis, boletos e Pix (separados por vírgula; a conta demo sempre tem)
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
+  ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
 """
 import asyncio
 import http.server
@@ -40,7 +42,7 @@ from banco_sqlite import BancoSqlite, conectar  # noqa: E402
 
 # Interface montada pelo Vite (npm run build): exatamente o que vai para o Cloudflare
 UI = (AQUI.parent / "public").resolve()
-BANCO = AQUI / "zozo-local.db"
+BANCO = pathlib.Path(os.environ.get("ZOZO_DEV_BANCO") or AQUI / "zozo-local.db")
 ARQ_SEGREDO = AQUI / ".segredo-local"            # gerado na 1ª execução (fora do git)
 PORTA = int(os.environ.get("ZOZO_DEV_PORTA", "8787"))
 # 5173: servidor do Vite (npm run dev), que repassa /api/* para cá mantendo o Host
@@ -60,8 +62,16 @@ CONFIG = {
     "SEGREDO": _segredo_local(),
     "RECURSOS_AVANCADOS": os.environ.get("ZOZO_DEV_RECURSOS", ""),
     "RECURSOS_CAMBIO": os.environ.get("ZOZO_DEV_RECURSOS_CAMBIO", ""),
-    "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 }
+# E-mail local: ZOZO_DEV_EMAIL=console liga a confirmação de e-mail e IMPRIME os e-mails aqui no terminal
+# (nada é enviado); ZOZO_DEV_RESEND_KEY=… envia de verdade pelo Resend (use só com o seu próprio e-mail).
+if os.environ.get("ZOZO_DEV_EMAIL") == "console" or os.environ.get("ZOZO_DEV_RESEND_KEY"):
+    CONFIG.update({"RESEND_API_KEY": os.environ.get("ZOZO_DEV_RESEND_KEY") or "console",
+                   "EMAIL_REMETENTE": os.environ.get("ZOZO_DEV_EMAIL_REMETENTE", "ZoZo <nao-responda@usezozo.com.br>"),
+                   "URL_PUBLICA": os.environ.get("ZOZO_DEV_URL", "http://127.0.0.1:5173")})
+CONFIG.update({
+    "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
+})
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
 if os.environ.get("ZOZO_DEV_GOOGLE_ID") and os.environ.get("ZOZO_DEV_GOOGLE_SECRET"):
     CONFIG["GOOGLE_CLIENT_ID"], CONFIG["GOOGLE_CLIENT_SECRET"] = os.environ["ZOZO_DEV_GOOGLE_ID"], os.environ["ZOZO_DEV_GOOGLE_SECRET"]
@@ -95,6 +105,15 @@ class Servicos:
     async def http_post(self, url, campos):
         dados = urllib.parse.urlencode(campos).encode("utf-8")
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
+
+    async def http_post_json(self, url, cabecalhos, corpo):
+        if CONFIG.get("RESEND_API_KEY") == "console":
+            # modo console: mostra o e-mail aqui (assunto e texto, com o link) e não envia nada
+            m = json.loads(corpo)
+            sys.stderr.write("\n===== E-MAIL (não enviado) para " + ", ".join(m.get("to", [])) + " =====\n"
+                             + m.get("subject", "") + "\n\n" + m.get("text", "") + "\n================================\n")
+            return 200, "{}"
+        return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=corpo.encode("utf-8"), headers=cabecalhos, method="POST"))
 
 
 class Manipulador(http.server.BaseHTTPRequestHandler):
@@ -160,6 +179,11 @@ class Manipulador(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    try:                                          # acentos legíveis também quando a saída vai para um arquivo/pipe
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORTA), Manipulador)
     print(f"ZoZo (desenvolvimento): API e interface montada em http://127.0.0.1:{PORTA}  ·  "
           "com recarga instantânea: npm run dev (http://127.0.0.1:5173 ; demonstração: /?mock=1)  ·  Ctrl+C para parar")

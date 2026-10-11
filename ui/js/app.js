@@ -75,6 +75,7 @@
 
   /* ---------------- Autenticação ---------------- */
   let authErro = null, authEmail = "";
+  let authAviso = null;           // aviso positivo na tela de entrada (ex.: e-mail confirmado)
   let turnstile = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
   let googleAtivo = false;       // "Continuar com Google" configurado no servidor
   let captchaLogin = false;      // o servidor pediu CAPTCHA para a próxima tentativa de login
@@ -92,13 +93,14 @@
   function renderAuth() {
     ZoZo.auth.render(authRoot, {
       erro: authErro,
+      aviso: authAviso,
       emailInicial: authEmail,
       turnstile, captchaLogin, google: googleAtivo,
-      onIrCadastro: () => { authErro = null; store.set({ session: { status: "register" } }); },
-      onVoltar: () => { authErro = null; store.set({ session: { status: "login" } }); },
+      onIrCadastro: () => { authErro = null; authAviso = null; store.set({ session: { status: "register" } }); },
+      onVoltar: () => { authErro = null; authAviso = null; store.set({ session: { status: "login" } }); },
       onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
       onLogin: (cred) => {
-        authEmail = cred.email;
+        authEmail = cred.email; authAviso = null;
         ZoZo.auth.carregando(authRoot, "Entrando no ZoZo");
         bridge.request(A.login, cred).then((r) => {
           captchaLogin = false;
@@ -106,6 +108,7 @@
           if (r && r.doisFatores && !r.authenticated) { authErro = null; errosCodigo = 0; store.set({ session: { status: "2fa" } }); return; }
           entrar(r);
         }).catch((e) => {
+          if (e.code === "EMAIL_NOT_CONFIRMED") { aguardarConfirmacao(cred.email); return; }
           if (e.captcha || e.code === "CAPTCHA_REQUIRED") captchaLogin = true;
           // a falha que inicia um bloqueio já informa o tempo de espera
           authErro = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? textoBloqueio(e)
@@ -123,13 +126,35 @@
       onCancelar2FA: () => { ZoZo.auth.reiniciar(); bridge.request(A.logout).catch(() => null); authErro = null; store.set({ session: { status: "login" } }); },
       onCadastro: (dados) => {
         ZoZo.auth.carregando(authRoot, "Preparando sua conta...");
-        bridge.request(A.registerUser, dados).then((r) => { salvarCredencial(dados.email, dados.senha, dados.nomeUsuario); entrar(r); }).catch((e) => {
+        bridge.request(A.registerUser, dados).then((r) => {
+          salvarCredencial(dados.email, dados.senha, dados.nomeUsuario);
+          if (r && r.confirmarEmail) { authEmail = r.email; aguardarConfirmacao(r.email); return; }    // e-mail ligado: falta o link
+          entrar(r);
+        }).catch((e) => {
           authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e)
             : ["EMAIL_IN_USE", "WEAK_PASSWORD", "STORAGE_UNAVAILABLE", "PASSWORD_BREACHED", "ACCESS_DENIED", "CAPTCHA_REQUIRED", "REGISTER_FAILED", "CF_CHALLENGE"].includes(e.code) ? FR[e.code] : FR.REGISTER_FAILED;
           renderAuth();
         });
       },
     });
+  }
+
+  /** Tela "Confirme seu e-mail" (depois do cadastro ou ao tentar entrar sem confirmar) */
+  function aguardarConfirmacao(email) {
+    ZoZo.auth.aguardandoEmail(authRoot, email, {
+      onReenviar: () => bridge.request(A.reenviarConfirmacao, { email }),
+      onEntrar: () => { authErro = null; authAviso = null; ZoZo.auth.reiniciar(); store.set({ session: { status: "login" } }); renderAuth(); },
+    });
+  }
+
+  /** Link do e-mail (#confirmar=…): confirma e limpa o endereço (o token não fica no histórico) */
+  function retornoConfirmacao() {
+    const m = location.hash.match(/^#confirmar=([A-Za-z0-9_-]{20,100})$/);
+    if (!m) return Promise.resolve();
+    history.replaceState(null, "", location.pathname + location.search);
+    return bridge.request(A.confirmarEmail, { token: m[1] })
+      .then(() => { authAviso = "E-mail confirmado! Agora é só entrar com a sua senha."; authErro = null; })
+      .catch((e) => { authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e) : FR.TOKEN_INVALID; });
   }
 
   /** Oferece salvar no gerenciador de senhas do navegador (Chrome/Edge; os demais detectam pelo formulário) */
@@ -158,7 +183,7 @@
 
   function entrar(sessao) {
     geracao += 1;
-    authErro = null;
+    authErro = null; authAviso = null;
     if (ZoZo.servico) ZoZo.servico.reset();
     store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user } });
   }
@@ -357,7 +382,7 @@
       if (sessao && sessao.email) authEmail = sessao.email;       // sessão aberta sem a chave neste navegador: só pede a senha
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
       if (sessao && sessao.authenticated) { history.replaceState(null, "", location.pathname + (location.search.includes("mock=1") ? "?mock=1" : "")); entrar(sessao); return; }
-      return retornoGoogle().then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
+      return retornoConfirmacao().then(retornoGoogle).then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
     });
   }
 

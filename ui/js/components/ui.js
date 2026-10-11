@@ -244,7 +244,8 @@
   const DURACAO_ARVORE = 200;
   function alternarArvore(chave, aplicar) {
     const corpo = document.querySelector('[data-arvore="' + CSS.escape(chave) + '"]');
-    if (!corpo || corpo.hidden || semMovimento() || !corpo.animate) { if (!corpo || corpo.hidden) abrindo.add(chave); aplicar(); return; }
+    // "Reduzir movimento": nada de animação (nem a de abrir, que só aconteceria no próximo desenho)
+    if (!corpo || corpo.hidden || semMovimento() || !corpo.animate) { if ((!corpo || corpo.hidden) && !semMovimento()) abrindo.add(chave); aplicar(); return; }
     let feito = false;
     const fim = () => { if (!feito) { feito = true; aplicar(); } };
     corpo.style.overflow = "hidden";
@@ -257,10 +258,12 @@
     if (abrindo.has(chave)) {
       abrindo.delete(chave);
       requestAnimationFrame(() => {
-        if (!el.isConnected || el.hidden || !el.animate) return;
+        if (!el.isConnected || el.hidden || !el.animate || semMovimento()) return;      // preferência conferida na hora de animar
         el.style.overflow = "hidden";
-        el.animate([{ height: "0px", opacity: 0 }, { height: el.scrollHeight + "px", opacity: 1 }],
-          { duration: DURACAO_ARVORE + 20, easing: "cubic-bezier(.2,.7,.3,1)" }).onfinish = () => { el.style.overflow = ""; };
+        const anim = el.animate([{ height: "0px", opacity: 0 }, { height: el.scrollHeight + "px", opacity: 1 }],
+          { duration: DURACAO_ARVORE + 20, easing: "cubic-bezier(.2,.7,.3,1)" });
+        const limpar = () => { el.style.overflow = ""; };
+        anim.onfinish = limpar; anim.oncancel = limpar;
       });
     }
     return el;
@@ -364,7 +367,30 @@
       icon(ICONE_TIPO_CONTA[conta.tipo] || "carteira", { size: 16 }));
   }
 
+  /**
+   * Confirmação no próprio botão (os avisos de sucesso no canto da tela não aparecem mais):
+   * ícone vira ✓ e o texto/rótulo muda por ~1,6 s; leitores de tela ouvem pela região viva.
+   */
+  function confirmarNoBotao(btn, texto) {
+    const rotulo = btn.querySelector(".btn__label");
+    const iconeAntes = btn.querySelector("svg");
+    const textoAntes = rotulo ? rotulo.textContent : null, ariaAntes = btn.getAttribute("aria-label");
+    const ok = icon("check", { size: iconeAntes ? Number(iconeAntes.getAttribute("width")) || 15 : 15 });
+    if (iconeAntes) iconeAntes.replaceWith(ok);
+    if (rotulo) rotulo.textContent = texto; else btn.setAttribute("aria-label", texto);
+    btn.classList.add("is-confirmado");
+    const vivo = document.getElementById("toast-root");
+    if (vivo) { const aviso = h("span", { class: "sr-only" }, texto); vivo.appendChild(aviso); setTimeout(() => aviso.remove(), 1600); }
+    clearTimeout(btn._confirmar);
+    btn._confirmar = setTimeout(() => {
+      if (iconeAntes) ok.replaceWith(iconeAntes);
+      if (rotulo) rotulo.textContent = textoAntes; else if (ariaAntes) btn.setAttribute("aria-label", ariaAntes);
+      btn.classList.remove("is-confirmado");
+    }, 1600);
+  }
+
   ZoZo.ui = {
+    confirmarNoBotao,
     Button, IconButton, Field, Input, Select, Textarea, Toggle, Tag, CategoryLabel, PercentageChange, ProgressBar,
     FilterTabs, recortarSerie, Segmented, Card, Section, Skeleton, EmptyState, ErrorState, ColorPicker,
     AccountIcon, INTERVALOS, refocus, Checkbox, alternarArvore, corpoArvore, alternarGrupo,

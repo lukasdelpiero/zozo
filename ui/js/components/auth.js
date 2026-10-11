@@ -204,6 +204,8 @@
           logo(),
           h("h1", { class: tituloClasse }, titulo),
           st.storageAvailable === false ? h("div", { class: "auth__warning", role: "status" }, icon("nuvem", { size: 16 }), h("span", null, FR.STORAGE_UNAVAILABLE)) : null,
+          // aviso positivo (ex.: "E-mail confirmado") — os erros ficam no próprio formulário
+          cfg.aviso ? h("p", { class: "auth__ok", role: "status" }, icon("check", { size: 15 }), h("span", null, cfg.aviso)) : null,
           corpo, demo))));
 
     requestAnimationFrame(() => { const a = root.querySelector("[data-autofocus]"); if (a) a.focus(); });
@@ -229,5 +231,38 @@
       : { modo: "register", etapa: 2, email: dados.email, nome: dados.nome || dados.email.split("@")[0], google: true };
   }
 
-  ZoZo.auth = { render, reiniciar, prepararGoogle, carregando, A };
+  /**
+   * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar): explica, permite
+   * reenviar o link (com espera de 60 s entre envios) e voltar para entrar.
+   */
+  function aguardandoEmail(root, email, cfg) {
+    const situacao = h("p", { class: "auth__espera-email", role: "status", "aria-live": "polite" });
+    const reenviar = h("button", { type: "button", class: "auth__opcao auth__opcao--email" }, "Reenviar link");
+    let espera = 0, timer = null;
+    const contar = () => {
+      reenviar.disabled = espera > 0;
+      reenviar.textContent = espera > 0 ? "Reenviar link (" + espera + " s)" : "Reenviar link";
+      if (espera > 0) { espera -= 1; timer = setTimeout(contar, 1000); }
+    };
+    reenviar.addEventListener("click", () => {
+      reenviar.disabled = true;
+      Promise.resolve(cfg.onReenviar()).then(() => { situacao.textContent = "Se houver um cadastro aguardando confirmação, enviamos um novo link."; })
+        .catch((e) => { situacao.textContent = (e && e.friendly) || "Não foi possível reenviar agora. Tente de novo em instantes."; })
+        .finally(() => { clearTimeout(timer); espera = 60; contar(); });
+    });
+    mount(root, h("div", { class: "auth" },
+      h("div", { class: "auth__center" },
+        h("div", { class: "auth__card auth__card--frente" },
+          logo(),
+          h("h1", { class: "auth__title" }, "Confirme seu e-mail"),
+          h("div", { class: "auth__form" },
+            h("p", { class: "auth__texto" }, "Enviamos um link para ", h("strong", null, email),
+              ". Abra o e-mail e toque em “Confirmar e-mail” para ativar a conta; depois é só entrar com a sua senha."),
+            h("p", { class: "auth__texto auth__texto--suave" }, "Não chegou? Confira a caixa de spam ou reenvie o link (ele vale por 24 horas)."),
+            reenviar, situacao,
+            rodape("Já confirmou?", "Entrar", cfg.onEntrar))))));
+    requestAnimationFrame(() => reenviar.focus());
+  }
+
+  ZoZo.auth = { render, reiniciar, prepararGoogle, carregando, aguardandoEmail, A };
 })(window.ZoZo);

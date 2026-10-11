@@ -202,6 +202,13 @@ function abrir(anchor: HTMLElement, opts?: { atual?: string; aoEscolher?: (emoji
 
 window.ZoZo.emojiPicker = { abrir, carregar: preparar, fechar };
 
-// Prepara logo depois que o app abre (fora do caminho do primeiro desenho): a 1ª abertura já é instantânea
+// Prepara depois do login, quando o navegador fica ocioso (a tela de entrada não baixa os emojis):
+// a 1ª abertura já é instantânea
 const ocioso = (window as unknown as { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-if (ocioso) ocioso(() => { void preparar(); }, { timeout: 2000 }); else setTimeout(() => { void preparar(); }, 1500);
+const agendar = () => { if (ocioso) ocioso(() => { void preparar(); }, { timeout: 2000 }); else setTimeout(() => { void preparar(); }, 1500); };
+let agendado = false;
+window.ZoZo.store.subscribe((s: { session?: { authenticated?: boolean } }) => {
+  if (agendado || !s.session || !s.session.authenticated) return;
+  agendado = true;
+  agendar();
+});

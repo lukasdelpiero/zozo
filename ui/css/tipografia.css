@@ -486,7 +486,6 @@
 .launch-row__desc > .launch-row__title { flex: 0 1 auto; min-width: 3em; }
 .launch-row__conta { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 8 auto; min-width: 0; overflow: hidden; }
 .launch-row__conta .launch-row__account { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.kind-badge--vazio { visibility: hidden; }
 /* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
 .recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
 .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(0, max-content) 120px; }
@@ -927,7 +926,13 @@
     transition: transform var(--duration-medium) var(--easing), visibility 0s linear var(--duration-medium);
   }
 }
-@media (prefers-reduced-motion: reduce) { .sidebar, .app-shell { transition: none !important; } }
+/* O conteúdo acompanha o recuo do título da barra superior (abre espaço para o botão do menu recolhido):
+   os dois mudam juntos, com a mesma curva — nada desalinha durante a animação */
+@media (min-width: 901px) {
+  .main > .page { transition: padding-left var(--duration-medium) var(--easing); }
+  .app-shell[data-menu="recolhido"] .main > .page { padding-left: 60px; }
+}
+@media (prefers-reduced-motion: reduce) { .sidebar, .app-shell, .main > .page, .topbar { transition: none !important; } }
 
 /* Grupos que abrem/fecham (animação em ui.js: alternarArvore/corpoArvore) */
 .arvore-grupo { display: flex; flex-direction: column; }
@@ -1027,7 +1032,7 @@
 .doc__pix-texto { font-weight: 620; }
 
 /* Recorrências: check de pago sem o fundo circular */
-.recurrence-row__paid { background: transparent !important; width: auto; }
+.recurrence-row__paid { background: transparent !important; width: 14px; flex: none; }   /* mesma largura com e sem o check: valores alinhados */
 
 /* Aviso de demonstração no menu: fundo laranja-claro, texto laranja */
 .demo-badge { background: #fff1e3; color: #e8730c; font-weight: 550; border-radius: 8px; }
@@ -1160,7 +1165,44 @@
 .icon-pick { padding: 0; line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", var(--font-family); }
 .hero-edit .icon-pick { display: inline-grid; place-items: center; }
 
-/* Painel da transação: "+ Adicionar divisão" */
-.lp-add-divisao { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 1px solid var(--color-border);
-  border-radius: 8px; background: var(--color-surface); color: var(--color-text-primary); font: inherit; font-size: var(--t-13); font-weight: 550; cursor: pointer; }
-.lp-add-divisao:hover { background: var(--color-surface-hover); border-color: var(--color-border-strong); }
+
+/* =============================================================
+   ZoZo 3.0
+   ============================================================= */
+/* Texto só para leitores de tela */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Confirmação no próprio botão (ex.: "Código Pix copiado") */
+.is-confirmado, .is-confirmado .icon { color: var(--color-positive) !important; }
+
+/* Combobox (select): aberta, a lista continua o campo — mesma borda, sem o arredondamento de baixo no campo,
+   e o arredondamento passa para o fim da lista. Navegadores sem "base-select" mostram a lista nativa. */
+@supports (appearance: base-select) {
+  .select, .select::picker(select) { appearance: base-select; }
+  .select { display: flex; align-items: center; }
+  .select::picker-icon { display: none; }                         /* a seta já vem no fundo do campo */
+  .select:open { border-color: var(--color-primary); border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: none; }
+  .select::picker(select) {
+    margin: 0; padding: 4px; border: 1px solid var(--color-primary); border-top: 0; border-radius: 0 0 8px 8px;
+    background: var(--color-surface); box-shadow: 0 10px 24px rgba(22, 33, 58, 0.12);
+    min-inline-size: anchor-size(self-inline); max-block-size: min(320px, 50vh);
+    position-try-fallbacks: none;
+  }
+  .select option { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 10px; border-radius: 6px;
+    font-size: var(--t-15); color: var(--color-text-primary); cursor: pointer; }
+  .select option:hover, .select option:focus-visible { background: var(--color-primary-soft); outline: none; }
+  .select option:checked { color: var(--color-primary); font-weight: 550; }
+  .select option::checkmark { order: 1; margin-left: auto; color: var(--color-primary); }
+}
+
+/* ---- Confirmação de e-mail (3.0) ---- */
+.auth__ok {
+  display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px;
+  font-size: var(--t-13); font-weight: 520; color: var(--color-positive); text-align: center;
+}
+.auth__ok svg { flex: none; }
+.auth__texto { margin: 0; font-size: var(--t-15); line-height: 1.5; color: var(--color-text-primary); text-align: center; overflow-wrap: anywhere; }
+.auth__texto strong { font-weight: 620; }
+.auth__texto--suave { color: var(--color-text-secondary); font-size: var(--t-13); }
+.auth__espera-email { min-height: 1.4em; margin: 0; font-size: var(--t-13); color: var(--color-text-secondary); text-align: center; }
+.auth__espera-email:empty { min-height: 0; }
+.auth__opcao:disabled { cursor: default; filter: saturate(0.4) opacity(0.7); transform: none; }

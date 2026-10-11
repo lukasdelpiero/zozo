@@ -23,7 +23,7 @@
   function tiposPermitidos(l, novo) {
     if (novo) return ["regular", "interno", "receita", "debito"];
     if (l.tipo === "recorrente") return [];                           // permanece "Recorrente"
-    if (l.tipo === "regular" || l.tipo === "estorno") return ["regular", "interno", "debito"];
+    if (l.tipo === "regular" || l.tipo === "estorno") return ["regular", "interno", "receita", "debito"];
     if (l.tipo === "interno") return ["interno", "regular", "receita", "debito"];
     if (l.tipo === "receita") return ["receita", "interno", "regular", "debito"];
     if (l.tipo === "debito") return ["debito", "regular", "interno", "receita"];
@@ -393,12 +393,12 @@
             h("div", { class: "lp-pilula" }, campoPerfil(), perfilAtual() ? seta(perfilAtual().nome, () => ZoZo.perfilShared.abrirDetalhe(perfilAtual(), ctx, { voltar: voltarParaCa })) : null)) : null,
           temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Recorrência"),
             h("div", { class: "lp-pilula" }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
-          // Divisão entre perfis: rachada → resumo; senão "+ Adicionar divisão" (também em recorrentes já criadas)
+          // Divisão entre perfis: rachada → resumo; senão o "+" (igual ao da recorrência; também em recorrentes já criadas)
           podeDividir ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
             d.divisao
               ? h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },
                 icon("dividir", { size: 14 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")
-              : h("button", { type: "button", class: "lp-add-divisao", onClick: abrirDivisao }, icon("mais", { size: 14 }), "Adicionar divisão")) : null),
+              : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar divisão", title: "Adicionar divisão", onClick: abrirDivisao }, icon("mais", { size: 14 }))) : null),
         h("section", { class: "lp-notes-wrap" }, campoNotas()),
         statusEl,
         historico());

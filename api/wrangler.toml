@@ -9,6 +9,7 @@
 #   npx wrangler secret put SEGREDO                       (e: --env previa)
 #   npx wrangler secret put TURNSTILE_SECRET              (e: --env previa)
 #   npx wrangler secret put GOOGLE_CLIENT_SECRET          (opcional, para o "Continuar com Google")
+#   npx wrangler secret put RESEND_API_KEY                (chave da API do Resend: e-mails de confirmação e avisos)
 #   npx wrangler secret put RECURSOS_CAMBIO               (e-mails que podem levar transações entre moedas no multicâmbio)
 #   npx wrangler secret put RECURSOS_AVANCADOS            (e-mails com Perfis, boletos e Pix, separados por vírgula;
 #                                                          a conta demo@usezozo.com.br sempre tem)
@@ -40,6 +41,10 @@ database_id = "7964c186-da78-4c07-942c-79d583691f75"
 migrations_dir = "migracoes"
 
 [vars]
+# E-mail (Resend): remetente do domínio verificado e endereço público usado nos links (nunca o Host do pedido).
+# Sem o segredo RESEND_API_KEY o e-mail fica desligado e o cadastro funciona como antes.
+EMAIL_REMETENTE = "ZoZo <nao-responda@usezozo.com.br>"
+URL_PUBLICA = "https://usezozo.com.br"
 # CAPTCHA (chave pública; a secreta é o segredo TURNSTILE_SECRET)
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 # "Continuar com Google": ID do cliente OAuth (público). Vazio = botão avisa que não está disponível.
@@ -63,5 +68,7 @@ database_id = "d267ce2a-3920-4c7b-8e91-7b3990dba0ba"
 migrations_dir = "migracoes"
 
 [env.previa.vars]
+EMAIL_REMETENTE = "ZoZo (prévia) <nao-responda@usezozo.com.br>"
+URL_PUBLICA = "https://zozo-previa.zozo-finance-app.workers.dev"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"

@@ -29,6 +29,10 @@
   const API = "/api";
   const ITERACOES = 600000;
   const ITERACOES_MAX = 10000000;
+  // Argon2id (contas novas e senhas trocadas): 64 MiB, 3 passagens, 1 linha — RFC 9106 (2ª recomendação).
+  // Contas antigas continuam em PBKDF2 até trocarem a senha. Mudar estes números exige um "argon2id-2".
+  const KDF_PBKDF2 = "pbkdf2", KDF_ARGON2 = "argon2id-1";
+  const ARGON2 = { memorySize: 65536, iterations: 3, parallelism: 1, hashLength: 32 };
   const FORMATO = 2;                       // primeiro byte do documento cifrado
   const LIMITE_CONTEUDO = 1900000;         // mesmo limite da API (D1: ~2 MB por linha)
   const LIMITE_EXPANDIDO = 40 * 1024 * 1024; // documento descomprimido: no máximo 40 MB
@@ -97,7 +101,8 @@
     }
     if (r.status === 404 && metodo === "GET") return null;
     if (r.status === 409) throw erro(["EMAIL_IN_USE", "2FA_ALREADY_ON", "2FA_NOT_PENDING"].includes(codigo) ? codigo : "DATA_CHANGED");
-    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY"].includes(codigo)) throw erro(codigo);
+    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY", "EMAIL_NOT_CONFIRMED"].includes(codigo)) throw erro(codigo);
+    if (r.status === 400 && codigo === "TOKEN_INVALID") throw erro(codigo);
     if (r.status === 403) throw erro("ACCESS_DENIED");                   // pedido recusado pela checagem de origem
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
     if (r.status === 429) throw erro("TOO_MANY_ATTEMPTS", extra);
@@ -106,12 +111,23 @@
   }
   const parametros = (email) => api("GET", "/conta/parametros?email=" + encodeURIComponent(normalizarEmail(email)));
 
-  /* ---------------- chaves ---------------- */
-  async function derivar(senha, sal, iteracoes) {
-    const base = await crypto.subtle.importKey("raw", enc.encode(normalizarSenha(senha)), "PBKDF2", false, ["deriveBits"]);
-    const mestre = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: sal, iterations: iteracoes }, base, 256);
+  /* ---------------- chaves ----------------
+     senha → (PBKDF2 ou Argon2id) → 32 bytes "mestre" → HKDF → chave dos dados + prova da senha.
+     A etapa HKDF e o formato dos documentos não mudam: só a função que estica a senha. */
+  async function mestreArgon2(senha, sal) {
+    // WebAssembly sob demanda (CSP: 'wasm-unsafe-eval'); só baixa ao entrar/cadastrar/trocar a senha
+    const { argon2id } = await import("hash-wasm");
+    return argon2id(Object.assign({ password: normalizarSenha(senha), salt: sal, outputType: "binary" }, ARGON2));
+  }
+  async function derivar(senha, sal, iteracoes, kdf) {
+    let mestre;
+    if (kdf === KDF_ARGON2) mestre = await mestreArgon2(senha, sal);
+    else {
+      const base = await crypto.subtle.importKey("raw", enc.encode(normalizarSenha(senha)), "PBKDF2", false, ["deriveBits"]);
+      mestre = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: sal, iterations: iteracoes }, base, 256));
+    }
     const hk = await crypto.subtle.importKey("raw", mestre, "HKDF", false, ["deriveKey", "deriveBits"]);
-    new Uint8Array(mestre).fill(0);
+    mestre.fill(0);
     const param = (uso) => ({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: enc.encode("zozo/" + uso + "/v2") });
     // Mesmos bytes que deriveKey(AES-GCM 256) produzia: documentos já gravados continuam abrindo
     const bits = new Uint8Array(await crypto.subtle.deriveBits(param("dados"), hk, 256));
@@ -122,15 +138,18 @@
     return { chave, bits, prova: provaB64 };
   }
 
-  /** Deriva as chaves de uma conta. Recusa parâmetros fracos vindos do servidor (proteção contra rebaixamento). */
+  /** Deriva as chaves de uma conta. Recusa parâmetros fracos ou desconhecidos vindos do servidor (proteção contra rebaixamento). */
   async function derivarConta(senha, par) {
     if (!par) throw erro("STORAGE_UNAVAILABLE");
     const it = par.iteracoes;
+    const kdf = par.kdf === undefined ? KDF_PBKDF2 : par.kdf;           // servidor de versão anterior: PBKDF2
     let sal;
     try { sal = deB64(String(par.sal || "")); } catch (e) { sal = new Uint8Array(0); }
-    if (!Number.isInteger(it) || it < ITERACOES || it > ITERACOES_MAX || sal.length < 16 || sal.length > 64) throw erro("STORAGE_UNAVAILABLE");
+    if (kdf !== KDF_PBKDF2 && kdf !== KDF_ARGON2) throw erro("STORAGE_UNAVAILABLE");
+    if (kdf === KDF_PBKDF2 && (!Number.isInteger(it) || it < ITERACOES || it > ITERACOES_MAX)) throw erro("STORAGE_UNAVAILABLE");
+    if (sal.length < 16 || sal.length > 64) throw erro("STORAGE_UNAVAILABLE");
     if (!senha) throw erro("WRONG_PASSWORD");
-    return derivar(senha, sal, it);
+    return derivar(senha, sal, it, kdf);
   }
 
   /* ---------------- chave dos dados guardada (cifrada com o envelope da sessão) ---------------- */
@@ -302,9 +321,24 @@
       const email = normalizarEmail(d.email);
       if (await senhaVazada(d.senha)) throw erro("PASSWORD_BREACHED");
       const sal = aleatorio(16);
-      const k = await derivar(d.senha, sal, ITERACOES);
-      const r = await api("POST", "/conta", { email, nome, sal: b64(sal), iteracoes: ITERACOES, prova: k.prova, turnstile: d.turnstile || undefined });
+      const k = await derivar(d.senha, sal, ITERACOES, KDF_ARGON2);
+      const r = await api("POST", "/conta", { email, nome, sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: k.prova, turnstile: d.turnstile || undefined });
+      // E-mail ligado: a conta só entra depois do link de confirmação (nada fica guardado aqui até lá)
+      if (r && r.confirmar && !r.envelope) { k.bits.fill(0); return { confirmarEmail: true, email }; }
       return concluir(r, k);
+    },
+
+    /** Link do e-mail (#confirmar=…): confirma o cadastro; depois é só entrar com a senha */
+    async confirmarEmail(d) {
+      const token = String((d && d.token) || "");
+      if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw erro("TOKEN_INVALID");
+      await api("POST", "/email/confirmar", { token });
+      return { confirmado: true };
+    },
+
+    async reenviarConfirmacao(d) {
+      await api("POST", "/email/reenviar", { email: normalizarEmail(d && d.email) });
+      return { enviado: true };
     },
 
     async logout() {
@@ -377,10 +411,10 @@
       if (doc) { try { documento = await decifrar(atual.chave, s.email, doc.versao, doc.conteudo); } catch (e) { throw erro("LOAD_FAILED"); } }
       const va = doc ? doc.versao : 0;
       const sal = aleatorio(16);
-      const nova = await derivar(d.novaSenha, sal, ITERACOES);
+      const nova = await derivar(d.novaSenha, sal, ITERACOES, KDF_ARGON2);           // senha nova já em Argon2id
       const conteudo = await cifrar(nova.chave, s.email, va + 1, documento);
       // troca atômica no servidor: novo sal + nova prova + documento recifrado (e os outros dispositivos saem)
-      await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, prova: nova.prova, conteudo, versaoAnterior: va }, atual.prova);
+      await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va }, atual.prova);
       if (sessao === s) {
         Object.assign(s, { chave: nova.chave, prova: nova.prova, versao: va + 1 });
         await guardarChaveLocal(s.email, s.envelope, nova.bits, nova.prova);

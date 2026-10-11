@@ -45,7 +45,7 @@
   /** Botão de ícone (emoji) que abre o seletor de emojis */
   function seletorIcone(valor, aoMudar) {
     let atual = valor || "📦";
-    const btn = h("button", { type: "button", class: "icon-pick", "aria-label": "Escolher ícone", "aria-haspopup": "menu" }, atual);
+    const btn = h("button", { type: "button", class: "icon-pick", "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, atual);
     btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e) => { atual = e; btn.textContent = e; aoMudar(e); } }));
     return btn;
   }

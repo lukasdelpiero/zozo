@@ -34,6 +34,21 @@
     requestAnimationFrame(frame);
   }
 
+  /**
+   * Espera a entrada da página/cartão terminar antes de animar o gráfico: as páginas entram com um
+   * "fade" em sequência e, sem esperar, o gráfico se desenhava enquanto o cartão ainda estava
+   * transparente — parecia não ter animação. Teto de 900 ms (nunca fica preso).
+   */
+  function depoisDaEntrada(el) {
+    const fim = [];
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      if (!e.getAnimations) continue;
+      e.getAnimations().forEach((a) => { if (a.playState === "running" || a.playState === "pending") fim.push(a.finished.catch(() => null)); });
+    }
+    return fim.length ? Promise.race([Promise.all(fim), new Promise((r) => setTimeout(r, 900))]) : Promise.resolve();
+  }
+  function animarDepoisDaEntrada(el, dur, passo) { depoisDaEntrada(el).then(() => animar(dur, passo)); }
+
   /** Executa fn uma vez quando o elemento estiver conectado e com tamanho */
   function quandoVisivel(el, fn) {
     let feito = false;
@@ -231,7 +246,7 @@
 
       if (!iniciada && holder.isConnected && holder.clientWidth) {
         iniciada = true;
-        animar(parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; clipAtual.rect.setAttribute("width", clipAtual.W * p); });
+        animarDepoisDaEntrada(holder, parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; clipAtual.rect.setAttribute("width", clipAtual.W * p); });
       }
     }
 
@@ -305,7 +320,7 @@
       });
     };
     if (ZoZo.charts.permitirAnimacao === false) pintar(1);
-    else quandoVisivel(container, () => animar(parseFloat(css("--duration-chart")) || 900, pintar));
+    else quandoVisivel(container, () => animarDepoisDaEntrada(container, parseFloat(css("--duration-chart")) || 900, pintar));
     return svg;
   }
 
@@ -364,7 +379,7 @@
       pintarAtual(progresso);
       if (!iniciada) {
         iniciada = true;
-        animar(parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; pintarAtual(p); });
+        animarDepoisDaEntrada(holder, parseFloat(css("--duration-chart")) || 900, (p) => { progresso = p; pintarAtual(p); });
       }
     }
 

@@ -216,7 +216,7 @@
 
     const avisoPix = h("p", { class: "boleto-editor__pix" });
     const copiarPix = UI.Button("Copiar Pix copia e cola", { size: "sm", variant: "secondary", icon: "copiar", class: "btn--block",
-      onClick: () => pronto(st) && st.pixCodigo && navigator.clipboard.writeText(st.pixCodigo).then(() => ctx.toast("Código Pix copiado."), () => ctx.toast("Não foi possível copiar.", { tone: "error" })) });
+      onClick: (e) => { const b = e.currentTarget; if (pronto(st) && st.pixCodigo) navigator.clipboard.writeText(st.pixCodigo).then(() => UI.confirmarNoBotao(b, "Código Pix copiado"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } });
     const imprimirBtn = UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
 
     function atualizarResumo() {
@@ -324,7 +324,7 @@
     ro.observe(preview);
 
     const tecla = (e) => {
-      if (e.key === "Escape" && !document.querySelector(".modal-overlay, .menu")) { e.preventDefault(); close(); }
+      if (e.key === "Escape" && !document.querySelector(".modal-overlay, .menu, .emoji-pop.is-aberto")) { e.preventDefault(); close(); }
     };
     document.addEventListener("keydown", tecla);
 

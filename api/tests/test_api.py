@@ -21,6 +21,7 @@ AQUI = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(AQUI.parent / "src"))
 sys.path.insert(0, str(AQUI.parent / "dev"))
 
+import emails  # noqa: E402
 import google  # noqa: E402
 import nucleo  # noqa: E402
 import totp  # noqa: E402
@@ -118,6 +119,21 @@ class FakeServicos:
 
     google_token = None        # resposta do endpoint de token do Google (falso)
 
+    async def http_post_json(self, url, cabecalhos, corpo):
+        self.chamadas.append((url, dict(cabecalhos)))
+        if url == emails.RESEND_URL:
+            self.emails.append(json.loads(corpo))
+            return (200, '{"id":"x"}') if self.email_ok else (500, "{}")
+        return 404, ""
+
+    email_ok = True
+
+    @property
+    def emails(self):
+        if not hasattr(self, "_emails"):
+            self._emails = []
+        return self._emails
+
 
 class TesteTotp(unittest.TestCase):
     SEG = b"12345678901234567890"          # vetor da RFC 6238 (SHA-1)
@@ -168,6 +184,7 @@ class Cliente:
         self.cookies = {}
         self.agora = T0
         self.ultima = None
+        self.logs = []
 
     def __call__(self, metodo, caminho, corpo=None, prova=None, cab=None):
         h = {"Host": "zozo.exemplo.com", "CF-Connecting-IP": self.ip}
@@ -180,7 +197,7 @@ class Cliente:
         h.update(cab or {})
         texto = corpo if isinstance(corpo, str) else (json.dumps(corpo) if corpo is not None else "")
         p = nucleo.Pedido(metodo, "https://zozo.exemplo.com" + caminho, h, texto)
-        r = rodar(nucleo.atender(p, self.banco, self.servicos, self.config, log=lambda *_: None, agora=self.agora))
+        r = rodar(nucleo.atender(p, self.banco, self.servicos, self.config, log=self.logs.append, agora=self.agora))
         self.ultima = r
         sc = r.cabecalhos.get("Set-Cookie")
         if sc:
@@ -854,6 +871,144 @@ class TesteDemo(Base):
             self.assertTrue(self.entrar(cli)[1]["recursos"]["perfis"], repr(valor))
         cli = Cliente(self.banco, config=dict(CONFIG, RECURSOS_AVANCADOS="ana@exemplo.co"), ip="198.51.100.65")
         self.assertFalse(self.entrar(cli)[1]["recursos"]["perfis"])           # e-mail parecido não vale
+
+
+CONFIG_EMAIL = dict(CONFIG, RESEND_API_KEY="re_teste_123", EMAIL_REMETENTE="ZoZo <nao-responda@usezozo.com.br>",
+                    URL_PUBLICA="https://usezozo.com.br")
+
+
+class TesteEmail(unittest.TestCase):
+    """Confirmação de e-mail (Resend) e avisos de segurança."""
+
+    def setUp(self):
+        self.con = conectar()
+        self.addCleanup(self.con.close)
+        self.banco = BancoSqlite(self.con)
+        self.serv = FakeServicos()
+        self.cli = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="198.51.100.90")
+        self.cli.agora = time.time()                  # o banco usa o relógio real (criado_em)
+        self.sal, self.pv = b64(os.urandom(16)), prova()
+
+    def cadastrar(self, cli=None, email=EMAIL, pv=None, **extra):
+        return (cli or self.cli)("POST", "/api/conta", dict({"email": email, "nome": "Ana <b>", "sal": self.sal, "iteracoes": 600000,
+                                                              "prova": pv or self.pv}, **extra))
+
+    def entrar(self, cli=None, email=EMAIL, pv=None):
+        return (cli or self.cli)("POST", "/api/sessao", {"email": email, "prova": pv or self.pv})
+
+    def token(self, i=-1):
+        texto = self.serv.emails[i]["text"]
+        return texto.split("#confirmar=", 1)[1].split()[0]
+
+    def test_cadastro_fica_pendente_ate_confirmar(self):
+        st, r = self.cadastrar()
+        self.assertEqual((st, r), (202, {"confirmar": True}))
+        self.assertNotIn("Set-Cookie", self.cli.ultima.cabecalhos)                     # sem sessão antes de confirmar
+        self.assertEqual(tuple(self.con.execute("SELECT confirmacao_pendente, email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()), (1, 0))
+        m = self.serv.emails[0]
+        self.assertEqual((m["to"], m["from"], m["subject"]), ([EMAIL], "ZoZo <nao-responda@usezozo.com.br>", "Confirme seu e-mail no ZoZo"))
+        self.assertIn("Ana &lt;b&gt;", m["html"])                                      # nome escapado no HTML
+        url, cab = [c for c in self.serv.chamadas if c[0] == emails.RESEND_URL][0]
+        self.assertEqual(cab["Authorization"], "Bearer re_teste_123")
+        token = self.token()
+        guardado = self.con.execute("SELECT hash FROM tokens_email").fetchone()[0]
+        self.assertNotEqual(guardado, token)                                            # o banco guarda só o hash
+        self.assertEqual(self.entrar()[1]["erro"], "EMAIL_NOT_CONFIRMED")
+        self.assertEqual(self.entrar(pv=prova())[1]["erro"], "INVALID_CREDENTIALS")    # senha errada: resposta genérica
+        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": token}), (200, {"ok": True}))
+        self.assertEqual(self.entrar()[0], 200)
+        self.assertEqual(tuple(self.con.execute("SELECT confirmacao_pendente, email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()), (0, 1))
+        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": token})[1]["erro"], "TOKEN_INVALID")   # uso único
+        texto = " ".join(self.cli.logs)
+        self.assertNotIn(EMAIL, texto)
+        self.assertNotIn(token, texto)
+
+    def test_link_usa_url_publica_e_nao_o_host(self):
+        # pedido que chegou com o Host (e a URL) de outro site: o link do e-mail continua sendo o do ZoZo
+        corpo = json.dumps({"email": EMAIL, "nome": "Ana", "sal": self.sal, "iteracoes": 600000, "prova": self.pv})
+        pedido = nucleo.Pedido("POST", "https://phishing.exemplo/api/conta",
+                               {"Host": "phishing.exemplo", "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.96"}, corpo)
+        r = rodar(nucleo.atender(pedido, self.banco, self.serv, CONFIG_EMAIL, log=lambda *_: None, agora=time.time()))
+        self.assertEqual(r.status, 202)
+        texto = self.serv.emails[0]["text"]
+        self.assertIn("https://usezozo.com.br/#confirmar=", texto)
+        self.assertNotIn("phishing", texto)
+
+    def test_resposta_igual_para_email_ja_cadastrado(self):
+        self.cadastrar()
+        self.cli("POST", "/api/email/confirmar", {"token": self.token()})
+        antes = tuple(self.con.execute("SELECT verificador FROM contas WHERE email = ?", (EMAIL,)).fetchone())
+        outro = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="198.51.100.91")
+        outro.agora = self.cli.agora
+        st, r = self.cadastrar(outro, pv=prova())
+        self.assertEqual((st, r), (202, {"confirmar": True}))                          # não revela que já existe
+        self.assertEqual(self.serv.emails[-1]["subject"], "Tentativa de cadastro no ZoZo")
+        self.assertEqual(tuple(self.con.execute("SELECT verificador FROM contas WHERE email = ?", (EMAIL,)).fetchone()), antes)
+
+    def test_cadastro_pendente_recente_nao_e_sobrescrito(self):
+        self.cadastrar()
+        intruso = prova()
+        self.cadastrar(pv=intruso)                                                      # outra senha antes da confirmação
+        self.cli("POST", "/api/email/confirmar", {"token": self.token()})               # o link novo confirma a senha ORIGINAL
+        self.assertEqual(self.entrar(pv=intruso)[0], 401)
+        self.assertEqual(self.entrar()[0], 200)
+
+    def test_link_vencido_ou_de_outra_senha(self):
+        self.cadastrar()
+        token = self.token()
+        self.con.execute("UPDATE tokens_email SET expira = 1")
+        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": token})[1]["erro"], "TOKEN_INVALID")
+        self.cli("POST", "/api/email/reenviar", {"email": EMAIL})
+        novo = self.token()
+        self.con.execute("UPDATE contas SET verificador = ? WHERE email = ?", ("f" * 64, EMAIL))   # senha mudou depois do link
+        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": novo})[1]["erro"], "TOKEN_INVALID")
+        for ruim in ("", "curto", "x" * 200, "<script>alert(1)</script>xxxxxxxxxxxx", 123):
+            self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": ruim})[0], 400, repr(ruim))
+
+    def test_reenviar_sempre_igual_e_limitado(self):
+        self.assertEqual(self.cli("POST", "/api/email/reenviar", {"email": "ninguem@exemplo.com"}), (202, {"ok": True}))
+        self.assertEqual(self.serv.emails, [])                                          # sem conta pendente: nada enviado
+        self.cadastrar()
+        for _ in range(5):
+            self.cli("POST", "/api/email/reenviar", {"email": EMAIL})
+        self.assertEqual(len(self.serv.emails), nucleo.EMAILS_POR_CONTA)               # no máximo 3 por hora
+
+    def test_falha_do_resend_nao_quebra_o_cadastro(self):
+        self.serv.email_ok = False
+        self.assertEqual(self.cadastrar()[0], 202)
+        self.assertIn("email_falhou", " ".join(self.cli.logs))
+
+    def test_aviso_de_senha_alterada(self):
+        self.cadastrar()
+        self.cli("POST", "/api/email/confirmar", {"token": self.token()})
+        self.entrar()
+        nova = prova()
+        st, _ = self.cli("PUT", "/api/conta/senha", {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova, "kdf": "argon2id-1",
+                                                       "conteudo": conteudo(), "versaoAnterior": 0}, prova=self.pv)
+        self.assertEqual(st, 200)
+        self.assertEqual(self.serv.emails[-1]["subject"], "Sua senha do ZoZo foi alterada")
+        self.assertEqual(self.con.execute("SELECT kdf FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "argon2id-1")
+
+    def test_sem_configuracao_o_cadastro_e_como_antes(self):
+        cli = Cliente(self.banco, self.serv, dict(CONFIG_EMAIL, RESEND_API_KEY=""), ip="198.51.100.92")
+        self.assertEqual(self.cadastrar(cli)[0], 201)
+        self.assertEqual(self.serv.emails, [])
+        cli = Cliente(self.banco, self.serv, dict(CONFIG_EMAIL, URL_PUBLICA="javascript:alert(1)"), ip="198.51.100.93")
+        self.assertFalse(emails.ativo(cli.config))
+
+
+class TesteKdf(Base):
+    def test_kdf_argon2_no_cadastro_e_nos_parametros(self):
+        cli = Cliente(self.banco, ip="198.51.100.94")
+        st, _ = self.cadastrar(cli, OUTRO, prova(), kdf="argon2id-1")
+        self.assertEqual(st, 201)
+        self.assertEqual(cli("GET", "/api/conta/parametros?email=" + OUTRO)[1]["kdf"], "argon2id-1")
+        self.assertEqual(self.api("GET", "/api/conta/parametros?email=" + EMAIL)[1]["kdf"], "pbkdf2")       # conta antiga
+        # e-mail sem conta: parâmetros iguais aos de uma conta nova (não revela quem tem conta)
+        self.assertEqual(self.api("GET", "/api/conta/parametros?email=ninguem@exemplo.com")[1]["kdf"], "argon2id-1")
+        for ruim in ("md5", "", 1, "ARGON2ID-1"):
+            st, r = self.cadastrar(Cliente(self.banco, ip="198.51.100.95"), "x" + str(len(str(ruim))) + "@exemplo.com", prova(), kdf=ruim)
+            self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
 
 
 class TestePedidoInvalido(Base):
