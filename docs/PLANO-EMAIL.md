@@ -1,6 +1,15 @@
 # Plano — e-mails do ZoZo (confirmação, recuperação de senha, avisos)
 
-Status: **planejado, não implementado** (2.6.0). Nada aqui está no código ainda.
+Status (3.0.0): **confirmação de e-mail no cadastro, avisos de senha alterada / 2FA desativado e Argon2id implementados** (Resend; `api/src/emails.py`, migrações 0006 e 0007). **Recuperação de senha continua planejada** — depende da migração de chaves v3 descrita abaixo.
+
+### Como ficou a confirmação (diferente do plano original)
+
+O plano previa `POST /api/email/confirmar { token }` só com o link. Na implementação isso se mostrou um **sequestro de conta por pré-cadastro**: quem cadastrasse o e-mail de outra pessoa com uma senha própria teria essa senha confirmada quando a pessoa clicasse no link. Por isso:
+
+- o link (`#confirmar=<token>`) só **guarda o token na memória da página**; a conta é ativada no **login** (`POST /api/sessao { email, prova, confirmacao }`), com o token **e** a senha certa — quem lê a caixa de entrada e sabe a senha;
+- a rota `/api/email/confirmar` não existe; um cadastro pendente é substituído pelo mais recente (quem errou a senha refaz), e o cadastro com Google substitui um pendente;
+- o e-mail de confirmação não leva o nome digitado no cadastro (o endereço ainda não foi comprovado);
+- testes negativos em `TesteEmail` (`api/tests/test_api.py`).
 
 ## O ponto que muda tudo: criptografia de ponta a ponta
 

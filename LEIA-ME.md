@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.9.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.0.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,15 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.0.0
+
+- **Confirmação de e-mail no cadastro** (Resend, domínio `usezozo.com.br`): a conta nasce pendente e é ativada no **primeiro login feito com o link do e-mail** — o link sozinho não basta, é preciso a senha. Assim ninguém consegue cadastrar o e-mail de outra pessoa com uma senha própria e esperar que ela clique. A resposta do cadastro é a mesma para e-mail novo ou já cadastrado (quem já tem conta recebe um aviso por e-mail): o cadastro **não revela mais quem tem conta**. "Reenviar link" com espera de 60 s; links valem 24 h e uma vez só; o mais recente vale.
+- **Avisos por e-mail:** senha alterada e verificação em duas etapas desativada.
+- **Argon2id** (64 MiB, 3 passagens) no lugar do PBKDF2 para **contas novas e senhas trocadas**; as contas antigas continuam em PBKDF2 até trocarem a senha (nenhum dado precisa ser recifrado de surpresa).
+- **Login em Tailwind CSS:** as telas de entrada, cadastro, 2FA e confirmação saíram do CSS antigo (~210 linhas repetidas a menos). De quebra: o carregando de "Entrando no ZoZo" voltou a girar e o aviso de servidor indisponível não sai mais do centro.
+- **Segurança (auditoria):** novo login encerra a sessão anterior do mesmo navegador; cadastro com Google substitui um cadastro pendente de outra pessoa; o e-mail de confirmação não leva o nome digitado; corpo do pedido lido com limite real (FastAPI); `ZoZo.dom` em TypeScript, descartando `on…` em texto e links `javascript:`.
+- **Interface (2.9.x):** "+" da divisão igual ao da recorrência; lista dos menus de seleção emendada no campo (estilo Apple); "Salvar" do Pix desativado enquanto houver campo inválido; animação dos gráficos de volta; menu recolhido sem desalinhar a borda; Regular → Receita; alinhamentos das transações e das recorrências sem "pago".
 
 ## Novidades da versão 2.9.0
 
@@ -183,7 +192,9 @@ Fluxo recomendado: **mudar → testar no local → publicar na prévia → testa
 
 O script roda os testes (API, serviço de dados e tipos), monta a interface com o Vite, aplica as migrações do banco e publica; qualquer falha interrompe. Requer Node.js (npm) e uv.
 
-**Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO` e `npx wrangler secret put TURNSTILE_SECRET` (acrescente `--env previa` para a prévia). **Sem `TURNSTILE_SECRET` a produção não é publicada** (a chave pública está no `wrangler.toml`; sem a secreta, cadastro e login com CAPTCHA seriam recusados). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
+**Segredos** (uma vez por ambiente; nunca no `wrangler.toml`): `npx wrangler secret put SEGREDO`, `npx wrangler secret put TURNSTILE_SECRET` e `npx wrangler secret put RESEND_API_KEY` (acrescente `--env previa` para a prévia). **Sem `TURNSTILE_SECRET` a produção não é publicada** (a chave pública está no `wrangler.toml`; sem a secreta, cadastro e login com CAPTCHA seriam recusados). O `SEGREDO` é uma sequência aleatória longa (gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`). **Não troque o `SEGREDO` sem necessidade** (só se ele vazar): o segredo do 2FA de cada usuário está cifrado com ele, e quem tem 2FA ativo ficaria sem conseguir entrar. Se precisar trocar, desative antes o 2FA de todos (`npx wrangler d1 execute zozo --remote --command "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL"`), troque o segredo e peça para reativarem. As sessões e os dados não dependem dele.
+
+**E-mail (Resend):** com `RESEND_API_KEY` + `EMAIL_REMETENTE` e `URL_PUBLICA` (estes dois no `wrangler.toml`) o cadastro passa a exigir a confirmação do e-mail. Sem a chave, o e-mail fica desligado e o cadastro funciona como na 2.9 (sem confirmação). Os links usam sempre `URL_PUBLICA`, nunca o endereço do pedido.
 
 **Perfis, boletos e Pix:** liberados para a conta de demonstração e para os e-mails do segredo `RECURSOS_AVANCADOS` (separados por vírgula): `npx wrangler secret put RECURSOS_AVANCADOS` (e `--env previa`). Fica como segredo para os e-mails não irem para o GitHub. Sem ele, só a demonstração tem esses recursos.
 
@@ -206,6 +217,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 
 - **Primeira vez:** `npm ci` na pasta `ZoZo` (instala Vite, TypeScript e Tailwind nas versões do `package-lock.json`).
 - **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados) · `npm run typecheck` (TypeScript).
+- **E-mail no computador:** `$env:ZOZO_DEV_EMAIL = "console"` antes do `python api/dev/servidor_local.py` liga a confirmação e **mostra os e-mails no terminal** (nada é enviado). `$env:ZOZO_DEV_BANCO` aponta para outro arquivo SQLite (ex.: um banco descartável).
 - **Aplicativo completo com a API Python:** `python api/dev/servidor_local.py` (http://127.0.0.1:8787, serve a interface montada por `npm run build`). Para mexer na interface: `npm run dev` → http://127.0.0.1:5173 (recarga instantânea; repassa `/api/*` para o servidor Python). Cadastre uma conta; o CAPTCHA usa as chaves de teste da Cloudflare, que sempre aprovam.
 - **Modo demonstração (só interface, dados no navegador):** `npm run dev` e abra http://127.0.0.1:5173/?mock=1. A conta é definida por você:
   1. No VS Code, em `ui/mock/`, copie `credenciais.exemplo.js` para **`credenciais.local.js`** (botão direito › Copiar / Colar e renomeie).
@@ -219,7 +231,8 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 | Item | Como está |
 |---|---|
 | Login | E-mail + prova da senha. Mensagem única para e-mail inexistente e senha errada; e-mail sem conta recebe parâmetros simulados (não revela quem tem conta) |
-| Senha | Nunca sai do navegador. PBKDF2-SHA256 com 600.000 iterações e sal aleatório → HKDF → chave dos dados + prova da senha. O servidor guarda só o SHA-256 da prova. O navegador recusa parâmetros mais fracos vindos do servidor |
+| Cadastro | Com o e-mail ligado: resposta igual para e-mail novo ou já cadastrado; conta pendente até o **primeiro login com o link do e-mail + a senha** (token de 256 bits, banco guarda só o hash, 24 h, uso único, só o mais recente vale); até 3 e-mails por hora por endereço; pendentes somem em 7 dias |
+| Senha | Nunca sai do navegador. **Argon2id** (64 MiB, 3 passagens; contas novas e senhas trocadas) ou PBKDF2-SHA256 com 600.000 iterações (contas antigas), sal aleatório → HKDF → chave dos dados + prova da senha. O servidor guarda só o SHA-256 da prova. O navegador recusa parâmetros mais fracos ou desconhecidos vindos do servidor |
 | Sessão | Identificador aleatório de 256 bits em cookie `__Host-` `HttpOnly` `Secure` `SameSite=Strict`, sem data de validade (termina ao fechar o navegador); o banco guarda só o SHA-256 dele; novo identificador a cada login e após o 2FA; encerra no "Sair", na troca de senha (outros dispositivos), após 7 dias sem uso ou 30 dias de idade |
 | Chave dos dados | Para não pedir a senha a cada recarga, fica no navegador **cifrada com o "envelope" da sessão** = HMAC(`SEGREDO`, cookie). O envelope **não fica no banco**: o banco + o navegador não bastam para abrir os dados. Saiu ou fechou o navegador: vira lixo ilegível e é apagada |
 | 2FA | TOTP (RFC 6238), ±30 s de tolerância, um código não vale duas vezes; segredo cifrado no banco com o `SEGREDO` do servidor; 5 códigos errados → 15 min de bloqueio |
@@ -231,7 +244,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 | Integridade | Gravação com versão (outro dispositivo gravou antes → recusa e recarrega); documento danificado → recuperado do histórico com aviso; versão mais antiga que a já vista neste navegador → aviso |
 | Operações atômicas | Troca de senha e "apagar dados" numa única transação: ou tudo muda, ou nada muda |
 | CSRF | Cookie `SameSite=Strict` + escritas só da própria origem (`Origin` / `Sec-Fetch-Site`) + só `Content-Type: application/json` |
-| Interface | Sem `innerHTML`/`eval`; CSP sem scripts/estilos inline (só `challenges.cloudflare.com` liberado, para o CAPTCHA); não pode ser exibida em outros sites; HSTS |
+| Interface | Sem `innerHTML`/`eval`; `ZoZo.dom` descarta atributos `on…` em texto e links `javascript:`; CSP sem scripts/estilos inline (só `challenges.cloudflare.com`, para o CAPTCHA, e `'wasm-unsafe-eval'`, que permite só compilar o WebAssembly do Argon2id); não pode ser exibida em outros sites; HSTS |
 | Logs | Eventos de segurança (login, falhas, bloqueios, 2FA, senha, exclusão) com identificadores HMAC — sem e-mail, IP, senha, cookie ou código em texto; cada resposta tem `X-Request-Id` |
 | PDF (boleto) | Impressão do navegador ("Salvar como PDF"); montado só com texto (sem HTML dos dados); nome do arquivo sem caracteres inválidos |
 | CSV | Gerado no navegador; valores que começam com `= + - @`, tab ou CR são neutralizados (evita fórmulas maliciosas no Excel) |
@@ -242,11 +255,13 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 
 ### Pontos em aberto (documentados, não escondidos)
 
-- **Sem envio de e-mail** (o ZoZo não tem provedor de e-mail; plano em [docs/PLANO-EMAIL.md](docs/PLANO-EMAIL.md)): não há aviso por e-mail no bloqueio de 24 h nem confirmação do e-mail no cadastro. Com o cadastro aberto, alguém pode criar uma conta com um e-mail que não é dele (os dados de ninguém ficam expostos, mas o dono real não conseguiria usar aquele e-mail).
-- **Cadastro revela se o e-mail já tem conta** ("Já existe uma conta com esse e-mail"): inevitável sem confirmação por e-mail.
-- **Argon2id** (recomendado pela OWASP) não existe no navegador sem biblioteca extra; usamos PBKDF2-SHA256 com 600.000 iterações (mínimo atual da OWASP para PBKDF2).
+- **Sem "esqueci minha senha"**: a senha é a chave dos dados. A recuperação depende da migração de chaves v3 (chave de recuperação), planejada em [docs/PLANO-EMAIL.md](docs/PLANO-EMAIL.md).
+- **Sem `RESEND_API_KEY`** o e-mail fica desligado: o cadastro volta a não confirmar o e-mail e a dizer "Já existe uma conta com esse e-mail".
+- **Contas antigas em PBKDF2** até trocarem a senha (Argon2id só para contas novas e senhas trocadas).
+- **Contas anteriores à 2.5** foram marcadas como de e-mail confirmado pela migração 0005 (premissa: eram de pessoas conhecidas). Se isso não valer para alguma conta, corrija com uma migração nova — nunca editando a 0005.
+- **Cópia de segurança fora do D1:** o Time Travel (30 dias) e o histórico de versões ficam no mesmo banco; uma cópia independente e testada ainda não existe.
 - **Domínio próprio:** `usezozo.com.br` já aponta para o ZoZo; regras de WAF/limite na borda devem deixar `/api/*` sem desafio (veja acima).
-- **E-mail confirmado só pelo Google:** recursos de `RECURSOS_AVANCADOS` exigem o e-mail confirmado. Sem provedor de e-mail, a confirmação é o "Continuar com Google" (no cadastro ou entrando uma vez com ele). Contas criadas antes da 2.5 foram marcadas como confirmadas.
+- **E-mail confirmado:** recursos de `RECURSOS_AVANCADOS`/`RECURSOS_CAMBIO` exigem o e-mail confirmado — pelo link do e-mail (3.0) ou pelo "Continuar com Google".
 - **Recursos por conta só na interface:** Perfis/boletos/Pix são escondidos e recusados no navegador; quem alterar o próprio navegador conseguiria usá-los **nos próprios dados** (o servidor não lê o documento cifrado). Não dá acesso a nada de outra conta.
 
 ## Limites
