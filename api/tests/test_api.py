@@ -749,6 +749,24 @@ class TesteGoogle(Base):
         self.assertEqual(self.cli("GET", "/api/google/identidade")[1]["contaExiste"], False)
         self.assertEqual(self.cadastrar(self.cli, OUTRO, prova(), nome="Beto")[0], 201)
 
+    def test_google_substitui_cadastro_pendente_mas_nao_conta_confirmada(self):
+        # alguém deixou um cadastro pendente com o e-mail do Beto (senha do intruso, nunca confirmado)
+        self.con.execute("INSERT INTO contas (email, nome, sal, iteracoes, verificador, email_verificado, kdf, confirmacao_pendente) "
+                         "VALUES (?, 'Intruso', ?, 600000, ?, 0, 'pbkdf2', 1)", (OUTRO, self.sal, "e" * 64))
+        self.q = self.iniciar()
+        self.voltar(self.token(email=OUTRO, given_name="Beto"))
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[1]["contaExiste"], False)     # pendente não conta
+        pv = prova()
+        self.assertEqual(self.cadastrar(self.cli, OUTRO, pv, nome="Beto")[0], 201)
+        linha = self.con.execute("SELECT nome, verificador, email_verificado, confirmacao_pendente FROM contas WHERE email = ?", (OUTRO,)).fetchone()
+        self.assertEqual(tuple(linha), ("Beto", hashlib.sha256(base64.b64decode(pv)).hexdigest(), 1, 0))
+        # conta CONFIRMADA nunca é substituída, nem com o Google
+        self.q = self.iniciar()
+        self.voltar(self.token())
+        self.assertEqual(self.cli("GET", "/api/google/identidade")[1]["contaExiste"], True)
+        self.assertEqual(self.cadastrar(self.cli, EMAIL, prova())[1]["erro"], "EMAIL_IN_USE")
+        self.assertEqual(self.entrar(self.cli)[0], 200)
+
 
 def prova_da_senha(senha, sal_b64, iteracoes=600000):
     """Mesma derivação do navegador (host-web.js): PBKDF2-SHA256 → HKDF-SHA256 (sal zerado, info zozo/prova/v2)."""
@@ -893,21 +911,24 @@ class TesteEmail(unittest.TestCase):
         return (cli or self.cli)("POST", "/api/conta", dict({"email": email, "nome": "Ana <b>", "sal": self.sal, "iteracoes": 600000,
                                                               "prova": pv or self.pv}, **extra))
 
-    def entrar(self, cli=None, email=EMAIL, pv=None):
-        return (cli or self.cli)("POST", "/api/sessao", {"email": email, "prova": pv or self.pv})
+    def entrar(self, cli=None, email=EMAIL, pv=None, **extra):
+        return (cli or self.cli)("POST", "/api/sessao", dict({"email": email, "prova": pv or self.pv}, **extra))
 
     def token(self, i=-1):
         texto = self.serv.emails[i]["text"]
         return texto.split("#confirmar=", 1)[1].split()[0]
 
-    def test_cadastro_fica_pendente_ate_confirmar(self):
+    def pendente(self):
+        return tuple(self.con.execute("SELECT confirmacao_pendente, email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone())
+
+    def test_cadastro_fica_pendente_ate_entrar_com_o_link(self):
         st, r = self.cadastrar()
         self.assertEqual((st, r), (202, {"confirmar": True}))
         self.assertNotIn("Set-Cookie", self.cli.ultima.cabecalhos)                     # sem sessão antes de confirmar
-        self.assertEqual(tuple(self.con.execute("SELECT confirmacao_pendente, email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()), (1, 0))
+        self.assertEqual(self.pendente(), (1, 0))
         m = self.serv.emails[0]
         self.assertEqual((m["to"], m["from"], m["subject"]), ([EMAIL], "ZoZo <nao-responda@usezozo.com.br>", "Confirme seu e-mail no ZoZo"))
-        self.assertIn("Ana &lt;b&gt;", m["html"])                                      # nome escapado no HTML
+        self.assertNotIn("Ana", m["text"] + m["html"])            # o nome digitado no cadastro não vai para um e-mail não comprovado
         url, cab = [c for c in self.serv.chamadas if c[0] == emails.RESEND_URL][0]
         self.assertEqual(cab["Authorization"], "Bearer re_teste_123")
         token = self.token()
@@ -915,13 +936,53 @@ class TesteEmail(unittest.TestCase):
         self.assertNotEqual(guardado, token)                                            # o banco guarda só o hash
         self.assertEqual(self.entrar()[1]["erro"], "EMAIL_NOT_CONFIRMED")
         self.assertEqual(self.entrar(pv=prova())[1]["erro"], "INVALID_CREDENTIALS")    # senha errada: resposta genérica
-        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": token}), (200, {"ok": True}))
-        self.assertEqual(self.entrar()[0], 200)
-        self.assertEqual(tuple(self.con.execute("SELECT confirmacao_pendente, email_verificado FROM contas WHERE email = ?", (EMAIL,)).fetchone()), (0, 1))
-        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": token})[1]["erro"], "TOKEN_INVALID")   # uso único
+        self.assertEqual(self.entrar(pv=prova(), confirmacao=token)[1]["erro"], "INVALID_CREDENTIALS")   # link sem a senha: nada
+        self.assertEqual(self.pendente(), (1, 0))
+        st, r = self.entrar(confirmacao=token)                                         # link + senha: ativa e entra
+        self.assertEqual(st, 200)
+        self.assertIn("Set-Cookie", self.cli.ultima.cabecalhos)
+        self.assertEqual(self.pendente(), (0, 1))
+        self.assertEqual(self.entrar()[0], 200)                                         # depois: login normal
+        self.assertEqual(self.entrar(confirmacao=token)[0], 200)                        # conta ativa: o token é ignorado
+        self.assertEqual(self.con.execute("SELECT COUNT(*) FROM tokens_email WHERE usado = 0").fetchone()[0], 0)
         texto = " ".join(self.cli.logs)
         self.assertNotIn(EMAIL, texto)
         self.assertNotIn(token, texto)
+
+    def test_rota_antiga_de_confirmar_so_com_o_link_nao_existe(self):
+        self.cadastrar()
+        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": self.token()})[0], 404)
+        self.assertEqual(self.pendente(), (1, 0))
+
+    def test_pre_cadastro_por_outra_pessoa_nao_sequestra_a_conta(self):
+        # o atacante cadastra o e-mail da vítima com a senha DELE; a vítima clica no link que recebeu
+        atacante = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="203.0.113.66")
+        atacante.agora = self.cli.agora
+        senha_atacante = prova()
+        self.cadastrar(atacante, pv=senha_atacante)
+        link_do_atacante = self.token()
+        # a vítima abre o link e entra com a senha dela: recusado, e a conta continua pendente
+        self.assertEqual(self.entrar(confirmacao=link_do_atacante)[1]["erro"], "INVALID_CREDENTIALS")
+        self.assertEqual(self.pendente(), (1, 0))
+        # a vítima refaz o cadastro (o mais recente vale) e confirma com a PRÓPRIA senha
+        self.cadastrar()
+        self.assertEqual(self.entrar(confirmacao=self.token())[0], 200)
+        self.assertEqual(self.entrar(atacante, pv=senha_atacante)[0], 401)              # a senha do atacante não vale
+        # sem a caixa de entrada, o atacante não confirma nada — nem com um token inventado
+        outro = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="203.0.113.67")
+        outro.agora = self.cli.agora
+        self.cadastrar(outro, email=OUTRO, pv=senha_atacante)
+        self.assertEqual(self.entrar(outro, email=OUTRO, pv=senha_atacante, confirmacao="A" * 43)[1]["erro"], "TOKEN_INVALID")
+
+    def test_link_de_outra_conta_nao_confirma(self):
+        self.cadastrar()
+        link_ana = self.token()
+        outro = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="198.51.100.97")
+        outro.agora = self.cli.agora
+        pv_outro = prova()
+        self.cadastrar(outro, email=OUTRO, pv=pv_outro)
+        self.assertEqual(self.entrar(outro, email=OUTRO, pv=pv_outro, confirmacao=link_ana)[1]["erro"], "TOKEN_INVALID")
+        self.assertEqual(self.pendente(), (1, 0))
 
     def test_link_usa_url_publica_e_nao_o_host(self):
         # pedido que chegou com o Host (e a URL) de outro site: o link do e-mail continua sendo o do ZoZo
@@ -936,7 +997,7 @@ class TesteEmail(unittest.TestCase):
 
     def test_resposta_igual_para_email_ja_cadastrado(self):
         self.cadastrar()
-        self.cli("POST", "/api/email/confirmar", {"token": self.token()})
+        self.entrar(confirmacao=self.token())
         antes = tuple(self.con.execute("SELECT verificador FROM contas WHERE email = ?", (EMAIL,)).fetchone())
         outro = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="198.51.100.91")
         outro.agora = self.cli.agora
@@ -945,25 +1006,26 @@ class TesteEmail(unittest.TestCase):
         self.assertEqual(self.serv.emails[-1]["subject"], "Tentativa de cadastro no ZoZo")
         self.assertEqual(tuple(self.con.execute("SELECT verificador FROM contas WHERE email = ?", (EMAIL,)).fetchone()), antes)
 
-    def test_cadastro_pendente_recente_nao_e_sobrescrito(self):
+    def test_cadastro_pendente_e_refeito_pelo_mais_recente(self):
         self.cadastrar()
-        intruso = prova()
-        self.cadastrar(pv=intruso)                                                      # outra senha antes da confirmação
-        self.cli("POST", "/api/email/confirmar", {"token": self.token()})               # o link novo confirma a senha ORIGINAL
-        self.assertEqual(self.entrar(pv=intruso)[0], 401)
-        self.assertEqual(self.entrar()[0], 200)
+        primeiro_link = self.token()
+        nova = prova()
+        self.cadastrar(pv=nova)                                                         # errou a senha e refez o cadastro
+        self.assertEqual(self.entrar(confirmacao=primeiro_link)[1]["erro"], "INVALID_CREDENTIALS")   # a senha antiga não vale
+        self.assertEqual(self.entrar(pv=nova, confirmacao=primeiro_link)[1]["erro"], "TOKEN_INVALID")  # só o link mais recente
+        self.assertEqual(self.entrar(pv=nova, confirmacao=self.token())[0], 200)
 
-    def test_link_vencido_ou_de_outra_senha(self):
+    def test_link_vencido_usado_ou_malformado(self):
         self.cadastrar()
         token = self.token()
         self.con.execute("UPDATE tokens_email SET expira = 1")
-        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": token})[1]["erro"], "TOKEN_INVALID")
+        self.assertEqual(self.entrar(confirmacao=token)[1]["erro"], "TOKEN_INVALID")
+        self.assertEqual(self.pendente(), (1, 0))
+        for ruim in ("", "curto", "x" * 200, "<script>alert(1)</script>xxxxxxxxxxxx", 123, ["a" * 30]):
+            st, r = self.entrar(confirmacao=ruim)
+            self.assertEqual((st, r["erro"]), (400, "TOKEN_INVALID"), repr(ruim))
         self.cli("POST", "/api/email/reenviar", {"email": EMAIL})
-        novo = self.token()
-        self.con.execute("UPDATE contas SET verificador = ? WHERE email = ?", ("f" * 64, EMAIL))   # senha mudou depois do link
-        self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": novo})[1]["erro"], "TOKEN_INVALID")
-        for ruim in ("", "curto", "x" * 200, "<script>alert(1)</script>xxxxxxxxxxxx", 123):
-            self.assertEqual(self.cli("POST", "/api/email/confirmar", {"token": ruim})[0], 400, repr(ruim))
+        self.assertEqual(self.entrar(confirmacao=self.token())[0], 200)
 
     def test_reenviar_sempre_igual_e_limitado(self):
         self.assertEqual(self.cli("POST", "/api/email/reenviar", {"email": "ninguem@exemplo.com"}), (202, {"ok": True}))
@@ -980,13 +1042,13 @@ class TesteEmail(unittest.TestCase):
 
     def test_aviso_de_senha_alterada(self):
         self.cadastrar()
-        self.cli("POST", "/api/email/confirmar", {"token": self.token()})
-        self.entrar()
+        self.entrar(confirmacao=self.token())
         nova = prova()
         st, _ = self.cli("PUT", "/api/conta/senha", {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova, "kdf": "argon2id-1",
                                                        "conteudo": conteudo(), "versaoAnterior": 0}, prova=self.pv)
         self.assertEqual(st, 200)
         self.assertEqual(self.serv.emails[-1]["subject"], "Sua senha do ZoZo foi alterada")
+        self.assertIn("Ana &lt;b&gt;", self.serv.emails[-1]["html"])                   # nome da conta escapado no HTML
         self.assertEqual(self.con.execute("SELECT kdf FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "argon2id-1")
 
     def test_sem_configuracao_o_cadastro_e_como_antes(self):
@@ -995,6 +1057,24 @@ class TesteEmail(unittest.TestCase):
         self.assertEqual(self.serv.emails, [])
         cli = Cliente(self.banco, self.serv, dict(CONFIG_EMAIL, URL_PUBLICA="javascript:alert(1)"), ip="198.51.100.93")
         self.assertFalse(emails.ativo(cli.config))
+
+
+class TesteAuditoria30(Base):
+    def test_novo_login_encerra_a_sessao_anterior_do_mesmo_navegador(self):
+        antigo = self.api.cookies["__Host-zozo"]
+        self.assertEqual(self.entrar()[0], 200)
+        self.assertNotEqual(self.api.cookies["__Host-zozo"], antigo)
+        ids = {r[0] for r in self.con.execute("SELECT id FROM sessoes WHERE email = ?", (EMAIL,))}
+        self.assertNotIn(hashlib.sha256(antigo.encode()).hexdigest(), ids)        # o token antigo não vale mais
+        velho = Cliente(self.banco)
+        velho.cookies["__Host-zozo"] = antigo
+        self.assertEqual(velho("GET", "/api/sessao")[0], 204)
+
+    def test_nome_vazio_nao_apaga_o_nome(self):
+        for ruim in ("", "   ", "​", None):
+            st, r = self.api("PUT", "/api/conta/nome", {"nome": ruim}, prova=self.prova)
+            self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
+        self.assertEqual(self.con.execute("SELECT nome FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "Ana")
 
 
 class TesteKdf(Base):

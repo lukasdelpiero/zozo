@@ -61,6 +61,7 @@ class Entrada(Modelo):
     email: Email
     prova: Prova
     turnstile: Turnstile | None = None
+    confirmacao: TokenEmail | None = None        # link do e-mail: confirma a conta pendente junto com a senha
 
 
 class CodigoDoisFatores(Modelo):
@@ -83,10 +84,6 @@ class NovaSenha(Documento):
     kdf: Kdf | None = None
 
 
-class ConfirmarEmail(Modelo):
-    token: TokenEmail
-
-
 class ReenviarEmail(Modelo):
     email: Email
 
@@ -95,7 +92,6 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/conta"): Cadastro,
     ("POST", "/api/sessao"): Entrada,
     ("POST", "/api/sessao/2fa"): CodigoDoisFatores,
-    ("POST", "/api/email/confirmar"): ConfirmarEmail,
     ("POST", "/api/email/reenviar"): ReenviarEmail,
     ("PUT", "/api/conta/nome"): NovoNome,
     ("PUT", "/api/conta/senha"): NovaSenha,
@@ -123,7 +119,11 @@ def _falha(status: int, codigo: str) -> Response:
 
 
 async def _ler_corpo(request: Request) -> str | Response:
-    """Mesma regra do entry.py: só lê corpo com Content-Length válido e dentro do limite."""
+    """
+    Mesma regra do entry.py: só lê corpo com Content-Length válido e dentro do limite. A leitura é em
+    blocos e para assim que passar do tamanho DECLARADO (um corpo maior que o anunciado não é acumulado
+    na memória); texto que não é UTF-8 válido é recusado (nada de "consertar" bytes em silêncio).
+    """
     if request.method not in ("POST", "PUT"):
         return ""
     declarado = request.headers.get("content-length")
@@ -131,9 +131,21 @@ async def _ler_corpo(request: Request) -> str | Response:
         return ""                                   # a rota recebe vazio e recusa
     if not declarado.isdigit() or len(declarado) > 9:
         return _falha(400, "INVALID_REQUEST")
-    if int(declarado) > nucleo.LIMITE_CORPO:
+    limite = int(declarado)
+    if limite > nucleo.LIMITE_CORPO:
         return _falha(413, "DOCUMENT_TOO_LARGE")
-    return (await request.body()).decode("utf-8", "replace") if int(declarado) else ""
+    if not limite:
+        return ""
+    partes, total = [], 0
+    async for bloco in request.stream():
+        total += len(bloco)
+        if total > limite:
+            return _falha(400, "INVALID_REQUEST")
+        partes.append(bloco)
+    try:
+        return b"".join(partes).decode("utf-8")
+    except UnicodeDecodeError:
+        return _falha(400, "INVALID_REQUEST")
 
 
 def criar_app(dependencias: Dependencias) -> FastAPI:

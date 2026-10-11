@@ -37,8 +37,10 @@ O núcleo recebe:
              GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO,
              RESEND_API_KEY, EMAIL_REMETENTE, URL_PUBLICA (e-mail: ver emails.py)
 Confirmação de e-mail (com o e-mail ligado): o cadastro cria a conta PENDENTE e envia um link;
-a conta só entra depois de confirmar. A resposta do cadastro é a mesma para e-mail novo ou já
-cadastrado (não revela quem tem conta). Derivação da senha no navegador: PBKDF2 (contas antigas)
+a conta é confirmada no PRIMEIRO LOGIN feito com o link (token do e-mail + senha juntos): só quem
+lê a caixa de entrada E sabe a senha cadastrada ativa a conta — ninguém consegue "pré-cadastrar"
+o e-mail de outra pessoa com uma senha própria e esperar que ela clique. A resposta do cadastro é
+a mesma para e-mail novo ou já cadastrado (não revela quem tem conta). Derivação da senha no navegador: PBKDF2 (contas antigas)
 ou Argon2id (kdf "argon2id-1": contas novas e senhas trocadas).
 """
 import base64
@@ -65,10 +67,8 @@ KDF_PBKDF2, KDF_ARGON2 = "pbkdf2", "argon2id-1"
 KDFS = (KDF_PBKDF2, KDF_ARGON2)
 # Confirmação de e-mail
 CONFIRMACAO_S = 86400                     # o link vale 24 h
-PENDENTE_TROCA_S = 86400                  # cadastro pendente há mais de 24 h pode ser refeito
 PENDENTE_APAGA_S = 7 * 86400              # cadastro nunca confirmado some depois de 7 dias
 EMAILS_POR_CONTA, EMAIL_JANELA_S = 3, 3600            # e-mails de confirmação/aviso por endereço
-CONFIRMACOES_POR_IP, CONFIRMACAO_JANELA_S = 30, 600   # tentativas de confirmar por IP
 FORMATO_DOCUMENTO = 2           # primeiro byte do documento cifrado (versão do formato)
 MAX_VERSAO = 2**53 - 1
 
@@ -389,6 +389,9 @@ def _envelope(ctx, token):
 
 
 async def _criar_sessao(ctx, email, estado):
+    anterior = ctx.pedido.cookie(_nome_cookie(ctx))
+    if anterior and len(anterior) <= 128:            # o cookie será trocado: a sessão antiga deste navegador termina
+        await ctx.banco.executar("DELETE FROM sessoes WHERE id = ?", _hash_token(anterior))
     token = secrets.token_urlsafe(32)
     envelope = _envelope(ctx, token)
     await ctx.banco.executar(
@@ -545,9 +548,11 @@ async def _cadastrar(ctx):
     verificado = 1 if google_ok else 0                    # o Google confirmou que a pessoa é dona do e-mail
     if emails.ativo(ctx.config) and not google_ok:
         return await _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf)
-    n = await ctx.banco.executar(
+    # O Google provou a posse do e-mail: um cadastro PENDENTE (nunca confirmado, talvez de outra pessoa) dá lugar a este
+    descartar = [("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if google_ok else []
+    n = (await ctx.banco.lote(descartar + [(
         "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador, email_verificado, kdf) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        email, nome, sal, it, _verificador(prova), verificado, kdf)
+        (email, nome, sal, it, _verificador(prova), verificado, kdf))]))[-1]
     if not n:
         raise Falha(409, "EMAIL_IN_USE")
     envelope = await _criar_sessao(ctx, email, "ativa")
@@ -560,7 +565,7 @@ def _hash_link(token):
     return hashlib.sha256(("zozo/email/v1|" + token).encode("utf-8")).hexdigest()
 
 
-async def _enviar_confirmacao(ctx, email, nome, verificador):
+async def _enviar_confirmacao(ctx, email, verificador):
     """Novo link (os anteriores deixam de valer) e o e-mail. Limitado por endereço."""
     if await _contar(ctx, f"email|{ctx.h(email)}", EMAILS_POR_CONTA, EMAIL_JANELA_S):
         ctx.evento("email_limitado", email)
@@ -571,7 +576,7 @@ async def _enviar_confirmacao(ctx, email, nome, verificador):
         ("INSERT INTO tokens_email (hash, email, finalidade, verificador, expira) VALUES (?, ?, 'confirmar', ?, ?)",
          (_hash_link(token), email, verificador, int(ctx.agora) + CONFIRMACAO_S)),
     ])
-    ok = await emails.enviar(ctx.servicos, ctx.config, email, emails.confirmacao(ctx.config, nome, token))
+    ok = await emails.enviar(ctx.servicos, ctx.config, email, emails.confirmacao(ctx.config, token))
     ctx.evento("email_confirmacao_enviado" if ok else "email_falhou", email)
 
 
@@ -579,23 +584,18 @@ async def _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf):
     """
     Cadastro com e-mail ligado: a conta nasce pendente e só entra depois do link.
     Resposta SEMPRE igual (202) — e-mail novo, pendente ou já cadastrado —, para não revelar quem tem conta.
-    Um cadastro pendente recente NÃO é sobrescrito (senão alguém trocaria a senha do cadastro de outra
-    pessoa antes de ela confirmar); depois de 24 h sem confirmação ele pode ser refeito.
+    Um cadastro ainda pendente é SUBSTITUÍDO pelo mais recente (quem errou a senha refaz o cadastro):
+    isso não abre sequestro porque a confirmação exige o link E a senha juntos (ver _confirmar_no_login).
     """
     await ctx.banco.executar(
         "DELETE FROM contas WHERE confirmacao_pendente = 1 AND email != ? AND criado_em < strftime('%Y-%m-%dT%H:%M:%fZ', ?, 'unixepoch')",
         DEMO_EMAIL, int(ctx.agora) - PENDENTE_APAGA_S)
-    existente = await ctx.banco.primeiro(
-        "SELECT nome, verificador, confirmacao_pendente, CAST(strftime('%s', criado_em) AS INTEGER) AS criado FROM contas WHERE email = ?", email)
+    existente = await ctx.banco.primeiro("SELECT confirmacao_pendente FROM contas WHERE email = ?", email)
     if existente and not existente["confirmacao_pendente"]:
         # já tem conta confirmada: avisa o dono por e-mail (limitado) e responde igual a um cadastro novo
         if not await _contar(ctx, f"email|{ctx.h(email)}", EMAILS_POR_CONTA, EMAIL_JANELA_S):
             await emails.enviar(ctx.servicos, ctx.config, email, emails.ja_tem_conta(ctx.config))
         ctx.evento("cadastro_email_existente", email)
-        return Resposta(202, {"confirmar": True})
-    if existente and int(ctx.agora) - int(existente["criado"] or 0) < PENDENTE_TROCA_S:
-        # pendente recente: reenvia o link do cadastro ORIGINAL (a senha nova é descartada)
-        await _enviar_confirmacao(ctx, email, existente["nome"], existente["verificador"])
         return Resposta(202, {"confirmar": True})
     verificador = _verificador(prova)
     await ctx.banco.lote(([("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if existente else []) + [
@@ -603,31 +603,30 @@ async def _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf):
          "VALUES (?, ?, ?, ?, ?, 0, ?, 1)", (email, nome, sal, it, verificador, kdf)),
     ])
     ctx.evento("cadastro_pendente", email)
-    await _enviar_confirmacao(ctx, email, nome, verificador)
+    await _enviar_confirmacao(ctx, email, verificador)
     return Resposta(202, {"confirmar": True})
 
 
-async def _confirmar_email(ctx):
-    b = _json(ctx.pedido)
-    if await _contar(ctx, f"confirmar|{ctx.h(ctx.pedido.ip)}", CONFIRMACOES_POR_IP, CONFIRMACAO_JANELA_S):
-        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CONFIRMACAO_JANELA_S})
-    token = b.get("token")
-    if not isinstance(token, str) or not 20 <= len(token) <= 100 or not re.fullmatch(r"[A-Za-z0-9_-]+", token):
+async def _confirmar_no_login(ctx, email, token):
+    """
+    Confirma o e-mail DENTRO do login, depois de a senha conferir: o token prova a posse da caixa de
+    entrada e a prova prova a senha. Só o link mais recente vale, uma única vez e por 24 h.
+    """
+    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", token):
         raise Falha(400, "TOKEN_INVALID")
+    hash_ = _hash_link(token)
     t = await ctx.banco.primeiro(
-        "SELECT t.email, t.verificador, t.expira, t.usado, c.verificador AS atual FROM tokens_email t "
-        "JOIN contas c ON c.email = t.email WHERE t.hash = ? AND t.finalidade = 'confirmar'", _hash_link(token))
-    # Uso único, dentro do prazo e só para a senha que pediu o cadastro
-    if not t or t["usado"] or int(t["expira"]) < int(ctx.agora) or not hmac.compare_digest(str(t["verificador"]), str(t["atual"])):
-        ctx.evento("confirmacao_recusada")
+        "SELECT expira, usado FROM tokens_email WHERE hash = ? AND email = ? AND finalidade = 'confirmar'", hash_, email)
+    if not t or t["usado"] or int(t["expira"]) < int(ctx.agora):
+        ctx.evento("confirmacao_recusada", email)
         raise Falha(400, "TOKEN_INVALID")
     await _lote_atomico(ctx.banco, [
-        ("UPDATE tokens_email SET usado = 1 WHERE hash = ? AND usado = 0", (_hash_link(token),)), _GUARDA, _LIMPA_GUARDA,
-        ("UPDATE contas SET confirmacao_pendente = 0, email_verificado = 1 WHERE email = ?", (t["email"],)),
-        ("DELETE FROM tokens_email WHERE email = ? AND finalidade = 'confirmar' AND usado = 0", (t["email"],)),
+        ("UPDATE tokens_email SET usado = 1 WHERE hash = ? AND usado = 0", (hash_,)), _GUARDA, _LIMPA_GUARDA,
+        ("UPDATE contas SET confirmacao_pendente = 0, email_verificado = 1 WHERE email = ? AND confirmacao_pendente = 1", (email,)),
+        _GUARDA, _LIMPA_GUARDA,
+        ("DELETE FROM tokens_email WHERE email = ? AND usado = 0", (email,)),
     ])
-    ctx.evento("email_confirmado", t["email"])
-    return Resposta(200, {"ok": True})
+    ctx.evento("email_confirmado", email)
 
 
 async def _reenviar_confirmacao(ctx):
@@ -637,9 +636,9 @@ async def _reenviar_confirmacao(ctx):
     if await _contar(ctx, f"reenviar|{ctx.h(ctx.pedido.ip)}", CADASTROS_POR_IP, CADASTRO_JANELA_S):
         raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": CADASTRO_JANELA_S})
     if emails.ativo(ctx.config):
-        c = await ctx.banco.primeiro("SELECT nome, verificador FROM contas WHERE email = ? AND confirmacao_pendente = 1", email)
+        c = await ctx.banco.primeiro("SELECT verificador FROM contas WHERE email = ? AND confirmacao_pendente = 1", email)
         if c:
-            await _enviar_confirmacao(ctx, email, c["nome"], c["verificador"])
+            await _enviar_confirmacao(ctx, email, c["verificador"])
     return Resposta(202, {"ok": True})
 
 
@@ -691,8 +690,11 @@ async def _entrar(ctx):
     if conta["confirmacao_pendente"] and not verificado:
         # senha certa, mas o e-mail ainda não foi confirmado (só aqui: senha errada recebe a resposta genérica)
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
-        ctx.evento("login_email_pendente", email)
-        raise Falha(403, "EMAIL_NOT_CONFIRMED")
+        if b.get("confirmacao") is None:
+            ctx.evento("login_email_pendente", email)
+            raise Falha(403, "EMAIL_NOT_CONFIRMED")
+        await _confirmar_no_login(ctx, email, b.get("confirmacao"))     # link + senha: ativa a conta e entra
+        verificado = True
     if conta["totp_segredo"]:
         # Senha certa: zera o contador deste IP (o código do 2FA tem o próprio limite) e falta o código
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
@@ -833,7 +835,8 @@ async def _google_identidade(ctx):
     c = _ler_cookie_curto(ctx, COOKIE_GOOGLE)
     if not c:
         raise Falha(404, "NOT_FOUND")
-    existe = await ctx.banco.primeiro("SELECT 1 AS x FROM contas WHERE email = ?", c["m"])
+    # cadastro pendente (nunca confirmado) não conta como conta: o Google já provou a posse do e-mail
+    existe = await ctx.banco.primeiro("SELECT 1 AS x FROM contas WHERE email = ? AND confirmacao_pendente = 0", c["m"])
     return Resposta(200, {"email": c["m"], "nome": c.get("nm") or "", "contaExiste": bool(existe)})
 
 # ---------------- rotas ----------------
@@ -863,8 +866,6 @@ async def _rota(ctx):
         return await _cadastrar(ctx)
     if m == "POST" and c == "/api/sessao":
         return await _entrar(ctx)
-    if m == "POST" and c == "/api/email/confirmar":
-        return await _confirmar_email(ctx)
     if m == "POST" and c == "/api/email/reenviar":
         return await _reenviar_confirmacao(ctx)
     if m == "POST" and c == "/api/sessao/2fa":
@@ -907,7 +908,10 @@ async def _rota(ctx):
     conta = await _conferir_prova(ctx, email)
 
     if c == "/api/conta/nome":
-        await ctx.banco.executar("UPDATE contas SET nome = ? WHERE email = ?", _nome(b.get("nome")), email)
+        nome = _nome(b.get("nome"))
+        if not nome:
+            raise Falha(400, "INVALID_REQUEST")
+        await ctx.banco.executar("UPDATE contas SET nome = ? WHERE email = ?", nome, email)
         return Resposta(200, {"ok": True})
 
     if c == "/api/conta/senha":

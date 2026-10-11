@@ -11,7 +11,6 @@
     // Sessão / armazenamento
     getSession: "getSession",
     registerUser: "registerUser",
-    confirmarEmail: "confirmarEmail",
     reenviarConfirmacao: "reenviarConfirmacao",
     login: "login",
     verificar2FA: "verificar2FA",

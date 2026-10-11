@@ -12,7 +12,9 @@ Regras de segurança:
     e-mail apontar para um site de phishing);
   • o token vai no FRAGMENTO da URL (#confirmar=…): não aparece em logs de servidor,
     proxies nem no cabeçalho Referer;
-  • conteúdo só com texto fixo e o nome da pessoa ESCAPADO; nenhum dado financeiro;
+  • conteúdo só com texto fixo e o nome da pessoa ESCAPADO; nenhum dado financeiro. O e-mail de
+    confirmação vai para um endereço ainda NÃO comprovado: não leva o nome digitado no cadastro
+    (quem cadastra o e-mail de outra pessoa não escolhe o texto que ela recebe);
   • a chave da API só vai no cabeçalho Authorization para o endereço fixo do Resend.
 """
 import html
@@ -67,10 +69,10 @@ def _ola(nome):
     return f"Olá, {nome}!" if nome else "Olá!"
 
 
-def confirmacao(config, nome, token):
+def confirmacao(config, token):
     link = f"{_url_base(config)}/#confirmar={token}"
-    return _montar("Confirme seu e-mail no ZoZo", _ola(nome),
-                   ["Para terminar de criar sua conta no ZoZo, confirme que este e-mail é seu.",
+    return _montar("Confirme seu e-mail no ZoZo", "Olá!",
+                   ["Para terminar de criar sua conta no ZoZo, toque no botão abaixo e entre com a senha que você criou.",
                     "O link vale por 24 horas e só pode ser usado uma vez."],
                    botao=("Confirmar e-mail", link),
                    rodape="Se você não criou uma conta no ZoZo, ignore este e-mail: nada será criado sem a confirmação.")

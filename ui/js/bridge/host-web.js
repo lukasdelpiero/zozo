@@ -4,8 +4,9 @@
    Criptografia de ponta a ponta: os dados são cifrados AQUI, no
    navegador. O servidor (API + banco SQL) só guarda blocos cifrados
    e nunca vê a senha nem os lançamentos.
-     • senha → PBKDF2-SHA256 (600.000 iterações, sal de 16 bytes)
-       → HKDF → duas chaves independentes:
+     • senha → Argon2id (64 MiB, 3 passagens; contas novas e senhas
+       trocadas) ou PBKDF2-SHA256 (600.000 iterações; contas antigas),
+       sal de 16 bytes → HKDF → duas chaves independentes:
          - chave dos dados: AES-256-GCM (cifra e autentica)
          - prova da senha: enviada à API no login e em cada acesso
            aos dados; o servidor guarda só o SHA-256 dela.
@@ -299,7 +300,9 @@
       sessao = null; pendente = null;
       const email = normalizarEmail(d.email);
       const k = await derivarConta(d.senha, await parametros(email));
-      const r = await api("POST", "/sessao", { email, prova: k.prova, turnstile: d.turnstile || undefined });
+      // confirmacao: token do link do e-mail (#confirmar=…) — a conta pendente é ativada junto com a senha
+      const confirmacao = /^[A-Za-z0-9_-]{20,100}$/.test(String(d.confirmacao || "")) ? d.confirmacao : undefined;
+      const r = await api("POST", "/sessao", { email, prova: k.prova, turnstile: d.turnstile || undefined, confirmacao });
       if (r.doisFatores && !r.envelope) { pendente = { email, k }; return { doisFatores: true }; }
       return concluir(r, k);
     },
@@ -326,14 +329,6 @@
       // E-mail ligado: a conta só entra depois do link de confirmação (nada fica guardado aqui até lá)
       if (r && r.confirmar && !r.envelope) { k.bits.fill(0); return { confirmarEmail: true, email }; }
       return concluir(r, k);
-    },
-
-    /** Link do e-mail (#confirmar=…): confirma o cadastro; depois é só entrar com a senha */
-    async confirmarEmail(d) {
-      const token = String((d && d.token) || "");
-      if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw erro("TOKEN_INVALID");
-      await api("POST", "/email/confirmar", { token });
-      return { confirmado: true };
     },
 
     async reenviarConfirmacao(d) {

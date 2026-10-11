@@ -178,6 +178,13 @@ class TesteFastAPI(unittest.TestCase):
         self.assertEqual(st, 413)
         st, _ = self.api("POST", "/api/conta", self.cadastro(), cab={"Content-Length": "12a"})
         self.assertEqual(st, 400)
+        # corpo maior que o tamanho anunciado: recusado sem acumular o resto
+        st, _ = self.api("POST", "/api/conta", self.cadastro(), cab={"Content-Length": "20"})
+        self.assertEqual(st, 400)
+        # bytes que não são UTF-8 válido: recusado (antes era "consertado" com caracteres de substituição)
+        bruto = json.dumps(self.cadastro(nome="Ana")).encode().replace(b'"Ana"', b'"An' + bytes([0xFF]) + b'"')
+        st, _ = self.api("POST", "/api/conta", bruto=bruto)
+        self.assertEqual(st, 400)
         self.assertEqual(self.contas(), 0)
 
     def test_tipo_de_conteudo_fica_com_o_nucleo(self):
@@ -191,7 +198,7 @@ class TesteFastAPI(unittest.TestCase):
 
     def test_toda_rota_com_corpo_tem_modelo(self):
         com_corpo = {("POST", "/api/conta"), ("POST", "/api/sessao"), ("POST", "/api/sessao/2fa"),
-                     ("POST", "/api/email/confirmar"), ("POST", "/api/email/reenviar")} | {
+                     ("POST", "/api/email/reenviar")} | {
             (m, c) for m, c in nucleo._PROTEGIDAS if m in ("POST", "PUT") and c not in nucleo._SEM_CORPO}
         self.assertEqual(com_corpo, set(app_fastapi.MODELOS))
 

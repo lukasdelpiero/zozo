@@ -75,7 +75,8 @@
 
   /* ---------------- Autenticação ---------------- */
   let authErro = null, authEmail = "";
-  let authAviso = null;           // aviso positivo na tela de entrada (ex.: e-mail confirmado)
+  let authAviso = null;           // aviso na tela de entrada (ex.: "entre para confirmar o e-mail")
+  let authConfirmacao = null;     // token do link do e-mail: vai junto no próximo login (link + senha ativam a conta)
   let turnstile = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
   let googleAtivo = false;       // "Continuar com Google" configurado no servidor
   let captchaLogin = false;      // o servidor pediu CAPTCHA para a próxima tentativa de login
@@ -100,15 +101,16 @@
       onVoltar: () => { authErro = null; authAviso = null; store.set({ session: { status: "login" } }); },
       onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
       onLogin: (cred) => {
-        authEmail = cred.email; authAviso = null;
+        authEmail = cred.email;
         ZoZo.auth.carregando(authRoot, "Entrando no ZoZo");
-        bridge.request(A.login, cred).then((r) => {
-          captchaLogin = false;
+        bridge.request(A.login, authConfirmacao ? Object.assign({}, cred, { confirmacao: authConfirmacao }) : cred).then((r) => {
+          captchaLogin = false; authConfirmacao = null; authAviso = null;
           salvarCredencial(cred.email, cred.senha);
           if (r && r.doisFatores && !r.authenticated) { authErro = null; errosCodigo = 0; store.set({ session: { status: "2fa" } }); return; }
           entrar(r);
         }).catch((e) => {
           if (e.code === "EMAIL_NOT_CONFIRMED") { aguardarConfirmacao(cred.email); return; }
+          if (e.code === "TOKEN_INVALID") { authConfirmacao = null; authAviso = null; authErro = FR.TOKEN_INVALID; renderAuth(); return; }
           if (e.captcha || e.code === "CAPTCHA_REQUIRED") captchaLogin = true;
           // a falha que inicia um bloqueio já informa o tempo de espera
           authErro = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? textoBloqueio(e)
@@ -143,18 +145,20 @@
   function aguardarConfirmacao(email) {
     ZoZo.auth.aguardandoEmail(authRoot, email, {
       onReenviar: () => bridge.request(A.reenviarConfirmacao, { email }),
-      onEntrar: () => { authErro = null; authAviso = null; ZoZo.auth.reiniciar(); store.set({ session: { status: "login" } }); renderAuth(); },
+      onEntrar: () => { authErro = null; ZoZo.auth.reiniciar(); store.set({ session: { status: "login" } }); renderAuth(); },
     });
   }
 
-  /** Link do e-mail (#confirmar=…): confirma e limpa o endereço (o token não fica no histórico) */
+  /**
+   * Link do e-mail (#confirmar=…): guarda o token só na memória e limpa o endereço (não fica no
+   * histórico). A conta é ativada no próximo login — o link sozinho não basta, é preciso a senha.
+   */
   function retornoConfirmacao() {
     const m = location.hash.match(/^#confirmar=([A-Za-z0-9_-]{20,100})$/);
-    if (!m) return Promise.resolve();
+    if (!m) return;
     history.replaceState(null, "", location.pathname + location.search);
-    return bridge.request(A.confirmarEmail, { token: m[1] })
-      .then(() => { authAviso = "E-mail confirmado! Agora é só entrar com a sua senha."; authErro = null; })
-      .catch((e) => { authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e) : FR.TOKEN_INVALID; });
+    authConfirmacao = m[1];
+    authAviso = "Quase lá! Entre com seu e-mail e senha para ativar a conta.";
   }
 
   /** Oferece salvar no gerenciador de senhas do navegador (Chrome/Edge; os demais detectam pelo formulário) */
@@ -381,8 +385,16 @@
       googleAtivo = !!(armazenamento && armazenamento.google);
       if (sessao && sessao.email) authEmail = sessao.email;       // sessão aberta sem a chave neste navegador: só pede a senha
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
-      if (sessao && sessao.authenticated) { history.replaceState(null, "", location.pathname + (location.search.includes("mock=1") ? "?mock=1" : "")); entrar(sessao); return; }
-      return retornoConfirmacao().then(retornoGoogle).then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
+      if (sessao && sessao.authenticated) {
+        const linkConfirmacao = /^#confirmar=/.test(location.hash);
+        history.replaceState(null, "", location.pathname + (location.search.includes("mock=1") ? "?mock=1" : ""));
+        entrar(sessao);
+        // link de confirmação aberto com outra conta já conectada: o token não é usado nesta sessão
+        if (linkConfirmacao) ctx.toast("Você já está conectado. Para ativar a conta nova, saia desta conta e abra o link do e-mail de novo.", { tone: "aviso", duration: 10000 });
+        return;
+      }
+      retornoConfirmacao();
+      return retornoGoogle().then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
     });
   }
 

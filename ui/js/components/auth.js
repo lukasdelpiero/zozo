@@ -257,7 +257,7 @@
           h("h1", { class: "auth__title" }, "Confirme seu e-mail"),
           h("div", { class: "auth__form" },
             h("p", { class: "auth__texto" }, "Enviamos um link para ", h("strong", null, email),
-              ". Abra o e-mail e toque em “Confirmar e-mail” para ativar a conta; depois é só entrar com a sua senha."),
+              ". Abra o e-mail, toque em “Confirmar e-mail” e entre com a sua senha para ativar a conta."),
             h("p", { class: "auth__texto auth__texto--suave" }, "Não chegou? Confira a caixa de spam ou reenvie o link (ele vale por 24 horas)."),
             reenviar, situacao,
             rodape("Já confirmou?", "Entrar", cfg.onEntrar))))));
