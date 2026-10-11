@@ -146,6 +146,26 @@ class TesteFastAPI(unittest.TestCase):
         for segredo in (EMAIL, self.prova, self.sal):
             self.assertNotIn(segredo, texto)
 
+    def test_log_nao_tem_nome_de_campo_vindo_do_cliente(self):
+        # auditoria F04: o nome de um campo extra vem do cliente e pode carregar qualquer dado
+        segredo = "SEGREDO_SINTETICO_NO_NOME_DO_CAMPO_" + "x" * 300
+        st, _ = self.api("POST", "/api/conta", dict(self.cadastro(), **{segredo: 1, "aninhado": {segredo: 2}}))
+        self.assertEqual(st, 400)
+        texto = " ".join(self.logs)
+        self.assertIn("<extra>", texto)
+        self.assertNotIn("SEGREDO_SINTETICO", texto)
+        self.assertLess(len(texto), 600)
+
+    def test_query_com_campos_demais_responde_400(self):
+        # auditoria F05: 21 campos na query não podem virar erro interno
+        q = "&".join(f"c{i}=1" for i in range(21))
+        st, r = self.api("GET", "/api/conta/parametros?" + q)
+        self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"))
+        for k, v in nucleo.CABECALHOS.items():
+            self.assertEqual(self.api.ultima["headers"].get(k.lower()), v)
+        st, _ = self.api("GET", "/api/conta/parametros?" + "&".join(f"c{i}=1" for i in range(20)))
+        self.assertNotEqual(st, 500)
+
     def test_csrf_vem_antes_da_validacao(self):
         for cab in ({"Origin": "https://malicioso.exemplo"}, {"Sec-Fetch-Site": "cross-site"}):
             with self.subTest(cab=cab):

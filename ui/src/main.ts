@@ -38,8 +38,7 @@ import "../js/components/ui.js";
 import "../js/components/feedback.js";
 import "../js/components/menu.js";
 import "../js/components/calendario.js";
-import "../js/data/emojis.js";
-import "../js/components/emoji-picker.js";
+import "./emoji-picker.ts";                  // emoji-mart (carrega sob demanda)
 import "../js/components/modais.js";
 import "../js/components/inline.js";
 import "../js/components/dividir.js";

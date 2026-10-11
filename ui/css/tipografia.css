@@ -328,29 +328,11 @@
 .modal--nova-conta { width: min(500px, calc(100vw - 32px)); }
 
 /* =============================================================
-   Seletor de emojis
+   Seletor de emojis (emoji-mart; cores e cantos dentro de src/emoji-picker.ts)
    ============================================================= */
-.menu--emoji { padding: 0; overflow: hidden; max-height: none; }
-.ep { display: flex; flex-direction: column; width: 360px; height: 420px; }
-.ep__search { display: flex; align-items: center; gap: 8px; margin: 10px 10px 6px; padding: 0 10px; height: 36px; border-radius: 8px; background: var(--color-background); border: 1px solid var(--color-border); color: var(--color-text-muted); }
-.ep__search:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); }
-.ep__search-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font-size: var(--t-15); color: var(--color-text-primary); }
-.ep__tabs { display: flex; justify-content: space-between; padding: 0 8px 6px; border-bottom: 1px solid var(--color-border); }
-.ep__tabs.is-hidden { display: none; }
-.ep__tab { width: 34px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; font-size: 17px; filter: grayscale(0.6); opacity: 0.75; }
-.ep__tab:hover, .ep__tab.is-active { background: var(--color-surface-hover); filter: none; opacity: 1; }
-.ep__tab.is-active { box-shadow: inset 0 -2px 0 var(--color-primary); }
-.ep__grid { flex: 1; overflow-y: auto; padding: 4px 8px 8px; scroll-behavior: smooth; }
-.ep__title { position: sticky; top: -4px; z-index: 1; padding: 8px 4px 4px; background: var(--color-surface); font-size: var(--t-13); font-weight: 620; color: var(--color-text-secondary); }
-.ep__cells { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
-.ep__emoji { aspect-ratio: 1; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; font-size: 22px; line-height: 1; cursor: pointer;
-  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; transition: transform var(--duration-fast) var(--easing), background var(--duration-fast); }
-.ep__emoji:hover, .ep__emoji:focus-visible { background: var(--color-surface-hover); transform: scale(1.18); outline: none; }
-.ep__emoji.is-active { background: var(--color-primary-soft); }
-.ep__empty { padding: 24px; text-align: center; color: var(--color-text-muted); }
-.ep__preview { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-top: 1px solid var(--color-border); background: var(--color-background); }
-.ep__preview-emoji { font-size: 24px; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
-.ep__preview-name { font-size: var(--t-13); color: var(--color-text-secondary); text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu--emoji { padding: 0; overflow: hidden; max-height: none; border-radius: 12px; }
+.menu--emoji em-emoji-picker { display: flex; }
+.emoji-carregando { display: grid; place-items: center; width: 340px; height: 240px; }
 
 /* =============================================================
    Paleta de cores: quadrado aumenta ao passar o mouse; selecionado
@@ -988,11 +970,12 @@
 .sidebar__cambio:empty { display: none; }
 .sidebar__cambio { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--sidebar-divider); }
 .cambio { display: grid; gap: 6px; }
-.cambio__titulo { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--sidebar-fg); opacity: .7; padding-left: 4px; }
+/* "Câmbio" igual aos títulos das divisões do menu (ex.: Conta bancária) */
+.cambio__titulo { font-size: var(--t-15); font-weight: 620; letter-spacing: normal; text-transform: none; color: var(--sidebar-fg-muted); padding-left: 4px; }
 .cambio__opcoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .cambio__opcao { height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; cursor: pointer; }
 .cambio__opcao:hover { background: var(--sidebar-hover); }
-.cambio__opcao.is-active { background: var(--sidebar-hover); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35); }
+.cambio__opcao.is-active { background: rgba(255, 255, 255, 0.18); }
 .cambio__opcao:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
 .bandeira { display: block; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .12); }
 @media (max-width: 900px) {
@@ -1097,3 +1080,46 @@
 .lanc--busca .month-group:nth-of-type(n+3) { animation-delay: 60ms; }
 @keyframes busca-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .lanc--busca .month-group, .lanc--busca .empty { animation: none; } }
+
+/* Barra de rolagem do menu lateral: trilho na cor do menu (o polegar continua o do sistema, claro) */
+.sidebar, .sidebar * { scrollbar-color: rgba(255, 255, 255, 0.45) var(--sidebar-bg); }
+
+/* =============================================================
+   ZoZo 2.8 — animações
+   ============================================================= */
+/* Painel lateral: entrada suave ao começar uma transação e logo depois de criá-la */
+.lp--entrar { animation: lp-in 260ms var(--easing) both; }
+.lp--entrar .lp-props > *, .lp--entrar .lp-notes-wrap { animation: lp-in 300ms var(--easing) both; }
+.lp--entrar .lp-props > :nth-child(2) { animation-delay: 30ms; }
+.lp--entrar .lp-props > :nth-child(3) { animation-delay: 60ms; }
+.lp--entrar .lp-notes-wrap { animation-delay: 90ms; }
+@keyframes lp-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Troca de página: os blocos entram em sequência (o conteúdo "assenta" de cima para baixo) */
+.page--entrar > * { animation: bloco-in 380ms var(--easing) both; animation-delay: calc(var(--entrada-decorrida, 0ms) + 0ms); }
+.page--entrar > :nth-child(2) { animation-delay: calc(var(--entrada-decorrida, 0ms) + 40ms); }
+.page--entrar > :nth-child(3) { animation-delay: calc(var(--entrada-decorrida, 0ms) + 80ms); }
+.page--entrar > :nth-child(n+4) { animation-delay: calc(var(--entrada-decorrida, 0ms) + 120ms); }
+.page--entrar .dash-layout > * { animation: bloco-in 420ms var(--easing) both; }
+.page--entrar .dash-layout > :nth-child(2) { animation-delay: 50ms; }
+.page--entrar .dash-layout > :nth-child(3) { animation-delay: 100ms; }
+.page--entrar .dash-layout > :nth-child(n+4) { animation-delay: 150ms; }
+.page--lancamentos.page--entrar > .selbar { animation: selbar-in var(--duration-medium) var(--easing) both; }
+@keyframes bloco-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás) */
+.auth__card--entrar { animation: auth-card-in 480ms cubic-bezier(.2, .8, .2, 1) both; }
+.auth__card--entrar .auth__icon { animation: auth-logo-in 560ms cubic-bezier(.2, .8, .2, 1) both 80ms; }
+.auth__card--frente > :not(.auth__icon), .auth__card--tras > :not(.auth__icon) { animation: auth-frente 320ms var(--easing) both; }
+.auth__card--tras > :not(.auth__icon) { animation-name: auth-tras; }
+.auth__card--frente > :nth-child(3), .auth__card--tras > :nth-child(3) { animation-delay: 40ms; }
+.auth__card--frente > :nth-child(n+4), .auth__card--tras > :nth-child(n+4) { animation-delay: 70ms; }
+@keyframes auth-card-in { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes auth-logo-in { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes auth-frente { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes auth-tras { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp--entrar, .lp--entrar *, .page--entrar > *, .page--entrar .dash-layout > *, .auth__card--entrar, .auth__card--entrar *,
+  .auth__card--frente > *, .auth__card--tras > * { animation: none !important; }
+}

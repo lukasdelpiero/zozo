@@ -94,7 +94,7 @@ _APP_FASTAPI = None
 
 
 def _app_fastapi():
-    """App FastAPI (transição). None se o pacote não estiver no Worker: segue o caminho atual."""
+    """App FastAPI (transição). None se o pacote não estiver no Worker (aí o pedido é RECUSADO: ver fetch)."""
     global _APP_FASTAPI
     if _APP_FASTAPI is None:
         try:
@@ -113,9 +113,12 @@ class Default(WorkerEntrypoint):
         env = self.env
         if str(getattr(env, "API_FASTAPI", "") or "") == "1":
             app = _app_fastapi()
-            if app is not None:
-                import asgi                          # noqa: PLC0415 — adaptador ASGI do Python Workers
-                return await asgi.fetch(app, request.js_object, env)
+            if app is None:
+                # Ligado mas sem o pacote: falha VISÍVEL (503) em vez de voltar em silêncio ao caminho antigo —
+                # assim "API_FASTAPI = 1" sempre significa que a validação Pydantic está mesmo valendo
+                return _responder(nucleo.Resposta(503, {"erro": "UNAVAILABLE"}))
+            import asgi                              # noqa: PLC0415 — adaptador ASGI do Python Workers
+            return await asgi.fetch(app, request.js_object, env)
         config = _config(env)
         cab = _cabecalhos(request)
         metodo = _metodo(request)

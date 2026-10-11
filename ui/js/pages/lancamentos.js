@@ -292,6 +292,8 @@
       UI.IconButton("mais", "Nova transação", { onPrimary: true, onClick: () => abrirFormulario(null, ctx) }),
       ZoZo.recursos.boleto() ? UI.IconButton("boleto", "Criar fatura", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }) : null,
       UI.IconButton("baixar-circulo", "Exportar transações (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
+      // Multicâmbio: trazer transações de outra moeda para a escolhida (a qualquer momento, não só na 1ª vez)
+      ZoZo.cambio.disponivelTransferir() ? UI.IconButton("interno", "Trazer transações de outra moeda", { onPrimary: true, onClick: () => ZoZo.cambio.abrirTransferencia(ctx) }) : null,
       h("div", { class: "topbar-search topbar-search--larga" }, icon("pesquisar", { size: 15 }), busca, filtroBtn),
     ];
   }

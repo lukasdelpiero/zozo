@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 2.7.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 2.8.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,25 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 2.8.0
+
+- **Emojis com emoji-mart:** cantos arredondados e roxo do ZoZo ao passar o mouse e no emoji atual; pesquisa em português; dados locais (nada é buscado na internet) e CSS compatível com o CSP; carrega sob demanda e é pré-carregado quando o navegador fica ocioso (abre em ~40 ms).
+- **Débito em transação existente:** trocar o tipo para Débito agora funciona; se a transação estava num cartão, passa para a primeira conta (com aviso).
+- **Trazer transações de outra moeda a qualquer momento:** botão ao lado do CSV em Transações (multicâmbio, contas liberadas). Também dá para trazer de volta para o Real.
+- **Menu:** trilho da barra de rolagem na cor do menu; "Câmbio" no mesmo estilo de "Conta bancária"; moeda escolhida sem borda branca.
+- **Animações:** painel ao criar uma transação, entrada das páginas em sequência, cartão do login e troca de etapas (para a frente e para trás). Respeitam "reduzir movimento".
+- **Auditoria do Codex (cfd242e) — aplicado:**
+  - **F01** transferência entre moedas leva série e divisão de forma transitiva (nada fica metade em cada moeda);
+  - **F02** valor ilegível ou ID repetido no documento não vira zero gravado: abre só para leitura e o original fica intacto (texto "123.45" é convertido de forma determinística);
+  - **F03** falha de uma carga antiga não sobrescreve a mais nova;
+  - **F04** o log de corpo inválido (FastAPI) não registra nomes de campos vindos do cliente;
+  - **F05** query com campos demais ou URL quebrada responde 400 (nunca erro interno), nos dois caminhos;
+  - **F07** com `API_FASTAPI = 1` e sem o pacote, a API recusa (503) em vez de voltar em silêncio ao caminho antigo;
+  - **F10** publicação sempre roda `npm ci` e, em produção, para sem ponto de restauração do banco (a não ser com `-SemPontoDeRestauracao`);
+  - **F11** gráfico de barras para de observar o tamanho ao sair da tela;
+  - textos: CSV diz qual moeda exporta; o aviso de criptografia não promete mais do que entrega.
+- **Auditoria — fica como ação/decisão sua:** F06 (confirmar quem eram as contas marcadas como confirmadas pela migração 0005), F08/F09 (limites de leitura no runtime e backup externo com restauração ensaiada), F12 (tipar os contratos principais aos poucos).
 
 ## Novidades da versão 2.7.0
 

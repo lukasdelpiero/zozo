@@ -23,6 +23,7 @@
 
   // Etapa atual (sobrevive aos redesenhos após um erro). Login: 0 início · 1 e-mail · 2 senha
   let estado = { modo: null, etapa: 0, email: "", nome: "", google: false };
+  let ultimoPasso = null, ultimaEtapa = 0;   // para animar só quando a etapa muda
 
   function campo(cfg) {
     const input = UI.Input(Object.assign({ class: "auth__input", required: true }, cfg));
@@ -191,9 +192,15 @@
     const demo = modo === "login" && estado.etapa <= 1 && ZoZo.bridge.isDemo
       ? h("p", { class: "auth__demo" }, "Modo de demonstração — use a conta de prévia configurada neste computador.") : null;
 
+    // Animação: o cartão surge na 1ª vez; ao trocar de etapa o conteúdo desliza (para a frente ou para trás).
+    // Redesenho da mesma etapa (ex.: mensagem de erro) não anima.
+    const passo = modo + ":" + estado.etapa;
+    const animacao = !ultimoPasso || !root.querySelector(".auth__card") ? "auth__card--entrar"
+      : passo === ultimoPasso ? null : (estado.etapa >= ultimaEtapa ? "auth__card--frente" : "auth__card--tras");
+    ultimoPasso = passo; ultimaEtapa = estado.etapa;
     mount(root, h("div", { class: "auth" },
       h("div", { class: "auth__center" },
-        h("div", { class: "auth__card" },
+        h("div", { class: ["auth__card", animacao] },
           logo(),
           h("h1", { class: tituloClasse }, titulo),
           st.storageAvailable === false ? h("div", { class: "auth__warning", role: "status" }, icon("nuvem", { size: 16 }), h("span", null, FR.STORAGE_UNAVAILABLE)) : null,
@@ -206,7 +213,7 @@
   function carregando(root, texto) {
     mount(root, h("div", { class: "auth" },
       h("div", { class: "auth__center" },
-        h("div", { class: "auth__card auth__card--espera", role: "status", "aria-live": "polite" },
+        h("div", { class: "auth__card auth__card--espera auth__card--frente", role: "status", "aria-live": "polite" },
           logo(),
           h("p", { class: "auth__title auth__espera-texto" }, texto),
           h("span", { class: "spinner auth__espera-spinner", "aria-hidden": "true" })))));

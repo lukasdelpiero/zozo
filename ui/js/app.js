@@ -41,6 +41,8 @@
         return igual ? atual : data;
       }).catch((err) => {
         if (minha !== geracao) throw err;
+        // Falha de um pedido ANTIGO (já existe um mais novo): não mexe no estado nem avisa — quem chamou recebe o erro
+        if (pedido !== ordem[key]) throw err;
         // Com dados anteriores na tela, a falha não pode passar despercebida
         if (store.get().data[key] && err.code !== "SESSION_EXPIRED") ctx.toast("Não foi possível atualizar: mostrando os dados carregados antes. " + (err.friendly || ""), { tone: "error", duration: 7000 });
         store.set({ loading: { [key]: false }, errors: { [key]: err.friendly || FR.LOAD_FAILED } });
@@ -277,6 +279,7 @@
       OLDER_VERSION: "Os dados recebidos do servidor são mais antigos do que a última versão vista neste navegador. Confira as últimas transações antes de continuar.",
       DOCUMENT_MISSING: "Os dados desta conta não foram encontrados no servidor nem no backup. A conta abriu vazia e SÓ PARA LEITURA: peça a restauração do banco ou, para recomeçar do zero, use Configurações › Conta › Apagar todos os dados.",
       AUTOSAVE_FAILED: "As parcelas automáticas não foram salvas (sem conexão com o servidor). Elas serão criadas de novo na próxima vez.",
+      DOCUMENT_INVALID_LOCKED: ZoZo.messages.FRIENDLY.DOCUMENT_INVALID_LOCKED,
     };
     const texto = textos[e.detail && e.detail.codigo];
     if (texto) ctx.toast(texto, { tone: "error", duration: 12000 });

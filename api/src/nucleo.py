@@ -115,10 +115,17 @@ class Pedido:
 
     def __init__(self, metodo, url, cabecalhos, corpo=""):
         self.metodo = str(metodo).upper()
-        partes = urlsplit(url)
-        self.caminho = partes.path
-        self.host = (partes.netloc or "").lower()
-        self.query = {k: v[0] for k, v in parse_qs(partes.query, max_num_fields=20).items()}
+        # URL fora do padrão (ex.: mais de 20 campos na query, host IPv6 malformado) não pode estourar
+        # antes do tratamento central: o pedido fica marcado e atender() responde 400
+        self.invalido = False
+        try:
+            partes = urlsplit(url)
+            self.caminho = partes.path
+            self.host = (partes.netloc or "").lower()
+            self.query = {k: v[0] for k, v in parse_qs(partes.query, max_num_fields=20).items()}
+        except ValueError:
+            self.invalido = True
+            self.caminho, self.host, self.query = "/api/invalido", "", {}
         self.cabecalhos = {str(k).lower(): str(v) for k, v in (cabecalhos or {}).items()}
         self.corpo = corpo or ""
         self.ip = (self.cab("cf-connecting-ip") or "").strip()[:64] or "desconhecido"
@@ -882,6 +889,9 @@ async def atender(pedido, banco, servicos, config, log=print, agora=None):
         if len(ctx.segredo) < 32:
             log(json.dumps({"evento": "configuracao_incompleta", "req": ctx.req, "falta": "SEGREDO"}))
             r = Resposta(503, {"erro": "UNAVAILABLE"})
+        elif pedido.invalido:
+            ctx.evento("pedido_invalido")
+            r = Resposta(400, {"erro": "INVALID_REQUEST"})
         else:
             _mesma_origem(pedido)
             r = await _rota(ctx)

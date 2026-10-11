@@ -8,7 +8,9 @@
 # Passos: testes automáticos (API + serviço de dados + tipos) → segredos → monta a interface (Vite) → (produção: ponto de restauração do banco)
 #         → migrações do banco → publica. Qualquer falha interrompe tudo. Produção pede confirmação.
 param(
-  [Parameter(Mandatory = $true)][ValidateSet("previa", "producao")][string]$Ambiente
+  [Parameter(Mandatory = $true)][ValidateSet("previa", "producao")][string]$Ambiente,
+  # Produção sem ponto de restauração do banco só com esta opção, de propósito
+  [switch]$SemPontoDeRestauracao
 )
 # Falhas são detectadas pelo código de saída de cada comando ($LASTEXITCODE): o Python e o wrangler
 # escrevem progresso em stderr, que o PowerShell 5.1 trataria como erro.
@@ -29,7 +31,9 @@ uv run python -m unittest discover -s tests
 if ($LASTEXITCODE -ne 0) { Parar "Testes da API falharam: nada foi publicado." }
 Push-Location ..
 # Dependências da interface exatamente como no package-lock.json (sem scripts de instalação: .npmrc)
-if (-not (Test-Path "node_modules")) { npm ci; if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências da interface (npm ci)." } }
+# Sempre do zero, exatamente como no package-lock.json: um node_modules antigo nunca entra na publicação
+npm ci
+if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências da interface (npm ci)." }
 npm test
 if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Testes do serviço de dados falharam: nada foi publicado." }
 npm run typecheck
@@ -94,7 +98,10 @@ if ($Ambiente -eq "producao") {
     Write-Host "   Se precisar voltar o banco a este momento:" -ForegroundColor Gray
     Write-Host "   npx wrangler d1 time-travel restore $banco --bookmark=$marcador" -ForegroundColor Gray
   } else {
-    Write-Host "   Atenção: não foi possível registrar o ponto de restauração. O D1 guarda histórico (30 dias no plano pago, 7 no gratuito): veja 'npx wrangler d1 time-travel info $banco'" -ForegroundColor Yellow
+    if (-not $SemPontoDeRestauracao) {
+      Parar "Não foi possível registrar o ponto de restauração do banco: nada foi publicado. Confira o login do wrangler ('npx wrangler d1 time-travel info $banco'). Para publicar mesmo assim, de propósito: .\publicar.ps1 producao -SemPontoDeRestauracao"
+    }
+    Write-Host "   Atenção: publicando SEM ponto de restauração (-SemPontoDeRestauracao). O D1 guarda histórico (30 dias no plano pago, 7 no gratuito): veja 'npx wrangler d1 time-travel info $banco'" -ForegroundColor Yellow
   }
 } else {
   Write-Host "4/6 (prévia: banco de testes, sem ponto de restauração)" -ForegroundColor Cyan
@@ -106,6 +113,7 @@ if ($LASTEXITCODE -ne 0) { Parar "Falha nas migrações: nada foi publicado." }
 
 Write-Host "6/6 Publicando ($Ambiente)..." -ForegroundColor Cyan
 uv run pywrangler deploy @extra
-if ($LASTEXITCODE -ne 0) { Parar "Falha ao publicar." }
+# As migrações acima já valeram no banco: por isso elas são sempre aditivas (a versão anterior do site continua funcionando)
+if ($LASTEXITCODE -ne 0) { Parar "Falha ao publicar o código. Atenção: as migrações do banco JÁ foram aplicadas (são compatíveis com a versão no ar). Corrija e publique de novo." }
 Write-Host ""
 Write-Host "Pronto: $endereco" -ForegroundColor Green

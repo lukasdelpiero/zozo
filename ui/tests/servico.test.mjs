@@ -163,3 +163,60 @@ test("categoria com transação não sai do orçamento; sem transação, sai", a
   await t.req(t.A.updateCategoria, { id: livre.id, status: "excluida" });
   assert.equal((await t.req(t.A.getCategorias, {})).categorias.find((c) => c.id === livre.id).status, "excluida");
 });
+
+test("multicâmbio: transferência leva série e divisão de forma transitiva (auditoria F01)", async () => {
+  const t = carregar();
+  const p1 = (await t.req(t.A.createPerfil, { perfil: { nome: "Casa" } })).perfil;
+  const p2 = (await t.req(t.A.createPerfil, { perfil: { nome: "Mãe" } })).perfil;
+  const k = (await t.req(t.A.createCategoria, { categoria: { nome: "TV" } })).categoria;
+  const { lancamento } = await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "TV", valor: 100, tipo: "regular", categoriaId: k.id, perfilId: p1.id } });
+  await t.req(t.A.tornarRecorrente, { id: lancamento.id, recorrencia: "parcelada", parcelaAtual: 1, parcelaTotal: 3 });
+  await t.req(t.A.dividirLancamento, { id: lancamento.id, partes: [
+    { valor: 60, data: hoje(), categoriaId: k.id, perfilId: p1.id }, { valor: 40, data: hoje(), categoriaId: k.id, perfilId: p2.id }] });
+  const antes = (await t.req(t.A.getLancamentos)).lancamentos.filter((l) => l.descricao === "TV");
+  assert.equal(antes.length, 6);                                           // 2 séries × 3 parcelas
+  await t.req(t.A.updateConfig, { multicambio: true });
+  await t.req(t.A.updateConfig, { moeda: "EUR" });
+  // escolhe só a origem de UMA das séries: as duas séries inteiras (ligadas pela divisão) vão juntas
+  const r = await t.req(t.A.transferirMoeda, { ids: [lancamento.id] });
+  assert.equal(r.transferidos, 6);
+  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.filter((l) => l.descricao === "TV").length, 6);
+  await t.req(t.A.updateConfig, { moeda: "BRL" });
+  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.filter((l) => l.descricao === "TV").length, 0);
+});
+
+test("valor ilegível no documento não vira zero gravado: abre só para leitura (auditoria F02)", async () => {
+  const documento = { versao: 1, perfis: [], contas: [], categorias: [], grupos: {}, config: {}, meta: {},
+    lancamentos: [{ id: "l1", data: hoje(), descricao: "A", valor: "abc", tipo: "regular" },
+      { id: "l2", data: hoje(), descricao: "B", valor: "123.45", tipo: "regular" }] };
+  const t = carregar({ documento });
+  const lista = (await t.req(t.A.getLancamentos)).lancamentos;
+  assert.equal(lista.find((l) => l.id === "l2").valor, 123.45);            // conversão conhecida, determinística
+  await assert.rejects(t.req(t.A.createPerfil, { perfil: { nome: "X" } }), (e) => e.code === "DOCUMENT_INVALID_LOCKED");
+  assert.equal(t.salvos.length, 0);                                        // nada foi gravado
+  assert.equal(t.documento().lancamentos[0].valor, "abc");                 // o original continua intacto
+  assert.ok(t.eventos.some((e) => e.detail && e.detail.codigo === "DOCUMENT_INVALID_LOCKED"));
+});
+
+test("ID repetido no documento bloqueia gravação (referências ficariam ambíguas)", async () => {
+  const documento = { versao: 1, perfis: [], contas: [], categorias: [], grupos: {}, config: {}, meta: {},
+    lancamentos: [{ id: "l1", data: hoje(), descricao: "A", valor: 1, tipo: "regular" }, { id: "l1", data: hoje(), descricao: "B", valor: 2, tipo: "regular" }] };
+  const t = carregar({ documento });
+  await assert.rejects(t.req(t.A.createPerfil, { perfil: { nome: "X" } }), (e) => e.code === "DOCUMENT_INVALID_LOCKED");
+  assert.equal(t.salvos.length, 0);
+});
+
+test("multicâmbio: lista transações das outras moedas e traz de volta para o Real", async () => {
+  const t = carregar();
+  const a = (await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "A", valor: 10, tipo: "regular" } })).lancamento;
+  await t.req(t.A.updateConfig, { multicambio: true });
+  await t.req(t.A.updateConfig, { moeda: "USD" });
+  const outras = await t.req(t.A.getLancamentosOutrasMoedas);
+  assert.deepEqual(outras.lancamentos.map((l) => [l.id, l.moeda]), [[a.id, "BRL"]]);
+  await t.req(t.A.transferirMoeda, { ids: [a.id] });
+  assert.equal((await t.req(t.A.getLancamentosOutrasMoedas)).lancamentos.length, 0);
+  await t.req(t.A.updateConfig, { moeda: "BRL" });
+  assert.equal((await t.req(t.A.getLancamentosOutrasMoedas)).lancamentos[0].moeda, "USD");
+  await t.req(t.A.transferirMoeda, { ids: [a.id] });                         // de volta ao Real
+  assert.deepEqual((await t.req(t.A.getLancamentos)).lancamentos.map((l) => l.descricao), ["A"]);
+});

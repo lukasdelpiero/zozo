@@ -80,6 +80,7 @@
     updateGrupo: "updateGrupo",
     desagruparCategorias: "desagruparCategorias",
     transferirMoeda: "transferirMoeda",
+    getLancamentosOutrasMoedas: "getLancamentosOutrasMoedas",
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
@@ -117,6 +118,7 @@
     DEMO_LIMIT: "Na demonstração dá para criar só 1 item de cada tipo. Crie a sua conta para usar sem limites.",
     FEATURE_UNAVAILABLE: "Esse recurso não está disponível para a sua conta.",
     DOCUMENT_UNAVAILABLE: "Seus dados não foram encontrados agora e o backup não respondeu. Nada foi alterado: tente de novo em instantes.",
+    DOCUMENT_INVALID_LOCKED: "Encontramos um valor ilegível nos seus dados. Para não alterar nada por engano, o ZoZo abriu só para leitura e não grava nenhuma mudança. Seus dados originais continuam guardados.",
     DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",

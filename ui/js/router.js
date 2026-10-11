@@ -32,7 +32,10 @@
       ZoZo.charts.permitirAnimacao = true;
       if (animar && conteudo.classList) {
         conteudo.classList.add("page--entrar");
-        if (!entradaAgora && desdeEntrada < 800) conteudo.style.animationDelay = -desdeEntrada + "ms";   // continua de onde parou
+        if (!entradaAgora && desdeEntrada < 800) {
+          conteudo.style.animationDelay = -desdeEntrada + "ms";                                   // continua de onde parou
+          conteudo.style.setProperty("--entrada-decorrida", -desdeEntrada + "ms");                // e os blocos também
+        }
       }
       mount(mainEl, conteudo);
       mainEl.scrollTop = scroll;

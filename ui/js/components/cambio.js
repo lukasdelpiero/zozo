@@ -66,19 +66,31 @@
       return ctx.loadData("config", A.getConfig, null, { force: true }).then(() => aplicarMoeda(ctx, codigo)).then(() => {
         const m = MOEDAS.find((x) => x.codigo === codigo);
         ctx.toast("Moeda: " + m.nome + " (" + m.simbolo + ").");
-        if (primeiraVez && lista.length && ZoZo.recursos.cambio()) oferecerTransferencia(ctx, lista, origem, m);
+        if (primeiraVez && lista.length && ZoZo.recursos.cambio()) oferecerTransferencia(ctx, lista.map((l) => Object.assign({ moeda: origem.codigo }, l)), m, { primeiraVez: true });
       });
     })).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
-  /** Janela: escolher transações para levar à nova moeda (o valor não é convertido) */
-  function oferecerTransferencia(ctx, todas, origem, destino) {
+  /** Botão de Transações: trazer, a qualquer momento, transações de outras moedas para a moeda escolhida */
+  function abrirTransferencia(ctx) {
+    const destino = MOEDAS.find((m) => m.codigo === (config().moeda || "BRL"));
+    return ctx.bridge.request(A.getLancamentosOutrasMoedas).then((r) => {
+      if (!r.lancamentos.length) { ctx.toast("Não há transações em outras moedas para trazer para " + destino.nome + "."); return; }
+      oferecerTransferencia(ctx, r.lancamentos, destino, {});
+    }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+  }
+  const disponivelTransferir = () => ligado() && ZoZo.recursos.cambio();
+
+  /** Janela: escolher transações (de qualquer outra moeda) para levar a "destino". O valor não é convertido. */
+  function oferecerTransferencia(ctx, todas, destino, opts) {
+    const o = opts || {};
+    const simbolo = (codigo) => (MOEDAS.find((m) => m.codigo === codigo) || MOEDAS[0]).simbolo;
     const marcadas = new Set();
     // as de hoje para trás primeiro (mais novas no topo); parcelas futuras no fim
     const hoje = F.iso(new Date());
     const lista = todas.slice().sort((a, b) => (a.data > hoje) - (b.data > hoje) || (a.data > hoje ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data)));
     ZoZo.modais.janela({
-      titulo: "Usar transações em " + destino.nome + "?",
+      titulo: o.primeiraVez ? "Usar transações em " + destino.nome + "?" : "Trazer transações para " + destino.nome,
       classe: "modal--recorrencia modal--cambio",
       passo: function passo(api) {
         let termo = "";
@@ -96,18 +108,18 @@
             return h("label", { class: "zm-lanc cambio__item" }, cb,
               h("span", { class: "zm-lanc__data", title: F.dataExtenso(l.data) }, F.dataCurta(l.data)),
               h("span", { class: "zm-lanc__nome" }, h("span", null, l.descricao)),
-              h("span", { class: "zm-lanc__valor money" }, origem.simbolo + " " + F.moedaEditavel(l.valor)));
+              h("span", { class: "zm-lanc__valor money" }, simbolo(l.moeda) + " " + F.moedaEditavel(l.valor)));
           }) : h("p", { class: "menu__empty" }, "Nenhuma transação encontrada."));
         };
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         desenhar();
         return {
-          titulo: "Usar transações em " + destino.nome + "?",
+          titulo: o.primeiraVez ? "Usar transações em " + destino.nome + "?" : "Trazer transações para " + destino.nome,
           corpo: h("div", { class: "zm__pick" },
             h("p", { class: "modal__text cambio__aviso" }, "Selecione as transações que deseja transferir para sua conta em " + destino.nome + "."),
             h("div", { class: "zm__search" }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           botoes: [
-            { label: "Agora não", onClick: () => api.fechar() },
+            { label: o.primeiraVez ? "Agora não" : "Cancelar", onClick: () => api.fechar() },
             { label: "Transferir", primario: true, desabilitado: true, ref: (b) => { botao = b; contar(); }, onClick: (btn) => {
               btn.disabled = true;
               ctx.bridge.request(A.transferirMoeda, { ids: Array.from(marcadas) }).then((r) => {
@@ -146,5 +158,5 @@
         .catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar multicâmbio")));
   }
 
-  ZoZo.cambio = { Seletor, SecaoConfig, aplicarMoeda, trocar, MOEDAS };
+  ZoZo.cambio = { Seletor, SecaoConfig, aplicarMoeda, trocar, abrirTransferencia, disponivelTransferir, MOEDAS };
 })(window.ZoZo);

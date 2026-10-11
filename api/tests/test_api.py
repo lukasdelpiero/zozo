@@ -856,6 +856,19 @@ class TesteDemo(Base):
         self.assertFalse(self.entrar(cli)[1]["recursos"]["perfis"])           # e-mail parecido não vale
 
 
+class TestePedidoInvalido(Base):
+    def test_query_com_campos_demais_e_url_quebrada(self):
+        # auditoria F05: parse_qs(max_num_fields=20) lança ValueError — vira 400, nunca 500
+        q = "&".join(f"c{i}=1" for i in range(21))
+        st, r = self.api("GET", "/api/conta/parametros?" + q)
+        self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"))
+        self.assertIn("X-Request-Id", self.api.ultima.cabecalhos)
+        p = nucleo.Pedido("GET", "https://[::1/api/sessao", {})
+        self.assertTrue(p.invalido)
+        r = rodar(nucleo.atender(p, self.banco, FakeServicos(), CONFIG, log=lambda *_: None))
+        self.assertEqual(r.status, 400)
+
+
 class TesteMigracoes(unittest.TestCase):
     def test_0005_confirma_contas_existentes(self):
         con = sqlite3.connect(":memory:", isolation_level=None)

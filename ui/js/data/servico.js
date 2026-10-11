@@ -43,6 +43,7 @@
   let pendentes = 0;            // gravações ainda não confirmadas pelo servidor
   let criadosDemo = {};         // demonstração: itens criados pelo visitante, por tipo
   let somenteLeitura = false;   // documento sumiu do servidor sem backup: nada é gravado até um recomeço deliberado
+  let motivoBloqueio = "DOCUMENT_MISSING_LOCKED";   // ou DOCUMENT_INVALID_LOCKED (documento com dado financeiro ilegível)
 
   /* ---------------- recursos da conta ---------------- */
   const avancado = () => !!(ZoZo.recursos && ZoZo.recursos.perfis());     // Perfis (e boletos/Pix, que dependem deles)
@@ -110,14 +111,25 @@
     return { versao: VERSAO, perfis: [], contas: [], categorias: [], lancamentos: [], grupos: {}, config: {}, meta: {} };
   }
   const objeto = (x) => !!x && typeof x === "object" && !Array.isArray(x);
+  /**
+   * Põe o documento lido no formato atual. NUNCA "conserta" dinheiro: valor ilegível ou ID repetido
+   * (referências ficariam ambíguas) viram PROBLEMAS — a tela abre, mas nada é gravado, e o original
+   * continua intacto no servidor. Conversão conhecida e determinística: valor em texto "123.45" → 123.45.
+   * → { doc, problemas: [códigos] }
+   */
   function normalizar(d) {
+    const problemas = [];
     const out = Object.assign(vazio(), objeto(d) ? d : {});
     // Itens que não são registros (null, número, texto) não carregam dado nenhum: saem; os demais ganham os campos mínimos
     ["perfis", "contas", "categorias", "lancamentos"].forEach((k) => { out[k] = Array.isArray(out[k]) ? out[k].filter(objeto) : []; });
     const prefixo = { perfis: "p", contas: "c", categorias: "k", lancamentos: "l" };
     Object.keys(prefixo).forEach((k) => {
       const vistos = new Set();
-      out[k].forEach((x) => { if (typeof x.id !== "string" || !x.id || vistos.has(x.id)) x.id = novoId(prefixo[k]); vistos.add(x.id); });
+      out[k].forEach((x) => {
+        if (typeof x.id === "string" && x.id && vistos.has(x.id)) problemas.push("ID_DUPLICADO:" + k);
+        if (typeof x.id !== "string" || !x.id || vistos.has(x.id)) x.id = novoId(prefixo[k]);    // só para a tela (não é gravado)
+        vistos.add(x.id);
+      });
     });
     out.contas.forEach((c) => {
       c.historico = Array.isArray(c.historico) ? c.historico.filter((p) => objeto(p) && typeof p.data === "string" && Number.isFinite(p.saldo)) : [];
@@ -126,7 +138,8 @@
     out.lancamentos.forEach((l) => {
       if (typeof l.data !== "string") l.data = "";
       if (typeof l.descricao !== "string") l.descricao = String(l.descricao || "");
-      if (typeof l.valor !== "number" || !Number.isFinite(l.valor)) l.valor = 0;
+      if (typeof l.valor === "string" && /^\s*\d{1,13}(\.\d{1,2})?\s*$/.test(l.valor)) l.valor = Number(l.valor);   // migração conhecida
+      if (typeof l.valor !== "number" || !Number.isFinite(l.valor)) { problemas.push("VALOR_INVALIDO"); l.valorInvalido = true; l.valor = 0; }
     });
     if (!out.config || typeof out.config !== "object") out.config = {};
     if (!objeto(out.grupos)) out.grupos = {};
@@ -140,7 +153,7 @@
       }
     });
     out.versao = VERSAO;
-    return out;
+    return { doc: out, problemas };
   }
 
   function garantirCarregado() {
@@ -151,11 +164,20 @@
           const bruto = r && r.documento;
           // Gravado por uma versão MAIS NOVA do ZoZo (outra aba já atualizada): não abre nem regrava com o formato antigo
           if (bruto && typeof bruto === "object" && Number(bruto.versao) > VERSAO) throw erro("DOCUMENT_NEWER");
-          doc = normalizar(bruto);
+          const lido = normalizar(bruto);
+          doc = lido.doc;
           somenteLeitura = !!(r && r.somenteLeitura);
+          motivoBloqueio = "DOCUMENT_MISSING_LOCKED";
           // Avisos do host: restaurado de backup / versão mais antiga do que a conhecida
           if (r && r.aviso) window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: r.aviso } }));
-          if (sincronizarParcelas() + sincronizarDebitos() > 0) {
+          if (lido.problemas.length) {
+            // Dado financeiro ilegível: abre só para leitura; o documento original fica intocado no servidor
+            somenteLeitura = true;
+            motivoBloqueio = "DOCUMENT_INVALID_LOCKED";
+            ZoZo.log.error("serviço", { evento: "documento_invalido", problemas: Array.from(new Set(lido.problemas)) });
+            window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: "DOCUMENT_INVALID_LOCKED" } }));
+          }
+          if (!somenteLeitura && sincronizarParcelas() + sincronizarDebitos() > 0) {
             doc.meta.ultimaGravacao = new Date().toISOString();
             // grava pela mesma fila das alterações (nunca em paralelo com elas) e conta como gravação pendente
             pendentes += 1;
@@ -203,7 +225,7 @@
   function alterar(fn) {
     pendentes += 1;
     const exec = fila.then(() => garantirCarregado()).then(() => {
-      if (somenteLeitura) throw erro("DOCUMENT_MISSING_LOCKED");
+      if (somenteLeitura) throw erro(motivoBloqueio);
       const antes = JSON.stringify(doc);
       let resultado;
       try { resultado = fn(doc); sincronizarDebitos(); } catch (e) { doc = JSON.parse(antes); throw e; }
@@ -226,7 +248,7 @@
     return exec;
   }
 
-  function reset() { doc = null; carregando = null; fila = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; }
+  function reset() { doc = null; carregando = null; fila = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; }
   const gravando = () => pendentes > 0;
 
   /* ---------------- saldos e séries ---------------- */
@@ -696,6 +718,14 @@
   const A = M.ACTIONS;
   const LEITURAS = {
     [A.getLancamentos]: getLancamentos,
+    /** Multicâmbio: transações das OUTRAS moedas, para trazer para a moeda escolhida (lê o documento inteiro) */
+    [A.getLancamentosOutrasMoedas]: () => {
+      exigir(cambioLiberado());
+      const atual = moedaAtual();
+      return { moeda: atual, lancamentos: doc.lancamentos.filter((l) => moedaDe(l) !== atual)
+        .map((l) => ({ id: l.id, data: l.data, descricao: l.descricao, valor: l.valor, moeda: moedaDe(l), tipo: l.tipo, recorrencia: l.recorrencia || null }))
+        .sort((a, b) => b.data.localeCompare(a.data)) };
+    },
     [A.getContas]: getContas,
     [A.getInvestimentos]: (d) => getInvestimentos(d),
     [A.getCategorias]: getCategorias,
@@ -1199,16 +1229,28 @@
       exigir(cambioLiberado());
       const destino = moedaAtual();
       const ids = new Set(Array.isArray(d.ids) ? d.ids.slice(0, 5000) : []);
-      if (destino === "BRL" || !ids.size) throw erro("OPERATION_FAILED");
-      // A série inteira (parcelas/recorrência) e a divisão inteira vão juntas: nada fica metade em cada moeda
-      const series = new Set(), divisoes = new Set();
-      doc.lancamentos.forEach((l) => {
-        if (!ids.has(l.id) || moedaDe(l) === destino) return;
-        if (l.tipo === "recorrente") series.add(l.serieId || l.id);
+      if (!doc.config.multicambio || !ids.size) throw erro("OPERATION_FAILED");     // destino: a moeda escolhida (inclusive o Real)
+      // Unidade indivisível: a série inteira (parcelas/recorrência) E a divisão inteira, de forma TRANSITIVA
+      // (uma parte de divisão que é origem de outra série leva essa série, que pode ter outras divisões…).
+      // O conjunto completo é calculado antes de mexer em qualquer registro.
+      const chaveSerie = (l) => (l.tipo === "recorrente" ? (l.serieId && !String(l.serieId).startsWith("removida:") ? l.serieId : l.id) : null);
+      const series = new Set(), divisoes = new Set(), mover = new Set();
+      const candidatos = doc.lancamentos.filter((l) => moedaDe(l) !== destino);
+      const incluir = (l) => {
+        if (mover.has(l)) return false;
+        mover.add(l);
+        const s = chaveSerie(l); if (s) series.add(s);
         if (l.divisao) divisoes.add(l.divisao.id);
-      });
-      const mover = doc.lancamentos.filter((l) => moedaDe(l) !== destino && (ids.has(l.id) || series.has(l.id) ||
-        (l.serieId && series.has(l.serieId)) || (l.divisao && divisoes.has(l.divisao.id))));
+        return true;
+      };
+      candidatos.forEach((l) => { if (ids.has(l.id)) incluir(l); });
+      for (let mudou = true; mudou;) {
+        mudou = false;
+        candidatos.forEach((l) => {
+          if (mover.has(l)) return;
+          if (series.has(l.id) || series.has(chaveSerie(l)) || (l.divisao && divisoes.has(l.divisao.id))) mudou = incluir(l) || mudou;
+        });
+      }
       // Conta, categoria e perfil passam a ser os da moeda de destino: o de mesmo nome, ou uma cópia
       // (conta copiada começa com saldo 0 — o saldo pertence à outra moeda). Débito sai da conta nova
       // (sincronizarDebitos devolve o valor à conta antiga e debita a nova).
@@ -1230,7 +1272,7 @@
         l.categoriaId = equivalente(doc.categorias, "k", l.categoriaId, () => ({ orcamentos: {} }));
         l.perfilId = equivalente(doc.perfis, "p", l.perfilId, () => ({}));
       });
-      return { transferidos: mover.length };
+      return { transferidos: mover.size };
     },
   };
 
@@ -1260,7 +1302,9 @@
   function handle(action, data) {
     const d = data || {};
     if (action in LEITURAS) {
-      return fila.then(() => garantirCarregado()).then(() => (action === A.getConfig ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
+      // getConfig e a lista para transferir entre moedas enxergam o documento inteiro; o resto, só a moeda escolhida
+      const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas;
+      return fila.then(() => garantirCarregado()).then(() => (inteiro ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
     }
     if (action in ESCRITAS) {
       return alterar(() => clone(ESCRITAS[action](d))).catch((e) => { throw amigavel(e); });

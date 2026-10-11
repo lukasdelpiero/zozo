@@ -362,8 +362,12 @@
     }
 
     let primeira = ZoZo.charts.permitirAnimacao !== false;
+    let conectado = false;
     const ro = new ResizeObserver(() => {
-      if (!holder.isConnected || !holder.clientWidth) return;
+      // saiu da tela depois de ter aparecido (troca de página/painel): para de observar
+      if (!holder.isConnected) { if (conectado) ro.disconnect(); return; }
+      conectado = true;
+      if (!holder.clientWidth) return;
       draw(primeira); primeira = false;
     });
     ro.observe(holder);

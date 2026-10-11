@@ -148,9 +148,15 @@ def criar_app(dependencias: Dependencias) -> FastAPI:
             try:
                 modelo.model_validate_json(corpo or "{}")
             except ValidationError as erro:
-                # só o tipo de erro e o nome do campo: nunca o valor (pode ser e-mail, prova, código…)
-                log(json.dumps({"evento": "corpo_invalido", "rota": pedido.caminho,
-                                "erros": sorted({f"{'.'.join(map(str, e['loc']))}:{e['type']}" for e in erro.errors()})[:10]}))
+                # só o tipo do erro e o nome do campo QUANDO ele é do contrato: nunca o valor, e um campo
+                # desconhecido (o nome vem do cliente e pode conter qualquer coisa) vira "<extra>"
+                conhecidos = set(modelo.model_fields)
+                def campo(e):
+                    nome = e["loc"][0] if e.get("loc") else ""
+                    return nome if isinstance(nome, str) and nome in conhecidos else ("<extra>" if nome else "<corpo>")
+                tipo = lambda e: "".join(c for c in str(e.get("type", ""))[:40] if c.isalnum() or c == "_")
+                log(json.dumps({"evento": "corpo_invalido", "rota": pedido.caminho if pedido.caminho in {c for _, c in MODELOS} else "<outra>",
+                                "erros": sorted({f"{campo(e)}:{tipo(e)}" for e in erro.errors()})[:10]}))
                 return _falha(400, "INVALID_REQUEST")
 
         # 3) Regras de sempre

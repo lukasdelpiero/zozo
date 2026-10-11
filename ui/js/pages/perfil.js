@@ -439,7 +439,7 @@
           linhaConfig(
             ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador."
               : demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
-              : disponivel ? "Seus dados são criptografados neste navegador e guardados na nuvem do ZoZo. Ninguém lê seus dados sem a sua senha." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
+              : disponivel ? "Seus dados são criptografados neste navegador antes de ir para a nuvem do ZoZo; o servidor guarda só a versão cifrada, que não abre sem a sua senha." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
             demo ? "Ao sair ou recarregar a página, novos dados são sorteados." : "Última gravação: " + quando(cfg.ultimaGravacao) + ".",
             icon(disponivel ? "nuvem" : "alerta", { size: 18, class: disponivel ? "cfg-ok" : "cfg-alerta" })),
         ];
@@ -506,7 +506,8 @@
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
           h("h3", { class: "cfg-section" }, "Ações"),
-          linhaConfig("Exportar todas as transações", "Baixe seus dados em um arquivo CSV (o arquivo não é criptografado)", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
+          linhaConfig(cfg.multicambio ? "Exportar as transações em " + ({ BRL: "Real", EUR: "Euro", USD: "Dólar" }[cfg.moeda] || "Real") : "Exportar todas as transações",
+            "Baixe seus dados em um arquivo CSV (o arquivo não é criptografado" + (cfg.multicambio ? "; só a moeda escolhida no menu" : "") + ")", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
         ];

@@ -84,8 +84,9 @@
       : Object.assign({}, original);
     d.sentido = d.sentido || "saida";
     let pendenteRec = null;      // recorrência escolhida antes de criar o lançamento
-    const reabrir = () => abrir(novo ? null : { id: original.id }, ctx, opts);
-    const voltarParaCa = () => abrir(novo ? null : { id: original.id }, ctx, opts);
+    const semEntrada = Object.assign({}, opts, { recemCriada: false });
+    const reabrir = () => abrir(novo ? null : { id: original.id }, ctx, semEntrada);
+    const voltarParaCa = () => abrir(novo ? null : { id: original.id }, ctx, semEntrada);
 
     /* ---------- gravação ---------- */
     const statusEl = h("span", { class: "lp-status", "aria-live": "polite" });
@@ -121,10 +122,16 @@
           const antes = { tipo: d.tipo, contaId: d.contaId };
           d.tipo = t;
           if (t !== "interno") d.sentido = "saida";
-          // Débito sai de uma CONTA: com um cartão escolhido, troca para a primeira conta disponível
-          if (t === "debito" && novo) {
+          // Débito sai de uma CONTA (cartão não vale): com um cartão escolhido — ao criar ou ao editar —
+          // troca para a primeira conta disponível; sem nenhuma, avisa em vez de falhar calado
+          if (t === "debito") {
             const c = contas.find((x) => x.id === d.contaId);
-            if (!c || c.tipo === "cartao") d.contaId = (contas.find((x) => !x.oculta && x.tipo !== "cartao") || {}).id || null;
+            if (!c || c.tipo === "cartao") {
+              const conta = contas.find((x) => !x.oculta && x.tipo !== "cartao");
+              if (!conta) { Object.assign(d, antes); ctx.toast(ZoZo.messages.FRIENDLY.DEBIT_ACCOUNT, { tone: "error" }); return; }
+              d.contaId = conta.id;
+              if (!novo) ctx.toast("Débito sai de uma conta: a transação passou para " + conta.nome + ".");
+            }
           }
           if (novo) desenhar(); else salvar(() => Object.assign(d, antes)).then(() => reabrir());
         },
@@ -132,7 +139,8 @@
     }
 
     /* ---------- campos ---------- */
-    const corpo = h("div", { class: "lp" });
+    // Entrada suave ao começar uma transação nova e logo depois de criá-la (não a cada campo salvo)
+    const corpo = h("div", { class: ["lp", (novo || opts.recemCriada) && "lp--entrar"] });
 
     function campoData() {
       const rotulo = h("button", { type: "button", class: "lp-date", title: "Alterar data" }, dataLonga(d.data));
@@ -415,7 +423,7 @@
         return id;
       }).then((id) => {
         ctx.toast("Transação criada.");
-        return ctx.recarregarTudo().then(() => abrir({ id }, ctx));
+        return ctx.recarregarTudo().then(() => abrir({ id }, ctx, { recemCriada: true }));
       }).catch((e) => { btn.disabled = false; statusEl.textContent = e.friendly; statusEl.className = "lp-status lp-status--erro"; });
     }
 
