@@ -16,6 +16,7 @@
   "use strict";
   const { s, h, clear } = ZoZo.dom;
   const F = ZoZo.format;
+  const P = ZoZo.pecas;
 
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const reduzir = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -66,7 +67,7 @@
 
   /** Rótulo do eixo X em duas linhas, como no Copilot: "Abr" e, abaixo, o ano */
   function rotuloDuasLinhas(svg, x, yBase, mes, ano, ancora) {
-    const t = s("text", { x, y: yBase - 12, class: "line-chart__label", "text-anchor": ancora || "middle" });
+    const t = s("text", { x, y: yBase - 12, class: P.graficoRotulo, "text-anchor": ancora || "middle" });
     t.appendChild(s("tspan", { x, dy: 0, text: mes }));
     if (ano) t.appendChild(s("tspan", { x, dy: 13, text: ano }));
     svg.appendChild(t);
@@ -76,24 +77,24 @@
   function etiqueta(svg, xFim, y, texto) {
     const larg = texto.length * 6.4 + 14, alt = 20;
     const x0 = xFim - larg;
-    svg.appendChild(s("path", { d: `M${x0 - 6} ${y} L${x0} ${y - alt / 2} H${xFim - 3} Q${xFim} ${y - alt / 2} ${xFim} ${y - alt / 2 + 3} V${y + alt / 2 - 3} Q${xFim} ${y + alt / 2} ${xFim - 3} ${y + alt / 2} H${x0} Z`, class: "chart-tag" }));
-    svg.appendChild(s("text", { x: x0 + larg / 2, y: y + 4, "text-anchor": "middle", class: "chart-tag__text", text: texto }));
+    svg.appendChild(s("path", { d: `M${x0 - 6} ${y} L${x0} ${y - alt / 2} H${xFim - 3} Q${xFim} ${y - alt / 2} ${xFim} ${y - alt / 2 + 3} V${y + alt / 2 - 3} Q${xFim} ${y + alt / 2} ${xFim - 3} ${y + alt / 2} H${x0} Z`, class: P.etiquetaGrafico }));
+    svg.appendChild(s("text", { x: x0 + larg / 2, y: y + 4, "text-anchor": "middle", class: P.etiquetaGraficoTexto, text: texto }));
   }
 
   /* ================= Linha ================= */
   function renderLineChart(container, series, options) {
     const o = Object.assign({ height: 180, formatValue: (v) => F.moeda(v), ariaLabel: "Gráfico de linha", animar: ZoZo.charts.permitirAnimacao !== false }, options || {});
     clear(container);
-    container.classList.add("line-chart");
+    container.classList.add(...P.graficoLinha.split(" "));
 
     const validas = (series || []).filter((sr) => sr.points && sr.points.length);
     if (!validas.length) {
-      container.appendChild(h("div", { class: "chart-empty", style: { height: o.height + "px" } }, "Sem dados para o período."));
+      container.appendChild(h("div", { class: P.graficoVazio, style: { height: o.height + "px" } }, "Sem dados para o período."));
       return { destroy() {} };
     }
 
-    const tooltip = h("div", { class: "chart-tooltip", role: "presentation" });
-    const holder = h("div", { class: "line-chart__holder", style: { height: o.height + "px" } });
+    const tooltip = h("div", { class: P.dica, role: "presentation" });
+    const holder = h("div", { class: P.graficoSuporte, style: { height: o.height + "px" } });
     container.appendChild(holder);
     container.appendChild(tooltip);
 
@@ -133,7 +134,7 @@
       const x = (i, len) => m.l + (len <= 1 ? iw : (i / (len - 1)) * iw);
 
       if (svg) svg.remove();
-      svg = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: "line-chart__svg" });
+      svg = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: P.graficoSvg });
 
 
       if (!o.semEixo) {
@@ -145,7 +146,7 @@
           if (!ref[i]) return;
           const dt = F.parseData(ref[i].data);
           const ancora = i === 0 ? "start" : i === ultimo ? "end" : "middle";
-          if (o.rotuloX) svg.appendChild(s("text", { x: x(i, ref.length), y: H - 6, class: "line-chart__label", "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
+          if (o.rotuloX) svg.appendChild(s("text", { x: x(i, ref.length), y: H - 6, class: P.graficoRotulo, "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
           else rotuloDuasLinhas(svg, x(i, ref.length), H - 2, String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()), String(dt.getFullYear()), ancora);
         });
       }
@@ -213,7 +214,7 @@
       });
 
       // interação
-      const cursor = s("line", { y1: m.t, y2: m.t + ih, class: "line-chart__cursor", visibility: "hidden" });
+      const cursor = s("line", { y1: m.t, y2: m.t + ih, class: P.graficoCursor, visibility: "hidden" });
       const marcadores = validas.map((sr) => s("circle", { r: 3.5, fill: sr.colorBySlope ? css("--color-chart-up") : sr.color, visibility: "hidden" }));
       svg.appendChild(cursor);
       marcadores.forEach((c) => svg.appendChild(c));
@@ -233,11 +234,11 @@
           marcadores[k].setAttribute("cx", x(Math.min(i, sr.points.length - 1), sr.points.length));
           marcadores[k].setAttribute("cy", sr._y(p.valor));
           marcadores[k].setAttribute("visibility", "visible");
-          tooltip.appendChild(h("div", { class: "chart-tooltip__row" },
-            h("span", { class: "chart-tooltip__dot", style: { background: sr.colorBySlope ? "var(--color-text-secondary)" : sr.color } }),
+          tooltip.appendChild(h("div", { class: P.dicaLinha },
+            h("span", { class: P.dicaPonto, style: { background: sr.colorBySlope ? "var(--color-text-secondary)" : sr.color } }),
             h("span", null, sr.name), h("strong", null, o.formatValue(p.valor))));
         });
-        tooltip.insertBefore(h("div", { class: "chart-tooltip__date" }, o.rotuloTooltip ? o.rotuloTooltip(ponto) : F.dataExtenso(ponto.data)), tooltip.firstChild);
+        tooltip.insertBefore(h("div", { class: P.dicaData }, o.rotuloTooltip ? o.rotuloTooltip(ponto) : F.dataExtenso(ponto.data)), tooltip.firstChild);
         tooltip.classList.add("is-visible");
         tooltip.style.left = Math.min(Math.max(x(i, n) - tooltip.offsetWidth / 2, 0), W - tooltip.offsetWidth) + "px";
       };
@@ -277,7 +278,7 @@
     const folga = Math.max(3, Math.round(o.thickness * 0.3));
     const r = c0 - folga - o.thickness / 2;            // raio do meio do anel
     const C = 2 * Math.PI * r;
-    const svg = s("svg", { width: o.size, height: o.size, viewBox: `0 0 ${o.size} ${o.size}`, role: "img", "aria-label": o.ariaLabel, class: ["donut", o.onClick ? "donut--clicavel" : ""].join(" ") });
+    const svg = s("svg", { width: o.size, height: o.size, viewBox: `0 0 ${o.size} ${o.size}`, role: "img", "aria-label": o.ariaLabel, class: o.onClick ? P.roscaClicavel : P.rosca });
     svg.appendChild(s("circle", { cx: c0, cy: c0, r: c0, fill: css("--color-donut-fundo") || "#F1F2F5", class: "donut__fundo" }));
     svg.appendChild(s("circle", { cx: c0, cy: c0, r: Math.max(0, r - o.thickness / 2 - folga), fill: "#fff" }));
     const g = s("g", { transform: `rotate(-90 ${c0} ${c0})` });
@@ -285,7 +286,7 @@
     const barra = (cor, offset, titulo) => {
       const arc = s("circle", {
         cx: c0, cy: c0, r, fill: "none", stroke: cor, "stroke-width": o.thickness, "stroke-linecap": "round",
-        "stroke-dasharray": `0 ${C}`, "stroke-dashoffset": -offset, class: "donut__arc", visibility: "hidden",
+        "stroke-dasharray": `0 ${C}`, "stroke-dashoffset": -offset, class: P.roscaArco, visibility: "hidden",
       });
       if (titulo) arc.appendChild(s("title", { text: titulo }));
       return arc;
@@ -334,9 +335,9 @@
   function renderBarChart(container, barras, options) {
     const o = Object.assign({ height: 170, ariaLabel: "Gráfico de barras" }, options || {});
     clear(container);
-    const holder = h("div", { class: "bar-chart", style: { height: o.height + "px" } });
-    const tooltip = h("div", { class: "chart-tooltip", role: "presentation" });
-    container.classList.add("line-chart");
+    const holder = h("div", { class: P.barras, style: { height: o.height + "px" } });
+    const tooltip = h("div", { class: P.dica, role: "presentation" });
+    container.classList.add(...P.graficoLinha.split(" "));
     container.appendChild(holder);
     container.appendChild(tooltip);
 
@@ -349,8 +350,8 @@
       const y = (v) => m.t + ih - (v / max) * ih;
       const passo = iw / Math.max(1, barras.length);
       const bw = Math.max(4, Math.min(18, passo * 0.45));
-      const svg = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: "line-chart__svg" });
-      svg.appendChild(s("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, class: "bar-chart__base" }));
+      const svg = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: P.graficoSvg });
+      svg.appendChild(s("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, class: P.barrasLinha }));
       const rects = [];
       barras.forEach((b, i) => {
         const v = F.numero(b.valor);
@@ -367,8 +368,8 @@
         const alvo = s("rect", { x: cx - passo / 2, y: 0, width: passo, height: H, fill: "transparent" });
         alvo.addEventListener("mouseenter", () => {
           clear(tooltip);
-          tooltip.appendChild(h("div", { class: "chart-tooltip__date" }, b.titulo || b.rotulo));
-          tooltip.appendChild(h("div", { class: "chart-tooltip__row chart-tooltip__row--2" }, h("span", null, o.nomeValor || "Valor"), h("strong", null, F.moeda(v))));
+          tooltip.appendChild(h("div", { class: P.dicaData }, b.titulo || b.rotulo));
+          tooltip.appendChild(h("div", { class: P.dicaLinha2 }, h("span", null, o.nomeValor || "Valor"), h("strong", null, F.moeda(v))));
           tooltip.classList.add("is-visible");
           tooltip.style.left = Math.min(Math.max(cx - tooltip.offsetWidth / 2, 0), W - tooltip.offsetWidth) + "px";
         });
@@ -377,7 +378,7 @@
       });
       if (o.limite > 0) {
         const ly = y(o.limite);
-        svg.appendChild(s("line", { x1: m.l, x2: W - 4, y1: ly, y2: ly, class: "bar-chart__limit" }));
+        svg.appendChild(s("line", { x1: m.l, x2: W - 4, y1: ly, y2: ly, class: P.barrasLinha }));
         etiqueta(svg, W - 2, ly, F.moeda(o.limite));
       }
       holder.appendChild(svg);

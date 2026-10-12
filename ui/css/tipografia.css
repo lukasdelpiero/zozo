@@ -15,20 +15,6 @@
   --t-24: 1.5rem;      /* 24px — Gasto mensal */
 }
 
-/* ================= Cards (o Dashboard em si está em Tailwind: pages/dashboard.js) ================= */
-.card__title { font-size: var(--t-15); font-weight: 550; }
-.card__link { font-size: var(--t-15); font-weight: 550; }
-.pct, .pct__value { font-size: var(--t-13); font-weight: 550; }
-.filter-tabs__item { font-size: var(--t-13); font-weight: 620; }
-
-/* ================= Recorrências ================= */
-.recurrence-row .cat-pill { font-size: var(--t-11); font-weight: 620; }
-
-/* ================= Contas e Investimentos ================= */
-.section__title { font-size: var(--t-15); font-weight: 620; }
-
-.cat-label__name { font-size: var(--t-15); font-weight: 450; }
-
 /* ================= Recorrências ================= */
 .recurrence-row { grid-template-columns: 52px minmax(0, 1fr) minmax(140px, 220px) 120px; gap: var(--space-3); }
 .recurrence-row:has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(140px, 220px) 120px; }
@@ -44,52 +30,8 @@
 /* ================= Painel de informações ================= */
 .tipo-select { font-size: var(--t-15); font-weight: 620; }
 
-/* Topo em duas linhas (Contas, Investimentos, Recorrências) */
-.ph { display: flex; flex-direction: column; gap: 4px; padding-bottom: var(--space-4); }
-.ph__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 28px; }
-.ph__meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.ph__meta .account-icon { width: 22px; height: 22px; border-radius: 6px; }
-.ph__meta .account-icon .icon { width: 13px; height: 13px; }
-.ph__type { font-size: var(--t-15); font-weight: 450; color: var(--color-text-secondary); }
-.ph__chips { display: flex; align-items: center; gap: 6px; flex: none; }
-.ph__chips .pct { font-size: var(--t-13); font-weight: 550; }
-.ph__main { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.ph__name { font-size: var(--t-20); font-weight: 550; flex: 1; min-width: 0; }
-.ph__value { font-size: var(--t-20); font-weight: 550; width: auto; max-width: 220px; field-sizing: content; min-width: 90px; }
-.ph__extra { text-align: right; font-size: var(--t-13); color: var(--color-text-secondary); }
-
-/* Categoria */
-.detail .hero-edit .inline-input { font-size: var(--t-20); font-weight: 550; }
-.detail .detail-hero__label { font-size: var(--t-15); font-weight: 620; }
-.detail .detail-hero__value { font-size: var(--t-20); font-weight: 550; }
-
-/* Lançamento */
-.lp-top__left { gap: 2px; }
-.lp-date { font-size: var(--t-13); font-weight: 550; height: 24px; }
-.lp-sub { font-size: var(--t-13); font-weight: 550; height: 24px; }
-.lp-name, .lp-value { font-size: var(--t-20); font-weight: 550; }
-.lp-account { font-size: var(--t-13); font-weight: 550; }
-.lp-prop__label { font-size: var(--t-15); font-weight: 550; }
-.lp-prop .cat-pill, .lp-prop .tag--upper { font-size: 12px; font-weight: 620; }
-.lp-notes, .lp-notes::placeholder { font-size: var(--t-15); font-weight: 550; }
-
-/* Listas de lançamentos nos painéis: de borda a borda, valor na linha do nome */
-.pl-row {
-  grid-template-columns: 18px minmax(0, 1fr) auto auto; gap: 10px;
-  min-height: 34px; padding: 0 var(--page-gutter); margin: 0 calc(-1 * var(--page-gutter));
-}
-.pl-row__cat { margin-right: 2px; }
-.pl-row__value { min-width: 72px; text-align: right; font-size: var(--t-15); font-weight: 620; white-space: nowrap; }
-.pl-row__title { font-size: var(--t-15); font-weight: 450; }
-.pl-day { font-size: var(--t-13); font-weight: 620; padding: 8px 0 2px; }
-.pl-month__title, .pl-month__total { font-size: var(--t-15); font-weight: 620; }
-.pl-month + .pl-month { margin-top: var(--space-4); }
-
 /* ================= Janelas modais ================= */
-.modal .field__label { font-size: var(--t-15); font-weight: 620; }
-.modal .field__hint, .modal .cfg-row__sub { font-size: var(--t-13); font-weight: 620; }
-.modal .input::placeholder { font-size: var(--t-15); font-weight: 450; }
-.modal .btn { font-size: var(--t-15); font-weight: 620; }
+.modal .cfg-row__sub { font-size: var(--t-13); font-weight: 620; }
 /* listas de ponta a ponta */
 .freq-list__item { border-radius: 0; margin: 0 calc(-1 * var(--space-6)); padding-left: var(--space-6); padding-right: var(--space-6); }
 .freq-list__item { font-size: var(--t-15); }
@@ -101,16 +43,7 @@
    ============================================================= */
 :root { --gap-lista: calc(0.25rem * 4); }   /* 1rem */
 
-/* Data → primeiro lançamento do dia */
-.pl-day { padding: 12px 0 0; margin: 0 0 var(--gap-lista); line-height: 1.2; }
-/* Último lançamento → início do mês seguinte */
-.pl-month + .pl-month { margin-top: var(--gap-lista); }
-/* Cabeçalho do mês igual nos dois lugares */
-.pl-month__head { padding: var(--space-2) 0 0; }
-.pl-month__title, .pl-month__total { font-size: var(--t-20); font-weight: 620; }
-.pl-month__total .money { font-weight: 620; }
 /* Linhas com a mesma altura */
-.pl-row { min-height: var(--row-height); }
 
 /* =============================================================
    Arredondamentos
@@ -118,18 +51,10 @@
 :root { --radius-small: 8px; --radius-medium: 12px; --radius-large: 20px; }
 /* linhas, botões, selecionados e destaques: 8px
    (exceto lançamentos da página Lançamentos e das listas do painel, que vão de borda a borda) */
-.row, .btn, .icon-btn, .nav-item, .filter-tabs__item, .segmented__item, .lp-date, .lp-account, .lp-sub, .inline-input, .lp-name, .lp-value, .lp-notes, .tipo-select, .cfg-danger-btn, .icon-pick, .input, .select, .textarea { border-radius: 8px; }
-.pl-row { border-radius: 0; }
-.card, .chart-card { border-radius: 20px; }              /* cards da área principal */
-.color-picker { border-radius: 8px; overflow: hidden; }                 /* caixa de cores */
-.color-picker--4 .color-picker__swatch:nth-child(1) { border-top-left-radius: 8px; }
-.color-picker--4 .color-picker__swatch:nth-child(4) { border-top-right-radius: 8px; }
-.color-picker--4 .color-picker__swatch:nth-child(13) { border-bottom-left-radius: 8px; }
-.color-picker--4 .color-picker__swatch:nth-child(16) { border-bottom-right-radius: 8px; }
+.row, .nav-item, .tipo-select, .cfg-danger-btn { border-radius: 8px; }
+.chart-card { border-radius: 20px; }              /* cards da área principal */
 
 /* Botão Excluir nas janelas modais */
-.modal .btn--danger { background: #ff1a1a; border-color: #ff1a1a; color: #fff; }
-.modal .btn--danger:hover:not(:disabled) { background: #e60000; border-color: #e60000; }
 
 /* =============================================================
    Linhas de ponta a ponta
@@ -141,10 +66,6 @@
 .cfg-footer { border-top: 1px solid var(--color-border) !important; }
 
 /* Painel de informações: da borda esquerda à borda direita do painel */
-.detail-section, .lp-top, .lp-props, .lp-notes-wrap, .ph, .detail-hero {
-  margin-left: calc(-1 * var(--page-gutter)); margin-right: calc(-1 * var(--page-gutter));
-  padding-left: var(--page-gutter); padding-right: var(--page-gutter);
-}
 .cfg { gap: 0 !important; }   /* sem vão entre o menu e o conteúdo: linhas encostam no menu */
 
 /* =============================================================
@@ -159,15 +80,10 @@
 .cfg-row { min-height: 0; padding-top: 10px; padding-bottom: 10px; }
 .cfg-row__title { font-size: var(--t-15); font-weight: 450; }
 .cfg .cfg-row__sub { font-size: var(--t-13); font-weight: 450; }
-.cfg-readonly, .cfg .cfg-inline, .cfg .input--sm, .cfg .input--sm::placeholder { font-size: var(--t-13); font-weight: 550; }
-.cfg .btn, .cfg-danger-btn { font-size: var(--t-13); font-weight: 550; }
-/* Apagar: contorno igual a Baixar/Alterar, texto vermelho */
-.cfg .btn--danger-ghost { background: var(--color-surface); border: 1px solid var(--color-border-strong); color: var(--color-danger); }
-.cfg .btn--danger-ghost:hover { background: var(--color-danger-soft); }
+.cfg-readonly { font-size: var(--t-13); font-weight: 550; }
+.cfg-danger-btn { font-size: var(--t-13); font-weight: 550; }
 
 /* Botões toggle da janela de contas (Cartão de crédito · Poupança · Corrente): sem quebra de linha */
-.segmented--pilulas .segmented__item { font-size: var(--t-15); font-weight: 550; white-space: nowrap; padding: 0 10px; }
-.segmented--pilulas .segmented__item > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* =============================================================
    Seletor de emojis (emoji-mart; cores e cantos dentro de src/emoji-picker.ts)
@@ -183,36 +99,13 @@
    Paleta de cores: quadrado aumenta ao passar o mouse; selecionado
    fica destacado com o check branco no centro; sem borda branca
    ============================================================= */
-.color-picker { overflow: visible; gap: 0; }
-.color-picker__swatch {
-  border: 0 !important; box-shadow: none !important; outline: none;
-  display: grid; place-items: center; color: #fff;
-  transition: transform var(--duration-fast) var(--easing), border-radius var(--duration-fast) var(--easing), box-shadow var(--duration-fast);
-  position: relative; z-index: 0;
-}
-.color-picker__swatch:hover, .color-picker__swatch:focus-visible { transform: scale(1.14); border-radius: 8px !important; z-index: 2; box-shadow: 0 4px 12px rgba(22, 33, 58, 0.25) !important; }
-.color-picker__swatch.is-active { transform: scale(1.14); border-radius: 8px !important; z-index: 1; box-shadow: 0 4px 12px rgba(22, 33, 58, 0.25) !important; }
-.color-picker__swatch .icon { width: 16px; height: 16px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
 
 /* =============================================================
    Painel do lançamento: chips e "+"
    ============================================================= */
-/* "+" centralizado no círculo */
-.lp-add { display: inline-grid; place-items: center; padding: 0; line-height: 0; }
-.lp-add .icon { display: block; margin: 0; }
 /* Categoria e perfil: mesma altura da parte colorida, .6875rem/620 */
-.lp-prop .cat-pill, .lp-prop .tag, .lp-prop .tag--upper { font-size: var(--t-11); font-weight: 620; height: 24px; display: inline-flex; align-items: center; }
 /* Recorrência e Divisão: mesmo tamanho das pílulas de Categoria e Perfil (24 px, .6875rem/620, maiúsculas),
    fundo branco com a borda do "+" */
-.lp-rec, .lp-split {
-  height: 24px; padding: 0 9px 0 5px; gap: 5px; margin-left: 0;   /* a própria pílula é o botão: começa na linha dos valores */
-  background: var(--color-surface); color: var(--color-text-primary);
-  border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill);
-  font-size: var(--t-11); font-weight: 620; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
-}
-.lp-rec .kind-badge { width: 14px; height: 14px; font-size: 8.5px; }
-.lp-rec:hover, .lp-split:hover { border-color: var(--color-primary); box-shadow: none; }
-.lp-split .icon { color: var(--color-text-secondary); }
 
 /* =============================================================
    Janela "Dividir lançamento"
@@ -228,7 +121,6 @@
 .dv__card-left, .dv__card-right { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dv__card-right { align-items: flex-end; text-align: right; }
 .dv__card-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.dv__card-pills .cat-pill, .dv__card-pills .tag, .dv__row .cat-pill, .dv__row .tag { font-size: var(--t-11); font-weight: 620; height: 22px; display: inline-flex; align-items: center; }
 .dv__card-name { font-size: var(--t-15); font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv__card-date { font-size: var(--t-15); font-weight: 450; color: var(--color-text-secondary); }
 .dv__card-value { display: flex; gap: 10px; font-size: var(--t-15); font-weight: 550; }
@@ -237,21 +129,17 @@
   background: repeating-linear-gradient(to bottom, var(--color-border-strong) 0 6px, transparent 6px 9px, var(--color-border-strong) 9px 11px, transparent 11px 14px); }
 .dv__grid-line { height: 1px; background: var(--color-border); margin: 0 calc(-1 * var(--space-6)) var(--space-4); }
 .dv__toggle { align-self: flex-start; width: auto; grid-template-columns: repeat(2, auto); margin-bottom: var(--space-3); }
-.dv__toggle .segmented__item { font-size: var(--t-15); font-weight: 550; padding: 0 16px; }
 /* linhas */
 .dv__list { display: flex; flex-direction: column; }
 .dv__row {
   display: grid; grid-template-columns: minmax(0, 1fr) 104px auto auto 116px 72px 28px; gap: 10px; align-items: center;
   min-height: 44px; border-bottom: 1px solid var(--color-surface-hover);
 }
-.dv__name { font-size: var(--t-15); font-weight: 450; }
 .dv__date { border: 0; background: none; padding: 4px 6px; border-radius: 8px; font-size: var(--t-15); font-weight: 450; color: var(--color-text-secondary); text-align: right; justify-self: end; white-space: nowrap; }
 .dv__date:hover { background: var(--color-surface-hover); }
 .dv__pill { border: 0; background: none; padding: 0; justify-self: end; border-radius: var(--radius-pill); }
 .dv__pill:hover { box-shadow: 0 0 0 2px var(--color-primary-soft); }
 .dv__missing { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px dashed var(--color-danger); border-radius: var(--radius-pill); color: var(--color-danger); font-size: var(--t-11); font-weight: 620; text-transform: uppercase; }
-.dv__value { font-size: var(--t-15); font-weight: 550; text-align: right; margin: 0; }
-.dv__pct { font-size: var(--t-15); font-weight: 550; text-align: left; width: 72px; margin: 0; }
 .dv__remove { justify-self: end; }
 .dv__errors:empty { display: none; }
 .dv__errors { margin-top: var(--space-3); padding: 10px 14px; border-radius: 8px; background: var(--color-danger-soft); color: var(--color-danger); font-size: var(--t-13); font-weight: 450; }
@@ -263,7 +151,6 @@
 .dv__rest-value { color: var(--color-income); font-weight: 550; }
 .dv__rest-value.is-negative { color: var(--color-negative); }
 .dv__actions { display: flex; gap: var(--space-2); }
-.dv__actions .btn { font-size: var(--t-15); font-weight: 620; }
 
 /* =============================================================
    v1.3.1 — ajustes
@@ -273,26 +160,10 @@
 .cfg-photo-center .cfg-photo__btn .avatar, .cfg-photo-center .cfg-photo__btn img { width: 72px; height: 72px; }
 /* Dividir: toggle centralizado; "+ Add divisão" igual ao botão "Alterar" (contorno sólido) */
 .dv__toggle { align-self: center; }
-.dv__add.btn { align-self: flex-start; margin-top: 10px; border-style: solid; }
-/* Gráfico de pizza exatamente no centro do card (Categorias, Recorrências, Perfis) */
-.summary { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
-.summary__donut { display: grid; place-items: center; }
-
-/* ---------- Painéis: nomes longos (até 50 caracteres) encolhem com "…" em vez de sair do painel ---------- */
-.lp-account { max-width: 100%; min-width: 0; }
-.lp-account > span:not(.lp-account__dot) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lp-account > svg { flex: none; }
-.lp-chip-btn { max-width: 100%; min-width: 0; }
-.lp-chip-btn > .cat-pill, .lp-chip-btn > .tag { min-width: 0; }
-.ph__top > :first-child { min-width: 0; max-width: 100%; }
-.ph__top .cat-pill, .ph__top .lp-chip-btn { min-width: 0; }
-.ph__top > .status-chip { flex: none; }
 
 /* Listas: etiquetas de categoria/perfil têm largura máxima — o nome do lançamento nunca é espremido até sumir */
 .recurrence-row__category { max-width: 180px; }
 .recurrence-row__category > * { min-width: 0; max-width: 100%; }
-/* Nome editável no painel: "…" quando não está em edição */
-.lp-name, .ph__name, .inline-input { text-overflow: ellipsis; }
 
 /* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
 .recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
@@ -312,9 +183,7 @@
 @container (max-width: 460px) {
   .chart-card__top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
   .chart-card__value { font-size: var(--font-size-lg); }
-  .summary { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; }
-  .summary__value { font-size: var(--font-size-lg); }
-}
+    }
 
 /* =============================================================
    2FA, CAPTCHA e código de 6 dígitos
@@ -371,17 +240,11 @@
 .boleto-editor__section--summary .btn[hidden] { display: none; }
 /* Configurações › Pix */
 .cfg-pix { display: grid; grid-template-columns: 104px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.7fr) auto; gap: 8px; width: 100%; align-items: center; }
-.cfg-pix .select { height: 32px; min-width: 0; }
 .cfg-pix__erro { margin: 6px 0 0; font-size: var(--t-13); color: var(--color-danger); }
 .cfg-pix__erro:empty { display: none; }
 .cfg-pix__acoes { display: flex; gap: 8px; justify-content: flex-end; }
 @container (max-width: 560px) { .cfg-pix { grid-template-columns: minmax(0, 1fr); } }
 .cfg-row.cfg-row--bloco { flex-direction: column; align-items: stretch; gap: 8px; }
-
-/* Campos de senha pequenos (Configurações) com o botão de mostrar */
-.input-with-action--sm { flex: 1 1 0; min-width: 0; }
-.input-with-action--sm .input { width: 100%; padding-right: 34px; }
-.input-with-action--sm .input-reveal { width: 28px; height: 28px; }
 
 /* Perfis: nome + contagem à esquerda, valor à direita (a grade antiga tinha 3 colunas para 2 itens e quebrava no celular) */
 .profile-row { grid-template-columns: minmax(0, 1fr) auto; }
@@ -394,7 +257,6 @@
 }
 /* Configurações: as regras de área estreita (ex.: campos do Pix) valem pela largura do conteúdo da janela */
 .cfg-content { container-type: inline-size; }
-.cfg-pix .input { width: 100%; min-width: 0; }
 /* Configurações em telas estreitas: abas em cima (com texto), conteúdo na largura toda */
 @media (max-width: 700px) {
   .cfg { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto minmax(0, 1fr); }
@@ -406,8 +268,7 @@
   .cfg-row { flex-wrap: wrap; }
   .cfg-row__right { flex: 1 1 100%; justify-content: flex-start; }
   .cfg-password { flex-direction: column; align-items: stretch; width: 100%; }
-  .cfg .cfg-inline { width: 100%; text-align: left; margin: 0; }
-  .cfg-footer { padding-left: 16px; padding-right: 16px; }
+    .cfg-footer { padding-left: 16px; padding-right: 16px; }
 }
 
 /* =============================================================
@@ -418,11 +279,6 @@
   --botao-roxo-hover: linear-gradient(180deg, #7458EA 0%, #5F3FCF 100%);
   --sidebar-bg: #6948D8;
 }
-.btn--primary {
-  background: var(--botao-roxo); background-color: #6948D8; border-color: transparent; color: #fff;
-}
-.btn--primary:hover:not(:disabled) { background: var(--botao-roxo-hover); filter: none; }
-.btn--primary:active:not(:disabled) { background: linear-gradient(180deg, #6948D8 0%, #5A3BC4 100%); }
 
 /* =============================================================
    ZoZo 2.3 — acertos de layout
@@ -438,8 +294,6 @@
 
 /* ---------- Configurações › Conta: "Alterar senha" com o título em cima e os campos na largura toda ---------- */
 .cfg-row--bloco .cfg-password { display: flex; flex-direction: row; align-items: center; gap: 8px; width: 100%; }
-.cfg-row--bloco .cfg-password .input-with-action--sm { flex: 1 1 0; min-width: 0; }
-.cfg-row--bloco .cfg-password .input-with-action--sm .input { width: 100%; }
 .cfg-row--bloco .cfg-password > .btn { flex: none; }
 @container (max-width: 480px) {
   .cfg-row--bloco .cfg-password { flex-direction: column; align-items: stretch; }
@@ -447,16 +301,6 @@
 }
 .cfg-nota { margin: 4px 0 8px; font-size: var(--t-13); color: var(--color-text-secondary); }
 
-/* ---------- Celular: painel de informações em tela cheia e "Novo lançamento" empilhado ---------- */
-.lp-date { white-space: nowrap; }
-@media (max-width: 600px) {
-    .lp-top { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
-  .lp-top__right { flex-direction: row-reverse; align-items: center; justify-content: space-between; }
-  .lp-name { font-size: var(--t-20); }
-  .lp-value { text-align: left; }
-  .lp-account { max-width: 100%; }
-  .lp-account > span:last-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-}
 /* Configurações: as abas mantêm o texto em qualquer largura (a regra do menu estreito escondia os rótulos) */
 .cfg-nav .nav-item { justify-content: flex-start; padding: 0 10px; }
 .cfg-nav .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
@@ -505,25 +349,11 @@
 /* Grupos que abrem/fecham (animação em ui.js: alternarArvore/corpoArvore) */
 .arvore-grupo { display: flex; flex-direction: column; }
 
-/* Fatura: botão Fechar branco; fundo ao passar/clicar igual ao dos botões do menu */
-.boleto .boleto__header .icon-btn { color: #fff; }
-.boleto .boleto__header .icon-btn:hover:not(:disabled) { background: var(--sidebar-hover); color: #fff; }
-.boleto .boleto__header .icon-btn:active:not(:disabled) { background: var(--sidebar-active); color: #fff; }
-.boleto .boleto__header .icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-
 /* Fatura: texto ao lado do QR alinhado ao topo, roxo da marca */
 .doc__pix { align-items: flex-start; }
 .doc__pix-texto { color: #6948D8; font-weight: 550; margin-top: 2px; }
 
 /* Avisos (toasts): largura limitada, texto alinhado à esquerda e ícone no topo da primeira linha */
-#toast-root { width: min(440px, calc(100vw - 32px)); bottom: 24px; }
-.toast {
-  width: max-content; max-width: 100%; align-items: flex-start; gap: 10px;
-  padding: 11px 16px; border-radius: 12px;
-  font-size: 0.875rem; font-weight: 450; line-height: 1.45; text-align: left;
-}
-.toast__icon { flex: none; margin-top: 2px; }
-.toast__text { min-width: 0; overflow-wrap: anywhere; }
 
 /* Celular: o título do painel de informações (tela cheia) vai para o lado do botão do menu;
    na fatura (janela própria, com Fechar) o botão do menu sai */
@@ -535,11 +365,6 @@
 /* =============================================================
    ZoZo 2.6 — Débito, Câmbio, grupos de categorias e seleção
    ============================================================= */
-/* Painel da transação: seta → ao lado das pílulas e da conta (fora do botão) */
-.lp-pilula, .lp-account-linha { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
-.lp-account-linha .lp-account { min-width: 0; }
-.lp-ver { flex: none; width: 24px; height: 24px; color: var(--color-text-tertiary, var(--color-text-secondary)); opacity: .8; }
-.lp-ver:hover, .lp-ver:focus-visible { opacity: 1; color: var(--color-text-primary); }
 
 /* Parcelamento: prévia das parcelas */
 .parcelas__previa { margin-top: 6px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
@@ -572,17 +397,6 @@
 /* Recorrências: check de pago sem o fundo circular */
 .recurrence-row__paid { background: transparent !important; width: 14px; flex: none; }   /* mesma largura com e sem o check: valores alinhados */
 
-/* Menus: linha com interruptor (ex.: Investimentos › Contas incluídas) */
-.menu__toggle .toggle { flex: none; margin-left: auto; gap: 0; }
-.menu__toggle .toggle__label:empty { display: none; }
-
-/* Parcelas: valor total só para leitura (é o valor da transação) */
-.input--leitura, .input--leitura:hover, .input--leitura:focus { background: var(--color-background); color: var(--color-text-secondary); cursor: default; box-shadow: none; }
-
-/* Exportar CSV: ícone de carregando no botão */
-.spinner--btn { width: 14px; height: 14px; border-width: 2px; flex: none; }
-.btn--primary .spinner--btn { border-color: rgba(255, 255, 255, 0.35); border-top-color: #fff; }
-
 /* Calendário do ZoZo (substitui o do navegador) */
 .cal { display: grid; gap: 8px; }
 .cal__topo { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
@@ -602,8 +416,6 @@
 .cal__rodape { display: flex; justify-content: flex-end; border-top: 1px solid var(--color-border); padding-top: 8px; }
 .cal__hoje { border: 0; background: none; border-radius: 8px; padding: 4px 10px; font: inherit; font-size: var(--t-13); font-weight: 550; color: var(--color-primary); cursor: pointer; }
 .cal__hoje:hover { background: var(--color-primary-soft); }
-.cal-campo { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; }
-.cal-campo .icon { color: var(--color-text-secondary); flex: none; }
 
 /* =============================================================
    ZoZo 2.8 — animações
@@ -633,8 +445,6 @@
 /* =============================================================
    ZoZo 2.9
    ============================================================= */
-/* Avisos que explicam por que algo não aconteceu (as confirmações de sucesso não aparecem mais) */
-.toast--aviso .toast__icon { color: #ffb36b; }
 
 /* Aviso laranja (mesmo estilo do aviso de demonstração do menu) */
 .aviso-laranja { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 var(--space-3); padding: 8px 12px; border-radius: 8px;
@@ -645,16 +455,10 @@
 .cambio__modo { display: flex; justify-content: center; margin-bottom: var(--space-3); }
 .cambio__moeda { display: inline-flex; align-items: center; gap: 6px; }
 
-/* Botões de alternar (ex.: Poupança | Corrente): centralizados, com o fundo cinza só do tamanho deles */
-.segmented--pilulas { display: inline-grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(104px, max-content);
-  width: max-content; max-width: 100%; justify-self: center; align-self: center; margin-left: auto; margin-right: auto; }
-
 /* Investimentos › alocação: sem o ícone; a barra começa mais à esquerda */
 .allocation-row { grid-template-columns: minmax(96px, max-content) minmax(120px, 1fr) 64px; column-gap: var(--space-4); }
 
 /* Ícone da categoria (editar): o fundo do hover centralizado no emoji */
-.icon-pick { padding: 0; line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", var(--font-family); }
-.hero-edit .icon-pick { display: inline-grid; place-items: center; }
 
 /* =============================================================
    ZoZo 3.0
@@ -667,11 +471,9 @@
 /* Combobox (select): aberta, a lista continua o campo — mesma borda, sem o arredondamento de baixo no campo,
    e o arredondamento passa para o fim da lista. Navegadores sem "base-select" mostram a lista nativa. */
 @supports (appearance: base-select) {
-  .select, .select::picker(select) { appearance: base-select; }
-  .select { display: flex; align-items: center; }
-  .select::picker-icon { display: none; }                         /* a seta já vem no fundo do campo */
-  .select:open { border-color: var(--color-primary); border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: none; }
-  .select::picker(select) {
+  .select::picker(select) { appearance: base-select; }
+    .select::picker-icon { display: none; }                         /* a seta já vem no fundo do campo */
+    .select::picker(select) {
     margin: 0; padding: 4px; border: 1px solid var(--color-primary); border-top: 0; border-radius: 0 0 8px 8px;
     background: var(--color-surface); box-shadow: 0 10px 24px rgba(22, 33, 58, 0.12);
     min-inline-size: anchor-size(self-inline); max-block-size: min(320px, 50vh);

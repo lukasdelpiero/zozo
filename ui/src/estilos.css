@@ -56,6 +56,9 @@
   --font-zz: var(--font-family, inherit);
 }
 
+/* Base dos componentes (components/pecas.ts): :where(&) tem especificidade zero, então qualquer classe
+   passada por quem usa o componente — ou um ajuste por contexto no contêiner — vence a base sem "!" */
+@custom-variant base (:where(&));
 /* Telas do ZoZo: celular (≤ 640 px) e janela baixa no computador — mesmos cortes do CSS legado */
 @custom-variant celular (@media (max-width: 640px));
 @custom-variant tela-baixa (@media (max-height: 640px) and (min-width: 641px));
@@ -124,6 +127,11 @@
   --animate-zz-surge: zz-surge var(--duration-medium) var(--easing);
   @keyframes zz-painel { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
   @keyframes zz-surge { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  /* Peças: carregando (gira), esqueleto (brilho que passa) */
+  --animate-zz-gira: zz-gira 0.8s linear infinite;
+  --animate-zz-brilho: zz-brilho 1.3s ease-in-out infinite;
+  @keyframes zz-gira { to { transform: rotate(360deg); } }
+  @keyframes zz-brilho { from { background-position: 100% 0; } to { background-position: -100% 0; } }
   /* Menus flutuantes surgem logo abaixo do botão */
   --animate-zz-menu: zz-menu var(--duration-fast) var(--easing);
   @keyframes zz-menu { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }

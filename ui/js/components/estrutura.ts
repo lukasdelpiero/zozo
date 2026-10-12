@@ -28,7 +28,11 @@
 
   // Janelas modais: caixa (larguras por tipo vêm junto) e rodapé no celular (botões centralizados e da mesma largura)
   const CAIXA = "modal tw:bg-zz-surface tw:rounded-2xl tw:[box-shadow:var(--shadow-modal)] tw:[transform:translateY(8px)_scale(0.98)] "
-    + "tw:[transition:transform_var(--duration-medium)_var(--easing)] tw:in-[.is-visible]:[transform:none] tw:gaveta:max-w-full";
+    + "tw:[transition:transform_var(--duration-medium)_var(--easing)] tw:in-[.is-visible]:[transform:none] tw:gaveta:max-w-full "
+    // peças dentro das janelas: rótulos, dicas e botões maiores; "Excluir" vermelho vivo
+    + "tw:[&_.field-label]:text-[15px] tw:[&_.field-label]:font-[620] tw:[&_.field-hint]:text-[13px] tw:[&_.field-hint]:font-[620] "
+    + "tw:[&_.input::placeholder]:text-[15px] tw:[&_.input::placeholder]:font-[450] tw:[&_.btn]:text-[15px] tw:[&_.btn]:font-[620] tw:[&_.btn--danger]:bg-[#ff1a1a] tw:[&_.btn--danger]:border-[#ff1a1a] "
+    + "tw:[&_.btn--danger]:text-white tw:[&_.btn--danger:hover:not(:disabled)]:bg-[#e60000] tw:[&_.btn--danger:hover:not(:disabled)]:border-[#e60000]";
   const RODAPE_CELULAR = "tw:gaveta:justify-center tw:gaveta:flex-wrap tw:gaveta:[&>.btn]:flex-[1_1_0] tw:gaveta:[&>.btn]:min-w-0 tw:gaveta:[&>.btn]:max-w-[220px]";
   const LANC = "tw:grid tw:gap-3 tw:items-center tw:min-h-9 tw:[border:0] tw:rounded-none tw:bg-transparent tw:text-left "
     + "tw:hover:bg-zz-surface-hover tw:focus-visible:bg-zz-surface-hover";
@@ -203,7 +207,8 @@
     menuSegmentoItem: "tw:h-[30px] tw:border tw:border-zz-border tw:rounded-lg tw:bg-zz-surface tw:text-[13px] tw:text-zz-secondary "
       + "tw:[&.is-active]:border-zz-primary tw:[&.is-active]:bg-zz-primary-softer tw:[&.is-active]:text-zz-primary tw:[&.is-active]:font-semibold",
     // linha com interruptor (Investimentos › contas incluídas); o interruptor (.toggle) ainda está no CSS antigo
-    menuInterruptor: "menu__toggle tw:flex tw:items-center tw:gap-2 tw:min-h-9 tw:py-1 tw:px-2.5",
+    menuInterruptor: "menu__toggle tw:flex tw:items-center tw:gap-2 tw:min-h-9 tw:py-1 tw:px-2.5 tw:[&_.toggle]:flex-none tw:[&_.toggle]:ml-auto tw:[&_.toggle]:gap-0 "
+      + "tw:[&_.toggle-label:empty]:hidden",
     menuInterruptorRotulo: "tw:flex-auto tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
 
     /* ---------- Janelas modais (components/feedback.js: modal; components/modais.js: janela) ----------

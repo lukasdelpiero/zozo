@@ -16,7 +16,7 @@
     <div id="shell" class="tw:group/shell tw:relative tw:hidden tw:in-data-[auth=authenticated]:grid tw:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] tw:h-full tw:min-w-0 tw:[transition:grid-template-columns_var(--duration-medium)_var(--easing)] tw:data-[menu=recolhido]:grid-cols-[0_minmax(0,1fr)] tw:gaveta:grid-cols-[minmax(0,1fr)] tw:gaveta:data-[menu=recolhido]:grid-cols-[minmax(0,1fr)] tw:motion-reduce:transition-none!"></div>
     <div id="boleto-root"></div>
     <div id="modal-root"></div>
-    <div id="toast-root" aria-live="polite"></div>
+    <div id="toast-root" class="tw:fixed tw:left-1/2 tw:bottom-6 tw:[transform:translateX(-50%)] tw:flex tw:flex-col tw:gap-2 tw:items-center tw:z-100 tw:pointer-events-none tw:w-[min(440px,calc(100vw_-_32px))]" aria-live="polite"></div>
   </div>
 
   <!-- Interface (Vite): estilos e scripts em ordem, ver src/main.ts. O modo de demonstração (?mock=1)

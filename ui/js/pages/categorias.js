@@ -2,7 +2,7 @@
    ZoZo — Categorias (seções 34–40)
    Visual em Tailwind (tabela T abaixo; as linhas estão em components/list.js).
    Continuam no CSS antigo só as peças compartilhadas com outras telas: seção,
-   cartão de resumo com a rosca, cabeçalho do painel (detail-hero), pílula da
+   cartão de resumo com a rosca, cabeçalho do painel, pílula da
    categoria, barra de progresso e a árvore do grupo (também no Dashboard).
    page--categorias fica como gancho (resumo com o orçamento desligado).
    ============================================================= */
@@ -160,7 +160,7 @@
   function resumoGasto(gasto, reservado) {
     const dif = F.numero(gasto) - F.numero(reservado);
     if (!(F.numero(reservado) > 0)) return null;
-    return h("span", { class: ["detail-hero__hint", dif > 0 && "detail-hero__hint--over"] }, F.moeda(Math.abs(dif)) + (dif > 0 ? " acima" : " disponíveis"));
+    return h("span", { class: dif > 0 ? ZoZo.pecas.painelTopoDicaAcima : ZoZo.pecas.painelTopoDica }, F.moeda(Math.abs(dif)) + (dif > 0 ? " acima" : " disponíveis"));
   }
 
   const orcamentoAtivo = () => !(ZoZo.store.get().data.config && ZoZo.store.get().data.config.orcamentoAtivo === false);
@@ -188,7 +188,7 @@
     const mesAtualIso = mes || F.iso(new Date()).slice(0, 7);
     let modo = cat.orcamentoPorMes ? "mes" : "fixo";
     const valorOrc = UI.Input({ inputmode: "decimal", value: F.moedaEditavel(cat.reservado || 0), class: T.orcInput, "aria-label": "Valor do orçamento" });
-    const rotuloMes = h("span", { class: "detail-hero__label" });
+    const rotuloMes = h("span", { class: ZoZo.pecas.painelTopoRotulo });
     const modoBtn = h("button", { type: "button", class: T.orcModo, "aria-haspopup": "menu" });
     const pintarModo = () => {
       ZoZo.dom.mount(modoBtn, h("span", null, modo === "fixo" ? "Orçamento mensal fixo" : "Orçamentos por mês"), ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }));
@@ -202,8 +202,8 @@
     ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
     pintarModo();
     valorOrc.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvarOrcamento(); } });
-    const areaOrcamento = h("div", { class: ["detail-hero__figure", T.orcArea] }, modoBtn, rotuloMes,
-      h("div", { class: ["field__affix", T.orcValor] }, h("span", { class: "field__prefix" }, F.simbolo()), valorOrc));
+    const areaOrcamento = h("div", { class: [ZoZo.pecas.painelTopoNumero, T.orcArea] }, modoBtn, rotuloMes,
+      h("div", { class: [ZoZo.pecas.afixo, T.orcValor] }, h("span", { class: ZoZo.pecas.prefixo }, F.simbolo()), valorOrc));
     if (editando) requestAnimationFrame(() => { valorOrc.focus(); F.cursorNoFim(valorOrc); });
     function salvarOrcamento() {
       const v = F.parseMoeda(valorOrc.value);
@@ -244,27 +244,27 @@
         { label: "Excluir categoria", perigo: true, onClick: excluir },
       ].filter(Boolean),
       render(body) {
-        const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
-        const grafico = h("div", { class: "detail-chart" });
+        const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
+        const grafico = h("div", { class: ZoZo.pecas.painelGrafico });
         const acima = F.numero(cat.gasto) > F.numero(cat.reservado);
         mount(body,
-          h("div", { class: "detail-hero" },
+          h("div", { class: ZoZo.pecas.painelTopo },
             // Cor (bolinha), ícone e nome editáveis no lugar
-            h("div", { class: "hero-edit" },
-              h("div", { class: "hero-edit__row" },
+            h("div", { class: ZoZo.pecas.edicaoTopo },
+              h("div", { class: ZoZo.pecas.edicaoTopoLinha },
                 ZoZo.inline.corDot(cat.cor, (c) => alterar({ cor: c }, "Cor alterada.")),
                 ZoZo.modais.seletorIcone(cat.icone, (e) => alterar({ icone: e }, "Ícone alterado."))),
               ZoZo.inline.texto({ valor: cat.nome, rotulo: "Nome da categoria", max: ZoZo.regras.limiteNome, aoSalvar: (v) => alterar({ nome: v }, "Nome alterado.") }),
               cat.grupo ? h("span", { class: T.subtitulo }, cat.grupo) : null),
-            editando ? areaOrcamento : h("div", { class: "detail-hero__figure" },
-              h("span", { class: "detail-hero__label" }, "Gasto em " + mesNomeDe(mes)),
-              h("span", { class: "detail-hero__value money" }, F.moeda(cat.gasto)),
+            editando ? areaOrcamento : h("div", { class: ZoZo.pecas.painelTopoNumero },
+              h("span", { class: ZoZo.pecas.painelTopoRotulo }, "Gasto em " + mesNomeDe(mes)),
+              h("span", { class: [ZoZo.pecas.painelTopoValor, "money"] }, F.moeda(cat.gasto)),
               cat.status === "excluida" || !orcamentoAtivo() ? null : resumoGasto(cat.gasto, cat.reservado))),
           grafico,
           cat.status === "excluida" ? null : C.detalheSecao(null,
             C.detalheLinha("Orçamento mensal", F.moeda(cat.reservado)),
             UI.ProgressBar(F.numero(cat.reservado) > 0 ? F.numero(cat.gasto) / F.numero(cat.reservado) : (F.numero(cat.gasto) > 0 ? 1 : 0), {
-              tone: acima ? "over" : "ok", class: "progress--lg", label: acima ? "Gasto acima do orçamento" : "Gasto dentro do orçamento",
+              tone: acima ? "over" : "ok", grande: true, label: acima ? "Gasto acima do orçamento" : "Gasto dentro do orçamento",
             })),
           C.detalheSecao("Transações do mês", listaEl));
         graficoMeses(ctx, cat.id, grafico);
@@ -300,7 +300,7 @@
     const dt = F.parseData(mes + "-01");
     const rotuloModo = () => (modo === "fixo" ? "Orçamento para todos os meses" : "Orçamento de " + F.mesNome(dt.getMonth()) + " " + dt.getFullYear());
     const modoBtn = h("button", { type: "button", class: T.orcModo, "aria-haspopup": "menu" });
-    const valorNA = h("input", { type: "text", inputmode: "decimal", autocomplete: "off", class: ["input", T.orcInput], "aria-label": "Valor não atribuído" });
+    const valorNA = h("input", { type: "text", inputmode: "decimal", autocomplete: "off", class: [ZoZo.pecas.entrada, T.orcInput], "aria-label": "Valor não atribuído" });
     const pintarModo = () => {
       mount(modoBtn, h("span", null, rotuloModo()), editando ? ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }) : null);
       valorNA.value = F.moedaEditavel(modo === "fixo" ? info.naoAtribuidoFixo : (info.porMes ? info.naoAtribuidoBase : info.naoAtribuidoFixo));
@@ -341,23 +341,23 @@
         : (orcamentoAtivo() ? [{ label: "Editar orçamento", onClick: () => abrirGrupo(nome, ctx, Object.assign({}, o, { editando: true })) }] : []),
       menu: [{ label: "Desagrupar categorias", onClick: desagrupar }],
       render(body) {
-        const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
+        const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         mount(body,
-          h("div", { class: ["detail-hero", T.grupoHero] },
-            h("div", { class: ["detail-hero__lead", T.leadPilha] },
+          h("div", { class: [ZoZo.pecas.painelTopo, T.grupoHero] },
+            h("div", { class: [ZoZo.pecas.painelTopoInicio, T.leadPilha] },
               h("div", { class: T.pilulas }, ordenadas.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
                 maisCategorias(ordenadas, 2)),
-              h("span", { class: "detail-hero__name" }, nome)),
+              h("span", { class: ZoZo.pecas.painelTopoNome }, nome)),
             orcamentoAtivo() ? h("div", { class: T.grupoOrc },
               modoBtn,
               h("div", { class: T.grupoValores },
                 figura("Subcategorias", h("span", { class: T.grupoValor }, F.moeda(info.subcategorias))),
-                figura("Não atribuído", editando ? h("div", { class: ["field__affix", "field__affix--sm", T.grupoCampo] }, h("span", { class: "field__prefix" }, F.simbolo()), valorNA)
+                figura("Não atribuído", editando ? h("div", { class: [ZoZo.pecas.afixoPequeno, T.grupoCampo] }, h("span", { class: ZoZo.pecas.prefixo }, F.simbolo()), valorNA)
                   : h("span", { class: T.grupoValor }, F.moeda(info.naoAtribuido))))) : null),
           orcamentoAtivo() ? C.detalheSecao(null,
             C.detalheLinha("Orçamento total do grupo", F.moeda(info.total)),
             C.detalheLinha("Gasto em " + mesNomeDe(mes), F.moeda(gasto)),
-            UI.ProgressBar(info.total > 0 ? gasto / info.total : (gasto > 0 ? 1 : 0), { tone: gasto > info.total ? "over" : "ok", class: "progress--lg",
+            UI.ProgressBar(info.total > 0 ? gasto / info.total : (gasto > 0 ? 1 : 0), { tone: gasto > info.total ? "over" : "ok", grande: true,
               label: gasto > info.total ? "Gasto acima do orçamento do grupo" : "Gasto dentro do orçamento do grupo" })) : null,
           C.detalheSecao("Categorias do grupo", h("div", { class: "tw:flex tw:flex-col" },
             ordenadas.map((c) => L.CategoryRow(c, { excluida: c.status === "excluida", onClick: () => abrirDetalhe(c, ctx, { voltar: () => abrirGrupo(nome, ctx, o) }) })))),
@@ -393,17 +393,17 @@
       title: "Categorias regulares",
       selected: { tipo: "categoria", id: "*" },
       render(body) {
-        const grafico = h("div", { class: "detail-chart" });
+        const grafico = h("div", { class: ZoZo.pecas.painelGrafico });
         const tags = regulares.slice().sort((a, b) => b.gasto - a.gasto);
         mount(body,
-          h("div", { class: "detail-hero" },
-            h("div", { class: ["detail-hero__lead", T.leadPilha] },
+          h("div", { class: ZoZo.pecas.painelTopo },
+            h("div", { class: [ZoZo.pecas.painelTopoInicio, T.leadPilha] },
               h("div", { class: T.pilulas }, tags.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
                 maisCategorias(tags, 2)),
-              h("span", { class: "detail-hero__name" }, "Todas as categorias regulares")),
-            h("div", { class: "detail-hero__figure" },
-              h("span", { class: "detail-hero__label" }, "Gasto em " + mesNomeDe(d.mes)),
-              h("span", { class: "detail-hero__value money" }, F.moeda(d.resumo.gasto)),
+              h("span", { class: ZoZo.pecas.painelTopoNome }, "Todas as categorias regulares")),
+            h("div", { class: ZoZo.pecas.painelTopoNumero },
+              h("span", { class: ZoZo.pecas.painelTopoRotulo }, "Gasto em " + mesNomeDe(d.mes)),
+              h("span", { class: [ZoZo.pecas.painelTopoValor, "money"] }, F.moeda(d.resumo.gasto)),
               resumoGasto(d.resumo.gasto, d.resumo.reservado))),
           grafico,
           C.detalheSecao(null,
@@ -467,7 +467,7 @@
     deps: (s) => [s.data.categorias, s.errors.categorias, s.ui.gruposFechados, s.selectedItem],
     render(state, ctx) {
       const espera = C.estadoCarregamento(state, ["categorias"], () => this.carregar(ctx, true), {
-        skeleton: h("div", null, h("div", { class: "card skeleton-card skeleton-card--short" }), UI.Skeleton(8)),
+        skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCardBaixo }), UI.Skeleton(8)),
       });
       if (espera) return C.pagina("page--categorias", espera);
       const d = state.data.categorias;
@@ -476,10 +476,10 @@
       const excluidas = todas.filter((c) => c.status === "excluida");
 
       if (!todas.length) {
-        return C.pagina("page--categorias", h("div", { class: ["empty", T.vazioInicio] },
-          ZoZo.icons.icon("categorias", { size: 22, class: "empty__icon" }),
-          h("p", { class: "empty__text" }, "Nenhuma categoria cadastrada."),
-          h("div", { class: "detail-actions" },
+        return C.pagina("page--categorias", h("div", { class: [ZoZo.pecas.vazio, T.vazioInicio] },
+          ZoZo.icons.icon("categorias", { size: 22, class: ZoZo.pecas.vazioIcone }),
+          h("p", { class: ZoZo.pecas.vazioTexto }, "Nenhuma categoria cadastrada."),
+          h("div", { class: ZoZo.pecas.painelAcoes },
             UI.Button("Criar categorias sugeridas", { variant: "primary", icon: "categorias", onClick: (e) => {
               e.currentTarget.disabled = true;
               ctx.bridge.request(A.createCategoriasSugeridas).then(() => { ctx.toast("Categorias criadas."); return ctx.recarregarTudo(); })

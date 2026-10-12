@@ -68,9 +68,9 @@
 
       mount(el, h("div", { class: "cal" },
         h("div", { class: "cal__topo" },
-          h("button", { type: "button", class: "icon-btn icon-btn--sm cal__nav", "aria-label": "Mês anterior", onClick: () => trocarMes(-1) }, icon("chevron-left", { size: 15 })),
+          h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "cal__nav"], "aria-label": "Mês anterior", onClick: () => trocarMes(-1) }, icon("chevron-left", { size: 15 })),
           titulo,
-          h("button", { type: "button", class: "icon-btn icon-btn--sm cal__nav", "aria-label": "Próximo mês", onClick: () => trocarMes(1) }, icon("chevron-right", { size: 15 }))),
+          h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "cal__nav"], "aria-label": "Próximo mês", onClick: () => trocarMes(1) }, icon("chevron-right", { size: 15 }))),
         grade,
         h("div", { class: "cal__rodape" }, h("button", { type: "button", class: "cal__hoje", onClick: () => escolher(hoje) }, "Hoje"))));
       desenhar(atual && atual.getFullYear() === ano && atual.getMonth() === mes ? atual.getDate() : null);
@@ -82,7 +82,8 @@
   function Campo(cfg) {
     let valor = cfg.valor;
     const texto = () => { const d = F.parseData(valor); return d ? pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() : "Escolher data"; };
-    const btn = h("button", { type: "button", class: ["input", "cal-campo", cfg.classe], "aria-haspopup": "dialog", "aria-label": cfg.rotulo || "Data" },
+    // campo com a cara de um input; o ícone do calendário à direita
+    const btn = h("button", { type: "button", class: [ZoZo.pecas.entrada, "cal-campo tw:inline-flex tw:items-center tw:justify-between tw:gap-2 tw:cursor-pointer tw:text-left tw:[&_.icon]:text-zz-secondary tw:[&_.icon]:flex-none", cfg.classe], "aria-haspopup": "dialog", "aria-label": cfg.rotulo || "Data" },
       h("span", null, texto()), icon("calendario", { size: 15 }));
     btn.addEventListener("click", () => abrir(btn, valor, (iso) => { valor = iso; btn.firstChild.textContent = texto(); cfg.aoMudar(iso); }, { rotulo: cfg.rotulo }));
     return btn;

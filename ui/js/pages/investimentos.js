@@ -43,7 +43,7 @@
     const engrenagem = UI.IconButton("configuracoes", "Contas incluídas no gráfico", { class: "chart-card__gear", expanded: false });
     engrenagem.addEventListener("click", () => abrirContasIncluidas(engrenagem, ctx));
     const qtdExcluidas = (state.ui.invExcluidas || []).length;
-    return h("section", { class: "card chart-card", "aria-label": "Gráfico de investimentos" },
+    return h("section", { class: [ZoZo.pecas.card, "chart-card"], "aria-label": "Gráfico de investimentos" },
       engrenagem,
       qtdExcluidas ? h("span", { class: "chart-card__badge" }, qtdExcluidas === 1 ? "1 conta oculta" : qtdExcluidas + " contas ocultas") : null,
       h("div", { class: "chart-card__top chart-card__top--single" },
@@ -62,7 +62,7 @@
     deps: (s) => [s.data.investimentos, s.errors.investimentos, s.ui.intervaloInvestimentos, s.ui.gruposFechados, s.selectedItem, s.ui.invExcluidas],
     render(state, ctx) {
       const espera = C.estadoCarregamento(state, ["investimentos"], () => this.carregar(ctx, true), {
-        skeleton: h("div", null, h("div", { class: "card skeleton-card" }), UI.Skeleton(4)),
+        skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCard }), UI.Skeleton(4)),
       });
       if (espera) return C.pagina("page--investimentos", espera);
       const inv = state.data.investimentos;
@@ -70,14 +70,14 @@
 
       return C.pagina("page--investimentos",
         EvolucaoCard(state, ctx),
-        UI.Section({ key: "inv:contas", title: "Contas" },
+        UI.Section({ key: "inv:contas", title: "Contas", class: "tw:mt-5!" },
           inv.contas && inv.contas.length
             ? h("div", { class: "list" }, inv.contas.map((c) => L.AccountRow(c, {
               subtitulo: "Investimento", selected: c.id === sel,
               onClick: () => ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos"),
             })))
             : UI.EmptyState("Nenhuma conta de investimento cadastrada.", { icon: "investimentos" })),
-        UI.Section({ key: "inv:alocacoes", title: "Alocações" },
+        UI.Section({ key: "inv:alocacoes", title: "Alocações", class: "tw:mt-5!" },
           inv.alocacoes && inv.alocacoes.length
             ? h("div", { class: "list" }, inv.alocacoes.map(L.AllocationRow))
             : UI.EmptyState("Nenhuma alocação para exibir.", { icon: "categorias" })));

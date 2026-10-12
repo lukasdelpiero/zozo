@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.4.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.5.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,14 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.5.0
+
+- **Peças compartilhadas em Tailwind CSS:** botões, botões de ícone, campos (texto, valor com prefixo, senha com "mostrar", lista, área de texto), interruptores, seletores segmentados, paleta de cores, caixas de seleção, pílulas, rótulos, percentuais, barras, abas, cards, seções, esqueletos, estados vazios e avisos. As classes ficam em `components/pecas.ts`.
+- **Painéis de informações em Tailwind CSS:** transação (topo, propriedades, pílulas, notas, situação), cabeçalhos de Categoria/Grupo/Perfil e de Conta/Investimento/Recorrência, seções, linhas, ações, edição no lugar (nome, valor, cor, ícone), lista de transações dos painéis, formulários de criação e o card de resumo com a rosca; também os gráficos (linha, barras, rosca e a dica ao passar o mouse).
+- **Visual idêntico**, conferido elemento a elemento em 39 situações no computador (1280 px) e no celular (375 px); ~850 linhas de CSS antigo a menos.
+- **Correção:** o cabeçalho da fatura (título e botões "Fechar"/ações) tinha perdido o estilo na 3.4.0.
+- **Limpeza:** duas regras de CSS que nenhuma tela usava mais.
 
 ## Novidades da versão 3.4.0
 

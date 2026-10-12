@@ -36,7 +36,7 @@
     }
     if (t === "emoji") {
       let atual = valor || "📦";
-      const btn = h("button", { type: "button", class: "icon-pick", "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, atual);
+      const btn = h("button", { type: "button", class: ZoZo.pecas.iconeEscolha, "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, atual);
       btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e) => { atual = e; btn.textContent = e; aoMudar(); } }));
       return { el: h("div", { class: "emoji-field" }, btn), ler: () => atual, foco: btn, input: btn };
     }
@@ -84,12 +84,12 @@
           if (c.foco) c.foco.id = controlId;
           if (i === 0 && c.foco) c.foco.dataset.autofocus = "";
           const conteudo = c.prefixo
-            ? h("div", { class: "field__affix" }, h("span", { class: "field__prefix", "aria-hidden": "true" }, c.prefixo), c.el)
+            ? h("div", { class: ZoZo.pecas.afixo }, h("span", { class: ZoZo.pecas.prefixo, "aria-hidden": "true" }, c.prefixo), c.el)
             : c.el;
-          const wrap = h("div", { class: "field" },
-            c.semLabelFor ? h("span", { class: "field__label" }, campo.rotulo) : h("label", { class: "field__label", for: controlId }, campo.rotulo),
+          const wrap = h("div", { class: ZoZo.pecas.campo },
+            c.semLabelFor ? h("span", { class: ZoZo.pecas.campoRotulo }, campo.rotulo) : h("label", { class: ZoZo.pecas.campoRotulo, for: controlId }, campo.rotulo),
             conteudo,
-            campo.dica ? h("p", { class: "field__hint" }, campo.dica) : null);
+            campo.dica ? h("p", { class: ZoZo.pecas.campoDica }, campo.dica) : null);
           itens.push({ campo, c, wrap });
           valores[campo.nome] = c.ler();
         });
@@ -97,16 +97,16 @@
         atualizar = () => itens.forEach(({ campo, wrap }) => { wrap.hidden = campo.mostrarSe ? !campo.mostrarSe(valores) : false; });
         atualizar();
 
-        const erroEl = h("div", { class: "form-error", role: "alert" });
-        const salvar = h("button", { type: "submit", class: "btn btn--primary" }, icon("check", { size: 16 }), h("span", { class: "btn__label" }, cfg.textoSalvar || "Salvar"));
+        const erroEl = h("div", { class: ZoZo.pecas.erroForm, role: "alert" });
+        const salvar = h("button", { type: "submit", class: ZoZo.pecas.botaoPrimario }, icon("check", { size: 16 }), h("span", { class: ZoZo.pecas.rotuloBotao }, cfg.textoSalvar || "Salvar"));
 
         const form = h("form", { class: "entity-form", novalidate: true },
           cfg.aviso ? h("p", { class: ["form-notice", cfg.avisoPerigo && "form-notice--danger"] }, icon("alerta", { size: 16 }), h("span", null, cfg.aviso)) : null,
-          h("div", { class: "detail-grid" }, itens.map((x) => x.wrap)),
+          h("div", { class: ZoZo.pecas.painelGrade }, itens.map((x) => x.wrap)),
           erroEl,
-          h("footer", { class: "detail-footer" },
+          h("footer", { class: ZoZo.pecas.painelRodape },
             cfg.excluir ? UI.Button(cfg.excluir.rotulo || "Excluir", { variant: "danger-ghost", icon: "excluir", onClick: excluir }) : h("span"),
-            h("div", { class: "detail-footer__end" }, UI.Button("Cancelar", { onClick: () => (cfg.voltar ? cfg.voltar() : cfg.aoCancelar ? cfg.aoCancelar() : api.close()) }), salvar)));
+            h("div", { class: ZoZo.pecas.painelRodapeFim }, UI.Button("Cancelar", { onClick: () => (cfg.voltar ? cfg.voltar() : cfg.aoCancelar ? cfg.aoCancelar() : api.close()) }), salvar)));
 
         function excluir() {
           ZoZo.feedback.confirmarExclusao(cfg.excluir.titulo, cfg.excluir.mensagem).then((ok) => {

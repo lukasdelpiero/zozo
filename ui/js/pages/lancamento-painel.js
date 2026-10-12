@@ -89,7 +89,7 @@
     const voltarParaCa = () => abrir(novo ? null : { id: original.id }, ctx, semEntrada);
 
     /* ---------- gravação ---------- */
-    const statusEl = h("span", { class: "lp-status", "aria-live": "polite" });
+    const statusEl = h("span", { class: ZoZo.pecas.lpSituacao, "aria-live": "polite" });
     function payload() {
       return {
         data: d.data, descricao: d.descricao, valor: d.valor, tipo: d.tipo, contaId: d.contaId || null,
@@ -101,11 +101,11 @@
     let fila = Promise.resolve();
     function salvar(desfazer) {
       if (novo) return Promise.resolve();
-      if (!d.descricao.trim() || !(d.valor > 0)) { if (desfazer) desfazer(); statusEl.textContent = "Nome e valor são obrigatórios."; statusEl.className = "lp-status lp-status--erro"; return Promise.resolve(); }
-      statusEl.textContent = "Salvando…"; statusEl.className = "lp-status";
+      if (!d.descricao.trim() || !(d.valor > 0)) { if (desfazer) desfazer(); statusEl.textContent = "Nome e valor são obrigatórios."; statusEl.className = ZoZo.pecas.lpSituacaoErro; return Promise.resolve(); }
+      statusEl.textContent = "Salvando…"; statusEl.className = ZoZo.pecas.lpSituacao;
       fila = fila.then(() => ctx.bridge.request(A.updateLancamento, { id: original.id, lancamento: payload() })
-        .then(() => { statusEl.textContent = "Salvo"; statusEl.className = "lp-status lp-status--ok"; return ctx.recarregarTudo(); })
-        .catch((e) => { if (desfazer) desfazer(); statusEl.textContent = e.friendly; statusEl.className = "lp-status lp-status--erro"; }));
+        .then(() => { statusEl.textContent = "Salvo"; statusEl.className = ZoZo.pecas.lpSituacaoOk; return ctx.recarregarTudo(); })
+        .catch((e) => { if (desfazer) desfazer(); statusEl.textContent = e.friendly; statusEl.className = ZoZo.pecas.lpSituacaoErro; }));
       return fila;
     }
 
@@ -140,10 +140,10 @@
 
     /* ---------- campos ---------- */
     // Entrada suave ao começar uma transação nova e logo depois de criá-la (não a cada campo salvo)
-    const corpo = h("div", { class: ["lp", (novo || opts.recemCriada) && "lp--entrar"] });
+    const corpo = h("div", { class: [ZoZo.pecas.lp, (novo || opts.recemCriada) && "lp--entrar"] });
 
     function campoData() {
-      const rotulo = h("button", { type: "button", class: "lp-date", title: "Alterar data" }, dataLonga(d.data));
+      const rotulo = h("button", { type: "button", class: ZoZo.pecas.lpData, title: "Alterar data" }, dataLonga(d.data));
       rotulo.addEventListener("click", () => ZoZo.calendario.abrir(rotulo, d.data, (v) => {
         const antes = d.data; d.data = v;
         rotulo.textContent = dataLonga(d.data);
@@ -153,7 +153,7 @@
     }
 
     function campoNome() {
-      const input = h("input", { type: "text", class: "lp-name", placeholder: "Nome", value: d.descricao, maxlength: String(ZoZo.regras.limiteNome), "aria-label": "Nome" });
+      const input = h("input", { type: "text", class: ["lp-name", ZoZo.pecas.lpNome], placeholder: "Nome", value: d.descricao, maxlength: String(ZoZo.regras.limiteNome), "aria-label": "Nome" });
       if (novo) input.dataset.autofocus = "";
       input.addEventListener("input", () => { if (novo) d.descricao = input.value; });
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
@@ -169,14 +169,14 @@
 
     function campoValor() {
       // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo)
-      const input = h("input", { type: "text", inputmode: "decimal", class: ["lp-value", "money", ehVerde(d) && "money--income"], "aria-label": "Valor",
+      const input = h("input", { type: "text", inputmode: "decimal", class: ["lp-value", ZoZo.pecas.lpValor, "money", ehVerde(d) && "money--income"], "aria-label": "Valor",
         value: F.moeda(d.valor || 0), "data-com-simbolo": "" });
       input.addEventListener("focus", () => { input.value = d.valor ? F.valorParaEditar(input, d.valor) : ""; F.cursorNoFim(input); });   // sem selecionar tudo
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
       input.addEventListener("blur", () => {
         const v = F.parseMoeda(input.value);
         const valido = v > 0 && v < 1e12;
-        if (!valido && input.value.trim()) { statusEl.textContent = "Valor inválido: use só números, como 1.234,56."; statusEl.className = "lp-status lp-status--erro"; }
+        if (!valido && input.value.trim()) { statusEl.textContent = "Valor inválido: use só números, como 1.234,56."; statusEl.className = ZoZo.pecas.lpSituacaoErro; }
         if (valido && Math.round(v * 100) !== Math.round((d.valor || 0) * 100)) {
           const antes = d.valor; d.valor = Math.round(v * 100) / 100;
           salvar(() => { d.valor = antes; input.value = F.moeda(antes); });
@@ -193,7 +193,7 @@
       const opcoes = regular ? [["regular", "Despesa"], ["estorno", "Estorno"]] : [["saida", "Saída"], ["entrada", "Entrada"]];
       const atual = regular ? d.tipo : d.sentido;
       const rotulo = (opcoes.find(([v]) => v === atual) || opcoes[0])[1];
-      const btn = h("button", { type: "button", class: "lp-sub", "aria-haspopup": "menu" }, rotulo, icon("chevron-down", { size: 13, stroke: 2.25 }));
+      const btn = h("button", { type: "button", class: ZoZo.pecas.lpSub, "aria-haspopup": "menu" }, rotulo, icon("chevron-down", { size: 13, stroke: 2.25 }));
       btn.addEventListener("click", () => ZoZo.menu.abrir(btn, opcoes.map(([v, t]) => ({
         label: t, check: v === atual,
         onClick: () => {
@@ -210,16 +210,16 @@
         (com "voltar" para esta transação). Não mexe nos filtros da lista de Transações. */
     function seta(rotulo, abrirPainel) {
       if (novo) return null;
-      return h("button", { type: "button", class: "icon-btn icon-btn--sm lp-ver", "aria-label": "Ver " + rotulo, title: "Ver " + rotulo,
+      return h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "lp-ver", ZoZo.pecas.setaVer], "aria-label": "Ver " + rotulo, title: "Ver " + rotulo,
         onClick: abrirPainel }, icon("chevron-right", { size: 14 }));
     }
 
     /** Conta: escolhida no menu (ao criar e depois, em qualquer tipo); a seta ao lado lista as transações dela */
     function campoConta() {
       const conta = contas.find((c) => c.id === d.contaId);
-      const conteudo = [h("span", { class: "lp-account__dot", style: { background: F.cor(conta && conta.cor, "var(--palette-16)") } }),
+      const conteudo = [h("span", { class: ZoZo.pecas.lpContaPonto, style: { background: F.cor(conta && conta.cor, "var(--palette-16)") } }),
         h("span", null, conta ? conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "") : "Sem conta")];
-      const btn = h("button", { type: "button", class: "lp-account", "aria-haspopup": "menu", title: "Trocar conta" }, conteudo);   // clicar na conta abre a lista
+      const btn = h("button", { type: "button", class: ZoZo.pecas.lpConta, "aria-haspopup": "menu", title: "Trocar conta" }, conteudo);   // clicar na conta abre a lista
       const escolhiveis = contas.filter((c) => (!c.oculta || c.id === d.contaId) && (!ehDebito(d) || c.tipo !== "cartao"));   // débito: cartão não
       btn.addEventListener("click", () => ZoZo.menu.abrir(btn, escolhiveis.map((c) => ({
         label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), check: c.id === d.contaId,
@@ -236,7 +236,7 @@
             { icone: "cartao", label: "Cartão de crédito", onClick: () => novaConta("cartao") }] }]),
       { posicao: "esquerda", label: "Conta", largura: 260 }));
       const origem = conta && conta.tipo === "investimento" ? "investimentos" : "contas";
-      return h("div", { class: "lp-account-linha" }, btn,
+      return h("div", { class: ZoZo.pecas.lpContaLinha }, btn,
         conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa })) : null);
     }
     /** Cria a conta e já a escolhe nesta transação */
@@ -258,7 +258,7 @@
         const escolher = (id) => { api.fechar(); const antes = d.categoriaId; d.categoriaId = id; if (novo) desenhar(); else salvar(() => { d.categoriaId = antes; }).then(() => reabrir()); };
         const desenharLista = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) => h("div", { class: [ZoZo.estrutura.menuItemDividido, c.id === d.categoriaId && "is-checked"] },
           h("button", { type: "button", class: ZoZo.estrutura.menuDivididoPrincipal, onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true })),
-          novo ? null : h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Ver categoria " + c.nome, title: "Ver categoria",
+          novo ? null : h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Ver categoria " + c.nome, title: "Ver categoria",
             onClick: () => { api.fechar(); ZoZo.categoriasShared.abrirDetalhe(c, ctx, { voltar: voltarParaCa }); } }, icon("chevron-right", { size: 14 })))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenharLista(); });
         mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: ZoZo.estrutura.menuSeparador }),
@@ -283,8 +283,8 @@
       const lista = origens().filter((o) => !ehOrig || o.id === original.id);
       const itens = lista.map((o) => ({ render: (api) => h("div", { class: [ZoZo.estrutura.menuItemDividido, o.id === atualId && "is-checked"] },
         h("button", { type: "button", class: ZoZo.estrutura.menuDivididoPrincipal, onClick: () => { api.fechar(); if (o.id !== atualId) vincular(o); } },
-          h("span", { class: "kind-badge" }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: ZoZo.estrutura.menuRotulo }, o.descricao), h("small", { class: ZoZo.estrutura.menuDica }, rotuloRecorrencia(o))),
-        novo ? null : h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Ver recorrência " + o.descricao, onClick: () => { api.fechar(); abrirRecorrencia(o.id); } }, icon("chevron-right", { size: 14 }))) }));
+          h("span", { class: ZoZo.pecas.letra }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: ZoZo.estrutura.menuRotulo }, o.descricao), h("small", { class: ZoZo.estrutura.menuDica }, rotuloRecorrencia(o))),
+        novo ? null : h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Ver recorrência " + o.descricao, onClick: () => { api.fechar(); abrirRecorrencia(o.id); } }, icon("chevron-right", { size: 14 }))) }));
       if (temRecorrencia) itens.push({ label: "Sem recorrência", onClick: semRecorrencia });
       // membro de uma série: "Nova recorrência" só depois de sair dela (Sem recorrência)
       if (!recorrente || ehOrig) {
@@ -323,8 +323,8 @@
     const perfilAtual = () => perfis.find((x) => x.id === d.perfilId) || null;
     function campoPerfil() {
       const p = perfilAtual();
-      const btn = p ? h("button", { type: "button", class: "lp-chip-btn", "aria-haspopup": "menu" }, UI.Tag(p.nome, p.cor, { class: "tag--upper" }))
-        : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar perfil", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
+      const btn = p ? h("button", { type: "button", class: ZoZo.pecas.lpPilulaBotao, "aria-haspopup": "menu" }, UI.Tag(p.nome, p.cor, { class: "tag--upper" }))
+        : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar perfil", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
       btn.addEventListener("click", () => ZoZo.menu.abrir(btn, perfis.filter((x) => !x.arquivado || x.id === d.perfilId).map((x) => ({
         render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, x.id === d.perfilId && "is-checked"], onClick: () => {
           api.fechar(); const antes = d.perfilId; d.perfilId = x.id; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
@@ -342,7 +342,7 @@
     }
 
     function campoNotas() {
-      const t = h("textarea", { class: "lp-notes", rows: "1", placeholder: "Adicionar uma observação...", "aria-label": "Observação", maxlength: "2000" });
+      const t = h("textarea", { class: ZoZo.pecas.lpNotas, rows: "1", placeholder: "Adicionar uma observação...", "aria-label": "Observação", maxlength: "2000" });
       t.value = d.notas || "";
       const ajustar = () => { t.style.height = "auto"; t.style.height = Math.max(24, t.scrollHeight) + "px"; };
       t.addEventListener("input", () => { ajustar(); if (novo) d.notas = t.value; });
@@ -362,7 +362,7 @@
       const todos = (store.get().data.lancamentos && store.get().data.lancamentos.lancamentos) || [];
       const itens = todos.filter((x) => x.id !== original.id && norm(x.descricao) === norm(original.descricao)).slice(0, 40);
       if (!itens.length) return null;
-      return h("section", { class: "lp-history" }, L.ListaPainel(itens, { onClick: (x) => abrir(x, ctx, { voltar: voltarParaCa }) }));
+      return h("section", { class: ZoZo.pecas.lpHistorico }, L.ListaPainel(itens, { onClick: (x) => abrir(x, ctx, { voltar: voltarParaCa }) }));
     }
 
     /* ---------- montagem ---------- */
@@ -371,36 +371,36 @@
       tituloTxt.textContent = NOMES[d.tipo] || "Transação";               // o título acompanha o tipo escolhido
       const recAtual = !novo && d.tipo === "recorrente" ? origens().find((o) => o.id === (d.serieId && !String(d.serieId).startsWith("removida:") ? d.serieId : original.id)) || d : null;
       const chipRec = recAtual
-        ? h("button", { type: "button", class: "lp-chip-btn lp-rec", "aria-haspopup": "menu" }, h("span", { class: "kind-badge" }, recAtual.recorrencia === "parcelada" ? "P" : "R"), rotuloRecorrencia(recAtual))
+        ? h("button", { type: "button", class: ZoZo.pecas.lpRec, "aria-haspopup": "menu" }, h("span", { class: ZoZo.pecas.letraPequena }, recAtual.recorrencia === "parcelada" ? "P" : "R"), rotuloRecorrencia(recAtual))
         : pendenteRec
-          ? h("button", { type: "button", class: "lp-chip-btn lp-rec", "aria-haspopup": "menu" }, h("span", { class: "kind-badge" }, "R"),
+          ? h("button", { type: "button", class: ZoZo.pecas.lpRec, "aria-haspopup": "menu" }, h("span", { class: ZoZo.pecas.letraPequena }, "R"),
             pendenteRec.vincular ? pendenteRec.vincular.descricao : rotuloRecorrencia(Object.assign({}, pendenteRec.nova)))
-          : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar recorrência", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
+          : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar recorrência", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
       chipRec.addEventListener("click", () => menuRecorrencia(chipRec));
 
       const cat = cats.find((c) => c.id === d.categoriaId);
-      const chipCat = cat ? h("button", { type: "button", class: "lp-chip-btn", "aria-haspopup": "menu" }, UI.CategoryLabel(cat, { pill: true }))
-        : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar categoria", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
+      const chipCat = cat ? h("button", { type: "button", class: ZoZo.pecas.lpPilulaBotao, "aria-haspopup": "menu" }, UI.CategoryLabel(cat, { pill: true }))
+        : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar categoria", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
       chipCat.addEventListener("click", () => menuCategorias(chipCat));
 
       mount(corpo,
-        h("section", { class: "lp-top" },
-          h("div", { class: "lp-top__left" }, campoData(), campoNome(), campoConta()),
-          h("div", { class: "lp-top__right" }, subtipo(), campoValor())),
-        h("section", { class: "lp-props" },
-          temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Categoria"),
-            h("div", { class: "lp-pilula" }, chipCat, cat ? seta(cat.nome, () => ZoZo.categoriasShared.abrirDetalhe(cat, ctx, { voltar: voltarParaCa })) : null)) : null,
-          comPerfis ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Perfil"),
-            h("div", { class: "lp-pilula" }, campoPerfil(), perfilAtual() ? seta(perfilAtual().nome, () => ZoZo.perfilShared.abrirDetalhe(perfilAtual(), ctx, { voltar: voltarParaCa })) : null)) : null,
-          temCategoria(d) ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Recorrência"),
-            h("div", { class: "lp-pilula" }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
+        h("section", { class: ZoZo.pecas.lpTopo },
+          h("div", { class: ZoZo.pecas.lpTopoEsquerda }, campoData(), campoNome(), campoConta()),
+          h("div", { class: ZoZo.pecas.lpTopoDireita }, subtipo(), campoValor())),
+        h("section", { class: ZoZo.pecas.lpProps },
+          temCategoria(d) ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Categoria"),
+            h("div", { class: ZoZo.pecas.lpPilula }, chipCat, cat ? seta(cat.nome, () => ZoZo.categoriasShared.abrirDetalhe(cat, ctx, { voltar: voltarParaCa })) : null)) : null,
+          comPerfis ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Perfil"),
+            h("div", { class: ZoZo.pecas.lpPilula }, campoPerfil(), perfilAtual() ? seta(perfilAtual().nome, () => ZoZo.perfilShared.abrirDetalhe(perfilAtual(), ctx, { voltar: voltarParaCa })) : null)) : null,
+          temCategoria(d) ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Recorrência"),
+            h("div", { class: ZoZo.pecas.lpPilula }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
           // Divisão entre perfis: rachada → resumo; senão o "+" (igual ao da recorrência; também em recorrentes já criadas)
-          podeDividir ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
+          podeDividir ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Divisão"),
             d.divisao
-              ? h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },
+              ? h("button", { type: "button", class: ZoZo.pecas.lpRec, onClick: abrirDivisao },
                 icon("dividir", { size: 12 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")
-              : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar divisão", title: "Adicionar divisão", onClick: abrirDivisao }, icon("mais", { size: 14 }))) : null),
-        h("section", { class: "lp-notes-wrap" }, campoNotas()),
+              : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar divisão", title: "Adicionar divisão", onClick: abrirDivisao }, icon("mais", { size: 14 }))) : null),
+        h("section", { class: ZoZo.pecas.lpNotasArea }, campoNotas()),
         statusEl,
         historico());
     }
@@ -411,11 +411,11 @@
       if (nomeAtual) d.descricao = nomeAtual.value.trim();
       const valorEl = corpo.querySelector(".lp-value");
       if (valorEl && document.activeElement === valorEl) valorEl.blur();
-      if (!d.descricao) { statusEl.textContent = "Informe o nome."; statusEl.className = "lp-status lp-status--erro"; if (nomeAtual) nomeAtual.focus(); return; }
-      if (!(d.valor > 0)) { statusEl.textContent = "Informe um valor maior que zero."; statusEl.className = "lp-status lp-status--erro"; corpo.querySelector(".lp-value").focus(); return; }
-      if (temCategoria(d) && !d.categoriaId) { statusEl.textContent = "Escolha uma categoria."; statusEl.className = "lp-status lp-status--erro"; return; }
-      if (comPerfis && !d.perfilId) { statusEl.textContent = "Escolha um perfil."; statusEl.className = "lp-status lp-status--erro"; return; }
-      if (d.tipo === "debito" && !contas.some((c) => c.id === d.contaId && c.tipo !== "cartao")) { statusEl.textContent = ZoZo.messages.FRIENDLY.DEBIT_ACCOUNT; statusEl.className = "lp-status lp-status--erro"; return; }
+      if (!d.descricao) { statusEl.textContent = "Informe o nome."; statusEl.className = ZoZo.pecas.lpSituacaoErro; if (nomeAtual) nomeAtual.focus(); return; }
+      if (!(d.valor > 0)) { statusEl.textContent = "Informe um valor maior que zero."; statusEl.className = ZoZo.pecas.lpSituacaoErro; corpo.querySelector(".lp-value").focus(); return; }
+      if (temCategoria(d) && !d.categoriaId) { statusEl.textContent = "Escolha uma categoria."; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
+      if (comPerfis && !d.perfilId) { statusEl.textContent = "Escolha um perfil."; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
+      if (d.tipo === "debito" && !contas.some((c) => c.id === d.contaId && c.tipo !== "cartao")) { statusEl.textContent = ZoZo.messages.FRIENDLY.DEBIT_ACCOUNT; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
       btn.disabled = true;
       ctx.bridge.request(A.createLancamento, { lancamento: payload() }).then((r) => {
         const id = r.lancamento.id;
@@ -425,7 +425,7 @@
       }).then((id) => {
         ctx.toast("Transação criada.");
         return ctx.recarregarTudo().then(() => abrir({ id }, ctx, { recemCriada: true }));
-      }).catch((e) => { btn.disabled = false; statusEl.textContent = e.friendly; statusEl.className = "lp-status lp-status--erro"; });
+      }).catch((e) => { btn.disabled = false; statusEl.textContent = e.friendly; statusEl.className = ZoZo.pecas.lpSituacaoErro; });
     }
 
     const excluir = () => {

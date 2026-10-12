@@ -16,7 +16,7 @@
 
   /* ---------------- Visual (Tailwind; classes escritas por inteiro) ---------------- */
   const T = {
-    secao: "tw:mt-5",
+    secao: "tw:mt-5!",
     lista: "tw:flex tw:flex-col",
     olho: "tw:ml-0.5 tw:text-zz-muted",
     olhoAtivo: "tw:ml-0.5 tw:text-zz-primary",
@@ -78,7 +78,7 @@
       { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
     ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos" });
 
-    return h("section", { class: [!o.embedded && "card", T.cartao, o.embedded ? T.cartaoEmbutido : T.cartaoPadding], "aria-label": "Gráfico de contas" },
+    return h("section", { class: [!o.embedded && ZoZo.pecas.card, T.cartao, o.embedded ? T.cartaoEmbutido : T.cartaoPadding], "aria-label": "Gráfico de contas" },
       h("div", { class: T.topo },
         metade(T.pontoAtivos, "Ativos", resumo.ativos, o.embedded),
         metade(T.pontoPassivos, "Passivos", resumo.passivos, o.embedded)),
@@ -193,8 +193,8 @@
         { label: "Excluir conta", perigo: true, onClick: excluir },
       ],
       render(body) {
-        const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
-        const graficoEl = h("div", { class: "detail-chart" });
+        const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
+        const graficoEl = h("div", { class: ZoZo.pecas.painelGrafico });
         const filtrosEl = h("div", { class: "chart-card__filters" });
         const difEl = h("span");
         let serie = [];
@@ -209,22 +209,22 @@
         mount(body,
           // Linha 1: ícone pequeno + 4 dígitos + tipo ........ percentuais
           // Linha 2: nome ........................................ valor
-          h("div", { class: "ph" },
-            h("div", { class: "ph__top" },
-              h("span", { class: "ph__meta" }, UI.AccountIcon(conta),
+          h("div", { class: ZoZo.pecas.ph },
+            h("div", { class: ZoZo.pecas.phTopo },
+              h("span", { class: [ZoZo.pecas.phMeta, ZoZo.pecas.ctxIconeContaPequeno] }, UI.AccountIcon(conta),
                 // 4 últimos dígitos: um clique e já edita (investimento não tem cartão/conta com dígitos)
                 conta.tipo === "investimento" ? null : campoDigitos(conta, ctx),
-                h("span", { class: "ph__type" }, conta.oculta ? "Ocultado" : conta.tipo === "investimento" ? conta.tipoInvestimento || "Investimento" : L.SUBTITULO_CONTA[conta.tipo] || (conta.tipo === "cartao" ? "Cartão de crédito" : "Outros"))),
-              h("span", { class: "ph__chips" }, difEl, UI.PercentageChange(conta.variacaoPercentual))),
-            h("div", { class: "ph__main" },
-              ZoZo.inline.texto({ valor: conta.nome, rotulo: "Nome da conta", max: ZoZo.regras.limiteNome, classe: "ph__name",
+                h("span", { class: ZoZo.pecas.phTipo }, conta.oculta ? "Ocultado" : conta.tipo === "investimento" ? conta.tipoInvestimento || "Investimento" : L.SUBTITULO_CONTA[conta.tipo] || (conta.tipo === "cartao" ? "Cartão de crédito" : "Outros"))),
+              h("span", { class: ZoZo.pecas.phChips }, difEl, UI.PercentageChange(conta.variacaoPercentual))),
+            h("div", { class: ZoZo.pecas.phLinha },
+              ZoZo.inline.texto({ valor: conta.nome, rotulo: "Nome da conta", max: ZoZo.regras.limiteNome, classe: ZoZo.pecas.phNome,
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) }),
               // editando o fechamento, o saldo dá lugar ao combobox e aos dias
-              editandoCiclo ? ciclo.el : ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: "ph__value",
+              editandoCiclo ? ciclo.el : ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: ZoZo.pecas.phValor,
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, saldo: v }).then(() => { ctx.toast("Saldo atualizado."); return ctx.recarregarTudo(); }) })),
-            conta.limite && !editandoCiclo ? h("div", { class: "ph__extra" }, F.moeda(conta.limite) + " de limite") : null,
+            conta.limite && !editandoCiclo ? h("div", { class: ZoZo.pecas.phExtra }, F.moeda(conta.limite) + " de limite") : null,
             // cartão: fechamento e vencimento do mês atual (de todos os meses ou definidos só para este mês)
-            !editandoCiclo && conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: "ph__extra" },
+            !editandoCiclo && conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: ZoZo.pecas.phExtra },
               "Fecha dia " + conta.cicloAtual.fechamento + " · vence dia " + conta.cicloAtual.vencimento + (conta.cicloAtual.soEsteMes ? " (só neste mês)" : "")) : null),
           graficoEl, filtrosEl,
           C.detalheSecao("Transações", listaEl));
@@ -232,7 +232,7 @@
         ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r) => {
           serie = r.serie;
           const dif = r.diferenca;
-          mount(difEl, h("span", { class: ["pct", dif > 0 ? "pct--up" : dif < 0 ? "pct--down" : "pct--flat"] }, (dif > 0 ? "+ " : dif < 0 ? "− " : "") + F.moeda(dif)));
+          mount(difEl, h("span", { class: dif > 0 ? ZoZo.pecas.pctSobe : dif < 0 ? ZoZo.pecas.pctDesce : ZoZo.pecas.pctIgual }, (dif > 0 ? "+ " : dif < 0 ? "− " : "") + F.moeda(dif)));
           desenhar();
         }).catch(() => mount(graficoEl, h("p", { class: "muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
 
@@ -256,7 +256,7 @@
     deps: (s) => [s.data.contas, s.errors.contas, s.ui.intervaloContas, s.ui.gruposFechados, s.selectedItem, s.ui.mostrarOcultas],
     render(state, ctx) {
       const espera = C.estadoCarregamento(state, ["contas"], () => this.carregar(ctx, true), {
-        skeleton: h("div", null, h("div", { class: "card skeleton-card" }), UI.Skeleton(6)),
+        skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCard }), UI.Skeleton(6)),
       });
       if (espera) return C.pagina("page--contas", espera);
       const contas = state.data.contas.contas || [];
@@ -270,7 +270,7 @@
         const exibindo = !!mostrar[g.key];
         const itens = doGrupo.filter((c) => !c.oculta || exibindo);
         const olho = temOcultas ? h("button", {
-          type: "button", class: ["icon-btn", "icon-btn--sm", exibindo ? T.olhoAtivo : T.olho],
+          type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), exibindo ? T.olhoAtivo : T.olho],
           "aria-pressed": String(exibindo), title: exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
           "aria-label": exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
           onClick: (e) => { e.stopPropagation(); ZoZo.store.set({ ui: { mostrarOcultas: Object.assign({}, mostrar, { [g.key]: !exibindo }) } }); },

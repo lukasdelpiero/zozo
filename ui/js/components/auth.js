@@ -49,7 +49,7 @@
     campos: "tw:flex tw:flex-col tw:gap-2.5 tw:min-h-[98px]",
     input: "tw:h-11 tw:rounded-xl tw:border-[#e3e6eb] tw:bg-[#f4f6f8] tw:text-[16px] tw:font-[450] "
       + "tw:placeholder:text-[16px] tw:placeholder:font-[450] tw:focus:bg-zz-surface tw:focus:border-zz-primary",
-    botao: "btn btn--primary btn--block tw:h-11 tw:mt-1.5 tw:rounded-xl tw:text-[15px] tw:font-[650]",
+    botao: ZoZo.pecas.botaoPrimarioCheio + " tw:h-11 tw:mt-1.5 tw:rounded-xl tw:text-[15px] tw:font-[650]",
     erro: "tw:m-0 tw:min-h-0 tw:text-center tw:text-[13px] tw:font-[450] tw:text-zz-text tw:empty:hidden",
     rodape: "tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-1 tw:mt-1.5 tw:text-[15px] tw:font-[450] tw:text-zz-secondary",
     link: "tw:p-0 tw:[border:0] tw:bg-transparent tw:font-bold tw:text-zz-text tw:cursor-pointer tw:hover:underline tw:hover:underline-offset-2",
@@ -75,7 +75,7 @@
     texto: TEXTO + " tw:text-[15px] tw:text-zz-text",
     textoSuave: TEXTO + " tw:text-[13px] tw:text-zz-secondary",
     situacao: "tw:m-0 tw:min-h-[1.4em] tw:text-center tw:text-[13px] tw:text-zz-secondary tw:empty:min-h-0",
-    spinnerEspera: "spinner tw:size-[30px] tw:border-[3px]",
+    spinnerEspera: ZoZo.pecas.girando + " tw:size-[30px]! tw:border-[3px]!",
   };
   // Animações do cartão: [logo, título (2º filho), 3º filho, 4º em diante]
   const ANIM = {
@@ -165,7 +165,7 @@
       if (!cfg.google) { msg.textContent = "O login com Google ainda não está disponível. Continue com e-mail."; return; }
       // Mostra o logo do Google, "Continuar com Google" e o carregamento enquanto vai para o Google
       mount(area, h("div", { class: C.indoGoogle, role: "status" },
-        logoGoogle("tw:flex-none tw:size-7"), h("p", { class: C.indoTexto }, "Continuar com Google"), h("span", { class: "spinner", "aria-hidden": "true" })));
+        logoGoogle("tw:flex-none tw:size-7"), h("p", { class: C.indoTexto }, "Continuar com Google"), h("span", { class: ZoZo.pecas.girando, "aria-hidden": "true" })));
       setTimeout(() => location.assign("/api/google/inicio"), 350);
     };
     mount(area,
@@ -181,7 +181,7 @@
 
     if (modo === "loading") {
       mount(root, h("div", { class: C.raiz },
-        h("div", { class: C.centro }, h("div", { class: C.carregando, role: "status" }, h("span", { class: "spinner", "aria-hidden": "true" }), h("span", null, "Carregando…")))));
+        h("div", { class: C.centro }, h("div", { class: C.carregando, role: "status" }, h("span", { class: ZoZo.pecas.girando, "aria-hidden": "true" }), h("span", null, "Carregando…")))));
       return;
     }
     // Trocar entre Entrar e Cadastro recomeça na primeira etapa

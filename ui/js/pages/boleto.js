@@ -57,8 +57,8 @@
   function ListaTransacoes(st) {
     if (st.carregando) return UI.Skeleton(4, { short: true });
     if (st.erro) return UI.ErrorState(st.erro, () => atual.carregar());
-    if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil" });
-    if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito ou empréstimo deste perfil no período.", { icon: "lancamentos" });
+    if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil", class: "tw:min-h-[90px]! tw:p-4!" });
+    if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito ou empréstimo deste perfil no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
     return h("ul", { class: "boleto-list" }, st.lancamentos.map((l) => h("li", { class: "boleto-list__item" },
       h("span", { class: "boleto-list__date" }, diaMes(l.data)),
       h("span", { class: "boleto-list__desc" },
@@ -92,7 +92,7 @@
           });
           return h("div", { class: "adjustments__row" },
             desc,
-            h("div", { class: "field__affix field__affix--sm" }, h("span", { class: "field__prefix", "aria-hidden": "true" }, cfg.prefixo), valor),
+            h("div", { class: ZoZo.pecas.afixoPequeno }, h("span", { class: ZoZo.pecas.prefixo, "aria-hidden": "true" }, cfg.prefixo), valor),
             UI.IconButton("excluir", "Excluir " + cfg.rotulo.toLowerCase(), { class: "icon-btn--danger", onClick: () => { lista.splice(i, 1); desenhar(); cfg.onChange(); } }));
         })) : null,
         UI.Button(cfg.adicionar, { variant: "text", size: "sm", icon: "mais", onClick: () => {
@@ -290,7 +290,7 @@
     const editor = h("div", { class: "boleto__editor" },
       h("section", { class: "boleto-editor__section" },
         UI.Field("Perfil", perfilSel),
-        h("div", { class: "field" }, h("label", { class: "field__label", for: periodoId }, "Período"), h("div", { class: "form-row form-row--period" }, mesSel, anoSel)),
+        h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Período"), h("div", { class: "form-row form-row--period" }, mesSel, anoSel)),
         UI.Field("Data da fatura", dataInput)),
       h("section", { class: "boleto-editor__section" },
         h("h3", { class: "boleto-editor__title" }, "Transações", contadorEl),
@@ -303,9 +303,9 @@
     const preview = h("div", { class: "boleto__preview" }, h("div", { class: "paper-scaler" }, docEl));
 
     const el = h("div", { class: "boleto", role: "dialog", "aria-modal": "true", "aria-labelledby": "boleto-titulo" },
-      h("header", { class: "boleto__header" },
-        h("h1", { class: "topbar__title", id: "boleto-titulo" }, "Criar fatura"),
-        h("div", { class: "topbar__actions" },
+      h("header", { class: ["boleto__header", ZoZo.pecas.ctxCabecalhoFatura] },
+        h("h1", { class: ZoZo.estrutura.barraTitulo, id: "boleto-titulo" }, "Criar fatura"),
+        h("div", { class: ZoZo.estrutura.barraAcoes },
           UI.IconButton("fechar", "Fechar", { onPrimary: true, onClick: () => close() }))),
       h("div", { class: "boleto__body" }, editor, preview));
 

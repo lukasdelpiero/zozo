@@ -85,23 +85,23 @@
         { label: "Excluir perfil", perigo: true, onClick: () => excluirPerfil(p, ctx) },
       ].filter(Boolean),
       render(body) {
-        const listaEl = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
+        const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         mount(body,
-          h("div", { class: "detail-hero" },
-            h("div", { class: "hero-edit" },
-              h("div", { class: "hero-edit__row" },
+          h("div", { class: ZoZo.pecas.painelTopo },
+            h("div", { class: ZoZo.pecas.edicaoTopo },
+              h("div", { class: ZoZo.pecas.edicaoTopoLinha },
                 ZoZo.inline.corDot(p.cor, (c) => ctx.bridge.request(A.updatePerfil, { id: p.id, cor: c }).then(() => { ctx.toast("Cor alterada."); return ctx.recarregarTudo(); })),
                 ZoZo.inline.texto({ valor: p.nome, rotulo: "Nome do perfil", max: ZoZo.regras.limiteNome,
                   aoSalvar: (v) => ctx.bridge.request(A.updatePerfil, { id: p.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) })),
-              p.arquivado ? h("span", { class: "status-chip status-chip--pending" }, "Arquivado") : null),
-            h("div", { class: "detail-hero__figure" },
-              h("span", { class: "detail-hero__label" }, "Transações"),
-              h("span", { class: "detail-hero__value" }, String(p.quantidade || 0)))),
+              p.arquivado ? h("span", { class: ZoZo.pecas.chipPendente }, "Arquivado") : null),
+            h("div", { class: ZoZo.pecas.painelTopoNumero },
+              h("span", { class: ZoZo.pecas.painelTopoRotulo }, "Transações"),
+              h("span", { class: ZoZo.pecas.painelTopoValor }, String(p.quantidade || 0)))),
           C.detalheSecao(null,
             C.detalheLinha("Gasto em " + mesInteiro(), F.moeda(p.gasto || 0)),
-            p.arquivado ? h("p", { class: "field__hint" }, "Perfil arquivado: continua nas transações e nos totais, mas não pode ser usado em novas transações.") : null),
+            p.arquivado ? h("p", { class: ZoZo.pecas.campoDica }, "Perfil arquivado: continua nas transações e nos totais, mas não pode ser usado em novas transações.") : null),
           C.detalheSecao("Últimas transações", listaEl,
-            h("div", { class: "detail-actions detail-actions--end" }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
+            h("div", { class: ZoZo.pecas.painelAcoesFim }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
           const itens = d.lancamentos.filter((l) => l.perfilId === p.id).slice(0, 10);
           mount(listaEl, itens.length
@@ -116,7 +116,7 @@
   /** Ícone redondo do perfil: fundo na cor do perfil e a inicial do nome (mesmo formato do ícone das contas) */
   function AvatarPerfil(p) {
     const inicial = (Array.from(String(p.nome || "").trim())[0] || "?").toLocaleUpperCase("pt-BR");
-    return h("span", { class: "account-icon profile-avatar", style: { "--account-color": F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }, inicial);
+    return h("span", { class: [ZoZo.pecas.iconeConta, "profile-avatar"], style: { "--account-color": F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }, inicial);
   }
 
   /** Linha como a de Contas: [ícone] nome / quantidade de lançamentos ........ gasto no mês */
@@ -231,7 +231,7 @@
     if (botao.disabled) return;
     // Carregando: ícone animado no lugar do ícone do botão (pelo menos 600 ms, para dar para ver)
     const iconeOriginal = botao.querySelector("svg");
-    const giro = h("span", { class: "spinner spinner--btn", "aria-hidden": "true" });
+    const giro = h("span", { class: ZoZo.pecas.girandoBotao, "aria-hidden": "true" });
     if (iconeOriginal) iconeOriginal.replaceWith(giro); else botao.prepend(giro);
     botao.disabled = true;
     botao.setAttribute("aria-busy", "true");
@@ -282,10 +282,10 @@
 
     const check = h("span", { class: "p2fa__ok", "aria-hidden": "true", hidden: true }, icon("check", { size: 12 }));
     const erro = h("p", { class: "p2fa__erro", role: "alert" });
-    const qrArea = h("div", { class: "p2fa__qr", "aria-busy": "true" }, h("span", { class: "spinner", "aria-hidden": "true" }));
+    const qrArea = h("div", { class: "p2fa__qr", "aria-busy": "true" }, h("span", { class: ZoZo.pecas.girando, "aria-hidden": "true" }));
     const chaveTexto = h("code", { class: "p2fa__chave" }, "");
     let chave = "";
-    const copiar = h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Copiar chave de configuração", title: "Copiar",
+    const copiar = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Copiar chave de configuração", title: "Copiar",
       onClick: (e) => { const b = e.currentTarget; navigator.clipboard.writeText(chave).then(() => UI.confirmarNoBotao(b, "Chave copiada"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } },
       icon("copiar", { size: 15 }));
     const campo = V.CampoCodigo({
@@ -314,7 +314,7 @@
     const painel = h("aside", { class: "p2fa", role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
       h("header", { class: "p2fa__topo" },
         h("h3", { class: "p2fa__h" }, "Autenticação de Dois Fatores"),
-        h("button", { type: "button", class: "icon-btn", "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),
+        h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),
       h("ol", { class: "p2fa__passos" },
         passo(1, PASSOS_2FA[0], h("p", { class: "p2fa__dica" }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator, Authy ou o do seu gerenciador de senhas.")),
         passo(2, PASSOS_2FA[1]),
@@ -388,7 +388,7 @@
   function SecaoPix(ctx, cfg, u) {
     const pix = cfg.pix || null;
     let tipo = tipoDaChave(pix && pix.chave);
-    const entrada = (ph, valor, max, rotulo) => h("input", { class: "input input--sm", placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo });
+    const entrada = (ph, valor, max, rotulo) => h("input", { class: [ZoZo.pecas.entrada, ZoZo.pecas.entradaPequena], placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo });
     const chave = entrada("", "", 77, "Chave Pix");
     const nome = entrada("Nome do recebedor", pix ? pix.nome : String(u.nomeUsuario || "").replace(/[^\p{L} ]/gu, "").slice(0, 25), 25, "Nome do recebedor");
     const cidade = entrada("Cidade", pix ? pix.cidade : "", 15, "Cidade do recebedor");
@@ -436,7 +436,7 @@
         h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
         h("span", { class: "cfg-row__sub" }, "Definir chave Pix para o QRCode.")),
       // tipo · chave · nome · cidade · [Remover] Salvar — tudo numa linha
-      h("div", { class: "cfg-pix" }, tipoSel, chave, nome, cidade,
+      h("div", { class: ["cfg-pix", ZoZo.pecas.ctxListaPix] }, tipoSel, chave, nome, cidade,
         h("div", { class: "cfg-pix__acoes" },
           pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
             .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => { erro.textContent = e.friendly; }) }) : null,
@@ -450,7 +450,7 @@
   function linhaConfig(titulo, sub, direita) {
     return h("div", { class: "cfg-row" },
       h("div", { class: "cfg-row__text" }, h("span", { class: "cfg-row__title" }, titulo), sub ? h("span", { class: "cfg-row__sub" }, sub) : null),
-      h("div", { class: "cfg-row__right" }, direita));
+      h("div", { class: ["cfg-row__right", ZoZo.pecas.ctxInterruptorAjustado] }, direita));
   }
 
   ZoZo.pages.configuracoes = {
@@ -513,8 +513,8 @@
             .catch((e) => ctx.toast(e && e.friendly ? e.friendly : "Não foi possível usar essa imagem. Escolha um arquivo PNG ou JPG.", { tone: "error" }));
         });
         // Alterar senha (senha atual + nova)
-        const senhaAtual = h("input", { type: "password", class: "input input--sm", name: "current-password", placeholder: "Senha atual", autocomplete: "current-password", "aria-label": "Senha atual" });
-        const novaSenha = h("input", { type: "password", class: "input input--sm", name: "new-password", placeholder: "Nova senha", autocomplete: "new-password", "aria-label": "Nova senha", minlength: "8" });
+        const senhaAtual = h("input", { type: "password", class: [ZoZo.pecas.entrada, ZoZo.pecas.entradaPequena], name: "current-password", placeholder: "Senha atual", autocomplete: "current-password", "aria-label": "Senha atual" });
+        const novaSenha = h("input", { type: "password", class: [ZoZo.pecas.entrada, ZoZo.pecas.entradaPequena], name: "new-password", placeholder: "Nova senha", autocomplete: "new-password", "aria-label": "Nova senha", minlength: "8" });
         const senhaAtualCampo = ZoZo.verificacao.ComRevelar(senhaAtual, "input-with-action--sm");   // ocultas, com "mostrar" e sem copiar
         const novaSenhaCampo = ZoZo.verificacao.ComRevelar(novaSenha, "input-with-action--sm");
         const alterarSenha = (btn) => {
@@ -548,7 +548,7 @@
             cfg.foto ? UI.Button("Remover", { size: "sm", onClick: () => ctx.bridge.request(A.updateConfig, { foto: null })
               .then(() => ctx.loadData("config", A.getConfig, null, { force: true })) }) : null,
             arquivo),
-          demo ? linhaConfig("Nome", null, h("span", { class: "cfg-readonly" }, u.nomeUsuario || "")) : linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: "cfg-inline",
+          demo ? linhaConfig("Nome", null, h("span", { class: "cfg-readonly" }, u.nomeUsuario || "")) : linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: ZoZo.pecas.cfgNoLugar,
             aoSalvar: (v) => ZoZo.modais.confirmarComSenha({ titulo: "Confirmar alteração", botao: "Salvar", mensagem: "Digite sua senha para alterar o nome." })
               .then((senha) => {
                 if (!senha) throw new ZoZo.messages.BridgeError("CANCELADO", "Alteração cancelada.");
@@ -577,7 +577,7 @@
           mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." })
           .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
             .catch((e) => ctx.toast(e.friendly, { tone: "error" }))) }, "Excluir conta")) : null;
-      return h("div", { class: "page page--config cfg" }, nav, h("div", { class: "cfg-main" }, h("div", { class: "cfg-content" }, conteudo), rodape));
+      return h("div", { class: ["page page--config cfg", ZoZo.pecas.ctxConfig] }, nav, h("div", { class: "cfg-main" }, h("div", { class: "cfg-content" }, conteudo), rodape));
     },
   };
 

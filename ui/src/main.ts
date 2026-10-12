@@ -35,7 +35,8 @@ import "../js/data/servico.js";
 import "../js/bridge/transporte.js";
 
 // Componentes
-import "../js/components/estrutura.ts";          // classes Tailwind da estrutura (menu, barra, painel)
+import "../js/components/estrutura.ts";
+import "../js/components/pecas.ts";               // classes Tailwind das peças compartilhadas          // classes Tailwind da estrutura (menu, barra, painel)
 import "../js/components/ui.js";
 import "../js/components/feedback.js";
 import "../js/components/menu.js";

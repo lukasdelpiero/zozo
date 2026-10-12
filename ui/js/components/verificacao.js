@@ -123,7 +123,7 @@
   /** Envolve um <input type="password"> com o botão de mostrar/ocultar */
   function ComRevelar(input, classe) {
     protegerSenha(input);
-    const btn = h("button", { type: "button", class: "input-reveal", "aria-label": "Mostrar senha", "aria-pressed": "false", title: "Mostrar senha" },
+    const btn = h("button", { type: "button", class: ZoZo.pecas.revelar, "aria-label": "Mostrar senha", "aria-pressed": "false", title: "Mostrar senha" },
       ZoZo.icons.icon("olho", { size: 16 }));
     btn.addEventListener("click", () => {
       const visivel = input.type === "text";
@@ -134,7 +134,7 @@
       mount(btn, ZoZo.icons.icon(visivel ? "olho" : "olho-fechado", { size: 16 }));
       input.focus();
     });
-    return h("div", { class: ["input-with-action", classe] }, input, btn);
+    return h("div", { class: classe === "input-with-action--sm" ? ZoZo.pecas.comRevelarPequeno : [ZoZo.pecas.comRevelar, classe] }, input, btn);
   }
 
   ZoZo.verificacao = { Captcha, CampoCodigo, QR, protegerSenha, ComRevelar };

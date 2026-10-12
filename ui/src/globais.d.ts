@@ -164,6 +164,8 @@ declare global {
     busca: ZoZoBusca;
     /** js/components/estrutura.ts — classes Tailwind do menu lateral, barra superior e painel */
     estrutura: Readonly<Record<string, string>>;
+    /** js/components/pecas.ts — classes Tailwind das peças compartilhadas (ui.js e afins) */
+    pecas: Readonly<Record<string, string>>;
     pix: ZoZoPix;
     // módulos ainda em JavaScript
     [modulo: string]: any;

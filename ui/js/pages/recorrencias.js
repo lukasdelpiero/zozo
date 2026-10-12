@@ -43,8 +43,8 @@
 
     // Categoria acima do nome (menu com + Nova categoria)
     const cats = ((ZoZo.store.get().data.categorias || {}).categorias) || [];
-    const catBtn = h("button", { type: "button", class: "hero-cat-btn", "aria-haspopup": "menu", "aria-label": "Alterar categoria" },
-      r.categoria ? UI.CategoryLabel(r.categoria, { pill: true }) : h("span", { class: "lp-add" }, ZoZo.icons.icon("mais", { size: 14 })));
+    const catBtn = h("button", { type: "button", class: ZoZo.pecas.pilulaBotao, "aria-haspopup": "menu", "aria-label": "Alterar categoria" },
+      r.categoria ? UI.CategoryLabel(r.categoria, { pill: true }) : h("span", { class: ZoZo.pecas.lpMais }, ZoZo.icons.icon("mais", { size: 14 })));
     catBtn.addEventListener("click", () => ZoZo.menu.abrir(catBtn, cats.map((c) => ({
       render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, c.id === r.categoriaId && "is-checked"], onClick: () => { api.fechar(); salvarOrigem({ categoriaId: c.id }).then(reabrir).catch((e) => ctx.toast(e.friendly, { tone: "error" })); } }, UI.CategoryLabel(c, { pill: true })),
     })).concat([{ separador: true }, { icone: "mais", label: "Nova categoria", onClick: () => ZoZo.modais.novaCategoria(ctx, { aoCriar: (c) => salvarOrigem({ categoriaId: c.id }).then(reabrir) }) }]),
@@ -89,20 +89,20 @@
         { label: "Excluir recorrência", perigo: true, onClick: excluirRecorrencia },
       ],
       render(body) {
-        const grafico = h("div", { class: "detail-chart" });
-        const historico = h("div", { class: "detail-list" }, UI.Skeleton(3, { short: true }));
+        const grafico = h("div", { class: ZoZo.pecas.painelGrafico });
+        const historico = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         mount(body,
           // Linha 1: categoria ........ situação  |  Linha 2: nome ........ valor
-          h("div", { class: "ph" },
-            h("div", { class: "ph__top" },
+          h("div", { class: ZoZo.pecas.ph },
+            h("div", { class: ZoZo.pecas.phTopo },
               catBtn,
-              r.encerrada ? h("span", { class: "status-chip status-chip--neutral" }, "Arquivada")
-                : r.proxima ? h("span", { class: "status-chip status-chip--neutral" }, "Próxima: " + F.dataCurta(r.data))
-                  : h("span", { class: ["status-chip", r.pago ? "status-chip--ok" : "status-chip--pending"] }, r.pago ? "Pago" : "Pendente")),
-            h("div", { class: "ph__main" },
-              ZoZo.inline.texto({ valor: r.descricao, rotulo: "Nome da recorrência", max: ZoZo.regras.limiteNome, classe: "ph__name", aoSalvar: (v) => salvarOrigem({ descricao: v }) }),
-              ZoZo.inline.dinheiro({ valor: origem ? origem.valor : r.valor, rotulo: "Valor da recorrência", permitirZero: false, classe: "ph__value", aoSalvar: (v) => salvarOrigem({ valor: v }) }))),
-          r.pago || r.proxima || r.encerrada ? null : h("div", { class: "detail-actions" }, UI.Button("Registrar pagamento", { variant: "primary", icon: "check", onClick: (e) => pagar(e.currentTarget) })),
+              r.encerrada ? h("span", { class: [ZoZo.pecas.chipNeutro, "tw:flex-none"] }, "Arquivada")
+                : r.proxima ? h("span", { class: [ZoZo.pecas.chipNeutro, "tw:flex-none"] }, "Próxima: " + F.dataCurta(r.data))
+                  : h("span", { class: [r.pago ? ZoZo.pecas.chipOk : ZoZo.pecas.chipPendente, "tw:flex-none"] }, r.pago ? "Pago" : "Pendente")),
+            h("div", { class: ZoZo.pecas.phLinha },
+              ZoZo.inline.texto({ valor: r.descricao, rotulo: "Nome da recorrência", max: ZoZo.regras.limiteNome, classe: ZoZo.pecas.phNome, aoSalvar: (v) => salvarOrigem({ descricao: v }) }),
+              ZoZo.inline.dinheiro({ valor: origem ? origem.valor : r.valor, rotulo: "Valor da recorrência", permitirZero: false, classe: ZoZo.pecas.phValor, aoSalvar: (v) => salvarOrigem({ valor: v }) }))),
+          r.pago || r.proxima || r.encerrada ? null : h("div", { class: ZoZo.pecas.painelAcoes }, UI.Button("Registrar pagamento", { variant: "primary", icon: "check", onClick: (e) => pagar(e.currentTarget) })),
           grafico,
           C.detalheSecao(null,
             C.detalheLinha("Recorrência", r.recorrencia === "parcelada" ? "Parcelada" : (ZoZo.servico.FREQUENCIAS[r.recorrencia] || ZoZo.servico.FREQUENCIAS.mensal).texto),
@@ -137,7 +137,7 @@
     deps: (s) => [s.data.recorrencias, s.errors.recorrencias, s.ui.gruposFechados, s.selectedItem],
     render(state, ctx) {
       const espera = C.estadoCarregamento(state, ["recorrencias"], () => this.carregar(ctx, true), {
-        skeleton: h("div", null, h("div", { class: "card skeleton-card skeleton-card--short" }), UI.Skeleton(8)),
+        skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCardBaixo }), UI.Skeleton(8)),
       });
       if (espera) return C.pagina("page--recorrencias", espera);
       const d = state.data.recorrencias;

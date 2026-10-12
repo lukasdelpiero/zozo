@@ -99,7 +99,7 @@
         const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
         const itensEl = h("div", { class: ZoZo.estrutura.janelaListaSemRolagemLateral });
         const alternar = h("div", { class: "cambio__modo" });
-        const moedaBtn = h("button", { type: "button", class: "btn btn--secondary btn--sm cambio__moeda", "aria-haspopup": "menu" });
+        const moedaBtn = h("button", { type: "button", class: [ZoZo.pecasFn.botao("secondary", true), "cambio__moeda"], "aria-haspopup": "menu" });
         let botao = null;
         const contar = () => { if (botao) botao.disabled = !marcadas.size; };
         const origem = () => (modo === "importar" ? outra : atual);
@@ -237,7 +237,7 @@
       h("div", { class: "cfg-row__text" },
         h("span", { class: "cfg-row__title" }, "Ativar multicâmbio"),
         h("span", { class: "cfg-row__sub" }, "Trabalhar com diferentes câmbios (Real, Euro e Dólar)")),
-      h("div", { class: "cfg-row__right" }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v) => ctx.bridge.request(A.updateConfig, { multicambio: v })
+      h("div", { class: ["cfg-row__right", ZoZo.pecas.ctxInterruptorAjustado] }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v) => ctx.bridge.request(A.updateConfig, { multicambio: v })
         .then(() => ctx.loadData("config", A.getConfig, null, { force: true }))
         .then((c) => { ctx.toast(v ? "Multicâmbio ativado: escolha a moeda no menu lateral." : "Multicâmbio desativado"); return aplicarMoeda(ctx, (c && c.moeda) || "BRL"); })
         .catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar multicâmbio")));

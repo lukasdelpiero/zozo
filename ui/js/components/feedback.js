@@ -16,9 +16,10 @@
     // Confirmações de ação ("Transação criada.", "Salvo"…) não aparecem: a própria tela já mostra o resultado.
     // Só erros e avisos que explicam por que algo NÃO aconteceu.
     if (tone !== "error" && tone !== "aviso") return;
-    const el = h("div", { class: ["toast", "toast--" + tone], role: tone === "error" ? "alert" : "status" },
-      icon(tone === "error" || tone === "aviso" ? "alerta" : "check", { size: 16, class: "toast__icon" }),
-      h("span", { class: "toast__text" }, mensagem));
+    const P = ZoZo.pecas;
+    const el = h("div", { class: tone === "error" ? P.avisoErro : P.aviso, role: tone === "error" ? "alert" : "status" },
+      icon("alerta", { size: 16, class: tone === "aviso" ? P.avisoIconeAviso : P.avisoIcone }),
+      h("span", { class: P.avisoTexto }, mensagem));
     root.appendChild(el);
     requestAnimationFrame(() => el.classList.add("is-visible"));
     setTimeout(() => {
@@ -68,7 +69,7 @@
     const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", "aria-modal": "true", "aria-labelledby": tituloId },
       h("header", { class: parte("modalTopo") },
         h("h2", { class: parte("modalTitulo"), id: tituloId }, o.title || ""),
-        h("button", { type: "button", class: "icon-btn", "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
+        h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
       h("div", { class: parte("modalCorpo") }, o.body || null),
       o.actions ? h("footer", { class: tipo === "Confirmacao" ? E.modalRodapeConfirmacao : E.modalRodape }, o.actions(fechar)) : null);
 

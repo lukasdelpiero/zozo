@@ -26,9 +26,10 @@
 
   /** Nome + 4 últimos dígitos (mais claro) */
   function nomeComDigitos(nome, digitos, cls) {
-    return h("span", { class: ["name-digits", cls] },
-      h("span", { class: "name-digits__name" }, nome || ""),
-      digitos ? h("span", { class: "name-digits__digits" }, digitos) : null);
+    const P = ZoZo.pecas;
+    return h("span", { class: [P.nomeDigitos, cls] },
+      h("span", { class: P.nomeDigitosNome }, nome || ""),
+      digitos ? h("span", { class: P.nomeDigitosDigitos }, digitos) : null);
   }
 
   /* ---------- Lançamento (seção 15) ----------
@@ -115,7 +116,7 @@
         // data primeiro (largura fixa) para os nomes alinharem com ou sem a letra T/R/I/P
         o.mostrarData || resumo ? h("span", { class: [LR.data, V.data] }, F.dataCurta(l.data)) : null,
         // letra (R/P/T/I/D) só quando existe: a Regular começa logo ao lado da caixa de seleção
-        marca && !resumo ? h("span", { class: ["kind-badge", LR.letra], title: marcaTitulo, "aria-label": marcaTitulo }, marca) : null,
+        marca && !resumo ? h("span", { class: [ZoZo.pecas.letra, LR.letra], title: marcaTitulo, "aria-label": marcaTitulo }, marca) : null,
         h("span", { class: ["launch-row__title", LR.titulo] }, nomeDestacado(l.descricao, o.destacar)),
         l.parcelaTotal ? h("span", { class: LR.parcela, title: "Parcela " + l.parcelaAtual + " de " + l.parcelaTotal }, l.parcelaAtual + "/" + l.parcelaTotal) : null,
         // conta e 4 dígitos juntos ("Itaú 4821"): o nome encurta com "…" se faltar espaço
@@ -251,7 +252,7 @@
       h("span", { class: "recurrence-row__desc" },
         h("span", { class: ["recurrence-row__title", p.titulo] }, r.descricao),
         h("span", { class: "recurrence-row__type" }, r.tipoRecorrencia)),
-      h("span", { class: ["recurrence-row__category", p.categoria] }, UI.CategoryLabel(r.categoria, { pill: true })),
+      h("span", { class: ["recurrence-row__category", ZoZo.pecas.ctxPilulaLinha, p.categoria] }, UI.CategoryLabel(r.categoria, { pill: true })),
       h("span", { class: ["recurrence-row__value money", p.valor] },
         F.moeda(r.valor),
         r.pago ? h("span", { class: "recurrence-row__paid", title: "Pago", "aria-label": "Pago",
@@ -301,37 +302,37 @@
         const doMes = ordenados.filter((x) => x.data.startsWith(mes));
         const gasto = doMes.reduce((s, x) => s + (T.gasto[x.tipo] || 0) * x.valor, 0);
         const recebido = doMes.reduce((s, x) => s + (T.recebido[x.tipo] || 0) * x.valor, 0);
-        secao = h("section", { class: "pl-month" }, h("header", { class: "pl-month__head" },
-          h("h4", { class: "pl-month__title" }, F.mesAno(mes + "-01")),
-          h("span", { class: "pl-month__total" },
+        secao = h("section", { class: ZoZo.pecas.plMes }, h("header", { class: ZoZo.pecas.plMesTopo },
+          h("h4", { class: ZoZo.pecas.plMesTitulo }, F.mesAno(mes + "-01")),
+          h("span", { class: ZoZo.pecas.plMesTotal },
             recebido > 0 ? h("span", { class: "money money--income" }, F.moeda(recebido)) : null,
-            recebido > 0 && gasto > 0 ? h("span", { class: "money pl-month__paren" }, "(" + F.moeda(gasto) + ")") : null,
+            recebido > 0 && gasto > 0 ? h("span", { class: ZoZo.pecas.plMesParenteses }, "(" + F.moeda(gasto) + ")") : null,
             !(recebido > 0) ? h("span", { class: "money" }, F.moeda(gasto)) : null)));
         blocos.push(secao);
       }
       if (l.data !== diaAtual) {
         diaAtual = l.data;
-        secao.appendChild(h("h5", { class: "pl-day" }, F.rotuloDia(l.data)));
-        lista = h("div", { class: "pl-list" });
+        secao.appendChild(h("h5", { class: ZoZo.pecas.plDia }, F.rotuloDia(l.data)));
+        lista = h("div", { class: ZoZo.pecas.plLista });
         secao.appendChild(lista);
       }
       const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
       const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
       const marcado = marcados.has(l.id);
-      lista.appendChild(h("div", { class: ["pl-row", marcado && "is-checked"], role: "button", tabindex: "0", "data-id": l.id,
+      lista.appendChild(h("div", { class: [ZoZo.pecas.plLinha, marcado && "is-checked"], role: "button", tabindex: "0", "data-id": l.id,
         onClick: () => o.onClick && o.onClick(l),
         onKeydown: (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); if (o.onClick) o.onClick(l); } } },
         UI.Checkbox(marcado, (v) => {
           const atual = new Set(ZoZo.store.get().ui.selecionados || []);
           if (v) atual.add(l.id); else atual.delete(l.id);
           ZoZo.store.set({ ui: { selecionados: Array.from(atual) } });
-        }, { label: "Selecionar " + l.descricao, class: "pl-row__check" }),
-        h("span", { class: "pl-row__name" },
-          marca ? h("span", { class: "kind-badge", title: { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] }, marca) : null,
-          h("span", { class: "pl-row__title" }, l.descricao),
+        }, { label: "Selecionar " + l.descricao, class: ZoZo.pecas.plCaixa }),
+        h("span", { class: ZoZo.pecas.plNome },
+          marca ? h("span", { class: ZoZo.pecas.letra, title: { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] }, marca) : null,
+          h("span", { class: ZoZo.pecas.plTitulo }, l.descricao),
           l.parcelaTotal ? h("span", { class: "launch-row__parcel" }, l.parcelaAtual + "/" + l.parcelaTotal) : null),
-        l.categoria ? h("span", { class: "pl-row__cat", title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, l.categoria.icone || "•") : h("span"),
-        h("span", { class: ["pl-row__value", "money", verde && "money--income"] }, F.moeda(l.valor))));
+        l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, l.categoria.icone || "•") : h("span"),
+        h("span", { class: [ZoZo.pecas.plValor, verde && "money--income"] }, F.moeda(l.valor))));
     });
     return h("div", { class: "pl" }, blocos);
   }

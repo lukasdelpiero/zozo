@@ -10,6 +10,7 @@
   const { h, id: uid } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const F = ZoZo.format;
+  const P = ZoZo.pecas;                       // classes Tailwind das peças (components/pecas.ts)
 
   /** Após re-render, devolve o foco ao elemento com a mesma chave */
   function refocus(key) {
@@ -22,22 +23,25 @@
   /* ---------- Botões ---------- */
   function Button(label, opts) {
     const o = opts || {};
-    const variant = o.variant || "secondary"; // primary | secondary | danger | text | on-primary
+    const variant = o.variant || "secondary"; // primary | secondary | danger | danger-ghost | text
+    const cheio = String(o.class || "").split(/\s+/).includes("btn--block");
     return h("button", {
       type: o.type || "button",
-      class: ["btn", "btn--" + variant, o.size === "sm" && "btn--sm", o.class],
+      class: [ZoZo.pecasFn.botao(variant, o.size === "sm", cheio), o.class],
       onClick: o.onClick,
       disabled: o.disabled,
       "aria-pressed": o.pressed === undefined ? undefined : String(!!o.pressed),
       title: o.title,
-    }, o.icon && icon(o.icon), label ? h("span", { class: "btn__label" }, label) : null);
+    }, o.icon && icon(o.icon), label ? h("span", { class: P.rotuloBotao }, label) : null);
   }
 
   function IconButton(iconName, label, opts) {
     const o = opts || {};
+    const mods = String(o.class || "").split(/\s+/);
+    const tom = mods.includes("icon-btn--danger") ? "perigo" : o.onPrimary ? "claro" : "";
     return h("button", {
       type: "button",
-      class: ["icon-btn", o.onPrimary && "icon-btn--on-primary", o.active && "is-active", o.class],
+      class: [ZoZo.pecasFn.botaoIcone(tom, mods.includes("icon-btn--sm")), o.active && "is-active", o.class],
       "aria-label": label,
       title: label,
       onClick: o.onClick,
@@ -52,16 +56,17 @@
     const o = opts || {};
     const controlId = control.id || uid("campo");
     control.id = controlId;
-    return h("div", { class: ["field", o.class] },
-      h("label", { class: "field__label", for: controlId }, label),
-      o.prefix ? h("div", { class: "field__affix" }, h("span", { class: "field__prefix", "aria-hidden": "true" }, o.prefix), control) : control,
-      o.hint ? h("p", { class: "field__hint" }, o.hint) : null);
+    return h("div", { class: [P.campo, o.class] },
+      h("label", { class: P.campoRotulo, for: controlId }, label),
+      o.prefix ? h("div", { class: P.afixo }, h("span", { class: P.prefixo, "aria-hidden": "true" }, o.prefix), control) : control,
+      o.hint ? h("p", { class: P.campoDica }, o.hint) : null);
   }
 
   function Input(opts) {
     const o = opts || {};
+    const mods = String(o.class || "").split(/\s+/);
     return h("input", {
-      class: ["input", o.class],
+      class: [P.entrada, mods.includes("input--sm") && P.entradaPequena, mods.includes("input--leitura") && P.entradaLeitura, o.class],
       type: o.type || "text",
       name: o.name,
       id: o.id,                                   // ajuda gerenciadores de senha a reconhecer o campo
@@ -81,7 +86,7 @@
   /** options: [{ value, label }] ou [{ group, options:[...] }] */
   function Select(options, opts) {
     const o = opts || {};
-    const sel = h("select", { class: ["select", o.class], name: o.name, disabled: o.disabled, onChange: o.onChange, "aria-label": o.ariaLabel });
+    const sel = h("select", { class: [P.lista, o.class], name: o.name, disabled: o.disabled, onChange: o.onChange, "aria-label": o.ariaLabel });
     const addOpt = (parent, op) => parent.appendChild(h("option", { value: op.value }, op.label));
     (options || []).forEach((op) => {
       if (op.group) {
@@ -96,44 +101,46 @@
 
   function Textarea(opts) {
     const o = opts || {};
-    const t = h("textarea", { class: ["textarea", o.class], name: o.name, rows: o.rows || 4, placeholder: o.placeholder, "aria-label": o.ariaLabel });
+    const t = h("textarea", { class: [P.areaTexto, o.class], name: o.name, rows: o.rows || 4, placeholder: o.placeholder, "aria-label": o.ariaLabel });
     t.value = o.value || "";
     return t;
   }
 
   function Toggle(label, opts) {
     const o = opts || {};
-    const input = h("input", { type: "checkbox", class: "toggle__input", role: "switch", onChange: (e) => o.onChange && o.onChange(e.target.checked) });
+    const input = h("input", { type: "checkbox", class: P.interruptorEntrada, role: "switch", onChange: (e) => o.onChange && o.onChange(e.target.checked) });
     input.checked = !!o.checked;
-    return h("label", { class: "toggle" }, input, h("span", { class: "toggle__track", "aria-hidden": "true" }, h("span", { class: "toggle__thumb" })), h("span", { class: "toggle__label" }, label));
+    return h("label", { class: P.interruptor }, input, h("span", { class: P.interruptorTrilho, "aria-hidden": "true" }, h("span", { class: P.interruptorBolinha })),
+      h("span", { class: P.interruptorRotulo }, label));
   }
 
   /* ---------- Tag de Perfil (seção 14.4 / 33) ---------- */
   function Tag(nome, cor, opts) {
     const o = opts || {};
-    if (!nome) return o.placeholder ? h("span", { class: "tag tag--empty" }, o.placeholder) : null;
+    if (!nome) return o.placeholder ? h("span", { class: P.tagVazia }, o.placeholder) : null;
+    const maiusculas = String(o.class || "").split(/\s+/).includes("tag--upper");    // listas e painéis
     return h(o.onClick ? "button" : "span", {
       type: o.onClick ? "button" : undefined,
-      class: ["tag", o.onClick && "tag--interactive", o.class],
+      class: [maiusculas ? P.tagUpper : P.tag, o.onClick && P.tagInterativa, o.class],
       style: { "--tag-color": F.cor(cor, "var(--palette-16)") },
       onClick: o.onClick,
       title: o.title,
-    }, h("span", { class: "tag__dot", "aria-hidden": "true" }), h("span", { class: "tag__text" }, nome));
+    }, h("span", { class: P.tagPonto, "aria-hidden": "true" }), h("span", { class: maiusculas ? P.tagTextoUpper : P.tagTexto }, nome));
   }
 
   /* ---------- Categoria: [Ícone] [Nome] ---------- */
   function CategoryLabel(cat, opts) {
     const o = opts || {};
-    if (!cat) return o.pill ? null : h("span", { class: "cat-label cat-label--empty" }, o.vazio || "Sem categoria");
+    if (!cat) return o.pill ? null : h("span", { class: P.rotuloVazio }, o.vazio || "Sem categoria");
     if (o.pill) {
       // Fundo na cor da categoria e texto mais escuro do mesmo tom, em CAIXA ALTA
-      return h("span", { class: ["cat-pill", o.class], style: { "--tag-color": F.cor(cat.cor, "var(--palette-16)") }, title: cat.nome },
-        h("span", { class: "cat-pill__icon", "aria-hidden": "true" }, cat.icone || "•"),
-        h("span", { class: "cat-pill__name" }, cat.nome));
+      return h("span", { class: [P.pilula, o.class], style: { "--tag-color": F.cor(cat.cor, "var(--palette-16)") }, title: cat.nome },
+        h("span", { class: P.pilulaIcone, "aria-hidden": "true" }, cat.icone || "•"),
+        h("span", { class: P.pilulaNome }, cat.nome));
     }
-    return h("span", { class: ["cat-label", o.class] },
-      h("span", { class: "cat-label__icon", "aria-hidden": "true" }, cat.icone || "•"),
-      h("span", { class: "cat-label__name" }, cat.nome));
+    return h("span", { class: [P.rotulo, o.class] },
+      h("span", { class: P.rotuloIcone, "aria-hidden": "true" }, cat.icone || "•"),
+      h("span", { class: P.rotuloNome }, cat.nome));
   }
 
   /* ---------- Variação percentual (seções 19, 63) ---------- */
@@ -143,9 +150,10 @@
     const dir = n > 0 ? "up" : n < 0 ? "down" : "flat";
     const nomeIcone = dir === "up" ? "seta-sobe" : dir === "down" ? "seta-desce" : "igual";
     const descr = dir === "up" ? "Aumento de " : dir === "down" ? "Redução de " : "Sem variação, ";
-    return h("span", { class: ["pct", "pct--" + dir, o.plain && "pct--plain", o.class], title: o.title, "aria-label": descr + F.percentual(n) + (o.contexto ? " " + o.contexto : "") },
+    const cls = o.plain ? { up: P.pctSimplesSobe, down: P.pctSimplesDesce, flat: P.pctSimplesIgual }[dir] : { up: P.pctSobe, down: P.pctDesce, flat: P.pctIgual }[dir];
+    return h("span", { class: [cls, o.class], title: o.title, "aria-label": descr + F.percentual(n) + (o.contexto ? " " + o.contexto : "") },
       icon(nomeIcone, { size: 12, stroke: 2.25 }),
-      h("span", { class: "pct__value" }, F.percentual(n)));
+      h("span", { class: P.pctValor }, F.percentual(n)));
   }
 
   /* ---------- Barra de progresso ---------- */
@@ -153,11 +161,11 @@
     const o = opts || {};
     const pct = Math.max(0, Math.min(1, F.numero(ratio))) * 100;
     return h("div", {
-      class: ["progress", o.tone && "progress--" + o.tone, o.class],
+      class: [o.grande ? P.barraGrande : P.barra, o.class],
       role: "progressbar",
       "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(pct)),
       "aria-label": o.label,
-    }, h("div", { class: "progress__fill", style: { width: pct + "%" } }));
+    }, h("div", { class: o.tone === "over" ? P.barraAcima : o.tone === "allocation" ? P.barraAlocacao : P.barraOk, style: { width: pct + "%" } }));
   }
 
   /* ---------- Filtros 1S | 1M | 3M | ONT | 1A | TOTAL ---------- */
@@ -166,11 +174,11 @@
   function FilterTabs(valor, onChange, opts) {
     const o = opts || {};
     const itens = o.itens || INTERVALOS;
-    const wrap = h("div", { class: "filter-tabs", role: "radiogroup", "aria-label": o.label || "Período do gráfico" });
+    const wrap = h("div", { class: P.abas, role: "radiogroup", "aria-label": o.label || "Período do gráfico" });
     itens.forEach((it) => {
       const ativo = it === valor;
       wrap.appendChild(h("button", {
-        type: "button", role: "radio", class: ["filter-tabs__item", ativo && "is-active"],
+        type: "button", role: "radio", class: ativo ? P.abaAtiva : P.aba,
         "aria-checked": String(ativo), tabindex: ativo ? "0" : "-1", title: INTERVALO_DESCR[it], "data-fk": (o.label || "tabs") + ":" + it,
         onClick: () => onChange(it),
         onKeydown: (e) => {
@@ -201,12 +209,13 @@
   /* ---------- Segmented (Grid Superior do lançamento) ---------- */
   function Segmented(itens, valor, onChange, opts) {
     const o = opts || {};
-    const wrap = h("div", { class: ["segmented", o.class], role: "radiogroup", "aria-label": o.label });
+    const pilulas = String(o.class || "").split(/\s+/).includes("segmented--pilulas");   // pílulas sobre fundo cinza
+    const wrap = h("div", { class: [pilulas ? P.segmentadoPilulas : P.segmentado, o.class], role: "radiogroup", "aria-label": o.label });
     const botoes = [];
     itens.forEach((it, i) => {
       const ativo = it.value === valor;
       const b = h("button", {
-        type: "button", role: "radio", class: ["segmented__item", ativo && "is-active"],
+        type: "button", role: "radio", class: [pilulas ? P.segmentoPilula : P.segmento, ativo && "is-active"],
         "aria-checked": String(ativo), tabindex: ativo || (!valor && i === 0) ? "0" : "-1", "data-fk": "seg:" + it.value,
         onClick: () => onChange(it.value),
         onKeydown: (e) => {
@@ -217,7 +226,7 @@
           onChange(n.value, true);
           refocus("seg:" + n.value);
         },
-      }, it.icon ? icon(it.icon, { size: 15 }) : null, h("span", null, it.label), ativo ? icon("check", { size: 14, class: "segmented__check", stroke: 2.25 }) : null);
+      }, it.icon ? icon(it.icon, { size: 15 }) : null, h("span", null, it.label), ativo && !pilulas ? icon("check", { size: 14, class: P.segmentoMarca, stroke: 2.25 }) : null);
       botoes.push(b);
       wrap.appendChild(b);
     });
@@ -227,10 +236,10 @@
   /* ---------- Card / Section ---------- */
   function Card(opts, ...children) {
     const o = opts || {};
-    return h("section", { class: ["card", o.class], "aria-label": o.label },
-      o.title || o.link ? h("header", { class: "card__header" },
-        o.title ? h("h2", { class: "card__title" }, o.title) : h("span"),
-        o.link ? h("button", { type: "button", class: "card__link", onClick: o.link.onClick }, o.link.label, icon("chevron-right", { size: 14 })) : null) : null,
+    return h("section", { class: [P.card, o.class], "aria-label": o.label },
+      o.title || o.link ? h("header", { class: P.cardTopo },
+        o.title ? h("h2", { class: P.cardTitulo }, o.title) : h("span"),
+        o.link ? h("button", { type: "button", class: P.cardLink, onClick: o.link.onClick }, o.link.label, icon("chevron-right", { size: 14 })) : null) : null,
       ...children);
   }
 
@@ -288,14 +297,15 @@
     const fechado = !!(o.key && st.ui.gruposFechados[o.key]);
     const corpoId = uid("secao");
     const toggle = () => { if (o.key) alternarGrupo(o.key); };
-    return h("section", { class: ["section", fechado && "is-collapsed", o.class] },
-      h("header", { class: ["section__header", o.classeCabecalho] },
-        h("div", { class: ["section__lead", o.classeLead] },
-          h("button", { type: "button", class: "section__toggle", "aria-expanded": String(!fechado), "aria-controls": corpoId, onClick: toggle },
-            icon("chevron-down", { size: 14, class: "section__caret", stroke: 2.25 }),
-            h("h2", { class: "section__title" }, o.title)),
+    // classeCabecalho troca o layout do cabeçalho (ex.: grade com as colunas da lista, em Categorias)
+    return h("section", { class: [P.secao, fechado && "is-collapsed", o.class] },
+      h("header", { class: [P.secaoTopo, o.classeCabecalho || P.secaoTopoPadrao] },
+        h("div", { class: [P.secaoInicio, o.classeLead] },
+          h("button", { type: "button", class: P.secaoBotao, "aria-expanded": String(!fechado), "aria-controls": corpoId, onClick: toggle },
+            icon("chevron-down", { size: 14, class: fechado ? P.secaoSetaFechada : P.secaoSeta, stroke: 2.25 }),
+            h("h2", { class: ["section__title", P.secaoTitulo] }, o.title)),
           o.adorno || null),
-        o.aside ? h("div", { class: "section__aside" }, o.aside) : null),
+        o.aside ? h("div", { class: P.secaoLado }, o.aside) : null),
       o.key ? corpoArvore(o.key, h("div", { class: "section__body", id: corpoId, hidden: fechado }, ...children))
         : h("div", { class: "section__body", id: corpoId, hidden: fechado }, ...children));
   }
@@ -303,27 +313,27 @@
   /* ---------- Loading / Vazio ---------- */
   function Skeleton(linhas, opts) {
     const o = opts || {};
-    const wrap = h("div", { class: ["skeleton", o.class], "aria-busy": "true", "aria-label": "Carregando" });
+    const wrap = h("div", { class: [P.esqueleto, o.class], "aria-busy": "true", "aria-label": "Carregando" });
     for (let i = 0; i < (linhas || 4); i++) {
-      wrap.appendChild(h("div", { class: "skeleton__row" },
-        h("span", { class: "skeleton__block", style: { width: (o.short ? 18 : 30 + ((i * 17) % 40)) + "%" } }),
-        h("span", { class: "skeleton__block skeleton__block--end", style: { width: "14%" } })));
+      wrap.appendChild(h("div", { class: P.esqueletoLinha },
+        h("span", { class: P.esqueletoBloco, style: { width: (o.short ? 18 : 30 + ((i * 17) % 40)) + "%" } }),
+        h("span", { class: P.esqueletoBloco, style: { width: "14%" } })));
     }
     return wrap;
   }
 
   function EmptyState(mensagem, opts) {
     const o = opts || {};
-    return h("div", { class: ["empty", o.class] },
-      icon(o.icon || "lancamentos", { size: 20, class: "empty__icon" }),
-      h("p", { class: "empty__text" }, mensagem),
+    return h("div", { class: [P.vazio, o.class] },
+      icon(o.icon || "lancamentos", { size: 20, class: P.vazioIcone }),
+      h("p", { class: P.vazioTexto }, mensagem),
       o.action ? Button(o.action.label, { variant: "secondary", size: "sm", onClick: o.action.onClick, icon: o.action.icon }) : null);
   }
 
   function ErrorState(mensagem, onRetry) {
-    return h("div", { class: "empty empty--error", role: "alert" },
-      icon("alerta", { size: 20, class: "empty__icon" }),
-      h("p", { class: "empty__text" }, mensagem),
+    return h("div", { class: P.vazio, role: "alert" },
+      icon("alerta", { size: 20, class: P.vazioIconeErro }),
+      h("p", { class: P.vazioTexto }, mensagem),
       onRetry ? Button("Tentar novamente", { size: "sm", onClick: onRetry, icon: "atualizar" }) : null);
   }
 
@@ -331,12 +341,18 @@
   function ColorPicker(valor, onChange, opts) {
     const o = opts || {};
     const cores = ZoZo.regras.paleta;
-    const wrap = h("div", { class: ["color-picker", o.colunas === 4 && "color-picker--4"], role: "radiogroup", "aria-label": o.label || "Cor" });
+    // o.cheio: a paleta ocupa a largura toda e os quadrados têm o.altura (36 nas janelas, 40 no menu de cor)
+    const col = o.colunas === 4 ? 4 : 8;
+    const wrap = h("div", { class: [col === 4 ? P.paleta4 : P.paleta, o.cheio && P.paletaCheia], role: "radiogroup", "aria-label": o.label || "Cor" });
     const atual = (valor || "").toLowerCase();
+    // cantos arredondados só nos quatro cantos da paleta
+    const cantos = col === 4 ? { 0: "tw:rounded-tl-lg", 3: "tw:rounded-tr-lg", 12: "tw:rounded-bl-lg", 15: "tw:rounded-br-lg" }
+      : { 0: "tw:rounded-tl-[10px]", 7: "tw:rounded-tr-[10px]", 8: "tw:rounded-bl-[10px]", 15: "tw:rounded-br-[10px]" };
+    const quadrado = !o.cheio ? P.quadrado : o.altura === 40 ? P.quadradoCheio40 : P.quadradoCheio36;
     cores.forEach((cor, i) => {
       const ativo = cor.toLowerCase() === atual;
       wrap.appendChild(h("button", {
-        type: "button", role: "radio", class: ["color-picker__swatch", ativo && "is-active"],
+        type: "button", role: "radio", class: [quadrado, cantos[i], ativo && P.quadradoAtivo],
         style: { "--swatch": F.cor(cor, "#000") }, "aria-checked": String(ativo), "aria-label": "Cor " + (i + 1),
         tabindex: ativo || (!atual && i === 0) ? "0" : "-1",
         onClick: () => onChange(cor),
@@ -348,7 +364,7 @@
           const btns = wrap.querySelectorAll("button");
           btns[(i + map[e.key] + cores.length) % cores.length].focus();
         },
-      }, ativo ? icon("check", { size: 14, stroke: 2.5 }) : null));
+      }, ativo ? icon("check", { size: 14, stroke: 2.5, class: P.quadradoMarca }) : null));
     });
     return wrap;
   }
@@ -356,19 +372,19 @@
   /* ---------- Checkbox ---------- */
   function Checkbox(checked, onChange, opts) {
     const o = opts || {};
-    const input = h("input", { type: "checkbox", class: "check__input", "aria-label": o.label });
+    const input = h("input", { type: "checkbox", class: P.caixaEntrada, "aria-label": o.label });
     input.checked = !!checked;
     input.addEventListener("click", (e) => e.stopPropagation());
     input.addEventListener("change", () => onChange(input.checked));
-    return h("label", { class: ["check", o.class], onClick: (e) => e.stopPropagation() }, input,
-      h("span", { class: "check__box", "aria-hidden": "true" }, icon("check", { size: 12, stroke: 3 })),
+    return h("label", { class: [P.caixa, o.class], onClick: (e) => e.stopPropagation() }, input,
+      h("span", { class: P.caixaQuadro, "aria-hidden": "true" }, icon("check", { size: 12, stroke: 3 })),
       o.texto ? h("span", { class: "check__text" }, o.texto) : null);
   }
 
   /* ---------- Ícone de conta ---------- */
   const ICONE_TIPO_CONTA = { cartao: "cartao", corrente: "banco", poupanca: "banco", investimento: "investimentos", emprestimo: "emprestimo", outros: "carteira" };
   function AccountIcon(conta) {
-    return h("span", { class: "account-icon", style: { "--account-color": F.cor(conta.cor, "var(--palette-16)") }, "aria-hidden": "true" },
+    return h("span", { class: P.iconeConta, style: { "--account-color": F.cor(conta.cor, "var(--palette-16)") }, "aria-hidden": "true" },
       icon(ICONE_TIPO_CONTA[conta.tipo] || "carteira", { size: 16 }));
   }
 
@@ -377,7 +393,7 @@
    * ícone vira ✓ e o texto/rótulo muda por ~1,6 s; leitores de tela ouvem pela região viva.
    */
   function confirmarNoBotao(btn, texto) {
-    const rotulo = btn.querySelector(".btn__label");
+    const rotulo = btn.querySelector(".btn__label");     // gancho do rótulo do botão (pecas.rotuloBotao)
     const iconeAntes = btn.querySelector("svg");
     const textoAntes = rotulo ? rotulo.textContent : null, ariaAntes = btn.getAttribute("aria-label");
     const ok = icon("check", { size: iconeAntes ? Number(iconeAntes.getAttribute("width")) || 15 : 15 });

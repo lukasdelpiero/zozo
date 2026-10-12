@@ -11,7 +11,7 @@
   /** Campo de texto que salva ao sair (Enter também). aoSalvar(v) → Promise; em erro, volta ao valor anterior */
   function texto(cfg) {
     let atual = cfg.valor || "";
-    const input = h("input", { type: "text", class: ["inline-input", cfg.classe], value: atual, placeholder: cfg.placeholder || "", maxlength: String(cfg.max || 80), "aria-label": cfg.rotulo || "Editar" });
+    const input = h("input", { type: "text", class: [ZoZo.pecas.noLugar, cfg.classe], value: atual, placeholder: cfg.placeholder || "", maxlength: String(cfg.max || 80), "aria-label": cfg.rotulo || "Editar" });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = atual; input.blur(); } });
     input.addEventListener("blur", () => {
       const v = input.value.trim();
@@ -27,7 +27,7 @@
   function dinheiro(cfg) {
     let atual = F.numero(cfg.valor);
     // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo: ver format.mascararValor)
-    const input = h("input", { type: "text", inputmode: "decimal", class: ["inline-input", "inline-input--money", "money", cfg.classe], value: F.moeda(atual),
+    const input = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, ZoZo.pecas.noLugarValor, "money", cfg.classe], value: F.moeda(atual),
       "data-com-simbolo": "", "aria-label": cfg.rotulo || "Valor" });
     // ao clicar para editar o cursor vai para o fim (nada selecionado; Backspace apaga o último dígito)
     input.addEventListener("focus", () => { input.value = F.valorParaEditar(input, atual); F.cursorNoFim(input); });
@@ -47,11 +47,11 @@
   /** Bolinha de cor que abre a paleta 4×4 */
   function corDot(cor, aoMudar) {
     let atual = F.cor(cor, "#6078a9");
-    const btn = h("button", { type: "button", class: "color-dot", style: { "--dot": atual }, "aria-label": "Alterar cor", "aria-haspopup": "menu" });
+    const btn = h("button", { type: "button", class: ZoZo.pecas.pontoCor, style: { "--dot": atual }, "aria-label": "Alterar cor", "aria-haspopup": "menu" });
     btn.addEventListener("click", () => ZoZo.menu.abrir(btn, { largura: 184, render(el, api) {
-      ZoZo.dom.mount(el, h("div", { class: "color-dot__menu" }, ZoZo.ui.ColorPicker(atual, (c) => {
+      ZoZo.dom.mount(el, h("div", { class: ZoZo.pecas.pontoCorMenu }, ZoZo.ui.ColorPicker(atual, (c) => {
         atual = c; btn.style.setProperty("--dot", c); api.fechar(); aoMudar(c);
-      }, { colunas: 4, label: "Cor" })));
+      }, { colunas: 4, label: "Cor", cheio: true, altura: 40 })));
     } }, { posicao: "esquerda", largura: 184, label: "Cores" }));
     return btn;
   }

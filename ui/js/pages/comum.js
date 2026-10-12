@@ -25,16 +25,16 @@
 
   /** Bloco "valor / subtítulo" usado nos cards de resumo */
   function valorResumo(valor, subtitulo, align) {
-    return h("div", { class: ["summary__figure", "summary__figure--" + align] },
-      h("span", { class: "summary__value money" }, typeof valor === "string" ? valor : F.moeda(valor)),
-      h("span", { class: "summary__label" }, subtitulo));
+    return h("div", { class: align === "left" ? ZoZo.pecas.resumoDepois : ZoZo.pecas.resumoAntes },
+      h("span", { class: ZoZo.pecas.resumoValor }, typeof valor === "string" ? valor : F.moeda(valor)),
+      h("span", { class: ZoZo.pecas.resumoRotulo }, subtitulo));
   }
 
   /** Card Esquerda | Donut | Direita (Categorias e Recorrências) */
   function cardResumoDonut(cfg) {
-    const donut = h("div", { class: "summary__donut" });
+    const donut = h("div", { class: ZoZo.pecas.resumoRosca });
     ZoZo.charts.renderDonutChart(donut, cfg.segmentos, { ariaLabel: cfg.ariaLabel, size: 108, thickness: 15, onClick: cfg.onClick, progresso: cfg.progresso, corProgresso: cfg.corProgresso, tituloProgresso: cfg.tituloProgresso });
-    return h("section", { class: "card summary", "aria-label": cfg.ariaLabel },
+    return h("section", { class: [ZoZo.pecas.card, ZoZo.pecas.resumo], "aria-label": cfg.ariaLabel },
       valorResumo(cfg.esquerda.valor, cfg.esquerda.label, "right"),
       donut,
       valorResumo(cfg.direita.texto !== undefined ? cfg.direita.texto : cfg.direita.valor, cfg.direita.label, "left"));
@@ -55,11 +55,11 @@
 
   /** Linha de detalhe "rótulo ...... valor" no painel direito */
   function detalheLinha(rotulo, valor, cls) {
-    return h("div", { class: ["detail-line", cls] }, h("span", { class: "detail-line__label" }, rotulo), h("span", { class: "detail-line__value" }, valor));
+    return h("div", { class: [ZoZo.pecas.painelLinha, cls] }, h("span", { class: ZoZo.pecas.painelLinhaRotulo }, rotulo), h("span", { class: ZoZo.pecas.painelLinhaValor }, valor));
   }
 
   function detalheSecao(titulo, ...children) {
-    return h("section", { class: "detail-section" }, titulo ? h("h3", { class: "detail-section__title" }, titulo) : null, ...children);
+    return h("section", { class: ZoZo.pecas.painelSecao }, titulo ? h("h3", { class: ZoZo.pecas.painelSecaoTitulo }, titulo) : null, ...children);
   }
 
   ZoZo.pagesComum = { estadoCarregamento, pagina, valorResumo, cardResumoDonut, segmentosPorCategoria, detalheLinha, detalheSecao };

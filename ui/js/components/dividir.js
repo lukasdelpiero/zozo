@@ -80,7 +80,7 @@
     }
 
     function linha(parte, i) {
-      const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: ZoZo.regras.limiteNome, classe: "dv__name",
+      const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: ZoZo.regras.limiteNome, classe: "dv__name " + ZoZo.pecas.dvNome,
         aoSalvar: (v) => { parte.descricao = v; } });
       const dataBtn = h("button", { type: "button", class: "dv__date" }, dataCurta(parte.data));
       dataBtn.addEventListener("click", () => ZoZo.calendario.abrir(dataBtn, parte.data, (v) => { parte.data = v; desenhar(); }, { rotulo: "Data da parte " + (i + 1) }));
@@ -88,9 +88,9 @@
       catBtn.addEventListener("click", () => menuCategoria(catBtn, parte));
       const perfBtn = h("button", { type: "button", class: "dv__pill", "aria-haspopup": "menu", "aria-label": "Perfil" }, pillPerfil(parte.perfilId));
       perfBtn.addEventListener("click", () => menuPerfil(perfBtn, parte));
-      const valor = ZoZo.inline.dinheiro({ valor: parte.c / 100, rotulo: "Valor da parte " + (i + 1), classe: "dv__value",
+      const valor = ZoZo.inline.dinheiro({ valor: parte.c / 100, rotulo: "Valor da parte " + (i + 1), classe: "dv__value " + ZoZo.pecas.dvValor,
         aoSalvar: (v) => { mudarParaPersonalizado(); parte.pctDef = undefined; parte.c = parte.cP = Math.round(v * 100); desenhar(); } });
-      const pctInput = h("input", { type: "text", inputmode: "decimal", class: "inline-input dv__pct", value: fmtPct(pct(parte.c, total)), "aria-label": "Percentual da parte " + (i + 1), "data-sem-mascara": "1" });
+      const pctInput = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, "dv__pct", ZoZo.pecas.dvPct], value: fmtPct(pct(parte.c, total)), "aria-label": "Percentual da parte " + (i + 1), "data-sem-mascara": "1" });
       pctInput.addEventListener("focus", () => { pctInput.value = String(Math.round(pct(parte.c, total) * 100) / 100).replace(".", ","); pctInput.select(); });
       pctInput.addEventListener("keydown", (e) => { if (e.key === "Enter") pctInput.blur(); });
       pctInput.addEventListener("blur", () => {
@@ -103,9 +103,9 @@
         }
         desenhar();
       });
-      const remover = h("button", { type: "button", class: "icon-btn icon-btn--sm dv__remove", "aria-label": "Remover parte " + (i + 1), disabled: partes.length <= 1,
+      const remover = h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "dv__remove"], "aria-label": "Remover parte " + (i + 1), disabled: partes.length <= 1,
         onClick: () => { partes.splice(i, 1); if (modo === "igual") igualar(); desenhar(); } }, icon("fechar", { size: 14 }));
-      return h("div", { class: "dv__row" }, nome, dataBtn, catBtn, perfBtn, valor, pctInput, remover);
+      return h("div", { class: ["dv__row", ZoZo.pecas.ctxPilulasDivisao] }, nome, dataBtn, catBtn, perfBtn, valor, pctInput, remover);
     }
 
     /** Personalizado usa os valores que o usuário definiu (guardados em cP); partes novas ficam como estão */
@@ -131,7 +131,7 @@
     function desenhar() {
       if (modo === "igual") igualar();
       mount(lista, partes.map(linha),
-        UI.Button("Add divisão", { size: "sm", icon: "mais", class: "dv__add", onClick: () => {
+        UI.Button("Add divisão", { size: "sm", icon: "mais", class: "dv__add tw:self-start tw:mt-2.5", onClick: () => {
           const nova = Object.assign({}, partes[partes.length - 1]);          // repete a última parte (inclusive o perfil)
           partes.push(nova);
           if (modo === "igual") { igualar(); nova.cP = undefined; }
@@ -141,7 +141,7 @@
       const resto = total - partes.reduce((s, p) => s + p.c, 0);
       restanteEl.textContent = (resto < 0 ? "−" : "") + F.moeda(Math.abs(resto) / 100);
       restanteEl.classList.toggle("is-negative", resto < 0);
-      if (alternar) alternar.querySelectorAll(".segmented__item").forEach((b) => b.classList.toggle("is-active", b.dataset.v === modo));
+      if (alternar) alternar.querySelectorAll(".segmented-item").forEach((b) => b.classList.toggle("is-active", b.dataset.v === modo));
       mount(erroEl);
     }
 
@@ -160,7 +160,7 @@
 
     const card = h("div", { class: "dv__card" },
       h("div", { class: "dv__card-left" },
-        h("div", { class: "dv__card-pills" }, pillCategoria(base.categoriaId), pillPerfil(base.perfilId)),
+        h("div", { class: ["dv__card-pills", ZoZo.pecas.ctxPilulasDivisao] }, pillCategoria(base.categoriaId), pillPerfil(base.perfilId)),
         h("span", { class: "dv__card-name" }, base.descricao)),
       h("div", { class: "dv__card-right" },
         h("span", { class: "dv__card-date" }, dataCurta(data)),
@@ -171,8 +171,8 @@
       classe: "modal--dividir",
       passo: (api) => {
         alternar = UI.Segmented([{ value: "igual", label: "Igualmente" }, { value: "personalizado", label: "Personalizado" }], modo,
-          (v) => { if (v === "personalizado") mudarParaPersonalizado(true); else modo = "igual"; desenhar(); }, { label: "Forma de divisão", class: "segmented--pilulas dv__toggle" });
-        alternar.querySelectorAll(".segmented__item").forEach((b, i) => { b.dataset.v = i === 0 ? "igual" : "personalizado"; });
+          (v) => { if (v === "personalizado") mudarParaPersonalizado(true); else modo = "igual"; desenhar(); }, { label: "Forma de divisão", class: "segmented--pilulas dv__toggle tw:mb-3 tw:[&_.segmented-item]:px-4" });
+        alternar.querySelectorAll(".segmented-item").forEach((b, i) => { b.dataset.v = i === 0 ? "igual" : "personalizado"; });
         const salvar = (btn) => {
           const ativo = document.activeElement; if (ativo && corpo.contains(ativo)) ativo.blur();    // conclui a edição em andamento
           const erros = validar();

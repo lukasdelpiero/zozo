@@ -40,7 +40,7 @@
       "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-100", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-150"],
     entradaGrafico: ["tw:in-[.page--entrar]:motion-safe:animate-zz-desliza", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-50",
       "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-100", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-150"],
-    card: "card tw:p-5 tw:na-tela:flex tw:na-tela:flex-col tw:na-tela:flex-[1_1_auto] tw:na-tela:min-h-0 tw:na-tela:overflow-hidden tw:na-tela:baixa860:p-4",
+    card: ZoZo.pecas.card + " tw:p-5 tw:na-tela:flex tw:na-tela:flex-col tw:na-tela:flex-[1_1_auto] tw:na-tela:min-h-0 tw:na-tela:overflow-hidden tw:na-tela:baixa860:p-4",
     cardEstica: "tw:flex-1",
     cardFixo: "tw:flex-none",
     cardCab: "tw:flex tw:items-center tw:justify-between tw:mb-3 tw:na-tela:baixa860:mb-2",
@@ -113,7 +113,7 @@
   }
 
   function linkPara(label, onClick) {
-    return h("button", { type: "button", class: "card__link", onClick }, label, icon("chevron-right", { size: 14 }));
+    return h("button", { type: "button", class: ZoZo.pecas.cardLink, onClick }, label, icon("chevron-right", { size: 14 }));
   }
   function Card(titulo, link, onClick, estica, ...children) {
     return h("section", { class: [T.card, estica ? T.cardEstica : T.cardFixo], "aria-label": titulo },
@@ -196,8 +196,8 @@
 
       const espera = C.estadoCarregamento(state, ["dashboard"], () => this.carregar(ctx, true), {
         skeleton: h("div", { class: T.esqueleto },
-          h("div", { class: T.esqueletoCol }, h("div", { class: "card skeleton-card" }), h("div", { class: "card skeleton-card skeleton-card--short" })),
-          h("div", { class: T.esqueletoCol }, h("div", { class: "card skeleton-card skeleton-card--short" }), h("div", { class: "card skeleton-card" }))),
+          h("div", { class: T.esqueletoCol }, h("div", { class: ZoZo.pecas.esqueletoCard }), h("div", { class: ZoZo.pecas.esqueletoCardBaixo })),
+          h("div", { class: T.esqueletoCol }, h("div", { class: ZoZo.pecas.esqueletoCardBaixo }), h("div", { class: ZoZo.pecas.esqueletoCard }))),
       });
       if (espera) return C.pagina(T.pagina, saudacao, espera);
 
