@@ -108,6 +108,34 @@ declare global {
     simbolo(): string;
   }
 
+  /** js/core/busca.ts — busca local (os dados são cifrados: nada vai a um servidor de busca) */
+  /** [texto do campo, peso]: o peso multiplica a relevância (ex.: descrição 3, notas 1) */
+  type CampoBusca = [texto: unknown, peso: number];
+  interface ConsultaBusca {
+    termos: string[];                                // palavras normalizadas (sem acento, minúsculas)
+    valor: { min?: number; max?: number } | null;   // ">100", "<=50"
+    vazia: boolean;
+  }
+  interface ResultadoBusca<T> {
+    itens: T[];                                      // na ordem original da lista
+    termos: string[];
+    valor: ConsultaBusca["valor"];
+    pontos(item: T): number;                         // relevância (maior = melhor)
+    destacar(texto: unknown): Array<string | { marca: string }>;
+  }
+  interface IndiceBusca<T> {
+    buscar(texto: string, valorDe?: (item: T) => number): ResultadoBusca<T>;
+    tamanho: number;
+    vocabulario: number;
+  }
+  interface ZoZoBusca {
+    normalizar(t: unknown): string;
+    consulta(texto: unknown): ConsultaBusca;
+    indice<T extends object>(itens: readonly T[], campos: (item: T) => CampoBusca[], chave?: string): IndiceBusca<T>;
+    destacar(texto: unknown, termos: readonly string[]): Array<string | { marca: string }>;
+    distancia(a: string, b: string, max: number): number;
+  }
+
   /** js/data/pix.ts */
   interface DadosPix {
     chave: string;
@@ -132,6 +160,7 @@ declare global {
     recursos: ZoZoRecursos;
     log: ZoZoLog;
     format: ZoZoFormat;
+    busca: ZoZoBusca;
     pix: ZoZoPix;
     // módulos ainda em JavaScript
     [modulo: string]: any;

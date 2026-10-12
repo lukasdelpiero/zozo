@@ -113,18 +113,44 @@
     return null;
   }
 
-  const normalizar = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const normalizar = (t) => ZoZo.busca.normalizar(t);
+
+  /* ---------------- Pesquisa (busca local: js/core/busca.ts) ----------------
+     Os dados são cifrados de ponta a ponta, então a busca roda aqui. Campos e pesos: descrição pesa
+     mais; valor e data entram em vários formatos ("1.234,56", "1234", "11/10", "outubro"). */
+  const TIPO_BUSCA = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito" };
+  function valorBusca(v) {
+    const n = Math.abs(F.numero(v)), inteiro = Math.trunc(n);
+    return [F.moedaEditavel(n), n.toFixed(2).replace(".", ","), n.toFixed(2), String(inteiro), F.moedaEditavel(inteiro).replace(/,00$/, "")].join(" ");
+  }
+  function dataBusca(iso) {
+    const [a, m, d] = String(iso || "").split("-");
+    if (!d) return "";
+    const mes = Number(m), dia = Number(d);
+    return [d + "/" + m, d + "/" + m + "/" + a, dia + "/" + mes, dia + "/" + mes + "/" + a, F.mesNome(mes - 1), a].join(" ");
+  }
+  const camposBusca = (comPerfis) => (l) => [
+    [l.descricao, 3],
+    [l.categoria && l.categoria.nome, 2], [l.nomeConta, 2], [l.ultimos4Digitos, 2],
+    [comPerfis && l.perfil ? l.perfil.nome : null, 1.5],
+    [l.notas, 1],
+    [valorBusca(l.valor), 2],
+    [dataBusca(l.data), 1],
+    [(TIPO_BUSCA[l.tipo] || "") + (l.recorrencia === "parcelada" ? " parcelado parcela" : "") + (l.parcelaTotal ? " " + l.parcelaAtual + "/" + l.parcelaTotal : ""), 1],
+  ];
+  /** Índice da lista atual (montado uma vez por lista e guardado enquanto ela existir) */
+  const indiceBusca = (lancamentos, comPerfis) => ZoZo.busca.indice(lancamentos, camposBusca(comPerfis), comPerfis ? "perfis" : "");
 
   function aplicarFiltros(lancamentos, st) {
-    // Área principal mostra só até HOJE (parcelas e agendamentos futuros ficam de fora)
     const hoje = F.iso(new Date());
-    lancamentos = lancamentos.filter((l) => l.data <= hoje);
     const f = filtros();
-    const termo = normalizar(st.ui.busca).trim();
+    const termo = String(st.ui.busca || "").trim();
     const cats = (st.data.categorias && st.data.categorias.categorias) || [];
     const statusDe = (id) => { const c = cats.find((x) => x.id === id); return c ? c.status : null; };
     const faixa = f.periodo ? intervalo(f.periodo).map(F.iso) : null;
     const comPerfis = ZoZo.recursos.perfis();            // filtro de perfil só existe para contas com o recurso
+    // Área principal mostra só até HOJE; pesquisando, também acha parcelas e agendamentos futuros
+    lancamentos = termo ? indiceBusca(lancamentos, comPerfis).buscar(termo).itens : lancamentos.filter((l) => l.data <= hoje);
     let out = lancamentos.filter((l) => {
       if (f.contas.length && !f.contas.includes(l.contaId)) return false;
       if (f.categorias.length && !f.categorias.includes(l.categoriaId)) return false;
@@ -133,7 +159,6 @@
       if (faixa && (l.data < faixa[0] || l.data > faixa[1])) return false;
       if (f.tipos.length && !f.tipos.includes(l.tipo)) return false;
       if (f.recorrencias.length && !f.recorrencias.some((sid) => l.id === sid || l.serieId === sid)) return false;
-      if (termo && ![l.descricao, l.nomeConta, l.ultimos4Digitos, l.categoria && l.categoria.nome, l.perfil && l.perfil.nome, l.notas].some((v) => normalizar(v).includes(termo))) return false;
       return true;
     });
     const [campo, dir] = f.ordem.split("-");
@@ -345,12 +370,34 @@
   /* ---------------- Ações da barra superior ---------------- */
   let buscaTimer = null;
   let ultimaBusca = null;        // a lista entra com animação quando o termo pesquisado muda
+  /* O campo é criado uma vez só: a barra superior se redesenha (dados recarregados, atualização de outra
+     aba, filtros) e antes o campo era trocado no meio da digitação — perdia o foco e as últimas letras. */
+  let campoBusca = null;
+  function campoPesquisa() {
+    if (campoBusca) return campoBusca;
+    const aplicar = (v) => { clearTimeout(buscaTimer); store.set({ ui: { busca: v, selecionados: [] } }); };
+    campoBusca = h("input", {
+      type: "search", class: "topbar-search__input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações",
+      title: "Nome, categoria, conta, valor ou data — ex.: mercado outubro · >100 · 11/10 (atalho: / ou Ctrl+K)",
+      "aria-keyshortcuts": "/ Control+K", autocomplete: "off", spellcheck: "false", enterkeyhint: "search",
+      onInput: (e) => { clearTimeout(buscaTimer); const v = e.target.value; buscaTimer = setTimeout(() => aplicar(v), 120); },
+      // Enter pesquisa na hora; Esc limpa (e só depois, com o campo vazio, fecha o painel)
+      onKeydown: (e) => {
+        if (e.key === "Enter") aplicar(e.target.value);
+        else if (e.key === "Escape" && e.target.value) { e.preventDefault(); e.target.value = ""; aplicar(""); }
+      },
+    });
+    return campoBusca;
+  }
   function acoes(ctx) {
     const st = store.get();
-    const busca = h("input", {
-      type: "search", class: "topbar-search__input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações", value: st.ui.busca,
-      onInput: (e) => { clearTimeout(buscaTimer); const v = e.target.value; buscaTimer = setTimeout(() => store.set({ ui: { busca: v, selecionados: [] } }), 160); },
-    });
+    const busca = campoPesquisa();
+    const comFoco = document.activeElement === busca;
+    if (!comFoco && busca.value !== (st.ui.busca || "")) busca.value = st.ui.busca || "";
+    if (comFoco) {
+      const [ini, fim] = [busca.selectionStart, busca.selectionEnd];
+      queueMicrotask(() => { if (busca.isConnected) { busca.focus(); try { busca.setSelectionRange(ini, fim); } catch (e) { /* sem seleção */ } } });
+    }
     // Filtro ativo = algum filtro diferente do padrão (a pesquisa tem o próprio campo)
     const padrao = FILTROS_VAZIOS();
     const ativos = Object.keys(padrao).some((k) => JSON.stringify(filtros()[k]) !== JSON.stringify(padrao[k]));
@@ -426,7 +473,10 @@
           : UI.EmptyState("Nenhuma transação cadastrada.", { class: anim(0), action: { label: "Nova transação", icon: "mais", onClick: () => abrirFormulario(null, ctx) } }));
       }
 
+      const termosBusca = termoAtual ? ZoZo.busca.consulta(state.ui.busca).termos : [];
+      const destacar = termosBusca.length ? (t) => ZoZo.busca.destacar(t, termosBusca) : null;
       const linha = (l, comData) => L.LaunchRow(l, {
+        destacar,
         selected: l.id === selId,
         marcado: marcados.has(l.id),
         onMarcar: (v) => alternarMarca(l.id, v),

@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.2.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.3.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,14 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.3.0
+
+- **Busca nova (Transações):** várias palavras em qualquer ordem e em qualquer campo ("mercado outubro", "uber nubank"), prefixo enquanto digita, trecho no meio da palavra, tolerância a erros de digitação ("supermecado"), valores ("1.234,56", "150") e filtros de valor (">100", "<= 50"), datas ("11/10", "setembro"), tipo ("receita", "parcelado") e o trecho encontrado destacado no nome. Pesquisando, também aparecem parcelas e agendamentos futuros. Atalho **/** ou **Ctrl+K** de qualquer página; **Enter** pesquisa na hora e **Esc** limpa. Roda inteira no navegador (índice invertido, ~200 ms para montar e pesquisar 10 mil transações): como os dados são cifrados de ponta a ponta, nada é enviado a um servidor de busca (o Meilisearch exigiria os dados legíveis fora do navegador).
+- **Busca que "não funcionava":** o campo era recriado quando a barra superior se redesenhava (dados recarregados, atualização de outra aba) e perdia o foco e as últimas letras digitadas; agora é sempre o mesmo campo.
+- **Dashboard em Tailwind CSS:** saudação, grade, cards, Gasto mensal, Top categorias, Próximas transações e o modo "cabe na tela". Visual idêntico, conferido em 5 tamanhos de janela e 3 situações; ~130 linhas de CSS antigo a menos.
+- **Correções:** desligar e religar o orçamento deixava o Gasto mensal em "gastos" até recarregar; a conferência de atualização em tempo real podia disparar em rajada (trocas de janela) e gastar a cota da conta — agora no máximo 1 pedido a cada 10 s; Top categorias abre também com a barra de espaço.
+- **Limpeza:** ~25 regras de CSS antigo que nenhuma tela usava mais.
 
 ## Novidades da versão 3.2.0
 

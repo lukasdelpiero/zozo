@@ -270,6 +270,18 @@
     store.subscribe((s) => { if (s.session.authenticated) sidebar.render(s); });
     sidebar.render(store.get());
 
+    // "/" ou Ctrl+K (⌘K): pesquisar transações, de qualquer página
+    document.addEventListener("keydown", (e) => {
+      const alvo = e.target;
+      const digitando = alvo && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName));
+      const atalho = (e.key === "/" && !digitando && !e.ctrlKey && !e.metaKey && !e.altKey)
+        || ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k");
+      if (!atalho || e.defaultPrevented || document.querySelector(".modal-overlay")) return;
+      e.preventDefault();
+      if (document.getElementById("app").dataset.pagina !== "lancamentos") ctx.router.navigate("lancamentos");
+      setTimeout(() => { const c = document.querySelector(".topbar-search__input"); if (c) { c.focus(); c.select(); } });   // depois de a página montar
+    });
+
     // Escape fecha o painel de detalhes
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
@@ -320,8 +332,12 @@
      visível, confere só o NÚMERO da versão no servidor; se outro lugar gravou, baixa e redesenha
      (nada de F5). Nunca no meio de uma gravação desta aba. */
   let conferindo = false;
+  let ultimaConferencia = 0;
+  const INTERVALO_MINIMO = 10000;     // foco/visibilidade podem disparar em rajada (trocar de janela várias vezes): 1 pedido a cada 10 s, no máximo
   function conferirAtualizacao() {
     if (conferindo || document.hidden || !store.get().session.authenticated || !ZoZo.servico || ZoZo.servico.gravando()) return;
+    if (Date.now() - ultimaConferencia < INTERVALO_MINIMO) return;
+    ultimaConferencia = Date.now();
     conferindo = true;
     bridge.request(A.verificarAtualizacao)
       .then((r) => { if (r && r.mudou && ZoZo.servico.recarregarDoServidor()) return ctx.recarregarTudo(); })

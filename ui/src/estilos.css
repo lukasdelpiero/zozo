@@ -12,7 +12,8 @@
    • Telas já migradas: Configurações › Sobre; Login/Cadastro/2FA/
      confirmação de e-mail (components/auth.js); Transações
      (pages/lancamentos.js) e a linha de transação (components/list.js);
-     Categorias (pages/categorias.js, CategoryRow/CategoryGroupRow).
+     Categorias (pages/categorias.js, CategoryRow/CategoryGroupRow);
+     Contas (pages/contas.js, AccountRow) e Dashboard (pages/dashboard.js).
    • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
      "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
    • Cuidado ao migrar: utilitário vence o legado também em :focus,
@@ -67,6 +68,10 @@
 @custom-variant area340 (@container (max-width: 340px));
 /* Orçamento desligado nas Configurações (#app.sem-orcamento): barras e valores de orçamento somem */
 @custom-variant sem-orcamento (&:where(#app.sem-orcamento *));
+/* Dashboard "cabe na tela" (classe .dash--na-tela posta por pages/dashboard.js): vale para a página e o que está dentro */
+@custom-variant na-tela (&:where(.dash--na-tela, .dash--na-tela *));
+/* Janela até 860 px de altura (notebooks): menos respiro no Dashboard que cabe na tela */
+@custom-variant baixa860 (@media (max-height: 860px));
 
 /* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás).
    Os atrasos (40/70 ms) fazem o conteúdo entrar em sequência. */
@@ -93,4 +98,16 @@
   @keyframes zz-selbar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   @keyframes zz-busca { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @keyframes zz-chips { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* Dashboard: os cards entram em sequência (0/50/100/150 ms); os que têm gráfico só deslizam (sem esmaecer) */
+  --animate-zz-bloco: zz-bloco 420ms var(--easing) both;
+  --animate-zz-bloco-50: zz-bloco 420ms var(--easing) 50ms both;
+  --animate-zz-bloco-100: zz-bloco 420ms var(--easing) 100ms both;
+  --animate-zz-bloco-150: zz-bloco 420ms var(--easing) 150ms both;
+  --animate-zz-desliza: zz-desliza 420ms var(--easing) both;
+  --animate-zz-desliza-50: zz-desliza 420ms var(--easing) 50ms both;
+  --animate-zz-desliza-100: zz-desliza 420ms var(--easing) 100ms both;
+  --animate-zz-desliza-150: zz-desliza 420ms var(--easing) 150ms both;
+  @keyframes zz-bloco { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-desliza { from { transform: translateY(10px); } to { transform: none; } }
 }

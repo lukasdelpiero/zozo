@@ -33,7 +33,6 @@
 .topbar-search__input::placeholder { color: var(--color-on-primary-muted); }
 .topbar-search__input::-webkit-search-cancel-button { filter: invert(1); opacity: .7; }
 .detail-grid { display: flex; flex-direction: column; gap: var(--space-3); }
-.detail-grid--notas { gap: 6px; }
 
 .detail-footer {
   position: sticky; bottom: 0;
@@ -101,7 +100,6 @@
 .recurrence-row__type { color: var(--color-text-muted); flex: none; }
 .recurrence-row__category { min-width: 0; display: flex; }     /* seção 42: à esquerda */
 .recurrence-row__value { justify-self: end; }
-.recurrence-row--compact { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) auto; padding: 0 var(--space-2); gap: var(--space-3); }
 
 /* ---------- Perfil ---------- */
 .profile-row { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 48px; }
@@ -109,23 +107,7 @@
 
 /* ---------- Configurações ---------- */
 .page--config { max-width: 640px; display: flex; flex-direction: column; gap: var(--space-4); }
-.storage-status { display: flex; gap: var(--space-2); align-items: center; }
-.storage-status--ok { color: var(--color-positive); }
-.storage-status--off { color: var(--color-warning-text); }
 
-/* ---------- Dashboard ---------- */
-.greeting { margin-bottom: var(--space-5); }
-.greeting__title { font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; }
-.dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
-.dash-col { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-.dash-card--boxed { padding: var(--space-5); }
-.dash-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3); }
-.dash-card__title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); }
-.dash-card .summary { border: 0; box-shadow: none; padding: var(--space-2) 0 var(--space-4); gap: var(--space-5); }
-.dash-card .summary__value { font-size: var(--font-size-xl); }
-.dash-card .summary__label { font-size: var(--font-size-sm); }
-.list--flush { margin: 0 calc(var(--space-2) * -1); }
-@media (max-width: 1180px) { .dash-grid { grid-template-columns: 1fr; } }
 
 /* ---------- Boleto ---------- */
 .boleto {
@@ -205,10 +187,6 @@
 .doc__brand { display: flex; align-items: center; gap: 8px; font-weight: var(--font-weight-semibold); font-size: 15px; }
 .doc__title-wrap { text-align: right; }
 .doc__title { font-size: 30px; font-weight: var(--font-weight-semibold); letter-spacing: -0.03em; line-height: 1.1; }
-.doc__period { color: var(--color-text-secondary); margin-top: 4px; }
-.doc__meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.doc__meta dt { color: var(--color-text-secondary); font-size: 11.5px; margin-bottom: 2px; }
-.doc__meta dd { font-size: 15px; font-weight: var(--font-weight-semibold); }
 .doc__block-title { font-size: 13px; font-weight: var(--font-weight-semibold); margin-bottom: 8px; }
 .doc__table { width: 100%; border-collapse: collapse; }
 .doc__table th { text-align: left; font-size: 11.5px; font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); padding: 6px 8px; border-bottom: 1px solid var(--color-border-strong); }
@@ -253,15 +231,9 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
 .status-chip--pending { background: var(--color-warning-soft); color: var(--color-warning-text); }
 
 /* ---------- Estado vazio com orientação ---------- */
-.empty__hint { color: var(--color-text-muted); font-size: var(--font-size-sm); max-width: 360px; margin-bottom: var(--space-2); }
 
 
-/* ---------- Dashboard: saudação ---------- */
-.greeting { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-5); }
-.greeting__title { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; }
-.greeting__wave { display: inline-block; transform-origin: 70% 70%; animation: aceno 1.8s var(--easing) 0.3s 1; }
-@keyframes aceno { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(14deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(-4deg); } 50% { transform: rotate(10deg); } }
-.greeting__sub { color: var(--color-text-secondary); font-size: var(--font-size-md); margin-top: 2px; }
+/* ---------- Avatar ---------- */
 .avatar {
   flex: none; display: grid; place-items: center; overflow: hidden;
   border-radius: 50%;
@@ -271,11 +243,6 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-/* Gasto mensal */
-.spend__head { display: flex; flex-direction: column; gap: 2px; }
-.spend__value { font-size: var(--font-size-3xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; text-align: left; }
-.spend__note { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.spend__note--over { color: var(--color-negative); font-weight: var(--font-weight-medium); }
 
 /* ---------- Painéis: cabeçalho, gráficos e tabela ---------- */
 .detail-chart { margin: var(--space-2) 0 var(--space-3); min-height: 40px; position: relative; }
@@ -302,29 +269,6 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
 #app[data-pagina="dashboard"] .workspace { grid-template-columns: minmax(0, 1fr); }
 #app[data-pagina="dashboard"] .detail { display: none; }
 
-.dash-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas:
-    "gasto     patrimonio"
-    "recentes  top"
-    "recentes  proximos";
-  gap: var(--space-5);
-}
-.dash-area { min-width: 0; display: flex; flex-direction: column; }
-.dash-area > .card { flex: 1; }
-.dash-area--gasto { grid-area: gasto; }
-.dash-area--patrimonio { grid-area: patrimonio; }
-.dash-area--recentes { grid-area: recentes; align-self: start; }
-.dash-area--top { grid-area: top; align-self: start; }
-.dash-area--proximos { grid-area: proximos; align-self: start; }
-.dash-area--recentes > .card, .dash-area--top > .card, .dash-area--proximos > .card { flex: none; }
-/* Responsiva pelo ESPAÇO DISPONÍVEL (muda com o menu lateral aberto/recolhido), não pela largura da janela */
-.page--dashboard { container: dashboard / inline-size; }
-.dash-area { container-type: inline-size; }
-@container dashboard (max-width: 860px) {
-  .dash-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "gasto" "patrimonio" "recentes" "top" "proximos"; }
-}
 .profile-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Contas ocultas */
 
@@ -340,10 +284,8 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
   color: var(--color-text-secondary); font-size: var(--font-size-sm);
 }
 .lp-date:hover, .lp-account:hover, .lp-sub:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
-.lp-account--fixo:hover { background: none; color: var(--color-text-secondary); }
 .lp-account__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .lp-sub { align-self: flex-end; margin: 0 -6px 0 0; }
-.lp-sub--fixo { display: inline-flex; align-items: center; height: 26px; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
 .lp-name, .lp-value {
   border: 1px solid transparent; border-radius: 8px; background: transparent;
   font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.01em; color: var(--color-text-primary);
@@ -420,10 +362,4 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
 .topbar-search__filter:focus-visible { outline: 2px solid var(--color-on-primary); outline-offset: 0; }
 .status-chip--neutral { background: var(--color-neutral-soft); color: var(--color-neutral); }
 .recurrence-row__icon { font-size: 15px; }
-/* Gasto mensal: texto centralizado (restante/acima + reservado) */
-.spend__head { align-items: center; text-align: center; }
-.spend__value { font-size: var(--font-size-3xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; }
-.spend__value .money { font-weight: inherit; }
-.spend__value--over .money { color: var(--color-negative); }
-.spend__word { font-weight: var(--font-weight-semibold); }
-.spend__note { color: var(--color-text-secondary); font-size: var(--font-size-md); }
+

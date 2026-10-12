@@ -86,7 +86,13 @@
     etiqueta: "tw:min-w-0 tw:flex tw:justify-end tw:*:min-w-0 tw:*:max-w-full "
       + "tw:[&_.cat-pill]:text-[11px] tw:[&_.cat-pill]:font-[620] tw:[&_.tag--upper]:text-[11px] tw:[&_.tag--upper]:font-[620]",
     valor: "tw:[justify-self:end] tw:text-[15px] tw:font-[620]",
+    // trecho que atende a pesquisa (Transações)
+    destaque: "tw:bg-zz-primary-soft tw:text-inherit tw:rounded-[3px] tw:shadow-[0_0_0_1px_var(--color-primary-soft)]",
   };
+  /** Nome com o trecho pesquisado marcado (<mark>); sem pesquisa, o texto puro */
+  const nomeDestacado = (texto, destacar) => (destacar
+    ? destacar(texto).map((p) => (typeof p === "string" ? p : h("mark", { class: LR.destaque }, p.marca)))
+    : texto);
 
   function LaunchRow(l, opts) {
     const o = opts || {};
@@ -110,7 +116,7 @@
         o.mostrarData || resumo ? h("span", { class: [LR.data, V.data] }, F.dataCurta(l.data)) : null,
         // letra (R/P/T/I/D) só quando existe: a Regular começa logo ao lado da caixa de seleção
         marca && !resumo ? h("span", { class: ["kind-badge", LR.letra], title: marcaTitulo, "aria-label": marcaTitulo }, marca) : null,
-        h("span", { class: ["launch-row__title", LR.titulo] }, l.descricao),
+        h("span", { class: ["launch-row__title", LR.titulo] }, nomeDestacado(l.descricao, o.destacar)),
         l.parcelaTotal ? h("span", { class: LR.parcela, title: "Parcela " + l.parcelaAtual + " de " + l.parcelaTotal }, l.parcelaAtual + "/" + l.parcelaTotal) : null,
         // conta e 4 dígitos juntos ("Itaú 4821"): o nome encurta com "…" se faltar espaço
         (l.nomeConta || l.ultimos4Digitos) && !resumo ? h("span", { class: LR.conta },
@@ -238,14 +244,15 @@
 
   /* ---------- Recorrência (seção 42) ---------- */
   function RecurrenceRow(r, opts) {
+    const p = (opts && opts.partes) || {};     // classes extras por parte: { data, titulo, categoria, valor }
     return rowBase("recurrence-row", Object.assign({ id: r.id }, opts),
-      h("span", { class: "recurrence-row__date" }, (opts || {}).semData ? h("span", { class: "recurrence-row__icon", "aria-hidden": "true" }, (r.categoria && r.categoria.icone) || "•")
+      h("span", { class: ["recurrence-row__date", p.data] }, (opts || {}).semData ? h("span", { class: "recurrence-row__icon", "aria-hidden": "true" }, (r.categoria && r.categoria.icone) || "•")
         : F.dataCurta(r.data) + (r.data.slice(0, 4) !== String(new Date().getFullYear()) ? " " + r.data.slice(2, 4) : "")),
       h("span", { class: "recurrence-row__desc" },
-        h("span", { class: "recurrence-row__title" }, r.descricao),
+        h("span", { class: ["recurrence-row__title", p.titulo] }, r.descricao),
         h("span", { class: "recurrence-row__type" }, r.tipoRecorrencia)),
-      h("span", { class: "recurrence-row__category" }, UI.CategoryLabel(r.categoria, { pill: true })),
-      h("span", { class: "recurrence-row__value money" },
+      h("span", { class: ["recurrence-row__category", p.categoria] }, UI.CategoryLabel(r.categoria, { pill: true })),
+      h("span", { class: ["recurrence-row__value money", p.valor] },
         F.moeda(r.valor),
         r.pago ? h("span", { class: "recurrence-row__paid", title: "Pago", "aria-label": "Pago",
           style: { "--tag-color": F.cor(r.categoria && r.categoria.cor, "var(--color-progress-ok)") } }, icon("check", { size: 13, stroke: 2.5 }))

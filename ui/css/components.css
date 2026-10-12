@@ -146,7 +146,6 @@
 .tag__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tag-color); flex: none; }
 .tag__text { overflow: hidden; text-overflow: ellipsis; }
 .tag--interactive:hover { background: color-mix(in srgb, var(--tag-color) 20%, white); }
-.tag--lg { height: 28px; padding: 0 12px 0 10px; font-size: var(--font-size-md); }
 .tag--empty { background: none; color: var(--color-text-muted); }
 
 /* ---------- Categoria: [ícone] [nome] ---------- */
@@ -205,7 +204,6 @@
 
 /* ---------- Segmented (tipo de lançamento) ---------- */
 .segmented { display: flex; gap: var(--space-2); }
-.segmented--grid { display: grid; grid-template-columns: 1fr 1fr; }
 .segmented__item {
   display: flex;
   align-items: center;
@@ -411,7 +409,6 @@
   transition: opacity var(--duration-medium) var(--easing), transform var(--duration-medium) var(--easing);
 }
 .toast.is-visible { opacity: 1; transform: none; }
-.toast--success .toast__icon, .toast--default .toast__icon { color: #7ee2a0; }
 .toast--error { background: var(--color-negative); }
 
 /* ---------- Modal ---------- */
@@ -590,9 +587,6 @@
 .modal--confirm .modal__body { padding: var(--space-2) var(--space-6) var(--space-5); text-align: left; }
 .modal--confirm .modal__footer { border-top: 0; padding-top: 0; }
 /* Subtipo do lançamento (Recorrente/Parcelado · Despesa/Estorno · Saída/Entrada) */
-.segmented--sub { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: var(--space-2); }
-.segmented--sub .segmented__item { min-height: 32px; justify-content: center; font-size: 12.5px; }
-.segmented--sub .segmented__item > span { flex: 0 1 auto; }
 .menu__label--2 { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; white-space: normal; }
 .menu__label--2 small { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
 .menu__list--scroll { max-height: 290px; overflow-y: auto; }

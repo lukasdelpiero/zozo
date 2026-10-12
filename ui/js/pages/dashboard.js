@@ -1,7 +1,10 @@
 /* =============================================================
-   ZoZo — Dashboard
-   Saudação com foto · Gasto mensal · Patrimônio · Top categorias
+   ZoZo — Dashboard (Tailwind CSS)
+   Saudação · Gasto mensal · Patrimônio · Top categorias
    Próximas transações · Transações recentes
+   Continuam no CSS antigo só as peças que outras telas também usam
+   (card, card__link, bolinha/seta/contador da categoria, linha de
+   recorrência, estado vazio, esqueleto do card).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -13,6 +16,73 @@
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
 
+  /* Classes Tailwind (sempre escritas por inteiro). "na-tela" = computador com duas colunas e altura
+     suficiente: o Dashboard ocupa exatamente a área visível (ver ajustarNaTela). */
+  const T = {
+    pagina: "page--dashboard tw:@container/dashboard tw:na-tela:h-full tw:na-tela:flex tw:na-tela:flex-col tw:na-tela:pb-5 "
+      + "tw:na-tela:overflow-hidden tw:na-tela:baixa860:py-4",
+    saudacao: "tw:block tw:mb-5 tw:na-tela:flex-none tw:na-tela:baixa860:mb-3",
+    saudacaoTitulo: "tw:block tw:m-0 tw:text-[24px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15]",
+    // [Gasto | Patrimônio] na mesma altura; Recentes ocupa duas linhas à esquerda (uma coluna em área ≤ 860 px)
+    grade: "tw:grid tw:grid-cols-[repeat(2,minmax(0,1fr))] tw:[grid-template-areas:'gasto_patrimonio'_'recentes_top'_'recentes_proximos'] tw:gap-5 "
+      + "tw:@max-[860px]/dashboard:grid-cols-[minmax(0,1fr)] tw:@max-[860px]/dashboard:[grid-template-areas:'gasto'_'patrimonio'_'recentes'_'top'_'proximos'] "
+      + "tw:na-tela:flex-[1_1_0] tw:na-tela:min-h-0 tw:na-tela:grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)] tw:na-tela:baixa860:gap-4",
+    area: "tw:@container tw:min-w-0 tw:flex tw:flex-col tw:na-tela:min-h-0",
+    areas: {
+      gasto: "tw:[grid-area:gasto]",
+      patrimonio: "tw:[grid-area:patrimonio]",
+      recentes: "tw:[grid-area:recentes] tw:self-start tw:na-tela:self-stretch",
+      top: "tw:[grid-area:top] tw:self-start tw:na-tela:self-stretch",
+      proximos: "tw:[grid-area:proximos] tw:self-start tw:na-tela:self-stretch",
+    },
+    // os blocos entram em sequência ao abrir a página; os que têm gráfico só deslizam (o gráfico se desenha já visível)
+    entrada: ["tw:in-[.page--entrar]:motion-safe:animate-zz-bloco", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-50",
+      "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-100", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-150"],
+    entradaGrafico: ["tw:in-[.page--entrar]:motion-safe:animate-zz-desliza", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-50",
+      "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-100", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-150"],
+    card: "card tw:p-5 tw:na-tela:flex tw:na-tela:flex-col tw:na-tela:flex-[1_1_auto] tw:na-tela:min-h-0 tw:na-tela:overflow-hidden tw:na-tela:baixa860:p-4",
+    cardEstica: "tw:flex-1",
+    cardFixo: "tw:flex-none",
+    cardCab: "tw:flex tw:items-center tw:justify-between tw:mb-3 tw:na-tela:baixa860:mb-2",
+    cardTitulo: "tw:text-[15px] tw:font-[550]",
+    lista: "tw:flex tw:flex-col tw:-mx-2 tw:na-tela:min-h-0 tw:na-tela:overflow-hidden",
+    vazio: "tw:na-tela:min-h-0 tw:na-tela:py-3",
+    // Gasto mensal
+    gastoTopo: "tw:flex tw:flex-col tw:gap-0.5 tw:items-center tw:text-center",
+    gastoValor: "tw:text-left tw:text-[24px] tw:font-[550] tw:tracking-[-0.02em]",
+    gastoNumero: "money tw:[font-weight:inherit]",
+    gastoNumeroAcima: "money tw:[font-weight:inherit] tw:text-(--color-negative)",
+    gastoPalavra: "tw:font-semibold",
+    gastoNota: "tw:text-zz-secondary tw:text-[15px] tw:font-[550]",
+    grafico: "tw:relative tw:mt-4 tw:mb-2",
+    // Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado
+    tops: "tw:flex tw:flex-col tw:-mx-5 tw:na-tela:min-h-0 tw:na-tela:overflow-hidden",
+    top: "tw:grid tw:grid-cols-[16px_26px_minmax(0,1fr)_auto_112px] tw:gap-2.5 tw:items-center tw:min-h-9 tw:px-5 tw:text-[15px] tw:font-[450] "
+      + "tw:area460:grid-cols-[16px_26px_minmax(0,1fr)_auto_auto] tw:area340:grid-cols-[16px_26px_minmax(0,1fr)_auto]",
+    topItem: "tw:cursor-pointer tw:hover:bg-zz-surface-hover",
+    topLead: "tw:grid tw:place-items-center",
+    topPonto: "category-row__dot tw:w-2 tw:h-2",
+    topIcone: "tw:grid tw:place-items-center tw:text-[15px]",
+    topIconeFilho: "tw:grid tw:place-items-center tw:text-[15px] tw:ml-[18px]",
+    topQtd: "category-row__count tw:text-[11px]",
+    topNome: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
+    topNomeFilho: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:pl-[18px]",
+    topGasto: "money tw:justify-self-end tw:font-[620]",
+    topReservado: "money tw:text-right tw:pl-4 tw:text-zz-secondary tw:font-[620] tw:area340:hidden",
+    // Próximas transações (linha de recorrência compacta)
+    recorrencia: "recurrence-row--compact tw:grid-cols-[52px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:px-2 tw:gap-3 "
+      + "tw:area460:grid-cols-[48px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:area340:grid-cols-[48px_minmax(0,1fr)_auto]",
+    recorrenciaPartes: {
+      data: "tw:text-[15px] tw:font-[450]",
+      titulo: "tw:text-[15px] tw:font-[450]",
+      categoria: "tw:min-w-0 tw:max-w-[140px] tw:area460:max-w-[104px] tw:area340:hidden",
+      valor: "tw:text-[15px] tw:font-[620]",
+    },
+    // esqueleto enquanto carrega
+    esqueleto: "tw:grid tw:grid-cols-[repeat(2,minmax(0,1fr))] tw:gap-5 tw:items-start tw:max-[1180px]:grid-cols-[1fr]",
+    esqueletoCol: "tw:flex tw:flex-col tw:gap-5 tw:min-w-0",
+  };
+
   /** Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado */
   function topCategorias(cats, state, ctx) {
     const blocos = ZoZo.categoriasShared.estruturar(cats, ((state.data.dashboard || {}).categorias || {}).grupos)
@@ -20,12 +90,14 @@
       .sort((a, b) => F.numero(b.gasto) - F.numero(a.gasto)).slice(0, 5);
     const abertos = state.ui.dashGruposAbertos || {};
     const abrir = (c) => ctx.navigate("categorias", { select: { tipo: "categoria", id: c.id } });
-    const linha = (lead, icone, nome, gasto, reservado, extra) => h("div", Object.assign({ class: ["top-cat", extra && extra.class] }, extra && extra.attrs),
-      h("span", { class: "top-cat__lead" }, lead), h("span", { class: "top-cat__icon" }, icone), h("span", { class: "top-cat__name" }, nome),
-      h("span", { class: "top-cat__spent money" }, F.moeda(gasto)), h("span", { class: "top-cat__reserved money" }, F.moeda(reservado)));
-    const filho = (c, sub) => linha(sub ? null : h("span", { class: "category-row__dot", style: { background: F.cor(c.cor, "var(--palette-16)") } }),
+    const linha = (lead, icone, nome, gasto, reservado, o) => h("div", Object.assign({ class: [T.top, o.item && T.topItem] }, o.attrs),
+      h("span", { class: T.topLead }, lead), h("span", { class: o.filho ? T.topIconeFilho : T.topIcone }, icone),
+      h("span", { class: o.filho ? T.topNomeFilho : T.topNome }, nome),
+      h("span", { class: T.topGasto }, F.moeda(gasto)), h("span", { class: T.topReservado }, F.moeda(reservado)));
+    const filho = (c, sub) => linha(sub ? null : h("span", { class: T.topPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
       c.icone || "•", c.nome, c.gasto, c.reservado,
-      { class: ["top-cat--item", sub && "top-cat--child"].filter(Boolean).join(" "), attrs: { role: "button", tabindex: "0", onClick: () => abrir(c), onKeydown: (e) => { if (e.key === "Enter") abrir(c); } } });
+      { item: true, filho: sub, attrs: { role: "button", tabindex: "0", onClick: () => abrir(c),
+        onKeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(c); } } } });
     const out = [];
     blocos.forEach((b) => {
       if (b.tipo === "categoria") { out.push(filho(b.cat, false)); return; }
@@ -34,18 +106,18 @@
       out.push(linha(h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(aberto), "aria-label": (aberto ? "Ocultar" : "Mostrar") + " categorias de " + b.nome,
         onClick: () => UI.alternarArvore(chave, () => ZoZo.store.set({ ui: { dashGruposAbertos: Object.assign({}, ZoZo.store.get().ui.dashGruposAbertos || {}, { [b.nome]: !aberto }) } })) },
         icon(aberto ? "chevron-down" : "chevron-right", { size: 14, stroke: 2.25 })),
-        h("span", { class: "category-row__count" }, String(b.quantidade)), b.nome, b.gasto, b.reservado, { class: "top-cat--group" }));
+        h("span", { class: T.topQtd }, String(b.quantidade)), b.nome, b.gasto, b.reservado, {}));
       if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: "arvore-grupo" }, b.itens.map((c) => filho(c, true)))));
     });
-    return h("div", { class: "top-cats" }, out);
+    return h("div", { class: T.tops, "data-dash-lista": "" }, out);
   }
 
   function linkPara(label, onClick) {
     return h("button", { type: "button", class: "card__link", onClick }, label, icon("chevron-right", { size: 14 }));
   }
-  function Card(titulo, link, onClick, ...children) {
-    return h("section", { class: "card dash-card dash-card--boxed", "aria-label": titulo },
-      h("header", { class: "dash-card__header" }, h("h3", { class: "dash-card__title" }, titulo), link ? linkPara(link, onClick) : null),
+  function Card(titulo, link, onClick, estica, ...children) {
+    return h("section", { class: [T.card, estica ? T.cardEstica : T.cardFixo], "aria-label": titulo },
+      h("header", { class: T.cardCab }, h("h3", { class: T.cardTitulo }, titulo), link ? linkPara(link, onClick) : null),
       ...children);
   }
 
@@ -58,9 +130,9 @@
 
   function ajustarNaTela() {
     const pagina = document.querySelector(".page--dashboard");
-    const grade = pagina && pagina.querySelector(".dash-layout");
+    const grade = pagina && pagina.querySelector("[data-dash-grade]");
     if (!grade) return;
-    const listas = Array.from(grade.querySelectorAll(".dash-area .list, .dash-area .top-cats"));
+    const listas = Array.from(grade.querySelectorAll("[data-dash-lista]"));
     listas.forEach((l) => Array.from(l.children).forEach((x) => { x.hidden = false; }));
     const duasColunas = getComputedStyle(grade).gridTemplateColumns.trim().split(/\s+/).length >= 2;
     pagina.classList.toggle("dash--na-tela", duasColunas && innerHeight >= ALTURA_MINIMA);
@@ -87,7 +159,7 @@
   function GastoMensal(g) {
     const acima = g.orcamento > 0 && g.total > g.orcamento;
     const diferenca = Math.abs(g.total - g.orcamento);
-    const chart = h("div", { class: "chart-card__chart" });
+    const chart = h("div", { class: T.grafico });
     const cs = getComputedStyle(document.documentElement);
     const series = [{ name: "Gasto", color: cs.getPropertyValue(acima ? "--color-progress-over" : "--color-primary").trim(), points: g.dias, area: true }];
     if (g.orcamento > 0 && g.dias.length) {
@@ -97,12 +169,12 @@
     ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), area: true, ariaLabel: "Gasto acumulado no mês" });
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
-    return h("div", { class: "spend" },
-      h("div", { class: "spend__head" },
-        h("span", { class: ["spend__value", acima && "spend__value--over"] },
-          comOrcamento ? h("span", { class: "money" }, F.moeda(diferenca)) : h("span", { class: "money" }, F.moeda(g.total)),
-          h("span", { class: "spend__word" }, comOrcamento ? (acima ? " acima" : " restante") : " gastos")),
-        h("span", { class: "spend__note" }, comOrcamento ? F.moeda(g.orcamento) + " reservado" : "neste mês")),
+    return h("div", null,
+      h("div", { class: T.gastoTopo },
+        h("span", { class: T.gastoValor },
+          h("span", { class: acima ? T.gastoNumeroAcima : T.gastoNumero }, F.moeda(comOrcamento ? diferenca : g.total)),
+          h("span", { class: T.gastoPalavra }, comOrcamento ? (acima ? " acima" : " restante") : " gastos")),
+        h("span", { class: T.gastoNota }, comOrcamento ? F.moeda(g.orcamento) + " reservado" : "neste mês")),
       chart);
   }
 
@@ -119,49 +191,50 @@
       // Só a saudação pela hora do dia + nome (sem foto e sem ícones: a foto fica no rodapé do menu)
       const hora = new Date().getHours();
       const periodo = hora >= 5 && hora < 12 ? "Bom dia" : hora >= 12 && hora < 18 ? "Boa tarde" : "Boa noite";
-      const saudacao = h("header", { class: "greeting" },
-        h("h2", { class: "greeting__title" }, periodo + (primeiroNome ? ", " + primeiroNome : "") + "!"));
+      const saudacao = h("header", { class: T.saudacao },
+        h("h2", { class: T.saudacaoTitulo }, periodo + (primeiroNome ? ", " + primeiroNome : "") + "!"));
 
       const espera = C.estadoCarregamento(state, ["dashboard"], () => this.carregar(ctx, true), {
-        skeleton: h("div", { class: "dash-grid" },
-          h("div", { class: "dash-col" }, h("div", { class: "card skeleton-card" }), h("div", { class: "card skeleton-card skeleton-card--short" })),
-          h("div", { class: "dash-col" }, h("div", { class: "card skeleton-card skeleton-card--short" }), h("div", { class: "card skeleton-card" }))),
+        skeleton: h("div", { class: T.esqueleto },
+          h("div", { class: T.esqueletoCol }, h("div", { class: "card skeleton-card" }), h("div", { class: "card skeleton-card skeleton-card--short" })),
+          h("div", { class: T.esqueletoCol }, h("div", { class: "card skeleton-card skeleton-card--short" }), h("div", { class: "card skeleton-card" }))),
       });
-      if (espera) return C.pagina("page--dashboard", saudacao, espera);
+      if (espera) return C.pagina(T.pagina, saudacao, espera);
 
       const d = state.data.dashboard;
       const hojeIso = F.iso(new Date());
 
-      if (d.gastoMensal && state.data.config && state.data.config.orcamentoAtivo === false) d.gastoMensal = Object.assign({}, d.gastoMensal, { orcamento: 0 });
-      const cardGasto = d.gastoMensal ? Card("Gasto mensal", "Transações", () => ctx.navigate("lancamentos"), GastoMensal(d.gastoMensal)) : null;
+      // Orçamento desligado: o card mostra só o gasto (sem mexer nos dados guardados — religar o orçamento volta na hora)
+      const semOrcamento = state.data.config && state.data.config.orcamentoAtivo === false;
+      const gasto = d.gastoMensal && semOrcamento ? Object.assign({}, d.gastoMensal, { orcamento: 0 }) : d.gastoMensal;
+      const cardGasto = gasto ? Card("Gasto mensal", "Transações", () => ctx.navigate("lancamentos"), true, GastoMensal(gasto)) : null;
 
-      const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"),
+      const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"), true,
         ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
           intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
-      const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"),
-        cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria cadastrada.", { icon: "categorias" }));
+      const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"), false,
+        cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria cadastrada.", { icon: "categorias", class: T.vazio }));
 
       const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
-      const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"),
+      const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"), false,
         recs.length
-          ? h("div", { class: "list list--flush" }, recs.map((r) => L.RecurrenceRow(r, { class: "recurrence-row--compact", onClick: () => ctx.navigate("recorrencias") })))
-          : UI.EmptyState("Nenhuma transação prevista para este mês.", { icon: "recorrencias" }));
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r) => L.RecurrenceRow(r, { class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
+          : UI.EmptyState("Nenhuma transação prevista para este mês.", { icon: "recorrencias", class: T.vazio }));
 
       const ultimos = d.ultimosLancamentos || [];
-      const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"),
+      const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"), false,
         ultimos.length
-          ? h("div", { class: "list list--flush" }, ultimos.map((l) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
-          : UI.EmptyState("Nenhuma transação cadastrada."));
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, ultimos.map((l) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
+          : UI.EmptyState("Nenhuma transação cadastrada.", { class: T.vazio }));
 
-      // Grade: [Gasto mensal | Patrimônio] com a mesma altura; Recentes e Top categorias começam na mesma linha
-      const area = (nome, el) => (el ? h("div", { class: "dash-area dash-area--" + nome }, el) : null);
+      // Áreas na ordem da página; a entrada em sequência segue a posição de cada uma (0, 50, 100, 150 ms)
+      const areas = [["gasto", cardGasto, true], ["patrimonio", cardPatrimonio, true], ["recentes", cardLanc], ["top", cardCats], ["proximos", cardRec]]
+        .filter((a) => a[1])
+        .map(([nome, el, grafico], i) => h("div", { class: [T.area, T.areas[nome], (grafico ? T.entradaGrafico : T.entrada)[Math.min(i, 3)]] }, el));
       acompanharTela();
-      return C.pagina("page--dashboard", saudacao,
-        h("div", { class: "dash-layout" },
-          area("gasto", cardGasto), area("patrimonio", cardPatrimonio),
-          area("recentes", cardLanc), area("top", cardCats), area("proximos", cardRec)));
+      return C.pagina(T.pagina, saudacao, h("div", { class: T.grade, "data-dash-grade": "" }, areas));
     },
   };
 })(window.ZoZo);
