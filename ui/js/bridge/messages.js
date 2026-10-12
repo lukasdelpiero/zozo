@@ -17,6 +17,7 @@
     logout: "logout",
     getArmazenamento: "getArmazenamento",
     getGoogle: "getGoogle",
+    verificarAtualizacao: "verificarAtualizacao",
 
     // Dados
     getDashboard: "getDashboard",
@@ -126,6 +127,7 @@
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
     EMAIL_NOT_CONFIRMED: "Confirme seu e-mail antes de entrar: abra o link que enviamos para a sua caixa de entrada.",
     TOKEN_INVALID: "Este link de confirmação é inválido ou já venceu. Entre com seu e-mail e senha para receber um novo.",
+    DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     DEBIT_ACCOUNT: "Débito precisa de uma conta (corrente, poupança…). Cartão de crédito não pode.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",

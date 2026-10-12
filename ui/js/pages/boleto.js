@@ -6,6 +6,7 @@
    ============================================================= */
 (function (ZoZo) {
   "use strict";
+  const LOGO_FATURA = "assets/img/zozo-fatura.svg";
   const { h, mount, clear } = ZoZo.dom;
   const UI = ZoZo.ui;
   const F = ZoZo.format;
@@ -159,7 +160,7 @@
 
     return h("article", { class: "doc", "aria-label": "Pré-visualização da fatura", "aria-busy": ok ? "false" : "true" },
       h("header", { class: "doc__head" },
-        h("div", { class: "doc__brand" }, h("img", { class: "doc__logo", src: "assets/img/zozo-fatura.svg", alt: "ZoZo", width: "44", height: "44", decoding: "sync" })),
+        h("div", { class: "doc__brand" }, h("img", { class: "doc__logo", src: LOGO_FATURA, alt: "ZoZo", width: "44", height: "44", decoding: "sync" })),
         h("div", { class: "doc__title-wrap" },
           h("p", { class: "doc__perfil" }, maiusculas(st.perfil ? st.perfil.nome : "—")),
           h("p", { class: "doc__fatura" }, h("span", { class: "doc__fatura-rotulo" }, "FATURA"), " ", h("span", { class: "doc__fatura-data" }, diaMesAno(st.dataFatura))))),
@@ -347,6 +348,16 @@
   }
 
   function close() { if (atual) atual.close(); }
+
+  /* O logo da fatura é baixado assim que a sessão de uma conta com faturas abre (fica no cache):
+     ao gerar a fatura ele já aparece na hora, em vez de surgir depois do resto. */
+  let logoPronto = null;
+  ZoZo.store.subscribe((st) => {
+    if (logoPronto || !st.session.authenticated || !ZoZo.recursos.boleto()) return;
+    logoPronto = new Image();
+    logoPronto.decoding = "async";
+    logoPronto.src = LOGO_FATURA;
+  });
 
   ZoZo.boleto = { open, close, calcular };
 })(window.ZoZo);

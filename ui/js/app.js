@@ -297,6 +297,8 @@
   });
 
   // Integridade dos dados (avisos do host)
+  // gravação recusada depois de a tela já mostrar a alteração: redesenha com o que está gravado
+  window.addEventListener("zozo:dados-revertidos", () => { if (store.get().session.authenticated) ctx.recarregarTudo(); });
   window.addEventListener("zozo:dados-alterados", (e) => {
     if (!store.get().session.authenticated) return;
     ctx.toast(FR[(e.detail && e.detail.codigo) || "DATA_CHANGED"] || FR.DATA_CHANGED, { tone: "error", duration: 9000 });
@@ -313,6 +315,22 @@
     const texto = textos[e.detail && e.detail.codigo];
     if (texto) ctx.toast(texto, { tone: "error", duration: 12000 });
   });
+
+  /* Atualização em tempo real entre dispositivos e abas: ao voltar para a aba e a cada minuto com ela
+     visível, confere só o NÚMERO da versão no servidor; se outro lugar gravou, baixa e redesenha
+     (nada de F5). Nunca no meio de uma gravação desta aba. */
+  let conferindo = false;
+  function conferirAtualizacao() {
+    if (conferindo || document.hidden || !store.get().session.authenticated || !ZoZo.servico || ZoZo.servico.gravando()) return;
+    conferindo = true;
+    bridge.request(A.verificarAtualizacao)
+      .then((r) => { if (r && r.mudou && ZoZo.servico.recarregarDoServidor()) return ctx.recarregarTudo(); })
+      .catch(() => null)
+      .finally(() => { conferindo = false; });
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) conferirAtualizacao(); });
+  window.addEventListener("focus", conferirAtualizacao);
+  setInterval(conferirAtualizacao, 60000);
 
   // Sessão encerrada no servidor (saiu em outro lugar, senha trocada em outro dispositivo, expirou): volta ao login
   window.addEventListener("zozo:sessao-expirada", (e) => {

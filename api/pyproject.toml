@@ -1,6 +1,6 @@
 [project]
 name = "zozo-api"
-version = "3.1.1"
+version = "3.2.0"
 description = "ZoZo — API em Python (Cloudflare Python Workers + D1)"
 requires-python = ">=3.12"
 dependencies = []

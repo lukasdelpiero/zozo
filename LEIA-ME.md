@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.1.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.2.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,16 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.2.0
+
+- **Contas em Tailwind CSS:** página, linhas de conta (também as de Investimentos), gráfico de ativos e passivos (também o do Dashboard) e o painel da conta. Visual idêntico, conferido em 4 larguras e 15 situações; ~45 linhas de CSS antigo a menos.
+- **Saldo das contas e cartões:** toda transação nova, editada ou apagada atualiza o saldo — compra no cartão aumenta a fatura, estorno e pagamento diminuem, receita e transferências mudam a conta (antes só débitos contavam). As transações que já existiam não mexem no saldo informado.
+- **Atualização em tempo real:** o que for gravado em outra aba ou dispositivo aparece sozinho (ao voltar para a aba e a cada minuto), sem F5. O servidor só informa o número da versão; o documento só é baixado quando mudou.
+- **Sessão de 24 h:** a sessão termina 24 h depois do login, mesmo com o navegador aberto.
+- **Fechamento do cartão sem janela:** "Editar fechamento" troca o canto do painel por "Mesmo fechamento para todos os meses" / "Diferentes fechamentos por mês", com fechamento e vencimento logo abaixo.
+- **Painéis:** a transação clicada no painel de conta, categoria, grupo, recorrência ou perfil abre ali mesmo, com seta para voltar; "Cancelar" na edição da categoria volta ao painel; últimos 4 dígitos editáveis com um clique no título; valor editado com o símbolo da moeda; "Gasto em Outubro" (mês por extenso).
+- **Interface:** troca de moeda instantânea; gráficos animados também ao trocar de moeda; pílulas de Recorrência e Divisão do tamanho das de Categoria e Perfil; emoji da pílula alinhado; "+N" das categorias ao lado das pílulas, com menu mais estreito; janelas de criação e de transferência com a mesma largura (560 px); ícone da fatura já carregado; sem espaço sobrando entre a caixa de seleção e o nome da transação.
 
 ## Novidades da versão 3.1.1
 
@@ -139,7 +149,7 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 
 ## Novidades da versão 2.1.0
 
-- **Sem login da Cloudflare para os usuários:** o ZoZo tem login próprio. Sessão no servidor com cookie `HttpOnly` + `Secure` + `SameSite=Strict`, que **dura até o navegador ser fechado** (sem logout por inatividade).
+- **Sem login da Cloudflare para os usuários:** o ZoZo tem login próprio. Sessão no servidor com cookie `HttpOnly` + `Secure` + `SameSite=Strict`, que dura até o navegador ser fechado ou, no máximo, **24 h depois do login**.
 - **Autenticação de dois fatores (2FA)** por aplicativo autenticador (Google/Microsoft Authenticator, Authy…): Configurações › Conta › Ativar 2FA.
 - **Bloqueio progressivo** por e-mail + IP: 3 tentativas livres → CAPTCHA (Cloudflare Turnstile) da 4ª em diante → 15 min de bloqueio na 5ª falha → 24 h na 10ª. Outra rede (outro IP) continua entrando; o login certo zera tudo.
 - **Ambiente de prévia** com banco separado, para testar antes de publicar para os usuários.
@@ -245,7 +255,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 | Login | E-mail + prova da senha. Mensagem única para e-mail inexistente e senha errada; e-mail sem conta recebe parâmetros simulados (não revela quem tem conta) |
 | Cadastro | Com o e-mail ligado: resposta igual para e-mail novo ou já cadastrado; conta pendente até o **primeiro login com o link do e-mail + a senha** (token de 256 bits, banco guarda só o hash, 24 h, uso único, só o mais recente vale); até 3 e-mails por hora por endereço; pendentes somem em 7 dias |
 | Senha | Nunca sai do navegador. **Argon2id** (64 MiB, 3 passagens; contas novas e senhas trocadas) ou PBKDF2-SHA256 com 600.000 iterações (contas antigas), sal aleatório → HKDF → chave dos dados + prova da senha. O servidor guarda só o SHA-256 da prova. O navegador recusa parâmetros mais fracos ou desconhecidos vindos do servidor |
-| Sessão | Identificador aleatório de 256 bits em cookie `__Host-` `HttpOnly` `Secure` `SameSite=Strict`, sem data de validade (termina ao fechar o navegador); o banco guarda só o SHA-256 dele; novo identificador a cada login e após o 2FA; encerra no "Sair", na troca de senha (outros dispositivos), após 7 dias sem uso ou 30 dias de idade |
+| Sessão | Identificador aleatório de 256 bits em cookie `__Host-` `HttpOnly` `Secure` `SameSite=Strict`, sem data de validade (termina ao fechar o navegador); o banco guarda só o SHA-256 dele; novo identificador a cada login e após o 2FA; encerra no "Sair", na troca de senha (outros dispositivos), e **24 h depois do login** (mesmo em uso, sem fechar o navegador) |
 | Chave dos dados | Para não pedir a senha a cada recarga, fica no navegador **cifrada com o "envelope" da sessão** = HMAC(`SEGREDO`, cookie). O envelope **não fica no banco**: o banco + o navegador não bastam para abrir os dados. Saiu ou fechou o navegador: vira lixo ilegível e é apagada |
 | 2FA | TOTP (RFC 6238), ±30 s de tolerância, um código não vale duas vezes; segredo cifrado no banco com o `SEGREDO` do servidor; 5 códigos errados → 15 min de bloqueio |
 | Força bruta | Bloqueio progressivo por e-mail + IP (CAPTCHA na 4ª, 15 min na 5ª falha, 24 h na 10ª), contagem atômica (pedidos em paralelo não escapam); 20 falhas/h na mesma conta vindas de IPs diferentes → CAPTCHA para todos; no máximo 30 logins por IP a cada 10 min; cadastro e consultas também limitados por IP |

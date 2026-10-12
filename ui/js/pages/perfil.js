@@ -14,6 +14,7 @@
   const store = ZoZo.store;
 
   const mesAbrev = (mesIso) => F.mesAbrev((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
+  const mesInteiro = (mesIso) => F.mesNome((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
 
   function verLancamentos(p, ctx) {
     ZoZo.lancamentosShared.setFiltros(Object.assign(ZoZo.lancamentosShared.FILTROS_VAZIOS(), { perfis: [p.id] }));
@@ -22,10 +23,11 @@
   }
 
   /* ---------------- Cadastro / edição ---------------- */
-  function abrirFormPerfil(ctx, p) {
+  function abrirFormPerfil(ctx, p, voltar) {
     const novo = !p;
     return ctx.loadData("perfis", A.getPerfis).catch(() => null).then(() => ZoZo.forms.abrir(ctx, {
       titulo: novo ? "Novo perfil" : "Editar perfil",
+      voltar,
       selected: p ? { tipo: "perfil", id: p.id } : null,
       valores: p ? { nome: p.nome, orcamento: p.orcamento || "", cor: p.cor } : { cor: ZoZo.regras.corSugerida() },
       campos: [
@@ -74,7 +76,11 @@
       menu: [
         { label: p.arquivado ? "Desarquivar" : "Arquivar", onClick: () => arquivar(p, ctx) },
         ZoZo.recursos.boleto() ? { label: "Gerar fatura", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) } : null,
-        { label: "Editar perfil", onClick: () => abrirFormPerfil(ctx, p) },
+        // Cancelar/salvar voltam para este painel (com os dados atualizados)
+        { label: "Editar perfil", onClick: () => abrirFormPerfil(ctx, p, () => {
+          const atual = ((store.get().data.perfis || {}).perfis || []).find((x) => x.id === p.id);
+          if (atual) abrirDetalhe(atual, ctx, opts); else ctx.detail.close({ silencioso: true });
+        }) },
         { separador: true },
         { label: "Excluir perfil", perigo: true, onClick: () => excluirPerfil(p, ctx) },
       ].filter(Boolean),
@@ -92,14 +98,15 @@
               h("span", { class: "detail-hero__label" }, "Transações"),
               h("span", { class: "detail-hero__value" }, String(p.quantidade || 0)))),
           C.detalheSecao(null,
-            C.detalheLinha("Gasto em " + mesAbrev(), F.moeda(p.gasto || 0)),
+            C.detalheLinha("Gasto em " + mesInteiro(), F.moeda(p.gasto || 0)),
             p.arquivado ? h("p", { class: "field__hint" }, "Perfil arquivado: continua nas transações e nos totais, mas não pode ser usado em novas transações.") : null),
           C.detalheSecao("Últimas transações", listaEl,
             h("div", { class: "detail-actions detail-actions--end" }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
           const itens = d.lancamentos.filter((l) => l.perfilId === p.id).slice(0, 10);
           mount(listaEl, itens.length
-            ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
+            // a transação abre aqui mesmo, com a seta para voltar a este perfil
+            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe((((ZoZo.store.get().data.perfis || {}).perfis) || []).find((x) => x.id === p.id) || p, ctx, opts) }) })
             : UI.EmptyState("Nenhuma transação com este perfil."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
@@ -490,7 +497,7 @@
           linhaConfig(
             ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador."
               : demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
-              : disponivel ? "Seus dados são criptografados neste navegador antes de ir para a nuvem do ZoZo; o servidor guarda só a versão cifrada, que não abre sem a sua senha." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
+              : disponivel ? "Seus dados são criptografados." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
             demo ? "Ao sair ou recarregar a página, novos dados são sorteados." : "Última gravação: " + quando(cfg.ultimaGravacao) + ".",
             icon(disponivel ? "nuvem" : "alerta", { size: 18, class: disponivel ? "cfg-ok" : "cfg-alerta" })),
         ];

@@ -26,9 +26,11 @@
   /** Valor em reais que salva ao sair */
   function dinheiro(cfg) {
     let atual = F.numero(cfg.valor);
-    const input = h("input", { type: "text", inputmode: "decimal", class: ["inline-input", "inline-input--money", "money", cfg.classe], value: F.moeda(atual), "aria-label": cfg.rotulo || "Valor" });
-    input.addEventListener("focus", () => { input.value = F.moedaEditavel(atual); if (atual < 0) input.value = "-" + input.value; input.select(); });
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = F.moedaEditavel(atual); input.blur(); } });
+    // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo: ver format.mascararValor)
+    const input = h("input", { type: "text", inputmode: "decimal", class: ["inline-input", "inline-input--money", "money", cfg.classe], value: F.moeda(atual),
+      "data-com-simbolo": "", "aria-label": cfg.rotulo || "Valor" });
+    input.addEventListener("focus", () => { input.value = F.valorParaEditar(input, atual); input.select(); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = F.valorParaEditar(input, atual); input.blur(); } });
     input.addEventListener("blur", () => {
       const v = F.parseMoeda(input.value);
       const valido = Number.isFinite(v) && (cfg.permitirNegativo || v >= 0) && (cfg.permitirZero !== false || v > 0) && Math.abs(v) < 1e12;

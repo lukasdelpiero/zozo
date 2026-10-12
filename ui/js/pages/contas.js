@@ -1,5 +1,9 @@
 /* =============================================================
    ZoZo — Contas (seções 18–22, 26–28)
+   Visual em Tailwind (tabela T abaixo; a linha da conta está em
+   components/list.js). Continuam no CSS antigo as peças compartilhadas:
+   seção, cartão (.card), cabeçalho do painel (ph, também em Recorrências)
+   e o cartão de gráfico de Investimentos (chart-card).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -10,6 +14,41 @@
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
 
+  /* ---------------- Visual (Tailwind; classes escritas por inteiro) ---------------- */
+  const T = {
+    secao: "tw:mt-5",
+    lista: "tw:flex tw:flex-col",
+    olho: "tw:ml-0.5 tw:text-zz-muted",
+    olhoAtivo: "tw:ml-0.5 tw:text-zz-primary",
+    aviso: "tw:px-4 tw:pb-2 tw:text-zz-muted tw:text-[13px]",
+    // cartão do gráfico Ativos × Passivos (também no Dashboard, embutido)
+    cartao: "tw:relative tw:rounded-[20px]",
+    cartaoPadding: "tw:pt-6 tw:px-6 tw:pb-4",
+    cartaoEmbutido: "tw:p-0",
+    topo: "tw:grid tw:grid-cols-[1fr_1fr] tw:gap-4 tw:max-w-[520px] tw:mx-auto tw:area460:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tw:area460:gap-2",
+    metade: "tw:flex tw:flex-col tw:items-center tw:gap-1 tw:text-center",
+    legenda: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-secondary tw:text-[13px] tw:font-medium",
+    pontoAtivos: "tw:size-[7px] tw:rounded-[50%] tw:bg-(--color-assets)",
+    pontoPassivos: "tw:size-[7px] tw:rounded-[50%] tw:bg-(--color-liabilities)",
+    valor: "money tw:text-[28px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center tw:area460:text-[17px]",
+    valorEmbutido: "money tw:text-[15px] tw:font-[550] tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center",
+    grafico: "tw:relative tw:mt-4 tw:mb-2",
+    filtros: "tw:flex tw:justify-center",
+    // painel: 4 últimos dígitos editáveis no lugar (sem borda, fundo transparente)
+    digitos: "tw:[field-sizing:content] tw:min-w-[3ch] tw:max-w-[5ch] tw:p-0 tw:[border:0] tw:rounded-sm tw:bg-transparent tw:text-inherit tw:text-[15px] tw:font-[550] "
+      + "tw:placeholder:text-zz-muted tw:focus:outline-none tw:focus:shadow-[0_0_0_2px_var(--color-primary-soft)] tw:aria-invalid:shadow-[0_0_0_2px_var(--color-negative)]",
+    // painel do cartão: editar fechamento no próprio painel
+    cicloArea: "tw:flex tw:flex-col tw:items-end tw:gap-1.5",
+    cicloModo: "tw:inline-flex tw:items-center tw:gap-1.5 tw:h-7 tw:px-2.5 tw:py-0 tw:border tw:border-zz-border tw:rounded-lg tw:bg-zz-surface "
+      + "tw:text-[13px] tw:font-medium tw:hover:border-zz-border-strong",
+    cicloMes: "tw:h-7 tw:w-auto tw:text-[13px]",
+    cicloDias: "tw:flex tw:items-end tw:gap-2",
+    cicloCampo: "tw:flex tw:flex-col tw:items-end tw:gap-0.5",
+    cicloRotulo: "tw:text-[12px] tw:text-zz-secondary",
+    cicloInput: "tw:w-[72px] tw:h-9 tw:text-right tw:text-[17px] tw:font-semibold",
+    cicloErro: "tw:m-0 tw:text-right tw:text-[13px] tw:text-(--color-negative)",
+  };
+
   const GRUPOS = [
     { key: "cartoes", titulo: "Cartões de crédito", tipos: ["cartao"] },
     { key: "bancarias", titulo: "Contas bancárias", tipos: ["corrente", "poupanca"] },
@@ -19,10 +58,10 @@
   ];
 
   /* ---------- Card do gráfico de Contas (Ativos × Passivos) ---------- */
-  function metade(cls, titulo, dados) {
-    return h("div", { class: ["chart-card__half", cls] },
-      h("span", { class: "chart-card__legend" }, h("span", { class: "legend-dot", "aria-hidden": "true" }), titulo),
-      h("span", { class: "chart-card__value money" }, F.moeda(dados.valor)),
+  function metade(ponto, titulo, dados, embutido) {
+    return h("div", { class: T.metade },
+      h("span", { class: T.legenda }, h("span", { class: ponto, "aria-hidden": "true" }), titulo),
+      h("span", { class: embutido ? T.valorEmbutido : T.valor }, F.moeda(dados.valor)),
       UI.PercentageChange(dados.variacaoPercentual));
   }
 
@@ -31,7 +70,7 @@
     const resumo = state.data.contas.resumo;
     const intervalo = o.intervalo || state.ui.intervaloContas;
     const serie = UI.recortarSerie(resumo.serie, intervalo);
-    const chart = h("div", { class: "chart-card__chart" });
+    const chart = h("div", { class: T.grafico });
     const css = getComputedStyle(document.documentElement);
     ZoZo.charts.renderLineChart(chart, [
       // degradê: o de Ativos desce até a linha de Passivos; o de Passivos, até o fim do gráfico
@@ -39,12 +78,12 @@
       { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
     ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos" });
 
-    return h("section", { class: ["chart-card", !o.embedded && "card", o.compact && "chart-card--compact", o.embedded && "chart-card--embedded"], "aria-label": "Gráfico de contas" },
-      h("div", { class: "chart-card__top" },
-        metade("chart-card__half--assets", "Ativos", resumo.ativos),
-        metade("chart-card__half--liabilities", "Passivos", resumo.passivos)),
+    return h("section", { class: [!o.embedded && "card", T.cartao, o.embedded ? T.cartaoEmbutido : T.cartaoPadding], "aria-label": "Gráfico de contas" },
+      h("div", { class: T.topo },
+        metade(T.pontoAtivos, "Ativos", resumo.ativos, o.embedded),
+        metade(T.pontoPassivos, "Passivos", resumo.passivos, o.embedded)),
       chart,
-      o.compact && !o.filtros ? null : h("div", { class: "chart-card__filters" },
+      o.compact && !o.filtros ? null : h("div", { class: T.filtros },
         UI.FilterTabs(intervalo, (v) => ZoZo.store.set({ ui: { [o.chaveIntervalo || "intervaloContas"]: v } }), { label: o.rotuloFiltro || "Período do gráfico de contas" })));
   }
 
@@ -64,54 +103,74 @@
 
   /* ---------- Painel de detalhes de uma conta ---------- */
   /**
-   * Cartão de crédito: fechamento e vencimento — para todos os meses ou só para um mês.
+   * Cartão de crédito: editar fechamento no PRÓPRIO painel (sem janela). O canto direito vira:
+   *   [Mesmo fechamento para todos os meses ▾ | Diferentes fechamentos por mês ▾] (+ mês, no 2º caso)
+   *   Fechamento (dia)  Vencimento (dia)
    * Os DOIS são obrigatórios (não dá para mudar só um); a mesma regra vale no serviço de dados.
    */
-  function editarCiclo(conta, ctx, aoSalvar) {
+  function areaCiclo(conta, ctx, aoSalvar) {
     const hoje = new Date();
     const meses = Array.from({ length: 13 }, (_, i) => { const d = new Date(hoje.getFullYear(), hoje.getMonth() + i - 1, 1); return F.iso(d).slice(0, 7); });
-    let modo = "fixo", mes = meses[1];
-    const ciclo = (m) => (conta.ciclos && conta.ciclos[m]) || { fechamento: conta.fechamento, vencimento: conta.vencimento };
-    ZoZo.modais.janela({
-      titulo: "Fechamento e vencimento",
-      classe: "modal--nova-conta",
-      passo: function passo(api) {
-        const diaInput = (rotulo, valor) => { const i = UI.Input({ type: "number", inputmode: "numeric", placeholder: "1 a 31", value: valor || "" }); i.min = "1"; i.max = "31"; i.setAttribute("aria-label", rotulo); return i; };
-        const atual = ciclo(modo === "mes" ? mes : null);
-        const fech = diaInput("Dia do fechamento", atual.fechamento), venc = diaInput("Dia do vencimento", atual.vencimento);
-        const erro = h("p", { class: "form-error", role: "alert" });
-        let salvarBtn = null;
-        const valido = (v) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
-        const conferir = () => { if (salvarBtn) salvarBtn.disabled = !(valido(fech.value) && valido(venc.value)); };
-        [fech, venc].forEach((i) => i.addEventListener("input", () => { erro.textContent = ""; conferir(); }));
-        const mesSel = modo === "mes" ? UI.Select(meses.map((m) => ({ value: m, label: F.mesAno(m + "-01") })), { value: mes, ariaLabel: "Mês" }) : null;
-        if (mesSel) mesSel.addEventListener("change", () => { mes = mesSel.value; api.ir(passo); });
-        return {
-          titulo: "Fechamento e vencimento",
-          corpo: h("div", { class: "zm__form" },
-            UI.Segmented([{ value: "fixo", label: "Todos os meses" }, { value: "mes", label: "Só um mês" }], modo, (v) => { modo = v; api.ir(passo); },
-              { label: "Vale para", class: "segmented--pilulas" }),
-            mesSel ? UI.Field("Mês", mesSel) : null,
-            h("div", { class: "form-row form-row--2" }, UI.Field("Fechamento (dia)", fech), UI.Field("Vencimento (dia)", venc)),
-            h("p", { class: "field__hint" }, "Fechamento e vencimento são alterados juntos."),
-            erro),
-          botoes: [
-            { label: "Cancelar", onClick: () => api.fechar() },
-            { label: "Salvar", primario: true, ref: (b) => { salvarBtn = b; conferir(); }, onClick: (btn) => {
-              if (!(valido(fech.value) && valido(venc.value))) { erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
-              btn.disabled = true;
-              ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: fech.value.trim(), vencimento: venc.value.trim(), modo, mes: modo === "mes" ? mes : undefined })
-                .then((r) => { api.fechar(); return ctx.recarregarTudo().then(() => aoSalvar && aoSalvar(r.conta)); })
-                .catch((e) => { erro.textContent = e.friendly; btn.disabled = false; });
-            } },
-          ],
-        };
+    const soEsteMes = !!(conta.cicloAtual && conta.cicloAtual.soEsteMes);
+    let modo = soEsteMes ? "mes" : "fixo", mes = meses[1];
+    const ciclo = () => (modo === "mes" && conta.ciclos && conta.ciclos[mes]) || { fechamento: conta.fechamento, vencimento: conta.vencimento };
+    const dia = (rotulo) => { const i = UI.Input({ inputmode: "numeric", placeholder: "1–31", class: T.cicloInput }); i.maxLength = 2; i.setAttribute("aria-label", rotulo); return i; };
+    const fech = dia("Dia do fechamento"), venc = dia("Dia do vencimento");
+    const erro = h("p", { class: T.cicloErro, role: "alert" });
+    const modoBtn = h("button", { type: "button", class: T.cicloModo, "aria-haspopup": "menu" });
+    const mesSel = UI.Select(meses.map((m) => ({ value: m, label: F.mesAno(m + "-01") })), { value: mes, ariaLabel: "Mês do fechamento", class: T.cicloMes });
+    const preencher = () => { const c = ciclo(); fech.value = c.fechamento || ""; venc.value = c.vencimento || ""; erro.textContent = ""; };
+    const pintar = () => {
+      mount(modoBtn, h("span", null, modo === "fixo" ? "Mesmo fechamento para todos os meses" : "Diferentes fechamentos por mês"), ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }));
+      mesSel.hidden = modo !== "mes";
+      preencher();
+    };
+    modoBtn.addEventListener("click", () => ZoZo.menu.abrir(modoBtn, [
+      { label: "Mesmo fechamento para todos os meses", check: modo === "fixo", onClick: () => { modo = "fixo"; pintar(); } },
+      { label: "Diferentes fechamentos por mês", check: modo === "mes", onClick: () => { modo = "mes"; pintar(); } },
+    ], { posicao: "direita", checkEsquerda: true, largura: 300, label: "Tipo de fechamento" }));
+    mesSel.addEventListener("change", () => { mes = mesSel.value; preencher(); });
+    pintar();
+    const valido = (v) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
+    [fech, venc].forEach((i) => i.addEventListener("input", () => { i.value = i.value.replace(/\D/g, ""); i.removeAttribute("aria-invalid"); erro.textContent = ""; }));
+    const campo = (rotulo, input) => h("label", { class: T.cicloCampo }, h("span", { class: T.cicloRotulo }, rotulo), input);
+    requestAnimationFrame(() => { fech.focus(); fech.select(); });
+    return {
+      el: h("div", { class: T.cicloArea }, modoBtn, mesSel, h("div", { class: T.cicloDias }, campo("Fechamento (dia)", fech), campo("Vencimento (dia)", venc)), erro),
+      salvar(btn) {
+        const ruins = [fech, venc].filter((i) => !valido(i.value));
+        if (ruins.length) { ruins.forEach((i) => i.setAttribute("aria-invalid", "true")); ruins[0].focus(); erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
+        if (btn) btn.disabled = true;
+        ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: fech.value.trim(), vencimento: venc.value.trim(), modo, mes: modo === "mes" ? mes : undefined })
+          .then((r) => ctx.recarregarTudo().then(() => aoSalvar(r.conta)))
+          .catch((e) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
       },
+    };
+  }
+
+  /** 4 últimos dígitos editáveis no lugar: um clique e já é um campo (sem borda, fundo transparente) */
+  function campoDigitos(conta, ctx) {
+    let atual = conta.ultimos4Digitos || "";
+    const input = h("input", { type: "text", inputmode: "numeric", autocomplete: "off", maxlength: "4", placeholder: "0000", value: atual,
+      class: T.digitos, "aria-label": "4 últimos dígitos" });
+    input.addEventListener("input", () => { input.value = input.value.replace(/\D/g, "").slice(0, 4); input.removeAttribute("aria-invalid"); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = atual; input.blur(); } });
+    input.addEventListener("blur", () => {
+      const v = input.value.trim();
+      if (v === atual) return;
+      if (v && !/^\d{4}$/.test(v)) { input.setAttribute("aria-invalid", "true"); ctx.toast(ZoZo.messages.FRIENDLY.DIGITS_INVALID, { tone: "error" }); input.value = atual; return; }
+      const antes = atual; atual = v;
+      ctx.bridge.request(A.updateConta, { id: conta.id, ultimos4Digitos: v }).then(() => ctx.recarregarTudo())
+        .catch((e) => { atual = antes; input.value = antes; ctx.toast(e.friendly, { tone: "error" }); });
     });
+    return input;
   }
 
   function abrirDetalheConta(conta, ctx, origem, opts) {
     let intervalo = conta.tipo === "investimento" ? "1M" : "3M";
+    const editandoCiclo = !!(opts && opts.editandoCiclo) && conta.tipo === "cartao";
+    const reabrir = (extra, atual) => abrirDetalheConta(atual || conta, ctx, origem, Object.assign({}, opts, extra));
+    const ciclo = editandoCiclo ? areaCiclo(conta, ctx, (c) => reabrir({ editandoCiclo: false }, Object.assign({}, conta, c))) : null;
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir conta?", "Tem certeza de que deseja excluir esta conta?")
       .then((ok) => ok && ctx.bridge.request(A.deleteConta, { id: conta.id }).then(() => { ctx.detail.close({ silencioso: true }); ctx.toast("Conta excluída."); return ctx.recarregarTudo(); })
         .catch((e) => ctx.toast(e.friendly, { tone: "error" })));
@@ -125,7 +184,9 @@
         : (L.SUBTITULO_CONTA[conta.tipo] ? "Conta " + L.SUBTITULO_CONTA[conta.tipo].toLowerCase() : "Conta"),
       selected: { tipo: "conta", id: conta.id },
       voltar: opts && opts.voltar,
-      botoes: conta.tipo === "cartao" ? [{ label: "Editar fechamento", onClick: () => editarCiclo(conta, ctx, (c) => abrirDetalheConta(Object.assign({}, conta, c), ctx, origem, opts)) }] : [],
+      botoes: editandoCiclo
+        ? [{ label: "Cancelar", onClick: () => reabrir({ editandoCiclo: false }) }, { label: "Salvar fechamento", primario: true, onClick: (e) => ciclo.salvar(e.currentTarget) }]
+        : conta.tipo === "cartao" ? [{ label: "Editar fechamento", onClick: () => reabrir({ editandoCiclo: true }) }] : [],
       menu: [
         { label: conta.oculta ? "Mostrar conta" : "Ocultar conta", onClick: ocultar },
         { separador: true },
@@ -151,17 +212,19 @@
           h("div", { class: "ph" },
             h("div", { class: "ph__top" },
               h("span", { class: "ph__meta" }, UI.AccountIcon(conta),
-                conta.ultimos4Digitos ? h("span", { class: "ph__digits" }, conta.ultimos4Digitos) : null,
+                // 4 últimos dígitos: um clique e já edita (investimento não tem cartão/conta com dígitos)
+                conta.tipo === "investimento" ? null : campoDigitos(conta, ctx),
                 h("span", { class: "ph__type" }, conta.oculta ? "Ocultado" : conta.tipo === "investimento" ? conta.tipoInvestimento || "Investimento" : L.SUBTITULO_CONTA[conta.tipo] || (conta.tipo === "cartao" ? "Cartão de crédito" : "Outros"))),
               h("span", { class: "ph__chips" }, difEl, UI.PercentageChange(conta.variacaoPercentual))),
             h("div", { class: "ph__main" },
               ZoZo.inline.texto({ valor: conta.nome, rotulo: "Nome da conta", max: ZoZo.regras.limiteNome, classe: "ph__name",
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) }),
-              ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: "ph__value",
+              // editando o fechamento, o saldo dá lugar ao combobox e aos dias
+              editandoCiclo ? ciclo.el : ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: "ph__value",
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, saldo: v }).then(() => { ctx.toast("Saldo atualizado."); return ctx.recarregarTudo(); }) })),
-            conta.limite ? h("div", { class: "ph__extra" }, F.moeda(conta.limite) + " de limite") : null,
+            conta.limite && !editandoCiclo ? h("div", { class: "ph__extra" }, F.moeda(conta.limite) + " de limite") : null,
             // cartão: fechamento e vencimento do mês atual (de todos os meses ou definidos só para este mês)
-            conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: "ph__extra" },
+            !editandoCiclo && conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: "ph__extra" },
               "Fecha dia " + conta.cicloAtual.fechamento + " · vence dia " + conta.cicloAtual.vencimento + (conta.cicloAtual.soEsteMes ? " (só neste mês)" : "")) : null),
           graficoEl, filtrosEl,
           C.detalheSecao("Transações", listaEl));
@@ -176,7 +239,8 @@
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
           const itens = d.lancamentos.filter((l) => l.contaId === conta.id).slice(0, 8);
           mount(listaEl, itens.length
-            ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
+            // a transação abre aqui mesmo, com a seta para voltar a esta conta
+            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta((((ZoZo.store.get().data.contas || {}).contas) || []).find((x) => x.id === conta.id) || conta, ctx, origem, opts) }) })
             : UI.EmptyState("Nenhuma transação nesta conta."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
         void origem;
@@ -206,14 +270,14 @@
         const exibindo = !!mostrar[g.key];
         const itens = doGrupo.filter((c) => !c.oculta || exibindo);
         const olho = temOcultas ? h("button", {
-          type: "button", class: ["icon-btn", "icon-btn--sm", "section__eye", exibindo && "is-active"],
+          type: "button", class: ["icon-btn", "icon-btn--sm", exibindo ? T.olhoAtivo : T.olho],
           "aria-pressed": String(exibindo), title: exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
           "aria-label": exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
           onClick: (e) => { e.stopPropagation(); ZoZo.store.set({ ui: { mostrarOcultas: Object.assign({}, mostrar, { [g.key]: !exibindo }) } }); },
         }, ZoZo.icons.icon(exibindo ? "olho" : "olho-fechado", { size: 15 })) : null;
-        return UI.Section({ key: "contas:" + g.key, title: g.titulo, adorno: olho },
-          itens.length ? null : h("p", { class: "section__hint" }, "Todas as contas deste grupo estão ocultas."),
-          h("div", { class: "list" }, itens.map((c) => L.AccountRow(c, {
+        return UI.Section({ key: "contas:" + g.key, title: g.titulo, adorno: olho, class: T.secao },
+          itens.length ? null : h("p", { class: T.aviso }, "Todas as contas deste grupo estão ocultas."),
+          h("div", { class: T.lista }, itens.map((c) => L.AccountRow(c, {
             selected: c.id === sel,
             onClick: () => abrirDetalheConta(c, ctx, "contas"),
           }))));

@@ -70,12 +70,7 @@
 .detail-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 /* ---------- Contas / Investimentos ---------- */
-.account-row { grid-template-columns: 36px minmax(0, 1fr) auto 136px; min-height: var(--row-height-tall); }
-.account-row__info { display: flex; flex-direction: column; min-width: 0; }
-.account-row__sub { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-.account-row__pct { justify-self: end; }
-.account-row__value { justify-self: end; }
-.page--contas .section, .page--investimentos .section { margin-top: var(--space-5); }
+.page--investimentos .section { margin-top: var(--space-5); }
 
 .allocation-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 2fr) 72px; min-height: 48px; }
 .allocation-row__lead { display: flex; align-items: center; gap: 10px; }
@@ -332,11 +327,6 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
 }
 .profile-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Contas ocultas */
-.account-row__line { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.account-row__eye { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--color-text-primary); color: #fff; flex: none; }
-.account-row--oculta .account-icon { opacity: 0.55; }
-.section__eye { color: var(--color-text-muted); margin-left: 2px; }
-.section__eye.is-active { color: var(--color-primary); }
 
 /* ---------- Painel do lançamento (edição no lugar) ---------- */
 .lp { display: flex; flex-direction: column; }
@@ -374,7 +364,6 @@ input[type="number"].input { font-variant-numeric: lining-nums proportional-nums
 .lp-add:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .lp-chip-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 2px; border-radius: var(--radius-pill); }
 .lp-chip-btn:hover { box-shadow: 0 0 0 2px var(--color-primary-soft); }
-.lp-rec { height: 26px; padding: 0 10px 0 4px; background: var(--color-neutral-soft); color: var(--color-neutral); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
 .lp-notes-wrap { padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
 .lp-notes { width: 100%; border: 0; resize: none; background: transparent; font-size: var(--font-size-md); line-height: 1.5; padding: 4px 6px; margin-left: -6px; border-radius: 6px; overflow: hidden; color: var(--color-text-primary); }
 .lp-notes::placeholder { color: var(--color-text-muted); }

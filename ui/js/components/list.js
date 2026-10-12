@@ -38,6 +38,8 @@
      As colunas saem conforme a largura da ÁREA (tw:area620 etc.: container queries), não da tela.
      A caixa de seleção NÃO fica dentro do <button> da linha (controle dentro de controle é HTML
      inválido e some para leitores de tela): ela vem antes, sobreposta à 1ª coluna, que fica vazia.
+     Espaços: a 1ª coluna (12 px) + o vão (12 px) põem o conteúdo 8 px depois da caixa (16 px); dentro
+     da descrição, letra, nome, parcela e conta ficam a 6 px (o mesmo vão entre a conta e os dígitos).
      launch-row e launch-row__* são só ganchos (JS/testes), sem CSS. */
   const NUMEROS = "tw:[font-variant-numeric:lining-nums_proportional-nums]";
   const LR = {
@@ -46,9 +48,9 @@
     interativa: "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
     pagina: {
       linha: "tw:w-auto tw:-mx-(--page-gutter) tw:px-(--page-gutter) tw:gap-3 tw:rounded-none",
-      grade: "tw:grid-cols-[18px_minmax(0,1fr)_minmax(0,max-content)_minmax(84px,max-content)_112px] "
-        + "tw:area620:grid-cols-[18px_minmax(0,1fr)_minmax(0,max-content)_96px] tw:area420:grid-cols-[18px_minmax(0,1fr)_96px]",
-      gradeSemPerfil: "tw:grid-cols-[18px_minmax(0,1fr)_minmax(0,max-content)_112px] tw:area620:grid-cols-[18px_minmax(0,1fr)_96px]",
+      grade: "tw:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_minmax(84px,max-content)_112px] "
+        + "tw:area620:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_96px] tw:area420:grid-cols-[12px_minmax(0,1fr)_96px]",
+      gradeSemPerfil: "tw:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_112px] tw:area620:grid-cols-[12px_minmax(0,1fr)_96px]",
       data: "tw:min-w-[46px] tw:text-[13px]",
       categoria: "tw:overflow-hidden tw:max-w-[180px] tw:area620:hidden",
       perfil: "tw:max-w-[180px] tw:area620:max-w-[110px] tw:area420:hidden",
@@ -69,10 +71,10 @@
     clicada: "tw:bg-zz-surface-hover tw:shadow-[inset_3px_0_0_var(--color-primary)]",
     marcada: "tw:bg-zz-primary-soft",
     marcadaClicada: "tw:bg-zz-primary-soft tw:shadow-[inset_3px_0_0_var(--color-primary)]",
-    // caixa sobre a 1ª coluna (18 px), centrada na altura da linha
-    caixa: "tw:absolute tw:left-0 tw:inset-y-0 tw:w-[18px] tw:flex tw:items-center tw:[transition:opacity_var(--duration-fast)]",
+    // caixa sobre a 1ª coluna, centrada na altura da linha
+    caixa: "tw:absolute tw:left-0 tw:inset-y-0 tw:w-4 tw:flex tw:items-center tw:[transition:opacity_var(--duration-fast)]",
     caixaApagada: "tw:opacity-55 tw:group-hover/linha:opacity-100 tw:focus-within:opacity-100",
-    desc: "tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
+    desc: "tw:flex tw:items-baseline tw:gap-1.5 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     data: "tw:flex-none tw:w-[52px] tw:text-zz-secondary " + NUMEROS,
     letra: "tw:self-center tw:flex-none",
     titulo: "tw:flex-[0_1_auto] tw:min-w-[3em] tw:overflow-hidden tw:text-ellipsis tw:text-zz-text tw:text-[15px] tw:font-[450]",
@@ -123,19 +125,46 @@
     return h("div", { class: "tw:relative tw:flex tw:flex-col tw:group/linha", "data-linha": "" }, caixa, linha);
   }
 
-  /* ---------- Conta (seções 19–22, 24) ---------- */
+  /* ---------- Conta (seções 19–22, 24) ----------
+     Visual em Tailwind (Contas e Investimentos). account-row* são ganchos. Área estreita (≤ 620 px):
+     ícone e nome ocupam duas linhas; o valor fica em cima e a variação embaixo, à direita. */
+  const AR = {
+    linha: "tw:grid tw:items-center tw:gap-4 tw:w-full tw:min-h-(--row-height-tall) tw:px-4 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-inherit "
+      + "tw:text-left tw:text-[15px] tw:focus-visible:outline-offset-[-2px] tw:grid-cols-[36px_minmax(0,1fr)_auto_136px] "
+      + "tw:area620:grid-cols-[36px_minmax(0,1fr)_auto] tw:area620:grid-rows-[auto_auto] tw:area620:gap-y-0.5",
+    interativa: "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
+    normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
+    selecionada: "tw:bg-zz-primary-soft",
+    icone: "tw:area620:row-span-2",
+    info: "tw:flex tw:flex-col tw:min-w-0 tw:area620:row-span-2",
+    nomeLinha: "tw:flex tw:items-center tw:gap-1.5 tw:min-w-0",
+    olho: "tw:inline-grid tw:place-items-center tw:flex-none tw:size-[18px] tw:rounded-sm tw:bg-zz-text tw:text-white",
+    nome: "tw:*:text-[15px] tw:*:font-[450]",
+    sub: "tw:text-zz-secondary tw:text-[13px] tw:font-[450]",
+    variacao: "tw:[justify-self:end] tw:text-[13px] tw:font-[550] tw:[&_.pct]:text-[13px] tw:[&_.pct]:font-[550] tw:area620:col-start-3 tw:area620:row-start-2",
+    valor: "tw:[justify-self:end] tw:text-[15px] tw:font-[550] tw:area620:col-start-3 tw:area620:row-start-1",
+  };
   function AccountRow(c, opts) {
     const o = opts || {};
     const sub = c.oculta ? "Ocultado" : o.subtitulo !== undefined ? o.subtitulo : SUBTITULO_CONTA[c.tipo];
-    return rowBase(["account-row", c.oculta && "account-row--oculta"].filter(Boolean).join(" "), Object.assign({ id: c.id }, o),
-      UI.AccountIcon(c),
-      h("span", { class: "account-row__info" },
-        h("span", { class: "account-row__line" },
-          c.oculta ? h("span", { class: "account-row__eye", title: "Conta oculta", "aria-label": "Conta oculta" }, icon("olho-fechado", { size: 13 })) : null,
-          nomeComDigitos(c.nome, c.ultimos4Digitos)),
-        sub ? h("span", { class: "account-row__sub" }, sub) : null),
-      h("span", { class: "account-row__pct" }, UI.PercentageChange(c.variacaoPercentual, { contexto: "em relação ao mês anterior" })),
-      h("span", { class: "account-row__value money" }, F.moeda(c.valor)));
+    const icone = UI.AccountIcon(c);
+    icone.classList.add(...AR.icone.split(" "));
+    if (c.oculta) icone.classList.add("tw:opacity-55");                // conta oculta: ícone apagado
+    return h(o.onClick ? "button" : "div", {
+      type: o.onClick ? "button" : undefined,
+      class: ["account-row", AR.linha, o.selected ? AR.selecionada : AR.normal, o.onClick && AR.interativa],
+      onClick: o.onClick,
+      "aria-current": o.selected ? "true" : undefined,
+      "data-id": c.id,
+    },
+      icone,
+      h("span", { class: AR.info },
+        h("span", { class: AR.nomeLinha },
+          c.oculta ? h("span", { class: AR.olho, title: "Conta oculta", "aria-label": "Conta oculta" }, icon("olho-fechado", { size: 13 })) : null,
+          nomeComDigitos(c.nome, c.ultimos4Digitos, AR.nome)),
+        sub ? h("span", { class: AR.sub }, sub) : null),
+      h("span", { class: AR.variacao }, UI.PercentageChange(c.variacaoPercentual, { contexto: "em relação ao mês anterior" })),
+      h("span", { class: ["money", AR.valor] }, F.moeda(c.valor)));
   }
 
   /* ---------- Categoria (seções 35–39) ----------

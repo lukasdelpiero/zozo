@@ -120,7 +120,8 @@
             rotuloTooltip: (p) => F.mesNome(F.parseData(p.data).getMonth()) + " " + F.parseData(p.data).getFullYear(),
           });
           mount(historico, d.lancamentos.length
-            ? L.ListaPainel(d.lancamentos, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
+            // o pagamento abre aqui mesmo, com a seta para voltar a esta recorrência
+            ? L.ListaPainel(d.lancamentos, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe(r, ctx, opts) }) })
             : UI.EmptyState("Nenhum pagamento registrado ainda."));
         }).catch(() => mount(historico, UI.ErrorState(ZoZo.messages.FRIENDLY.LOAD_FAILED)));
       },

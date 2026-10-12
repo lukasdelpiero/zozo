@@ -315,3 +315,72 @@ test("estrutura inválida no documento não é descartada ao gravar (auditoria A
   await ok.req(ok.A.createPerfil, { perfil: { nome: "X" } });
   assert.equal(ok.salvos[0].contas[0].historico[0].saldo, 125);
 });
+
+test("compra no cartão aumenta a fatura; estorno e pagamento diminuem", async () => {
+  const t = carregar();
+  const { conta: cartao } = await t.req(t.A.createConta, { conta: { nome: "Nubank", tipo: "cartao", saldo: 0 } });
+  const { lancamento } = await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Mercado", valor: 250, tipo: "regular", contaId: cartao.id } });
+  assert.equal(await saldo(t, cartao.id), 250);
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Devolução", valor: 50, tipo: "estorno", contaId: cartao.id } });
+  assert.equal(await saldo(t, cartao.id), 200);
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Pagamento", valor: 200, tipo: "interno", sentido: "entrada", contaId: cartao.id } });
+  assert.equal(await saldo(t, cartao.id), 0);
+  await t.req(t.A.updateLancamento, { id: lancamento.id, lancamento: { data: hoje(), descricao: "Mercado", valor: 300, tipo: "regular", contaId: cartao.id } });
+  assert.equal(await saldo(t, cartao.id), 50);                                    // editou: só a diferença
+  await t.req(t.A.deleteLancamento, { id: lancamento.id });
+  assert.equal(await saldo(t, cartao.id), -250);                                  // excluiu: devolve
+});
+
+test("receita e transferências mudam o saldo da conta; regular não", async () => {
+  const t = carregar();
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 1000 } });
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Salário", valor: 3000, tipo: "receita", contaId: conta.id } });
+  assert.equal(await saldo(t, conta.id), 4000);
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Para a poupança", valor: 500, tipo: "interno", sentido: "saida", contaId: conta.id } });
+  assert.equal(await saldo(t, conta.id), 3500);
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Mercado", valor: 80, tipo: "regular", contaId: conta.id } });
+  assert.equal(await saldo(t, conta.id), 3500);
+  const futuro = new Date(); futuro.setDate(futuro.getDate() + 5);
+  await t.req(t.A.createLancamento, { lancamento: { data: futuro.toISOString().slice(0, 10), descricao: "Bônus", valor: 100, tipo: "receita", contaId: conta.id } });
+  assert.equal(await saldo(t, conta.id), 3500);                                   // data futura: só no dia
+});
+
+test("dados antigos: as transações que já existiam não mudam o saldo informado", async () => {
+  const documento = { versao: 1, perfis: [], categorias: [], grupos: {}, config: {}, meta: {},
+    contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", cor: "#000", historico: [{ data: "2026-01-01", saldo: 1000 }] },
+      { id: "c2", nome: "Nubank", tipo: "cartao", cor: "#000", historico: [{ data: "2026-01-01", saldo: 700 }] }],
+    lancamentos: [
+      { id: "l1", data: "2026-02-01", descricao: "Salário", valor: 3000, tipo: "receita", contaId: "c1" },
+      { id: "l2", data: "2026-02-02", descricao: "Compra", valor: 400, tipo: "regular", contaId: "c2" },
+      { id: "l3", data: "2026-02-03", descricao: "Padaria", valor: 10, tipo: "debito", contaId: "c1", debitado: { contaId: "c1", valor: 10 } }] };
+  const t = carregar({ documento });
+  assert.equal(await saldo(t, "c1"), 1000);
+  assert.equal(await saldo(t, "c2"), 700);
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Nova compra", valor: 100, tipo: "regular", contaId: "c2" } });
+  assert.equal(await saldo(t, "c2"), 800);                                        // a partir daqui, acompanha
+  assert.equal(await saldo(t, "c1"), 1000);
+  const salvo = t.documento();
+  assert.equal(salvo.meta.saldoPorTransacao, 1);
+  assert.equal(salvo.lancamentos.some((l) => l.debitado), false);                 // formato antigo convertido
+});
+
+test("leitura logo depois de uma alteração já a enxerga (sem esperar a gravação no servidor)", async () => {
+  const t = carregar();
+  await t.req(t.A.getConfig);
+  const gravacao = t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 10 } });
+  const lidas = await t.req(t.A.getContas);                                       // não esperou a gravação
+  assert.equal(lidas.contas.some((c) => c.nome === "Itaú"), true);
+  await gravacao;
+});
+
+test("4 últimos dígitos: só 4 algarismos ou vazio", async () => {
+  const t = carregar();
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Nubank", tipo: "cartao", saldo: 0, ultimos4Digitos: "1111" } });
+  await t.req(t.A.updateConta, { id: conta.id, ultimos4Digitos: "9876" });
+  assert.equal((await t.req(t.A.getContas)).contas[0].ultimos4Digitos, "9876");
+  for (const ruim of ["12", "abcd", "12345", "12 4"]) {
+    await assert.rejects(t.req(t.A.updateConta, { id: conta.id, ultimos4Digitos: ruim }), (e) => e.code === "DIGITS_INVALID", ruim);
+  }
+  await t.req(t.A.updateConta, { id: conta.id, ultimos4Digitos: "" });
+  assert.equal((await t.req(t.A.getContas)).contas[0].ultimos4Digitos, "");
+});

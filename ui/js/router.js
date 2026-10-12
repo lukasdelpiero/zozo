@@ -27,11 +27,13 @@
       const animar = entrada || desdeEntrada < 800 || !!mainEl.querySelector('[aria-busy="true"]');
       const entradaAgora = entrada;
       entrada = false;
-      ZoZo.charts.permitirAnimacao = animar;          // gráficos só animam ao entrar na página
       // redesenho logo após entrar com gráfico já na tela: os gráficos novos continuam a animação em curso
       // (só a desta entrada: ao entrar na página o início anterior é esquecido)
       if (entradaAgora) ZoZo.charts.ultimoInicio = null;
       const tinhaGrafico = !entradaAgora && !!mainEl.querySelector(".line-chart__svg, .donut");
+      // gráficos animam ao entrar na página e quando aparecem pela 1ª vez (ex.: dados que chegaram depois);
+      // um redesenho com o gráfico já na tela (dados atualizados) não reanima
+      ZoZo.charts.permitirAnimacao = animar || !tinhaGrafico;
       ZoZo.charts.continuarDe = animar && tinhaGrafico ? ZoZo.charts.ultimoInicio : null;
       const conteudo = page.render(state, ctx);
       ZoZo.charts.permitirAnimacao = true;

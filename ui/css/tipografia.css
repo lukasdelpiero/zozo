@@ -29,7 +29,7 @@
 .card__link { font-size: var(--t-15); font-weight: 550; }
 .spend__value { font-size: var(--t-24); font-weight: 550; }
 .spend__note { font-size: var(--t-15); font-weight: 550; }
-.dash-area--patrimonio .summary__value, .dash-area--patrimonio .chart-card__value { font-size: var(--t-15); font-weight: 550; }
+.dash-area--patrimonio .summary__value { font-size: var(--t-15); font-weight: 550; }
 .pct, .pct__value { font-size: var(--t-13); font-weight: 550; }
 .filter-tabs__item { font-size: var(--t-13); font-weight: 620; }
 .dash-area--proximos .recurrence-row__date, .dash-area--proximos .recurrence-row__title { font-size: var(--t-15); font-weight: 450; }
@@ -59,11 +59,6 @@
 
 /* ================= Contas e Investimentos ================= */
 .section__title { font-size: var(--t-15); font-weight: 620; }
-.account-row .name-digits__name { font-size: var(--t-15); font-weight: 450; }
-.account-row .name-digits__digits { font-size: var(--t-15); font-weight: 450; }
-.account-row__sub { font-size: var(--t-13); font-weight: 450; }
-.account-row__pct, .account-row .pct { font-size: var(--t-13); font-weight: 550; }
-.account-row__value { font-size: var(--t-15); font-weight: 550; }
 
 .cat-label__name { font-size: var(--t-15); font-weight: 450; }
 
@@ -110,7 +105,6 @@
 .lp-account { font-size: var(--t-13); font-weight: 550; }
 .lp-prop__label { font-size: var(--t-15); font-weight: 550; }
 .lp-prop .cat-pill, .lp-prop .tag--upper { font-size: 12px; font-weight: 620; }
-.lp-rec { font-size: var(--t-15); font-weight: 550; }
 .lp-notes, .lp-notes::placeholder { font-size: var(--t-15); font-weight: 550; }
 
 /* Listas de lançamentos nos painéis: de borda a borda, valor na linha do nome */
@@ -272,7 +266,6 @@
 /* Botões toggle da janela de contas (Cartão de crédito · Poupança · Corrente): sem quebra de linha */
 .segmented--pilulas .segmented__item { font-size: var(--t-15); font-weight: 550; white-space: nowrap; padding: 0 10px; }
 .segmented--pilulas .segmented__item > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.modal--nova-conta { width: min(500px, calc(100vw - 32px)); }
 
 /* =============================================================
    Seletor de emojis (emoji-mart; cores e cantos dentro de src/emoji-picker.ts)
@@ -307,13 +300,15 @@
 .lp-add .icon { display: block; margin: 0; }
 /* Categoria e perfil: mesma altura da parte colorida, .6875rem/620 */
 .lp-prop .cat-pill, .lp-prop .tag, .lp-prop .tag--upper { font-size: var(--t-11); font-weight: 620; height: 24px; display: inline-flex; align-items: center; }
-/* Recorrência e Divisão: mesma altura, fundo branco com a borda do "+" */
+/* Recorrência e Divisão: mesmo tamanho das pílulas de Categoria e Perfil (24 px, .6875rem/620, maiúsculas),
+   fundo branco com a borda do "+" */
 .lp-rec, .lp-split {
-  height: 28px; padding: 0 12px 0 8px; gap: 6px;
+  height: 24px; padding: 0 9px 0 5px; gap: 5px;
   background: var(--color-surface); color: var(--color-text-primary);
   border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill);
-  font-size: var(--t-15); font-weight: 550;
+  font-size: var(--t-11); font-weight: 620; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
 }
+.lp-rec .kind-badge { width: 14px; height: 14px; font-size: 8.5px; }
 .lp-rec:hover, .lp-split:hover { border-color: var(--color-primary); box-shadow: none; }
 .lp-split .icon { color: var(--color-text-secondary); }
 .detail__textbtn--split { font-size: var(--t-15); font-weight: 620; }
@@ -431,11 +426,6 @@
 @container (max-width: 620px) {
   .recurrence-row:not(.recurrence-row--compact), .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 52px minmax(0, 1fr) 110px; }
   .recurrence-row:not(.recurrence-row--compact) .recurrence-row__category { display: none; }
-  .account-row { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 2px; }
-  .account-row .account-icon { grid-row: span 2; }
-  .account-row__info { grid-row: span 2; }
-  .account-row__value { grid-column: 3; grid-row: 1; }
-  .account-row__pct { grid-column: 3; grid-row: 2; }
 }
 
 /* Telas pequenas: o painel escondido fora da tela e a busca larga não podem alargar a página */

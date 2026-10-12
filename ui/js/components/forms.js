@@ -66,10 +66,13 @@
     return { el: input, ler: () => (t === "senha" ? input.value : input.value.trim()), foco: input, input };
   }
 
+  /** cfg.voltar: aberto a partir de outro painel → seta e "Cancelar" voltam para ele, e salvar também
+      (com os dados já atualizados) em vez de fechar o painel */
   function abrir(ctx, cfg) {
     return ctx.detail.open({
       title: cfg.titulo,
       selected: cfg.selected || null,
+      voltar: cfg.voltar || null,
       render(body, api) {
         const valores = Object.assign({}, cfg.valores || {});
         const itens = [];
@@ -103,7 +106,7 @@
           erroEl,
           h("footer", { class: "detail-footer" },
             cfg.excluir ? UI.Button(cfg.excluir.rotulo || "Excluir", { variant: "danger-ghost", icon: "excluir", onClick: excluir }) : h("span"),
-            h("div", { class: "detail-footer__end" }, UI.Button("Cancelar", { onClick: () => (cfg.aoCancelar ? cfg.aoCancelar() : api.close()) }), salvar)));
+            h("div", { class: "detail-footer__end" }, UI.Button("Cancelar", { onClick: () => (cfg.voltar ? cfg.voltar() : cfg.aoCancelar ? cfg.aoCancelar() : api.close()) }), salvar)));
 
         function excluir() {
           ZoZo.feedback.confirmarExclusao(cfg.excluir.titulo, cfg.excluir.mensagem).then((ok) => {
@@ -133,7 +136,8 @@
           erroEl.textContent = "";
           salvar.disabled = true; salvar.classList.add("is-busy");
           Promise.resolve(cfg.salvar(dados)).then(() => {
-            if (!cfg.manterAberto) api.close({ silencioso: true });
+            if (cfg.voltar) cfg.voltar();
+            else if (!cfg.manterAberto) api.close({ silencioso: true });
           }).catch((err) => {
             erroEl.textContent = (err && err.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED;
           }).finally(() => { if (salvar.isConnected) { salvar.disabled = false; salvar.classList.remove("is-busy"); } });

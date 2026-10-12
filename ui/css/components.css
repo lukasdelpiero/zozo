@@ -254,14 +254,9 @@
 .chart-card__top--single { grid-template-columns: 1fr; }
 .chart-card__half { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .chart-card__legend { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.legend-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.chart-card__half--assets .legend-dot { background: var(--color-assets); }
-.chart-card__half--liabilities .legend-dot { background: var(--color-liabilities); }
 .chart-card__value { font-size: var(--font-size-3xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; line-height: 1.15; text-align: center; }
 .chart-card__chart { position: relative; margin: var(--space-4) 0 var(--space-2); }
 .chart-card__filters { display: flex; justify-content: center; }
-.chart-card--compact .chart-card__value { font-size: var(--font-size-xl); }
-.chart-card--embedded { padding: 0; }
 
 /* Gráficos */
 .line-chart { position: relative; }
@@ -488,7 +483,7 @@
   font-size: 11px; font-weight: var(--font-weight-semibold); letter-spacing: 0.03em;
   text-transform: uppercase; white-space: nowrap; line-height: 1;
 }
-.cat-pill__icon { font-size: 12px; letter-spacing: 0; }
+.cat-pill__icon { font-size: 12px; letter-spacing: 0; position: relative; top: -1px; }   /* emoji alinhado ao texto (a tinta dele fica ~1 px abaixo do centro) */
 /* line-height maior para não cortar acentos em maiúsculas (SALÁRIO, SAÚDE) */
 .cat-pill__name { overflow: hidden; text-overflow: ellipsis; line-height: 22px; }
 .tag--upper .tag__text { line-height: 22px; }
@@ -527,15 +522,10 @@
 .donut--clicavel { cursor: pointer; border-radius: 50%; transition: transform var(--duration-fast) var(--easing); }
 .donut--clicavel:hover { transform: scale(1.03); }
 
-/* ---------- Linha de conta: adapta à largura da área (tela dividida) ---------- */
+/* ---------- Áreas que se adaptam à própria largura (container queries; ver também tw:area620 etc.) ---------- */
 .main, .detail__body { container-type: inline-size; }
 /* Ajustes de área estreita: ver o fim de tipografia.css (precisam vir depois das grades de pages.css) */
 @container (max-width: 620px) {
-  .account-row { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: auto auto; row-gap: 2px; }
-  .account-row .account-icon { grid-row: span 2; }
-  .account-row__info { grid-row: span 2; }
-  .account-row__value { grid-column: 3; grid-row: 1; }
-  .account-row__pct { grid-column: 3; grid-row: 2; }
   .summary { gap: var(--space-4); padding: var(--space-4); }
   .recurrence-row { grid-template-columns: 52px minmax(0, 1fr) 110px; }
   .recurrence-row__category { display: none; }
@@ -605,7 +595,6 @@
 .segmented--sub .segmented__item > span { flex: 0 1 auto; }
 .menu__label--2 { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; white-space: normal; }
 .menu__label--2 small { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
-.section__hint { padding: 0 var(--space-4) var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .menu__list--scroll { max-height: 290px; overflow-y: auto; }
 
 /* ---------- Configurações (janela modal) ---------- */
@@ -616,7 +605,8 @@
 .section__lead { display: flex; align-items: center; gap: 2px; min-width: 0; }
 
 /* ---------- Janelas modais de criação ---------- */
-.modal--zm { width: min(460px, 100%); }
+/* Janelas de criação e de transferência (modais.janela): todas com a mesma largura */
+.modal--zm { width: min(560px, calc(100vw - 32px)); }
 .modal--zm .modal__body { padding: var(--space-4) var(--space-6) 0; }
 .zm__footer { margin: var(--space-4) calc(-1 * var(--space-6)) 0; border-top: 0; padding-top: 0; }
 .zm__footer:empty { display: none; }
@@ -639,7 +629,6 @@
 .toggle__input:checked + .toggle__track { background: var(--color-primary); }
 
 /* Nova recorrência: lista e frequência */
-.modal--recorrencia { width: min(520px, 100%); }
 .zm__pick { display: flex; flex-direction: column; gap: var(--space-3); padding-bottom: var(--space-4); }
 .zm__search { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-radius: var(--radius-small); background: var(--color-background); color: var(--color-text-muted); }
 .zm__search-input { flex: 1; min-width: 0; border: 0; outline: none; background: none; font-size: var(--font-size-md); color: var(--color-text-primary); }

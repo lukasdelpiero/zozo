@@ -343,6 +343,15 @@
       return sessaoData();
     },
 
+    /** Outro dispositivo/aba gravou depois da última leitura? Só o número da versão (o documento não vem) */
+    async verificarAtualizacao() {
+      const s = exigirSessao();
+      if (s.demo) return { mudou: false };
+      const r = await comProvaDaSessao(() => api("GET", "/documento/versao", undefined, s.prova));
+      const versao = Number(r && r.versao) || 0;
+      return { mudou: versao > s.versao, versao };
+    },
+
     async loadUserData() {
       const s = exigirSessao();
       // Demonstração: dados fictícios, sorteados a cada acesso (nada vem do servidor)

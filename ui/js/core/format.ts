@@ -103,7 +103,13 @@
    * Campo de valor enquanto a pessoa digita, como numa maquininha: os dígitos entram pelos centavos
    * e vão subindo ("1" → "0,01", "12" → "0,12", "1200" → "12,00", "120000" → "1.200,00").
    * Apagar tira o último dígito. Valor colado ("1.234,56", "1234.5") é lido inteiro, sem deslocar casas.
+   * Campo com data-com-simbolo: o símbolo da moeda fica na frente enquanto digita ("R$ 1.234,56").
    */
+  const prefixoMoeda = (input: HTMLInputElement): string => (input.dataset.comSimbolo !== undefined ? simbolo() + " " : "");
+  /** Texto do campo de valor para editar: "1.234,56" ou, com data-com-simbolo, "R$ 1.234,56" (negativo: "-R$ …") */
+  function valorParaEditar(input: HTMLInputElement, v: number): string {
+    return (v < 0 ? "-" : "") + prefixoMoeda(input) + moedaEditavel(v);
+  }
   function mascararValor(input: HTMLInputElement, _digitado?: string | null, tipo?: string): void {
     const v = input.value;
     const negativo = /^\s*[-−]/.test(v);
@@ -115,16 +121,16 @@
       const digitos = v.replace(/\D/g, "").replace(/^0+/, "").slice(0, 15);   // até R$ 9.999.999.999.999,99
       centavos = digitos ? Number(digitos) : 0;
     }
-    const novo = !centavos && !/\d/.test(v) ? (negativo ? "-" : "") : (negativo ? "-" : "") + moedaEditavel(centavos / 100);
+    const novo = !centavos && !/\d/.test(v) ? (negativo ? "-" : "") : (negativo ? "-" : "") + prefixoMoeda(input) + moedaEditavel(centavos / 100);
     if (novo !== v) input.value = novo;
     try { input.setSelectionRange(novo.length, novo.length); } catch (e) { /* campo sem seleção */ }
   }
   /** Ao sair do campo: completa os centavos ("12.000" → "12.000,00"). Texto que não é valor fica como está. */
   function completarValor(input: HTMLInputElement): void {
-    const v = input.value.trim();
+    const v = input.value.trim().replace(/US\$|R\$|[$€\s\u00a0]/g, "");
     if (!v || !/^[-−]?[\d.]+(,\d*)?$/.test(v)) return;
     const n = parseMoeda(v);
-    if (Number.isFinite(n)) input.value = (n < 0 ? "-" : "") + moedaEditavel(n);
+    if (Number.isFinite(n)) input.value = valorParaEditar(input, n);
   }
 
   /**
@@ -151,6 +157,6 @@
 
   const api: ZoZoFormat = {
     diaSemana, rotuloDia, cor, moeda, percentual, parseData, iso, dataExtenso, dataCurta, mesAno, mesAbrev, mesNome, parseMoeda, moedaEditavel, numero, MESES, MESES_ABREV,
-    definirMoeda, simbolo, mascararValor, completarValor };
+    definirMoeda, simbolo, mascararValor, completarValor, valorParaEditar };
   ZoZo.format = api;
 })(window.ZoZo);

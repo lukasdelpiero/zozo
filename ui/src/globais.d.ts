@@ -100,6 +100,7 @@ declare global {
     moedaEditavel(v: unknown): string;
     mascararValor(input: HTMLInputElement, digitado?: string | null, tipo?: string): void;
     completarValor(input: HTMLInputElement): void;
+    valorParaEditar(input: HTMLInputElement, v: number): string;
     cor(v: unknown, padrao?: string | null): string | null;
     diaSemana(d: Date): string;
     rotuloDia(dataIso: string): string;

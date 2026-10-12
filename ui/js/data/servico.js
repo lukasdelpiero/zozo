@@ -40,6 +40,9 @@
   let doc = null;          // documento do usuário em memória
   let carregando = null;   // Promise de carga
   let fila = Promise.resolve(); // operações de escrita em série
+  // Leituras esperam só a alteração ser APLICADA na memória (não a gravação no servidor terminar): a tela
+  // atualiza na hora. Se a gravação falhar, o documento volta ao estado anterior e a tela é redesenhada.
+  let aplicadas = Promise.resolve();
   let pendentes = 0;            // gravações ainda não confirmadas pelo servidor
   let criadosDemo = {};         // demonstração: itens criados pelo visitante, por tipo
   let somenteLeitura = false;   // documento sumiu do servidor sem backup: nada é gravado até um recomeço deliberado
@@ -191,7 +194,7 @@
             ZoZo.log.error("serviço", { evento: "documento_invalido", problemas: Array.from(new Set(lido.problemas)) });
             window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: "DOCUMENT_INVALID_LOCKED" } }));
           }
-          if (!somenteLeitura && sincronizarParcelas() + sincronizarDebitos() > 0) {
+          if (!somenteLeitura && sincronizarParcelas() + sincronizarSaldos() > 0) {
             doc.meta.ultimaGravacao = new Date().toISOString();
             // grava pela mesma fila das alterações (nunca em paralelo com elas) e conta como gravação pendente
             pendentes += 1;
@@ -238,16 +241,21 @@
   /** Executa uma alteração e grava. Se a gravação falhar, desfaz. */
   function alterar(fn) {
     pendentes += 1;
+    let aplicada;
+    aplicadas = new Promise((r) => { aplicada = r; });
     const exec = fila.then(() => garantirCarregado()).then(() => {
       if (somenteLeitura) throw erro(motivoBloqueio);
       const antes = JSON.stringify(doc);
       let resultado;
-      try { resultado = fn(doc); sincronizarDebitos(); } catch (e) { doc = JSON.parse(antes); throw e; }
+      try { resultado = fn(doc); sincronizarSaldos(); } catch (e) { doc = JSON.parse(antes); throw e; }
       doc.meta.ultimaGravacao = new Date().toISOString();
+      aplicada();
       return ZoZo.bridge.requestHost(M.ACTIONS.saveUserData, { documento: doc })
         .then(() => resultado)
         .catch((e) => {
           if (doc) doc = JSON.parse(antes);
+          // quem leu enquanto gravava viu a alteração: a tela volta ao que está gravado
+          window.dispatchEvent(new CustomEvent("zozo:dados-revertidos"));
           if (tratarConflito(e)) throw erro("DATA_CHANGED");
           if (e && e.code === "TIMEOUT") {
             // Sem resposta: a gravação pode ter acontecido ou não. Nada de "desfazer" às cegas: relê do servidor.
@@ -257,13 +265,19 @@
           }
           throw erroDaGravacao(e);
         });
-    }).finally(() => { pendentes -= 1; });
+    }).finally(() => { pendentes -= 1; aplicada(); });
     fila = exec.catch(() => null);
     return exec;
   }
 
-  function reset() { doc = null; carregando = null; fila = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; }
+  function reset() { doc = null; carregando = null; fila = Promise.resolve(); aplicadas = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; }
   const gravando = () => pendentes > 0;
+  /** Outro dispositivo gravou: esquece o documento (a próxima leitura baixa a versão nova). Nunca com gravação pendente. */
+  function recarregarDoServidor() {
+    if (pendentes > 0) return false;
+    doc = null; carregando = null;
+    return true;
+  }
 
   /* ---------------- saldos e séries ---------------- */
   function saldoAtual(c) {
@@ -416,7 +430,7 @@
       out.valorParcela = atual.valorParcela;
       if (atual.valorTotal) out.valorTotal = atual.valorTotal;
     }
-    if (atual && atual.debitado) out.debitado = atual.debitado;                 // efeito no saldo (conciliado abaixo)
+    if (atual && atual.efeito) out.efeito = atual.efeito;                       // efeito no saldo (conciliado em sincronizarSaldos)
     // A competência acompanha a data quando o lançamento não é ocorrência de série
     if (!out.serieId) out.competencia = mesDe(data);
     return out;
@@ -472,28 +486,56 @@
     return criadas;
   }
 
-  /* ---------------- Débito: sai do saldo da conta ----------------
-     Cada débito com data até hoje tira o valor do saldo da conta. O efeito aplicado fica anotado no
-     lançamento (debitado = { contaId, valor }) e é conciliado depois de toda gravação e ao abrir os
-     dados: mudou valor, conta, tipo ou data → desfaz o efeito antigo e aplica o novo (nunca em dobro).
-     Excluir o lançamento devolve o valor (reverterDebito). Débito com data futura só sai no dia. */
+  /* ---------------- Saldo das contas e cartões acompanha as transações ----------------
+     Cada transação com data até hoje muda o saldo da conta dela (regra em efeitoNoSaldo):
+       • conta (corrente, poupança, investimento, outros): débito e transferência de saída tiram;
+         receita e transferência de entrada somam; a "Regular" não mexe (para sair da conta, use Débito);
+       • cartão: compra (Regular/Recorrente) aumenta a fatura; estorno, receita e transferência de
+         entrada (pagamento da fatura) diminuem;
+       • empréstimo: só transferências (entrada = pagamento, diminui a dívida).
+     O efeito aplicado fica anotado na transação (efeito = { contaId, delta }) e é conciliado depois de
+     toda gravação e ao abrir os dados: mudou valor, conta, tipo, sentido ou data → desfaz o efeito antigo
+     e aplica o novo (nunca em dobro). Excluir devolve. Data futura só conta no dia.
+     Na 1ª abertura com esta regra, as transações que já existiam são só ANOTADAS (o saldo informado à mão
+     já as considera): nenhum saldo pula. A partir daí, cada transação nova ou editada atualiza o saldo. */
   const ehDebito = (l) => l.tipo === "debito" || (l.tipo === "recorrente" && l.debito === true);
-  function reverterDebito(l) {
-    if (!l.debitado) return false;
-    const c = doc.contas.find((x) => x.id === l.debitado.contaId);
-    if (c) registrarSaldo(c, r2(saldoAtual(c) + l.debitado.valor));
-    delete l.debitado;
+  function efeitoNoSaldo(l, conta, hoje) {
+    if (!conta || !l.data || l.data > hoje || l.valorInvalido) return 0;
+    const v = l.valor, entrada = l.tipo === "interno" && l.sentido === "entrada";
+    if (conta.tipo === "cartao") {
+      if (l.tipo === "interno") return entrada ? -v : v;
+      return l.tipo === "receita" || l.tipo === "estorno" ? -v : v;
+    }
+    if (conta.tipo === "emprestimo") return l.tipo === "interno" ? (entrada ? -v : v) : 0;
+    if (ehDebito(l)) return -v;
+    if (l.tipo === "receita") return v;
+    if (l.tipo === "interno") return entrada ? v : -v;
+    return 0;
+  }
+  function reverterEfeito(l) {
+    if (!l.efeito) return false;
+    const c = doc.contas.find((x) => x.id === l.efeito.contaId);
+    if (c && Number.isFinite(l.efeito.delta)) registrarSaldo(c, r2(saldoAtual(c) - l.efeito.delta));
+    delete l.efeito;
     return true;
   }
-  function sincronizarDebitos() {
+  function sincronizarSaldos() {
     const hoje = hojeIso();
+    const soAnotar = !doc.meta.saldoPorTransacao;          // 1ª vez: o que já existe já está no saldo informado
     let n = 0;
     doc.lancamentos.forEach((l) => {
-      const conta = l.contaId && doc.contas.find((c) => c.id === l.contaId && c.tipo !== "cartao");
-      const deve = ehDebito(l) && !!conta && !!l.data && l.data <= hoje;
-      if (l.debitado && (!deve || l.debitado.contaId !== l.contaId || l.debitado.valor !== l.valor)) { reverterDebito(l); n += 1; }
-      if (deve && !l.debitado) { registrarSaldo(conta, r2(saldoAtual(conta) - l.valor)); l.debitado = { contaId: conta.id, valor: l.valor }; n += 1; }
+      // formato anterior (2.8–3.1: só débito) → efeito equivalente, sem mexer no saldo
+      if (l.debitado) { l.efeito = { contaId: l.debitado.contaId, delta: -r2(l.debitado.valor) }; delete l.debitado; n += 1; }
+      const conta = l.contaId ? doc.contas.find((c) => c.id === l.contaId) : null;
+      const delta = r2(efeitoNoSaldo(l, conta, hoje));
+      if (l.efeito && (l.efeito.contaId !== (conta && conta.id) || l.efeito.delta !== delta)) { reverterEfeito(l); n += 1; }
+      if (delta && !l.efeito) {
+        if (!soAnotar) registrarSaldo(conta, r2(saldoAtual(conta) + delta));
+        l.efeito = { contaId: conta.id, delta };
+        n += 1;
+      }
     });
+    if (soAnotar) { doc.meta.saldoPorTransacao = 1; n += 1; }
     return n;
   }
 
@@ -874,7 +916,7 @@
       if (!alvo) throw erro("OPERATION_FAILED");
       // Excluir a origem: parcelas futuras automáticas saem; pagamentos já registrados ficam
       encerrarSerieDe(alvo);
-      reverterDebito(alvo);                                                   // débito excluído devolve o valor à conta
+      reverterEfeito(alvo);                                                   // transação excluída devolve o efeito no saldo
       doc.lancamentos = doc.lancamentos.filter((l) => l.id !== d.id);
       if (alvo.divisao) ajustarDivisao(alvo.divisao.id);
       return { id: d.id };
@@ -987,11 +1029,11 @@
         // as parcelas futuras automáticas das séries atuais saem e são refeitas por parte, com o novo valor
         membros.forEach((m) => { if (ehOrigem(m)) { removerParcelasFuturas(m.id); if (m !== base) desligarSerie(m.id); } });
       }
-      membros.forEach((m) => { if (m !== base) reverterDebito(m); });
+      membros.forEach((m) => { if (m !== base) reverterEfeito(m); });
       doc.lancamentos = doc.lancamentos.filter((l) => l === base || !membros.includes(l));
       partes.forEach((p, i) => {
         const alvo = i === 0 ? base : Object.assign({}, base, { id: novoId("l") });
-        if (i > 0) { delete alvo.debitado; if (recorrente) alvo.serieId = null; }
+        if (i > 0) { delete alvo.efeito; if (recorrente) alvo.serieId = null; }
         delete alvo.valorParcela; delete alvo.valorTotal;
         Object.assign(alvo, {
           descricao: texto(p.descricao, NOME()) || base.descricao, valor: centavos[i] / 100, data: base.data,
@@ -1065,6 +1107,12 @@
       if (typeof d.oculta === "boolean") c.oculta = d.oculta;
       if (d.nome !== undefined) { const n = texto(d.nome, NOME()); if (!n) throw erro("OPERATION_FAILED"); c.nome = n; }
       if (d.saldo !== undefined) { const v = numero(d.saldo); if (!Number.isFinite(v) || Math.abs(v) > 1e12) throw erro("OPERATION_FAILED"); registrarSaldo(c, r2(v)); }
+      // 4 últimos dígitos (editados no painel): exatamente 4 algarismos, ou vazio para tirar
+      if (d.ultimos4Digitos !== undefined) {
+        const dig = String(d.ultimos4Digitos === null ? "" : d.ultimos4Digitos).trim();
+        if (dig && !/^\d{4}$/.test(dig)) throw erro("DIGITS_INVALID");
+        c.ultimos4Digitos = dig;
+      }
       return { conta: contaPublica(c), id: c.id, cor: c.cor };
     },
     [A.deleteConta]: (d) => {
@@ -1221,7 +1269,7 @@
       const ids = new Set(Array.isArray(d.ids) ? d.ids : []);
       const antes = doc.lancamentos.length;
       const grupos = new Set();
-      doc.lancamentos.filter((l) => ids.has(l.id)).forEach((l) => { encerrarSerieDe(l); reverterDebito(l); if (l.divisao) grupos.add(l.divisao.id); });
+      doc.lancamentos.filter((l) => ids.has(l.id)).forEach((l) => { encerrarSerieDe(l); reverterEfeito(l); if (l.divisao) grupos.add(l.divisao.id); });
       doc.lancamentos = doc.lancamentos.filter((l) => !ids.has(l.id));
       grupos.forEach(ajustarDivisao);
       return { excluidos: antes - doc.lancamentos.length };
@@ -1298,7 +1346,7 @@
       }
       // Conta, categoria e perfil passam a ser os da moeda de destino: o de mesmo nome, ou uma cópia
       // (conta copiada começa com saldo 0 — o saldo pertence à outra moeda). Débito sai da conta nova
-      // (sincronizarDebitos devolve o valor à conta antiga e debita a nova).
+      // (sincronizarSaldos desfaz o efeito na conta antiga e aplica na nova).
       const mapa = {};
       const equivalente = (lista, prefixo, id, copiar) => {
         if (!id) return id;
@@ -1349,7 +1397,7 @@
     if (action in LEITURAS) {
       // getConfig e a lista para transferir entre moedas enxergam o documento inteiro; o resto, só a moeda escolhida
       const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas;
-      return fila.then(() => garantirCarregado()).then(() => (inteiro ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
+      return aplicadas.then(() => garantirCarregado()).then(() => (inteiro ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
     }
     if (action in ESCRITAS) {
       return alterar(() => clone(ESCRITAS[action](d))).catch((e) => { throw amigavel(e); });
@@ -1360,5 +1408,5 @@
   /** Promessa que resolve quando todas as gravações pendentes terminarem (antes de sair, trocar senha ou apagar dados) */
   const aguardarGravacoes = () => fila.catch(() => null);
 
-  ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando };
+  ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor };
 })(window.ZoZo);

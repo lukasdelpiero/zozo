@@ -7,7 +7,7 @@ Camadas de proteção:
      guarda só o SHA-256 da prova;
   2. sessão no servidor: cookie aleatório HttpOnly + Secure + SameSite=Strict, sem
      data de expiração (termina ao fechar o navegador); o banco guarda só o SHA-256
-     dele. Expira também por inatividade (7 dias) e idade (30 dias). O "envelope" que
+     dele. Expira 24 h depois do login, mesmo em uso e com o navegador aberto. O "envelope" que
      protege a chave dos dados guardada no navegador é HMAC(SEGREDO, cookie): não fica
      no banco, então banco + navegador não bastam para abrir os dados;
   3. 2FA opcional por aplicativo autenticador (TOTP), com proteção contra reuso;
@@ -73,8 +73,8 @@ FORMATO_DOCUMENTO = 2           # primeiro byte do documento cifrado (versão do
 MAX_VERSAO = 2**53 - 1
 
 # Sessões
-SESSAO_OCIOSA_S = 7 * 86400     # sem uso por 7 dias → encerra
-SESSAO_MAXIMA_S = 30 * 86400    # no máximo 30 dias, mesmo em uso
+SESSAO_OCIOSA_S = 86400         # sem uso por 24 h → encerra
+SESSAO_MAXIMA_S = 86400         # no máximo 24 h depois do login, mesmo em uso (sem fechar o navegador)
 SESSAO_2FA_S = 600              # 10 min para digitar o código do 2FA
 TOQUE_SESSAO_S = 300            # "último uso" é gravado no máximo a cada 5 min
 COOKIE_SEGURO = "__Host-zozo"   # HTTPS: prefixo __Host- (só este site, Path=/, Secure)
@@ -842,7 +842,7 @@ async def _google_identidade(ctx):
 # ---------------- rotas ----------------
 _PROTEGIDAS = {
     ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("DELETE", "/api/conta"),
-    ("GET", "/api/documento"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
+    ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
 }
 _SEM_CORPO = {"/api/2fa/iniciar"}
@@ -948,6 +948,12 @@ async def _rota(ctx):
     if m == "GET" and c == "/api/documento":
         d = await ctx.banco.primeiro("SELECT versao, conteudo FROM documentos WHERE email = ?", email)
         return Resposta(200, d) if d else Resposta(404, {"erro": "NOT_FOUND"})
+
+    if m == "GET" and c == "/api/documento/versao":
+        # Só o número da versão (sem o documento): a tela confere se outro dispositivo/aba gravou algo
+        # e só então baixa o documento de novo. Mesma proteção das outras rotas de dados.
+        d = await ctx.banco.primeiro("SELECT versao FROM documentos WHERE email = ?", email)
+        return Resposta(200, {"versao": int(d["versao"]) if d else 0})
 
     if m == "PUT" and c == "/api/documento":
         conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))

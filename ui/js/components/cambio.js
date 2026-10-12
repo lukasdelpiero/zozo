@@ -62,13 +62,20 @@
     // a lista é lida ANTES de trocar (são as transações da moeda atual)
     const anteriores = primeiraVez && ZoZo.recursos.cambio() ? ctx.bridge.request(A.getLancamentos).then((d) => d.lancamentos || []).catch(() => []) : Promise.resolve([]);
     const origem = MOEDAS.find((m) => m.codigo === (cfg.moeda || "BRL"));
-    return anteriores.then((lista) => ctx.bridge.request(A.updateConfig, { moeda: codigo }).then(() => {
+    return anteriores.then((lista) => {
+      // A tela troca assim que a escolha é aplicada na memória; a gravação no servidor segue em paralelo
+      // (se falhar, avisa e volta para a moeda anterior)
+      const gravacao = ctx.bridge.request(A.updateConfig, { moeda: codigo });
+      gravacao.catch((e) => {
+        ctx.toast(e.friendly, { tone: "error" });
+        ctx.loadData("config", A.getConfig, null, { force: true }).then((c) => aplicarMoeda(ctx, (c && c.moeda) || origem.codigo)).catch(() => null);
+      });
       return ctx.loadData("config", A.getConfig, null, { force: true }).then(() => aplicarMoeda(ctx, codigo)).then(() => {
         const m = MOEDAS.find((x) => x.codigo === codigo);
         ctx.toast("Moeda: " + m.nome + " (" + m.simbolo + ").");
         if (primeiraVez && lista.length && ZoZo.recursos.cambio()) oferecerTransferencia(ctx, lista.map((l) => Object.assign({ moeda: origem.codigo }, l)), m, { primeiraVez: true });
       });
-    })).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+    }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
   /**

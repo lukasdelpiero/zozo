@@ -168,9 +168,10 @@
     }
 
     function campoValor() {
+      // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo)
       const input = h("input", { type: "text", inputmode: "decimal", class: ["lp-value", "money", ehVerde(d) && "money--income"], "aria-label": "Valor",
-        value: F.moeda(d.valor || 0) });
-      input.addEventListener("focus", () => { input.value = d.valor ? F.moedaEditavel(d.valor) : ""; input.select(); });
+        value: F.moeda(d.valor || 0), "data-com-simbolo": "" });
+      input.addEventListener("focus", () => { input.value = d.valor ? F.valorParaEditar(input, d.valor) : ""; input.select(); });
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
       input.addEventListener("blur", () => {
         const v = F.parseMoeda(input.value);
@@ -397,7 +398,7 @@
           podeDividir ? h("div", { class: "lp-prop" }, h("span", { class: "lp-prop__label" }, "Divisão"),
             d.divisao
               ? h("button", { type: "button", class: "lp-chip-btn lp-rec lp-split", onClick: abrirDivisao },
-                icon("dividir", { size: 14 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")
+                icon("dividir", { size: 12 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")
               : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar divisão", title: "Adicionar divisão", onClick: abrirDivisao }, icon("mais", { size: 14 }))) : null),
         h("section", { class: "lp-notes-wrap" }, campoNotas()),
         statusEl,

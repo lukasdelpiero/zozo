@@ -30,8 +30,9 @@
     subtitulo: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     // pílulas das categorias + "+N" no topo dos painéis de grupo e de "todas"
     leadPilha: "tw:flex-col tw:items-start tw:gap-1.5",
-    pilulas: "tw:flex tw:flex-wrap tw:items-center tw:gap-1.5",
-    mais: "tw:inline-grid tw:place-items-center tw:h-[22px] tw:px-2 tw:py-0 tw:[border:0] tw:rounded-(--radius-pill) tw:bg-(--color-neutral-soft) "
+    // pílulas e "+N" sempre lado a lado: as pílulas encolhem (com "…") antes de quebrar a linha
+    pilulas: "tw:flex tw:flex-nowrap tw:items-center tw:gap-1.5 tw:min-w-0 tw:max-w-full tw:*:min-w-0",
+    mais: "tw:flex-none tw:inline-grid tw:place-items-center tw:h-[22px] tw:px-2 tw:py-0 tw:[border:0] tw:rounded-(--radius-pill) tw:bg-(--color-neutral-soft) "
       + "tw:text-(--color-neutral) tw:text-[11px] tw:font-semibold tw:cursor-pointer tw:hover:bg-zz-primary-soft tw:hover:text-zz-primary "
       + "tw:[&.is-open]:bg-zz-primary-soft tw:[&.is-open]:text-zz-primary",
     // editar orçamento no painel
@@ -60,6 +61,11 @@
   function mesAbrevDe(mesIso) {
     const d = F.parseData((mesIso || "") + "-01") || new Date();
     return F.mesAbrev(d.getMonth());
+  }
+  /** Nome do mês por extenso (painéis: "Gasto em Outubro") */
+  function mesNomeDe(mesIso) {
+    const d = F.parseData((mesIso || "") + "-01") || new Date();
+    return F.mesNome(d.getMonth());
   }
 
   /** Mantém a ordem original: grupos (na 1ª aparição) e categorias soltas.
@@ -105,12 +111,13 @@
     return out;
   }
 
-  function abrirFormCategoria(ctx, cat, preset) {
+  function abrirFormCategoria(ctx, cat, preset, voltar) {
     const novo = !cat;
     const todas = (ZoZo.store.get().data.categorias && ZoZo.store.get().data.categorias.categorias) || [];
     const grupos = Array.from(new Set(todas.map((c) => c.grupo).filter(Boolean)));
     ZoZo.forms.abrir(ctx, {
       titulo: novo ? "Nova categoria" : "Editar categoria",
+      voltar,
       selected: cat ? { tipo: "categoria", id: cat.id } : null,
       valores: cat ? { nome: cat.nome, icone: cat.icone, grupo: cat.grupo || "", status: cat.status, reservado: cat.reservado, cor: cat.cor }
         : Object.assign({ status: "regular", icone: "", cor: ZoZo.regras.corSugerida() }, preset || {}),
@@ -240,7 +247,11 @@
           { label: "Regular", check: cat.status === "regular", onClick: () => alterar({ status: "regular" }, "Categoria regular.") },
           { label: "Excluída", check: cat.status === "excluida", onClick: () => alterar({ status: "excluida" }, "Categoria excluída do orçamento.") },
         ] },
-        { label: "Editar categoria", onClick: () => abrirFormCategoria(ctx, cat) },
+        // Cancelar/salvar voltam para este painel (com os dados atualizados)
+        { label: "Editar categoria", onClick: () => abrirFormCategoria(ctx, cat, null, () => {
+          const atual = (((ZoZo.store.get().data.categorias || {}).categorias) || []).find((c) => c.id === cat.id);
+          if (atual) abrirDetalhe(atual, ctx, Object.assign({}, opts, { editandoOrcamento: false })); else ctx.detail.close({ silencioso: true });
+        }) },
         { separador: true },
         { label: "Excluir categoria", perigo: true, onClick: excluir },
       ].filter(Boolean),
@@ -258,7 +269,7 @@
               ZoZo.inline.texto({ valor: cat.nome, rotulo: "Nome da categoria", max: ZoZo.regras.limiteNome, aoSalvar: (v) => alterar({ nome: v }, "Nome alterado.") }),
               cat.grupo ? h("span", { class: T.subtitulo }, cat.grupo) : null),
             editando ? areaOrcamento : h("div", { class: "detail-hero__figure" },
-              h("span", { class: "detail-hero__label" }, "Gasto em " + mesAbrevDe(mes)),
+              h("span", { class: "detail-hero__label" }, "Gasto em " + mesNomeDe(mes)),
               h("span", { class: "detail-hero__value money" }, F.moeda(cat.gasto)),
               cat.status === "excluida" || !orcamentoAtivo() ? null : resumoGasto(cat.gasto, cat.reservado))),
           grafico,
@@ -272,7 +283,8 @@
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
           const itens = d.lancamentos.filter((l) => l.categoriaId === cat.id && (!mes || l.data.startsWith(mes)));
           mount(listaEl, itens.length
-            ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
+            // a transação abre aqui mesmo, com a seta para voltar a esta categoria
+            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe((((ZoZo.store.get().data.categorias || {}).categorias) || []).find((x) => x.id === cat.id) || cat, ctx, Object.assign({}, opts, { editandoOrcamento: false })) }) })
             : UI.EmptyState("Nenhuma transação nesta categoria no mês."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
@@ -356,7 +368,7 @@
                   : h("span", { class: T.grupoValor }, F.moeda(info.naoAtribuido))))) : null),
           orcamentoAtivo() ? C.detalheSecao(null,
             C.detalheLinha("Orçamento total do grupo", F.moeda(info.total)),
-            C.detalheLinha("Gasto em " + mesAbrevDe(mes), F.moeda(gasto)),
+            C.detalheLinha("Gasto em " + mesNomeDe(mes), F.moeda(gasto)),
             UI.ProgressBar(info.total > 0 ? gasto / info.total : (gasto > 0 ? 1 : 0), { tone: gasto > info.total ? "over" : "ok", class: "progress--lg",
               label: gasto > info.total ? "Gasto acima do orçamento do grupo" : "Gasto dentro do orçamento do grupo" })) : null,
           C.detalheSecao("Categorias do grupo", h("div", { class: "tw:flex tw:flex-col" },
@@ -366,7 +378,8 @@
           const ids = new Set(cats.map((c) => c.id));
           const itens = dl.lancamentos.filter((l) => ids.has(l.categoriaId) && l.data.startsWith(mes));
           mount(listaEl, itens.length
-            ? L.ListaPainel(itens, { onClick: (l) => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })
+            // a transação abre aqui mesmo, com a seta para voltar a este grupo
+            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirGrupo(nome, ctx, Object.assign({}, o, { editando: false })) }) })
             : UI.EmptyState("Nenhuma transação deste grupo no mês."));
         }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
@@ -380,7 +393,7 @@
       "aria-label": "Ver as outras " + (lista.length - visiveis) + " categorias" }, "+" + (lista.length - visiveis));
     btn.addEventListener("click", () => ZoZo.menu.abrir(btn, lista.map((c) => ({
       render: () => h("div", { class: "menu__item menu__item--estatico", role: "menuitem", "aria-disabled": "true" }, UI.CategoryLabel(c, { pill: true })),
-    })), { posicao: "esquerda", largura: 240, label: "Categorias" }));
+    })), { posicao: "esquerda", label: "Categorias", class: "tw:min-w-0 tw:w-max" }));       // largura das pílulas, sem sobra
     return btn;
   }
 
@@ -401,7 +414,7 @@
                 maisCategorias(tags, 2)),
               h("span", { class: "detail-hero__name" }, "Todas as categorias regulares")),
             h("div", { class: "detail-hero__figure" },
-              h("span", { class: "detail-hero__label" }, "Gasto em " + mesAbrevDe(d.mes)),
+              h("span", { class: "detail-hero__label" }, "Gasto em " + mesNomeDe(d.mes)),
               h("span", { class: "detail-hero__value money" }, F.moeda(d.resumo.gasto)),
               resumoGasto(d.resumo.gasto, d.resumo.reservado))),
           grafico,

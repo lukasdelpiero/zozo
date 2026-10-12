@@ -337,10 +337,16 @@ class TesteContaESessao(Base):
         self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM sessoes").fetchone()[0], 0)
         self.entrar()
-        for dia in range(1, 32):                                            # usada todo dia, mas tem idade máxima
-            self.api.agora = T0 + nucleo.SESSAO_OCIOSA_S + dia * 86400
-            st, _ = self.api("GET", "/api/sessao")
-        self.assertEqual(st, 204)
+        inicio = self.api.agora
+        for hora in range(1, 24):                                           # usada a cada hora: vale até 24 h
+            self.api.agora = inicio + hora * 3600
+            self.assertEqual(self.api("GET", "/api/sessao")[0], 200, hora)
+        self.api.agora = inicio + 24 * 3600 + 1                             # 24 h depois do login: acabou
+        self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
+        self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 401)
+
+    def test_limite_da_sessao_e_24h(self):
+        self.assertEqual((nucleo.SESSAO_MAXIMA_S, nucleo.SESSAO_OCIOSA_S), (86400, 86400))
 
     def test_cookie_lixo(self):
         for lixo in ("", "x", "a" * 500, "'; DROP TABLE contas; --"):
@@ -1057,6 +1063,22 @@ class TesteEmail(unittest.TestCase):
         self.assertEqual(self.serv.emails, [])
         cli = Cliente(self.banco, self.serv, dict(CONFIG_EMAIL, URL_PUBLICA="javascript:alert(1)"), ip="198.51.100.93")
         self.assertFalse(emails.ativo(cli.config))
+
+
+class TesteVersaoDocumento(Base):
+    def test_versao_exige_sessao_e_prova_e_e_so_da_propria_conta(self):
+        self.assertEqual(self.api("GET", "/api/documento/versao", prova=self.prova), (200, {"versao": 0}))
+        self.gravar(0)
+        self.gravar(1)
+        self.assertEqual(self.api("GET", "/api/documento/versao", prova=self.prova), (200, {"versao": 2}))
+        self.assertEqual(self.api("GET", "/api/documento/versao")[1]["erro"], "WRONG_PASSWORD")          # sem a prova
+        self.assertEqual(self.api("GET", "/api/documento/versao", prova=prova())[1]["erro"], "WRONG_PASSWORD")
+        anonimo = Cliente(self.banco)
+        self.assertEqual(anonimo("GET", "/api/documento/versao", prova=self.prova)[0], 401)              # sem sessão
+        outro = Cliente(self.banco, ip="198.51.100.40")
+        pv = prova()
+        self.cadastrar(outro, OUTRO, pv)
+        self.assertEqual(outro("GET", "/api/documento/versao", prova=pv), (200, {"versao": 0}))           # nunca a versão de outra conta
 
 
 class TesteAuditoria30(Base):
