@@ -2,6 +2,7 @@
    ZoZo — Painel lateral (seções 5, 7, 8)
    Topo: logo (esquerda) e o botão de recolher/mostrar o menu (direita, criado em app.js)
    Superior: navegação · Central: resumo de contas · Inferior: foto + nome (esquerda) e Configurações (ícone, direita)
+   Visual em Tailwind (components/estrutura.ts).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -29,24 +30,25 @@
     { titulo: "Outros", tipos: ["outros"] },
   ];
 
+  const E = ZoZo.estrutura;
   function navItem(item, atual, onNavigate) {
     const ativo = item.id === atual;
     return h("button", {
-      type: "button", class: ["nav-item", ativo && "is-active"], "aria-current": ativo ? "page" : undefined,
+      type: "button", class: [E.navItem, ativo ? E.navItemAtivo : E.navItemNormal], "aria-current": ativo ? "page" : undefined,
       onClick: () => onNavigate(item.id),
-    }, icon(item.icon, { size: 16 }), h("span", null, item.label));
+    }, icon(item.icon, { size: 16, class: ativo ? E.navIconeAtivo : E.navIcone }), h("span", { class: E.navRotulo }, item.label));
   }
 
   function create(el, ctx) {
-    const navEl = h("nav", { class: "sidebar__nav", "aria-label": "Navegação principal" });
-    const contasEl = h("div", { class: "sidebar__accounts", "aria-label": "Resumo das contas", role: "region", tabindex: "-1" });
-    const footerEl = h("div", { class: "sidebar__footer" });
-    const avisoEl = h("div", { class: "sidebar__aviso" });
-    const cambioEl = h("div", { class: "sidebar__cambio" });
+    const navEl = h("nav", { class: E.nav, "aria-label": "Navegação principal" });
+    const contasEl = h("div", { class: E.contas, "aria-label": "Resumo das contas", role: "region", tabindex: "-1" });
+    const footerEl = h("div", { class: E.rodape });
+    const avisoEl = h("div");
+    const cambioEl = h("div", { class: E.cambio });
 
     mount(el,
-      h("div", { class: "sidebar__header" },
-        h("img", { class: "sidebar__logo", src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" })),
+      h("div", { class: E.menuTopo },
+        h("img", { class: E.logo, src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" })),
       navEl, contasEl, avisoEl, cambioEl, footerEl);
 
     let assinatura = null;
@@ -63,25 +65,27 @@
       mount(cambioEl, ZoZo.cambio.Seletor(ctx));            // Câmbio (só com o multicâmbio ligado)
       // Demonstração (modo local ou conta demo): nada é gravado
       mount(avisoEl, ZoZo.bridge.isDemo || ZoZo.recursos.demo()
-        ? h("p", { class: "demo-badge", role: "note" }, icon("alerta", { size: 14 }),
+        ? h("p", { class: E.demo, role: "note" }, icon("alerta", { size: 14, class: E.demoIcone }),
           ZoZo.bridge.isDemo ? "Modo de demonstração: nada é salvo no servidor." : "Conta de demonstração: dados fictícios, nada é salvo.")
         : null);
 
       if (!contas) {
-        mount(contasEl, state.errors.contas ? h("p", { class: "sidebar__note" }, state.errors.contas) : UI.Skeleton(5, { class: "skeleton--sidebar" }));
+        mount(contasEl, state.errors.contas ? h("p", { class: E.nota }, state.errors.contas) : UI.Skeleton(5, { class: "skeleton--sidebar" }));
       } else {
         const grupos = GRUPOS.map((g) => ({ titulo: g.titulo, contas: contas.filter((c) => !c.oculta && g.tipos.includes(c.tipo)) })).filter((g) => g.contas.length);
         mount(contasEl, grupos.length
           ? grupos.map((g) => ZoZo.list.SidebarAccountGroup(g.titulo, g.contas, {
             onSelect: (c) => ctx.navigate(c.tipo === "investimento" ? "investimentos" : "contas", { select: { tipo: "conta", id: c.id } }),
           }))
-          : h("p", { class: "sidebar__note" }, "Nenhuma conta cadastrada."));
+          : h("p", { class: E.nota }, "Nenhuma conta cadastrada."));
       }
 
+      const avatar = ZoZo.usuario.Avatar(foto, usuario.nomeUsuario, 28);
+      avatar.classList.add("tw:flex-none", "tw:bg-[rgba(255,255,255,0.92)]", "tw:text-zz-primary");   // foto/inicial clara sobre o roxo
       mount(footerEl,
-        h("button", { type: "button", class: "sidebar__user", title: "Minha conta", "aria-haspopup": "dialog", onClick: () => ctx.abrirConfiguracoes("conta") },
-          ZoZo.usuario.Avatar(foto, usuario.nomeUsuario, 28), h("span", { class: "sidebar__user-name" }, usuario.nomeUsuario || "")),
-        h("button", { type: "button", class: "sidebar__config", title: "Configurações", "aria-label": "Configurações", "aria-haspopup": "dialog",
+        h("button", { type: "button", class: E.usuario, title: "Minha conta", "aria-haspopup": "dialog", onClick: () => ctx.abrirConfiguracoes("conta") },
+          avatar, h("span", { class: E.usuarioNome }, usuario.nomeUsuario || "")),
+        h("button", { type: "button", class: E.config, title: "Configurações", "aria-label": "Configurações", "aria-haspopup": "dialog",
           onClick: () => ctx.abrirConfiguracoes() }, icon("configuracoes", { size: 18 })));
     }
 

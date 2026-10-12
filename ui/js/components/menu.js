@@ -11,12 +11,14 @@
      ]
      opts: { posicao: "direita" | "esquerda" | "acima", largura, label }
    Submenus abrem ao passar o mouse (ou com seta → / Enter) ao lado do
-   menu, do lado que couber na tela.
+   menu, do lado que couber na tela. Visual em Tailwind (components/estrutura.ts:
+   classes menu*, também usadas pelas páginas que montam conteúdo próprio).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
+  const E = ZoZo.estrutura;
 
   let ativo = null;   // { anchor, niveis: [painel], fora, tecla }
 
@@ -64,7 +66,7 @@
   function resolver(sub) { return typeof sub === "function" ? sub() : sub; }
 
   function criarPainel(itens, nivel, opts) {
-    const el = h("div", { class: ["menu", opts.class], role: "menu", "aria-label": opts.label || "Menu" });
+    const el = h("div", { class: [E.menuFlutuante, opts.class], role: "menu", "aria-label": opts.label || "Menu" });
     if (opts.largura) el.style.width = opts.largura + "px";
     const painel = { el, nivel };
     const api = {
@@ -81,20 +83,20 @@
         return;
       }
       mount(el, (conteudo || []).map((it) => {
-        if (it.separador) return h("div", { class: "menu__sep", role: "separator" });
-        if (it.secao) return h("div", { class: "menu__section" }, it.secao);
+        if (it.separador) return h("div", { class: E.menuSeparador, role: "separator" });
+        if (it.secao) return h("div", { class: E.menuSecao }, it.secao);
         if (it.render) return it.render(api);
         const btn = h("button", {
-          type: "button", role: "menuitem", class: ["menu__item", it.perigo && "menu__item--danger", it.check && "is-checked"],
+          type: "button", role: "menuitem", class: [it.perigo ? E.menuItemPerigo : E.menuItem, it.check && "is-checked"],
           disabled: it.desabilitado, "aria-haspopup": it.submenu ? "menu" : undefined,
           "aria-checked": it.check === undefined ? undefined : String(!!it.check),
         },
-          it.check !== undefined && opts.checkEsquerda ? h("span", { class: "menu__checkslot" }, it.check ? icon("check", { size: 14, stroke: 2.25 }) : null) : null,
-          it.icone ? icon(it.icone, { size: 16, class: "menu__icon" }) : null,
-          it.descricao ? h("span", { class: "menu__label menu__label--2" }, h("span", null, it.label), h("small", null, it.descricao)) : h("span", { class: "menu__label" }, it.label),
-          it.valor ? h("span", { class: "menu__badge" }, it.valor) : null,
-          it.check && !opts.checkEsquerda ? icon("check", { size: 14, stroke: 2.25, class: "menu__check" }) : null,
-          it.submenu ? icon("chevron-right", { size: 14, class: "menu__chev" }) : null);
+          it.check !== undefined && opts.checkEsquerda ? h("span", { class: E.menuMarcaEsquerda }, it.check ? icon("check", { size: 14, stroke: 2.25 }) : null) : null,
+          it.icone ? icon(it.icone, { size: 16, class: E.menuIcone }) : null,
+          it.descricao ? h("span", { class: E.menuRotuloDuplo }, h("span", null, it.label), h("small", { class: E.menuRotuloDetalhe }, it.descricao)) : h("span", { class: E.menuRotulo }, it.label),
+          it.valor ? h("span", { class: E.menuContador }, it.valor) : null,
+          it.check && !opts.checkEsquerda ? icon("check", { size: 14, stroke: 2.25, class: E.menuMarca }) : null,
+          it.submenu ? icon("chevron-right", { size: 14, class: E.menuSeta }) : null);
 
         if (it.submenu) {
           let timer = null;
@@ -191,26 +193,26 @@
       largura: cfg.largura || 260,
       render(el, api) {
         let termo = "";
-        const busca = h("input", { type: "search", class: "menu__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar" });
-        const lista = h("div", { class: "menu__list", role: "group" });
+        const busca = h("input", { type: "search", class: E.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar" });
+        const lista = h("div", { class: E.menuLista, role: "group" });
         const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const desenhar = () => {
           const marcados = cfg.marcados();
           const itens = cfg.itens.filter((it) => !termo || norm(it.label).includes(termo));
           mount(lista, itens.length ? itens.map((it) => {
             const marcado = marcados.includes(it.value);
-            return h("button", { type: "button", role: "menuitemcheckbox", "aria-checked": String(marcado), class: ["menu__item", "menu__item--check", marcado && "is-checked"],
+            return h("button", { type: "button", role: "menuitemcheckbox", "aria-checked": String(marcado), class: [E.menuItem, marcado && "is-checked"],
               onClick: () => { cfg.alternar(it.value); desenhar(); } },
-              h("span", { class: ["menu__box", marcado && "is-on"], "aria-hidden": "true" }, marcado ? icon("check", { size: 11, stroke: 3 }) : null),
-              it.cor ? h("span", { class: "menu__dot", style: { background: ZoZo.format.cor(it.cor, "var(--palette-16)") } }) : null,
-              it.icone ? h("span", { class: "menu__emoji", "aria-hidden": "true" }, it.icone) : null,
-              h("span", { class: "menu__label" }, it.label));
-          }) : h("p", { class: "menu__empty" }, cfg.vazio || "Nada encontrado."));
+              h("span", { class: marcado ? E.menuCaixaMarcada : E.menuCaixa, "aria-hidden": "true" }, marcado ? icon("check", { size: 11, stroke: 3 }) : null),
+              it.cor ? h("span", { class: E.menuPonto, style: { background: ZoZo.format.cor(it.cor, "var(--palette-16)") } }) : null,
+              it.icone ? h("span", { class: E.menuEmoji, "aria-hidden": "true" }, it.icone) : null,
+              h("span", { class: E.menuRotulo }, it.label));
+          }) : h("p", { class: E.menuVazio }, cfg.vazio || "Nada encontrado."));
         };
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         mount(el,
           cfg.topo ? cfg.topo(() => desenhar()) : null,
-          h("div", { class: "menu__search" }, icon("pesquisar", { size: 14 }), busca),
+          h("div", { class: E.menuPesquisa }, icon("pesquisar", { size: 14 }), busca),
           lista);
         desenhar();
         void api;

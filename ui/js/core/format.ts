@@ -126,6 +126,11 @@
     try { input.setSelectionRange(novo.length, novo.length); } catch (e) { /* campo sem seleção */ }
   }
   /** Ao sair do campo: completa os centavos ("12.000" → "12.000,00"). Texto que não é valor fica como está. */
+  /** Cursor no fim do campo (ao clicar para editar: nada fica selecionado) */
+  function cursorNoFim(input: HTMLInputElement): void {
+    const n = input.value.length;
+    try { input.setSelectionRange(n, n); } catch (e) { /* campo sem seleção */ }
+  }
   function completarValor(input: HTMLInputElement): void {
     const v = input.value.trim().replace(/US\$|R\$|[$€\s\u00a0]/g, "");
     if (!v || !/^[-−]?[\d.]+(,\d*)?$/.test(v)) return;
@@ -157,6 +162,6 @@
 
   const api: ZoZoFormat = {
     diaSemana, rotuloDia, cor, moeda, percentual, parseData, iso, dataExtenso, dataCurta, mesAno, mesAbrev, mesNome, parseMoeda, moedaEditavel, numero, MESES, MESES_ABREV,
-    definirMoeda, simbolo, mascararValor, completarValor, valorParaEditar };
+    definirMoeda, simbolo, mascararValor, completarValor, valorParaEditar, cursorNoFim };
   ZoZo.format = api;
 })(window.ZoZo);

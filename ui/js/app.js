@@ -221,12 +221,13 @@
   function montarShell() {
     if (shellPronto) return;
     shellPronto = true;
-    const sidebarEl = h("aside", { class: "sidebar", "aria-label": "Painel lateral" });
-    const topbarEl = h("header", { class: "topbar" });
-    const mainEl = h("main", { class: "main", id: "main", tabindex: "-1" });
-    const detailEl = h("aside", { class: "detail", id: "detail", "aria-label": "Painel de informações" });
-    const workspace = h("div", { class: "workspace", "data-conteudo": "nao" },
-      h("div", { class: "workspace__main" }, topbarEl, mainEl), detailEl);
+    const E = ZoZo.estrutura;                 // classes Tailwind (components/estrutura.ts)
+    const sidebarEl = h("aside", { class: E.menuLateral, "aria-label": "Painel lateral" });
+    const topbarEl = h("header", { class: E.barra });
+    const mainEl = h("main", { class: E.principal, id: "main", tabindex: "-1" });
+    const detailEl = h("aside", { class: E.painel, id: "detail", "aria-label": "Painel de informações" });
+    const workspace = h("div", { class: E.trabalho, "data-conteudo": "nao" },
+      h("div", { class: E.trabalhoPrincipal }, topbarEl, mainEl), detailEl);
     mount(shellRoot, sidebarEl, workspace);
 
     // Recolher / expandir o menu lateral (o painel de informações continua fixo).
@@ -234,8 +235,8 @@
     const celular = window.matchMedia("(max-width: 600px)");
     const recolhido = (() => { try { return localStorage.getItem("zozo.menuRecolhido") === "1"; } catch (e) { return false; } })();
     shellRoot.dataset.menu = recolhido ? "recolhido" : "aberto";
-    const toggleMenu = h("button", { type: "button", class: "menu-toggle" }, ZoZo.icons.icon("painel", { size: 18 }));
-    const fundoGaveta = h("div", { class: "gaveta-fundo", "aria-hidden": "true" });
+    const toggleMenu = h("button", { type: "button", class: E.alternar }, ZoZo.icons.icon("painel", { size: 18 }));
+    const fundoGaveta = h("div", { class: E.fundoGaveta, "aria-hidden": "true" });
     const rotularToggle = () => {
       const aberto = celular.matches ? shellRoot.dataset.gaveta === "aberta" : shellRoot.dataset.menu !== "recolhido";
       const texto = aberto ? (celular.matches ? "Fechar menu" : "Recolher menu") : "Mostrar menu";

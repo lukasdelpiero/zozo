@@ -45,7 +45,7 @@
     cicloDias: "tw:flex tw:items-end tw:gap-2",
     cicloCampo: "tw:flex tw:flex-col tw:items-end tw:gap-0.5",
     cicloRotulo: "tw:text-[12px] tw:text-zz-secondary",
-    cicloInput: "tw:w-[72px] tw:h-9 tw:text-right tw:text-[17px] tw:font-semibold",
+    cicloInput: "tw:w-[72px] tw:h-9 tw:text-right tw:text-[17px] tw:font-semibold " + ZoZo.ui.CAMPO_PAINEL,
     cicloErro: "tw:m-0 tw:text-right tw:text-[13px] tw:text-(--color-negative)",
   };
 
@@ -134,7 +134,7 @@
     const valido = (v) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
     [fech, venc].forEach((i) => i.addEventListener("input", () => { i.value = i.value.replace(/\D/g, ""); i.removeAttribute("aria-invalid"); erro.textContent = ""; }));
     const campo = (rotulo, input) => h("label", { class: T.cicloCampo }, h("span", { class: T.cicloRotulo }, rotulo), input);
-    requestAnimationFrame(() => { fech.focus(); fech.select(); });
+    requestAnimationFrame(() => { fech.focus(); F.cursorNoFim(fech); });
     return {
       el: h("div", { class: T.cicloArea }, modoBtn, mesSel, h("div", { class: T.cicloDias }, campo("Fechamento (dia)", fech), campo("Vencimento (dia)", venc)), erro),
       salvar(btn) {

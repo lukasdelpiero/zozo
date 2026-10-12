@@ -19,18 +19,19 @@
    * abrir({ titulo, classe, passo(api) → { titulo?, corpo: node, rodapeEsquerda?: node, botoes: [{label, primario, perigo, onClick, desabilitado}] } })
    */
   function janela(cfg) {
-    const corpoEl = h("div", { class: "zm__body" });
-    const rodapeEl = h("div", { class: "modal__footer zm__footer" });
-    const area = h("div", { class: "zm" }, corpoEl, rodapeEl);
+    const E = ZoZo.estrutura;                 // visual em Tailwind (components/estrutura.ts)
+    const corpoEl = h("div");
+    const rodapeEl = h("div", { class: E.janelaRodape });
+    const area = h("div", null, corpoEl, rodapeEl);
     const m = ZoZo.feedback.modal({ title: cfg.titulo, class: ["modal--zm", cfg.classe].filter(Boolean).join(" "), body: area, onClose: cfg.onClose });
     const api = {
       fechar: () => m.fechar(true),
       ir(passo) {
         const p = passo(api);
-        const tituloEl = area.closest(".modal") && area.closest(".modal").querySelector(".modal__title");
+        const tituloEl = area.closest(".modal") && area.closest(".modal").querySelector("h2");
         if (p.titulo && tituloEl) tituloEl.textContent = p.titulo;
         mount(corpoEl, p.corpo);
-        mount(rodapeEl, p.rodapeEsquerda ? h("div", { class: "zm__footer-esquerda" }, p.rodapeEsquerda) : null, (p.botoes || []).map((b) => {
+        mount(rodapeEl, p.rodapeEsquerda ? h("div", { class: E.janelaRodapeEsquerda }, p.rodapeEsquerda) : null, (p.botoes || []).map((b) => {
           const btn = UI.Button(b.label, { variant: b.primario ? "primary" : b.perigo ? "danger" : "secondary", onClick: () => b.onClick(btn), disabled: b.desabilitado });
           if (b.ref) b.ref(btn);
           return btn;
@@ -72,7 +73,7 @@
       titulo: "Nova categoria",
       classe: "modal--nova-categoria",
       passo: (api) => {
-        const nome = UI.Input({ value: d.nome, placeholder: "Nome da categoria" });
+        const nome = UI.Input({ value: d.nome, placeholder: "Nome da categoria", class: ZoZo.estrutura.janelaNome });
         nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const orc = campoDinheiro(0);
         const linhaOrc = h("div", { class: "field" }, h("span", { class: "field__label" }, "Orçamento"), orc.el);
@@ -94,8 +95,8 @@
         };
         nome.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); enviar(); } });
         return {
-          corpo: h("div", { class: "zm__form" },
-            h("div", { class: "zm__row" }, seletorIcone(d.icone, (e) => { d.icone = e; }), nome),
+          corpo: h("div", { class: ZoZo.estrutura.janelaForm },
+            h("div", { class: ZoZo.estrutura.janelaLinha }, seletorIcone(d.icone, (e) => { d.icone = e; }), nome),
             cores,
             Interruptor("Incluir no total e orçamento", d.incluir, (v) => { d.incluir = v; linhaOrc.hidden = !v || !orcamentoAtivo; }),
             linhaOrc, erro),
@@ -113,7 +114,7 @@
       titulo: "Novo perfil",
       classe: "modal--novo-perfil",
       passo: (api) => {
-        const nome = UI.Input({ placeholder: "Nome do perfil" });
+        const nome = UI.Input({ placeholder: "Nome do perfil", class: ZoZo.estrutura.janelaNome });
         nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const erro = h("p", { class: "form-error", role: "alert" });
         const cores = h("div");
@@ -129,7 +130,7 @@
         };
         nome.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); enviar(null); } });
         return {
-          corpo: h("div", { class: "zm__form" }, nome, cores, erro),
+          corpo: h("div", { class: ZoZo.estrutura.janelaForm }, nome, cores, erro),
           botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: "Criar", primario: true, onClick: enviar }],
         };
       },
@@ -151,7 +152,7 @@
         };
         nome.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); enviar(); } });
         return {
-          corpo: h("div", { class: "zm__form" }, UI.Field("Nome do grupo", nome), erro),
+          corpo: h("div", { class: ZoZo.estrutura.janelaForm }, UI.Field("Nome do grupo", nome), erro),
           botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: "Criar", primario: true, onClick: enviar }],
         };
       },
@@ -225,7 +226,7 @@
         };
         return {
           titulo: TITULOS_CONTA[d.tipo],
-          corpo: h("div", { class: "zm__form" },
+          corpo: h("div", { class: ZoZo.estrutura.janelaForm },
             bancos ? UI.Segmented([{ value: "poupanca", label: "Poupança" }, { value: "corrente", label: "Corrente" }],
               d.tipo, (t) => { d.tipo = t; api.ir(passo); }, { label: "Tipo de conta", class: "segmented--pilulas" }) : null,
             linhas, h("div", { class: "field" }, h("span", { class: "field__label" }, "Cor"), cores), erro),
@@ -300,7 +301,7 @@
       [ini, fim].forEach((i) => i.addEventListener("input", atualizar));
       return {
         titulo: "Parcelas",
-        corpo: h("div", { class: "zm__form" },
+        corpo: h("div", { class: ZoZo.estrutura.janelaForm },
           UI.Field("Valor total da compra", h("div", { class: "field__affix" }, h("span", { class: "field__prefix" }, F.simbolo()), total)),
           h("div", { class: "form-row form-row--2" }, UI.Field("Parcela atual", ini), UI.Field("Total de parcelas", fim)),
           previa,
@@ -345,26 +346,26 @@
       const passoLista = (api) => {
         let termo = "";
         const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
+        const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
         busca.dataset.autofocus = "";
-        const lista = h("div", { class: "zm__list" });
+        const lista = h("div", { class: ZoZo.estrutura.janelaLista });
         const desenhar = () => {
           const itens = candidatos.filter((l) => !termo || norm(l.descricao).includes(termo) || norm(l.categoria && l.categoria.nome).includes(termo));
           mount(lista, itens.length ? itens.map((l) => {
             const marca = l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : null;
             const verde = l.tipo === "receita" || l.tipo === "estorno" || (l.tipo === "interno" && l.sentido === "entrada");
-            return h("button", { type: "button", class: "zm-lanc", onClick: () => api.ir(passoFrequencia(tornarRecorrente(ctx, l.id, () => ctx.navigate("recorrencias")), () => api.ir(passoLista), l.valor)) },
-              h("span", { class: "zm-lanc__data" }, F.dataCurta(l.data)),
-              h("span", { class: "zm-lanc__nome" }, marca ? h("span", { class: "kind-badge" }, marca) : null, h("span", null, l.descricao)),
-              l.categoria ? h("span", { class: "zm-lanc__cat", style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") }, title: l.categoria.nome }, l.categoria.icone || "•") : h("span"),
-              h("span", { class: ["zm-lanc__valor", "money", verde && "money--income"] }, F.moeda(l.valor)));
-          }) : h("p", { class: "menu__empty" }, "Nenhuma transação encontrada."));
+            return h("button", { type: "button", class: ZoZo.estrutura.janelaLanc, onClick: () => api.ir(passoFrequencia(tornarRecorrente(ctx, l.id, () => ctx.navigate("recorrencias")), () => api.ir(passoLista), l.valor)) },
+              h("span", { class: ZoZo.estrutura.janelaLancData }, F.dataCurta(l.data)),
+              h("span", { class: ZoZo.estrutura.janelaLancNome }, marca ? h("span", { class: "kind-badge" }, marca) : null, h("span", null, l.descricao)),
+              l.categoria ? h("span", { class: ZoZo.estrutura.janelaLancCat, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") }, title: l.categoria.nome }, l.categoria.icone || "•") : h("span"),
+              h("span", { class: [ZoZo.estrutura.janelaLancValor, verde && "money--income"] }, F.moeda(l.valor)));
+          }) : h("p", { class: ZoZo.estrutura.menuVazio }, "Nenhuma transação encontrada."));
         };
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         desenhar();
         return {
           titulo: "Nova recorrência",
-          corpo: h("div", { class: "zm__pick" }, h("div", { class: "zm__search" }, icon("pesquisar", { size: 15 }), busca), lista),
+          corpo: h("div", { class: ZoZo.estrutura.janelaEscolha }, h("div", { class: ZoZo.estrutura.janelaPesquisa }, icon("pesquisar", { size: 15 }), busca), lista),
           botoes: [],
         };
       };
@@ -387,7 +388,7 @@
           const confirmar = () => { if (!senha.value) { senha.focus(); return; } fim(senha.value); api.fechar(); };
           senha.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); confirmar(); } });
           return {
-            corpo: h("div", { class: "zm__form" }, h("p", { class: "modal__text" }, cfg.mensagem), UI.Field("Senha", campoSenha)),
+            corpo: h("div", { class: ZoZo.estrutura.janelaForm }, h("p", { class: ZoZo.estrutura.modalTexto }, cfg.mensagem), UI.Field("Senha", campoSenha)),
             botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: cfg.botao || "Confirmar", perigo: true, onClick: confirmar }],
           };
         },

@@ -46,7 +46,7 @@
     const catBtn = h("button", { type: "button", class: "hero-cat-btn", "aria-haspopup": "menu", "aria-label": "Alterar categoria" },
       r.categoria ? UI.CategoryLabel(r.categoria, { pill: true }) : h("span", { class: "lp-add" }, ZoZo.icons.icon("mais", { size: 14 })));
     catBtn.addEventListener("click", () => ZoZo.menu.abrir(catBtn, cats.map((c) => ({
-      render: (api) => h("button", { type: "button", class: ["menu__item", c.id === r.categoriaId && "is-checked"], onClick: () => { api.fechar(); salvarOrigem({ categoriaId: c.id }).then(reabrir).catch((e) => ctx.toast(e.friendly, { tone: "error" })); } }, UI.CategoryLabel(c, { pill: true })),
+      render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, c.id === r.categoriaId && "is-checked"], onClick: () => { api.fechar(); salvarOrigem({ categoriaId: c.id }).then(reabrir).catch((e) => ctx.toast(e.friendly, { tone: "error" })); } }, UI.CategoryLabel(c, { pill: true })),
     })).concat([{ separador: true }, { icone: "mais", label: "Nova categoria", onClick: () => ZoZo.modais.novaCategoria(ctx, { aoCriar: (c) => salvarOrigem({ categoriaId: c.id }).then(reabrir) }) }]),
     { posicao: "esquerda", largura: 260, label: "Categoria" }));
 

@@ -180,7 +180,7 @@
   const CR = {
     linha: "tw:grid tw:items-center tw:gap-4 tw:w-full tw:min-h-(--row-height) tw:px-4 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-inherit tw:text-left "
       + "tw:text-[15px] tw:focus-visible:outline-offset-[-2px] tw:grid-cols-[minmax(8em,1.4fr)_112px_minmax(80px,2fr)_104px] "
-      + "tw:area620:grid-cols-[minmax(0,1fr)_auto_auto] tw:area420:grid-cols-[minmax(0,1fr)_auto]",
+      + "tw:area620:grid-cols-[minmax(0,1fr)_112px_104px] tw:area420:grid-cols-[minmax(0,1fr)_112px]",   // mesmas colunas do cabeçalho (Categorias)
     interativa: "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
     normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
     selecionada: "tw:bg-zz-primary-soft",
@@ -273,15 +273,16 @@
     const key = "sidebar:" + titulo;
     const fechado = !!ZoZo.store.get().ui.gruposFechados[key];
     const toggle = () => UI.alternarGrupo(key);
-    return h("div", { class: ["side-group", fechado && "is-collapsed"] },
-      h("button", { type: "button", class: "side-group__header", "aria-expanded": String(!fechado), onClick: toggle },
-        icon("chevron-down", { size: 12, class: "side-group__caret", stroke: 2.5 }),
+    const E = ZoZo.estrutura;                 // visual em Tailwind (components/estrutura.ts)
+    return h("div", { class: E.grupo },
+      h("button", { type: "button", class: E.grupoTopo, "aria-expanded": String(!fechado), onClick: toggle },
+        icon("chevron-down", { size: 12, class: fechado ? E.grupoSetaFechado : E.grupoSeta, stroke: 2.5 }),
         h("span", null, titulo)),
-      fechado ? null : UI.corpoArvore(key, h("ul", { class: "side-group__list" },
-        contas.map((c) => h("li", null, h("button", { type: "button", class: "side-account", onClick: () => o.onSelect && o.onSelect(c) },
-          h("span", { class: "side-account__dot", style: { background: F.cor(c.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
-          h("span", { class: "side-account__name" }, c.nome),
-          h("span", { class: "side-account__value" }, F.moeda(c.valor, { inteiro: true, comSinal: true }))))))));
+      fechado ? null : UI.corpoArvore(key, h("ul", null,
+        contas.map((c) => h("li", null, h("button", { type: "button", class: E.conta, onClick: () => o.onSelect && o.onSelect(c) },
+          h("span", { class: E.contaPonto, style: { background: F.cor(c.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
+          h("span", { class: E.contaNome }, c.nome),
+          h("span", { class: E.contaValor }, F.moeda(c.valor, { inteiro: true, comSinal: true }))))))));
   }
 
   /* ---------- Lista de lançamentos nos painéis (formato do Copilot) ----------

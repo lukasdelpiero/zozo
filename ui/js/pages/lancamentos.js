@@ -23,6 +23,18 @@
     + "tw:text-[13px] tw:font-medium tw:hover:bg-zz-surface-hover tw:gaveta:size-[34px] tw:gaveta:p-0 tw:gaveta:justify-center tw:gaveta:flex-none";
   const TITULO_MES = "tw:text-[20px] tw:font-[620] tw:tracking-[-0.01em]";
   const T = {
+    // pesquisa na barra superior (branca com contorno; o filtro fica dentro, à direita). topbar-search__input: gancho do atalho / e Ctrl+K
+    pesquisa: "tw:flex tw:items-center tw:gap-1.5 tw:h-8 tw:w-[clamp(140px,32vw,380px)] tw:min-w-0 tw:pt-0 tw:pr-1 tw:pb-0 tw:pl-2.5 tw:rounded-lg "
+      + "tw:bg-zz-surface tw:border tw:border-zz-border-strong tw:text-zz-muted tw:[transition:background_var(--duration-fast)] "
+      + "tw:focus-within:border-zz-primary tw:focus-within:[box-shadow:0_0_0_3px_var(--color-primary-soft)] tw:focus-within:text-zz-secondary "
+      + "tw:ate520:w-auto tw:ate520:flex-auto",
+    pesquisaCampo: "topbar-search__input tw:flex-1 tw:min-w-0 tw:h-full tw:[border:0] tw:bg-transparent tw:outline-none tw:text-zz-text tw:text-[15px] "
+      + "tw:placeholder:text-zz-muted tw:[&::-webkit-search-cancel-button]:opacity-60 tw:ate520:w-full",
+    pesquisaFiltro: "tw:w-7 tw:h-[26px] tw:grid tw:place-items-center tw:flex-none tw:[border:0] tw:rounded-lg "
+      + "tw:focus-visible:outline-2 tw:focus-visible:outline-[color:var(--color-focus)] tw:focus-visible:outline-offset-0",
+    pesquisaFiltroNormal: "tw:bg-transparent tw:text-zz-secondary tw:hover:bg-zz-surface-hover tw:hover:text-zz-text "
+      + "tw:[&.is-open]:bg-zz-surface-hover tw:[&.is-open]:text-zz-text",
+    pesquisaFiltroAtivo: "tw:bg-zz-primary-soft tw:text-zz-primary",
     // a barra de seleção fica presa ao rodapé da área (mesmo com poucas transações)
     pagina: "page--lancamentos tw:flex tw:flex-col tw:min-h-full tw:*:shrink-0 tw:[&>:has(+.selbar)]:mb-5",
     info: "tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-x-5 tw:gap-y-2 tw:min-h-11 tw:py-2 tw:px-(--page-gutter) "
@@ -202,10 +214,10 @@
     }));
 
     // Categoria: Regulares / Excluídas / Ambos acima da lista
-    const statusCategoria = (redesenhar) => h("div", { class: "menu__segment", role: "radiogroup", "aria-label": "Tipo de categoria" },
+    const statusCategoria = (redesenhar) => h("div", { class: ZoZo.estrutura.menuSegmento, role: "radiogroup", "aria-label": "Tipo de categoria" },
       [["regulares", "Regulares"], ["excluidas", "Excluídas"], ["ambos", "Ambos"]].map(([v, t]) => h("button", {
         type: "button", role: "radio", "aria-checked": String(filtros().statusCategoria === v),
-        class: ["popover__segment-item", filtros().statusCategoria === v && "is-active"],
+        class: [ZoZo.estrutura.menuSegmentoItem, filtros().statusCategoria === v && "is-active"],
         onClick: (e) => {
           setFiltros({ statusCategoria: v }, ctx);
           e.currentTarget.parentNode.querySelectorAll("button").forEach((b) => { const on = b === e.currentTarget; b.classList.toggle("is-active", on); b.setAttribute("aria-checked", String(on)); });
@@ -303,16 +315,16 @@
       ZoZo.menu.abrir(categoriaBtn, { largura: 250, render(el, api) {
         let termo = "";
         const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        const lista = h("div", { class: "menu__list menu__list--scroll" });
-        const busca = h("input", { type: "search", class: "menu__search-input", placeholder: "Pesquisar categoria", "aria-label": "Pesquisar categoria" });
+        const lista = h("div", { class: ZoZo.estrutura.menuListaRolagem });
+        const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar categoria", "aria-label": "Pesquisar categoria" });
         const desenhar = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) =>
-          h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); aplicar({ categoriaId: c.id }, "Categoria definida."); } }, UI.CategoryLabel(c, { pill: true }))));
+          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); aplicar({ categoriaId: c.id }, "Categoria definida."); } }, UI.CategoryLabel(c, { pill: true }))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         // + Nova categoria (como nos outros menus de categoria): já é aplicada às selecionadas
-        const nova = h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar();
+        const nova = h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar();
           ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => aplicar({ categoriaId: c.id }, "Categoria criada e definida.") }); } },
-          icon("mais", { size: 16, class: "menu__icon" }), h("span", { class: "menu__label" }, "Nova categoria"));
-        mount(el, h("div", { class: "menu__search" }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: "menu__sep" }), nova);
+          icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria"));
+        mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: ZoZo.estrutura.menuSeparador }), nova);
         desenhar();
         requestAnimationFrame(() => busca.focus());
       } }, { posicao: "acima", largura: 250, label: "Definir categoria", focar: false });
@@ -326,7 +338,7 @@
     const perfilBtn = ZoZo.recursos.perfis() ? botao("perfil", "Perfil") : null;      // só contas com o recurso de Perfis
     if (perfilBtn) perfilBtn.addEventListener("click", () => {
       const perfis = ((store.get().data.perfis && store.get().data.perfis.perfis) || []).filter((p) => !p.arquivado);
-      ZoZo.menu.abrir(perfilBtn, perfis.map((p) => ({ render: (api) => h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); aplicar({ perfilId: p.id }, "Perfil definido."); } }, UI.Tag(p.nome, p.cor, { class: "tag--upper" })) }))
+      ZoZo.menu.abrir(perfilBtn, perfis.map((p) => ({ render: (api) => h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); aplicar({ perfilId: p.id }, "Perfil definido."); } }, UI.Tag(p.nome, p.cor, { class: "tag--upper" })) }))
         .concat([{ separador: true },
           { icone: "mais", label: "Criar novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => aplicar({ perfilId: np.id }, "Perfil criado e definido.") }) }]), { posicao: "acima", label: "Definir perfil" });
     });
@@ -343,7 +355,7 @@
             ctx.detail.close({ silencioso: true }); limpar(); ctx.toast("Transações excluídas."); return aposAlterar(ctx);
           }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
       } },
-    ], { posicao: "acima", label: "Mais ações", class: "menu--compacto" }));
+    ], { posicao: "acima", label: "Mais ações", class: ZoZo.estrutura.menuCompacto }));
 
     const barra = h("div", { class: T.selbar, role: "toolbar", "aria-label": "Ações para as transações selecionadas", onKeydown: navegarBarra },
       h("button", { type: "button", class: T.selbarIcone, "aria-label": "Fechar seleção", onClick: limpar }, icon("fechar", { size: 15 })),
@@ -377,7 +389,7 @@
     if (campoBusca) return campoBusca;
     const aplicar = (v) => { clearTimeout(buscaTimer); store.set({ ui: { busca: v, selecionados: [] } }); };
     campoBusca = h("input", {
-      type: "search", class: "topbar-search__input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações",
+      type: "search", class: T.pesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações",
       title: "Nome, categoria, conta, valor ou data — ex.: mercado outubro · >100 · 11/10 (atalho: / ou Ctrl+K)",
       "aria-keyshortcuts": "/ Control+K", autocomplete: "off", spellcheck: "false", enterkeyhint: "search",
       onInput: (e) => { clearTimeout(buscaTimer); const v = e.target.value; buscaTimer = setTimeout(() => aplicar(v), 120); },
@@ -401,7 +413,7 @@
     // Filtro ativo = algum filtro diferente do padrão (a pesquisa tem o próprio campo)
     const padrao = FILTROS_VAZIOS();
     const ativos = Object.keys(padrao).some((k) => JSON.stringify(filtros()[k]) !== JSON.stringify(padrao[k]));
-    const filtroBtn = h("button", { type: "button", class: ["topbar-search__filter", ativos && "is-active"], "aria-label": "Filtrar", title: "Filtrar",
+    const filtroBtn = h("button", { type: "button", class: [T.pesquisaFiltro, ativos ? T.pesquisaFiltroAtivo : T.pesquisaFiltroNormal], "aria-label": "Filtrar", title: "Filtrar",
       "aria-haspopup": "menu", "aria-expanded": "false" }, icon("filtrar", { size: 16 }));
     filtroBtn.addEventListener("click", () => abrirMenuFiltros(filtroBtn, ctx, "direita"));
     return [
@@ -410,7 +422,7 @@
       UI.IconButton("baixar-circulo", "Exportar transações (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
       // Multicâmbio: trazer transações de outra moeda para a escolhida (a qualquer momento, não só na 1ª vez)
       ZoZo.cambio.disponivelTransferir() ? UI.IconButton("interno", "Trazer transações de outra moeda", { onPrimary: true, onClick: () => ZoZo.cambio.abrirTransferencia(ctx) }) : null,
-      h("div", { class: "topbar-search topbar-search--larga" }, icon("pesquisar", { size: 15 }), busca, filtroBtn),
+      h("div", { class: T.pesquisa }, icon("pesquisar", { size: 15, class: "tw:text-zz-muted" }), busca, filtroBtn),
     ];
   }
 

@@ -95,9 +95,9 @@
       titulo: "Transferir entre moedas",
       classe: "modal--recorrencia modal--cambio",
       passo: function passo(api) {
-        const descricao = h("p", { class: "modal__text cambio__aviso" });
-        const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
-        const itensEl = h("div", { class: "zm__list" });
+        const descricao = h("p", { class: [ZoZo.estrutura.modalTexto, "cambio__aviso"] });
+        const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
+        const itensEl = h("div", { class: ZoZo.estrutura.janelaListaSemRolagemLateral });
         const alternar = h("div", { class: "cambio__modo" });
         const moedaBtn = h("button", { type: "button", class: "btn btn--secondary btn--sm cambio__moeda", "aria-haspopup": "menu" });
         let botao = null;
@@ -120,11 +120,11 @@
             const cb = h("input", { type: "checkbox", class: "cambio__check", "aria-label": "Transferir " + l.descricao });
             cb.checked = marcadas.has(l.id);
             cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
-            return h("label", { class: "zm-lanc cambio__item" }, cb,
-              h("span", { class: "zm-lanc__data", title: F.dataExtenso(l.data) }, F.dataCurta(l.data)),
-              h("span", { class: "zm-lanc__nome" }, h("span", null, l.descricao)),
-              h("span", { class: "zm-lanc__valor money" }, origem().simbolo + " " + F.moedaEditavel(l.valor)));
-          }) : h("p", { class: "menu__empty" }, "Nenhuma transação em " + origem().nome + "."));
+            return h("label", { class: ZoZo.estrutura.janelaLancMarcavel }, cb,
+              h("span", { class: ZoZo.estrutura.janelaLancData, title: F.dataExtenso(l.data) }, F.dataCurta(l.data)),
+              h("span", { class: ZoZo.estrutura.janelaLancNome }, h("span", null, l.descricao)),
+              h("span", { class: ZoZo.estrutura.janelaLancValor }, origem().simbolo + " " + F.moedaEditavel(l.valor)));
+          }) : h("p", { class: ZoZo.estrutura.menuVazio }, "Nenhuma transação em " + origem().nome + "."));
         }
         function recarregar() {
           lista = null; marcadas.clear(); contar(); desenharTopo(); desenharLista();
@@ -144,11 +144,11 @@
 
         return {
           titulo: "Transferir entre moedas",
-          corpo: h("div", { class: "zm__pick" },
+          corpo: h("div", { class: ZoZo.estrutura.janelaEscolha },
             descricao,
             h("p", { class: "aviso-laranja", role: "note" }, ZoZo.icons.icon("alerta", { size: 14 }), "O valor numérico não será convertido, apenas a moeda será alterada."),
             alternar,
-            h("div", { class: "zm__search" }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
+            h("div", { class: ZoZo.estrutura.janelaPesquisa }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           rodapeEsquerda: moedaBtn,
           botoes: [
             { label: "Cancelar", onClick: () => api.fechar() },
@@ -180,8 +180,8 @@
       passo: function passo(api) {
         let termo = "";
         const norm = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-        const busca = h("input", { type: "search", class: "zm__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
-        const itensEl = h("div", { class: "zm__list" });
+        const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" });
+        const itensEl = h("div", { class: ZoZo.estrutura.janelaListaSemRolagemLateral });
         let botao = null;
         const contar = () => { if (botao) botao.disabled = !marcadas.size; };          // só "Transferir", sem contador
         const desenhar = () => {
@@ -190,19 +190,19 @@
             const cb = h("input", { type: "checkbox", class: "cambio__check", "aria-label": "Transferir " + l.descricao });
             cb.checked = marcadas.has(l.id);
             cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
-            return h("label", { class: "zm-lanc cambio__item" }, cb,
-              h("span", { class: "zm-lanc__data", title: F.dataExtenso(l.data) }, F.dataCurta(l.data)),
-              h("span", { class: "zm-lanc__nome" }, h("span", null, l.descricao)),
-              h("span", { class: "zm-lanc__valor money" }, simbolo(l.moeda) + " " + F.moedaEditavel(l.valor)));
-          }) : h("p", { class: "menu__empty" }, "Nenhuma transação encontrada."));
+            return h("label", { class: ZoZo.estrutura.janelaLancMarcavel }, cb,
+              h("span", { class: ZoZo.estrutura.janelaLancData, title: F.dataExtenso(l.data) }, F.dataCurta(l.data)),
+              h("span", { class: ZoZo.estrutura.janelaLancNome }, h("span", null, l.descricao)),
+              h("span", { class: ZoZo.estrutura.janelaLancValor }, simbolo(l.moeda) + " " + F.moedaEditavel(l.valor)));
+          }) : h("p", { class: ZoZo.estrutura.menuVazio }, "Nenhuma transação encontrada."));
         };
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         desenhar();
         return {
           titulo: o.primeiraVez ? "Usar transações em " + destino.nome + "?" : "Trazer transações para " + destino.nome,
-          corpo: h("div", { class: "zm__pick" },
-            h("p", { class: "modal__text cambio__aviso" }, "Selecione as transações que deseja transferir para sua conta em " + destino.nome + "."),
-            h("div", { class: "zm__search" }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
+          corpo: h("div", { class: ZoZo.estrutura.janelaEscolha },
+            h("p", { class: [ZoZo.estrutura.modalTexto, "cambio__aviso"] }, "Selecione as transações que deseja transferir para sua conta em " + destino.nome + "."),
+            h("div", { class: ZoZo.estrutura.janelaPesquisa }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           botoes: [
             { label: o.primeiraVez ? "Agora não" : "Cancelar", onClick: () => api.fechar() },
             { label: "Transferir", primario: true, desabilitado: true, ref: (b) => { botao = b; contar(); }, onClick: (btn) => {

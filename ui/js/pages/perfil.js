@@ -358,7 +358,7 @@
     const janela = ZoZo.feedback.modal({
       title: "Desativar 2FA?", class: "modal--confirm",
       body: h("div", { class: "desativar2fa" },
-        h("p", { class: "modal__text" }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA."),
+        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA."),
         campo.el, erro),
     });
     requestAnimationFrame(() => campo.foco());

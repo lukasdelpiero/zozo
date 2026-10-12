@@ -54,15 +54,15 @@
       ZoZo.menu.abrir(btn, { largura: 280, render(el, api) {
         let termo = "";
         const lista = () => ((store.get().data.categorias || {}).categorias || []);
-        const busca = h("input", { type: "search", class: "menu__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar categoria" });
-        const caixa = h("div", { class: "menu__list menu__list--scroll" });
+        const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar categoria" });
+        const caixa = h("div", { class: ZoZo.estrutura.menuListaRolagem });
         const escolher = (id) => { api.fechar(); parte.categoriaId = id; desenhar(); };
         const pintar = () => mount(caixa, lista().filter((c) => !termo || norm(c.nome).includes(termo)).map((c) =>
-          h("button", { type: "button", class: ["menu__item", c.id === parte.categoriaId && "is-checked"], onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true }))));
+          h("button", { type: "button", class: [ZoZo.estrutura.menuItem, c.id === parte.categoriaId && "is-checked"], onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true }))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); pintar(); });
-        mount(el, h("div", { class: "menu__search" }, icon("pesquisar", { size: 14 }), busca), caixa, h("div", { class: "menu__sep" }),
-          h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => { cats.push(c); escolher(c.id); } }); } },
-            icon("mais", { size: 16, class: "menu__icon" }), h("span", { class: "menu__label" }, "Nova categoria")));
+        mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), caixa, h("div", { class: ZoZo.estrutura.menuSeparador }),
+          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => { cats.push(c); escolher(c.id); } }); } },
+            icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria")));
         pintar();
         requestAnimationFrame(() => busca.focus());
       } }, { posicao: "direita", largura: 280, label: "Categoria", focar: false });
@@ -70,12 +70,12 @@
     function menuPerfil(btn, parte) {
       ZoZo.menu.abrir(btn, { largura: 240, render(el, api) {
         const atuais = () => ((store.get().data.perfis || {}).perfis || []).filter((p) => !p.arquivado);
-        mount(el, h("div", { class: "menu__list menu__list--scroll" }, atuais().map((p) =>
-          h("button", { type: "button", class: ["menu__item", p.id === parte.perfilId && "is-checked"], onClick: () => { api.fechar(); parte.perfilId = p.id; desenhar(); } },
+        mount(el, h("div", { class: ZoZo.estrutura.menuListaRolagem }, atuais().map((p) =>
+          h("button", { type: "button", class: [ZoZo.estrutura.menuItem, p.id === parte.perfilId && "is-checked"], onClick: () => { api.fechar(); parte.perfilId = p.id; desenhar(); } },
             UI.Tag(p.nome, p.cor, { class: "tag--upper" })))),
-          h("div", { class: "menu__sep" }),
-          h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => { perfis.push(np); parte.perfilId = np.id; desenhar(); } }); } },
-            icon("mais", { size: 16, class: "menu__icon" }), h("span", { class: "menu__label" }, "Novo perfil")));
+          h("div", { class: ZoZo.estrutura.menuSeparador }),
+          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => { perfis.push(np); parte.perfilId = np.id; desenhar(); } }); } },
+            icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Novo perfil")));
       } }, { posicao: "direita", largura: 240, label: "Perfil" });
     }
 

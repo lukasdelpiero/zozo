@@ -17,15 +17,19 @@
 
   /* ---------------- Visual (Tailwind; classes escritas por inteiro) ---------------- */
   const COLUNA = "tw:text-[13px] tw:font-[620] tw:uppercase tw:tracking-[0.04em] tw:text-zz-muted tw:area420:hidden";
-  const ORCAMENTO_INPUT = "tw:h-10 tw:text-[17px] tw:font-semibold";
+  // campo do painel: edição "invisível" (sem borda nem fundo, também com foco); erro = texto vermelho
+  const ORCAMENTO_INPUT = "tw:h-10 tw:text-[17px] tw:font-semibold " + ZoZo.ui.CAMPO_PAINEL;
   const T = {
     lista: "tw:flex tw:flex-col tw:mb-2",
-    // GASTO (à direita) e RESERVADO (à esquerda) alinhados com as colunas das linhas
-    cabecalho: "tw:grid tw:grid-cols-[minmax(0,1fr)_112px_minmax(120px,2.2fr)_104px] tw:gap-4 tw:px-4",
-    cabecalhoLead: "tw:-ml-4",
+    // GASTO (à direita) e RESERVADO (à esquerda) alinhados com as colunas das linhas: a MESMA grade de
+    // CategoryRow (components/list.js) em todas as larguras — antes, com a área estreita (painel aberto),
+    // as linhas passavam a 3 colunas e o cabeçalho não: o título quebrava e "Gasto" saía do lugar
+    cabecalho: "tw:grid tw:grid-cols-[minmax(8em,1.4fr)_112px_minmax(80px,2fr)_104px] tw:gap-4 tw:px-4 "
+      + "tw:area620:grid-cols-[minmax(0,1fr)_112px_104px] tw:area420:grid-cols-[minmax(0,1fr)_112px]",
+    cabecalhoLead: "tw:-ml-4 tw:whitespace-nowrap tw:overflow-hidden",          // título numa linha só
     colGasto: COLUNA + " tw:text-right",
-    colEspaco: COLUNA,
-    colReservado: COLUNA + " tw:text-left tw:area460:hidden",
+    colEspaco: COLUNA + " tw:area620:hidden",
+    colReservado: COLUNA + " tw:text-left",
     vazioInicio: "tw:min-h-[280px]",
     subtitulo: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     // pílulas das categorias + "+N" no topo dos painéis de grupo e de "todas"
@@ -178,22 +182,6 @@
     }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
 
     const grupos = () => Array.from(new Set(((ZoZo.store.get().data.categorias || {}).categorias || []).map((c) => c.grupo).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR"));
-    const criarGrupo = {
-      largura: 260,
-      render(el, api) {
-        const input = UI.Input({ placeholder: "Ex.: Moradia", name: "nomeGrupo" });
-        input.maxLength = 60;
-        const confirmar = () => { const nome = input.value.trim(); if (!nome) { input.setAttribute("aria-invalid", "true"); input.focus(); return; } api.fechar(); alterar({ grupo: nome }, "Grupo criado."); };
-        input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); confirmar(); } });
-        mount(el, h("div", { class: "menu__form" },
-          h("p", { class: "menu__form-title" }, "Criar novo grupo"),
-          UI.Field("Nome do grupo", input),
-          h("div", { class: "menu__form-actions" },
-            UI.Button("Cancelar", { size: "sm", onClick: () => api.voltar() }),
-            UI.Button("Criar", { size: "sm", variant: "primary", onClick: confirmar }))));
-        requestAnimationFrame(() => input.focus());
-      },
-    };
 
     /* ---------- Editar orçamento (modo de edição no próprio painel) ---------- */
     const editando = !!(opts && opts.editandoOrcamento);
@@ -216,7 +204,7 @@
     valorOrc.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvarOrcamento(); } });
     const areaOrcamento = h("div", { class: ["detail-hero__figure", T.orcArea] }, modoBtn, rotuloMes,
       h("div", { class: ["field__affix", T.orcValor] }, h("span", { class: "field__prefix" }, F.simbolo()), valorOrc));
-    if (editando) requestAnimationFrame(() => { valorOrc.focus(); valorOrc.select(); });
+    if (editando) requestAnimationFrame(() => { valorOrc.focus(); F.cursorNoFim(valorOrc); });
     function salvarOrcamento() {
       const v = F.parseMoeda(valorOrc.value);
       if (!(v >= 0)) { valorOrc.setAttribute("aria-invalid", "true"); valorOrc.focus(); return; }
@@ -323,7 +311,7 @@
     ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
     pintarModo();
     valorNA.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar(); } });
-    if (editando) requestAnimationFrame(() => { valorNA.focus(); valorNA.select(); });
+    if (editando) requestAnimationFrame(() => { valorNA.focus(); F.cursorNoFim(valorNA); });
 
     function salvar() {
       const v = F.parseMoeda(valorNA.value);
@@ -392,8 +380,8 @@
     const btn = h("button", { type: "button", class: T.mais, "aria-haspopup": "menu",
       "aria-label": "Ver as outras " + (lista.length - visiveis) + " categorias" }, "+" + (lista.length - visiveis));
     btn.addEventListener("click", () => ZoZo.menu.abrir(btn, lista.map((c) => ({
-      render: () => h("div", { class: "menu__item menu__item--estatico", role: "menuitem", "aria-disabled": "true" }, UI.CategoryLabel(c, { pill: true })),
-    })), { posicao: "esquerda", label: "Categorias", class: "tw:min-w-0 tw:w-max" }));       // largura das pílulas, sem sobra
+      render: () => h("div", { class: ZoZo.estrutura.menuItemEstatico, role: "menuitem", "aria-disabled": "true" }, UI.CategoryLabel(c, { pill: true })),
+    })), { posicao: "esquerda", label: "Categorias", class: "tw:min-w-0! tw:w-max" }));       // largura das pílulas, sem sobra
     return btn;
   }
 
@@ -445,25 +433,25 @@
       const modelos = (ZoZo.regras.modelosCategoria || ZoZo.regras.categoriasSugeridas || []).filter((m) => !existentes.has(m.nome.toLowerCase()));
       const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
       let termo = "";
-      const busca = h("input", { type: "search", class: "menu__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar modelos" });
-      const lista = h("div", { class: "menu__list menu__list--scroll" });
+      const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar modelos" });
+      const lista = h("div", { class: ZoZo.estrutura.menuListaRolagem });
       const desenhar = () => {
         const itens = modelos.filter((m) => !termo || norm(m.nome).includes(termo));
-        mount(lista, h("div", { class: "menu__section" }, "Modelos de categoria"),
-          itens.length ? itens.map((m) => h("button", { type: "button", class: "menu__item", onClick: () => {
+        mount(lista, h("div", { class: ZoZo.estrutura.menuSecao }, "Modelos de categoria"),
+          itens.length ? itens.map((m) => h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => {
             api.fechar();
             ctx.bridge.request(A.createCategoria, { categoria: Object.assign({ reservado: 0, status: "regular", grupo: null }, m) }).then((r) => {
               ctx.toast("Categoria criada.");
               return ctx.recarregarTudo().then(() => abrirDetalhe(Object.assign({ gasto: 0 }, r.categoria), ctx));
             }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
-          } }, h("span", { class: "menu__emoji" }, m.icone), h("span", { class: "menu__label" }, m.nome)))
-            : h("p", { class: "menu__empty" }, termo ? "Nenhum modelo encontrado." : "Todos os modelos já foram criados."));
+          } }, h("span", { class: ZoZo.estrutura.menuEmoji }, m.icone), h("span", { class: ZoZo.estrutura.menuRotulo }, m.nome)))
+            : h("p", { class: ZoZo.estrutura.menuVazio }, termo ? "Nenhum modelo encontrado." : "Todos os modelos já foram criados."));
       };
       busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
-      mount(el, h("div", { class: "menu__search" }, ZoZo.icons.icon("pesquisar", { size: 14 }), busca), lista,
-        h("div", { class: "menu__sep" }),
-        h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => abrirDetalhe(Object.assign({ gasto: 0 }, c), ctx) }); } },
-          ZoZo.icons.icon("mais", { size: 16, class: "menu__icon" }), h("span", { class: "menu__label" }, "Nova categoria")));
+      mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, ZoZo.icons.icon("pesquisar", { size: 14 }), busca), lista,
+        h("div", { class: ZoZo.estrutura.menuSeparador }),
+        h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => abrirDetalhe(Object.assign({ gasto: 0 }, c), ctx) }); } },
+          ZoZo.icons.icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria")));
       desenhar();
       requestAnimationFrame(() => busca.focus());
     } }, { posicao: "direita", largura: 270, label: "Nova categoria", focar: false }));

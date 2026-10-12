@@ -277,6 +277,11 @@
     });
   }
 
+  /** Campo de texto dentro dos painéis de informação: sem borda e com fundo transparente, também ao editar
+      (só o cursor indica a edição); valor inválido fica em vermelho em vez de ganhar borda */
+  const CAMPO_PAINEL = "tw:border-transparent tw:bg-transparent tw:shadow-none tw:hover:border-transparent tw:focus:border-transparent "
+    + "tw:focus:bg-transparent tw:focus:shadow-none tw:aria-invalid:border-transparent tw:aria-invalid:shadow-none tw:aria-invalid:text-(--color-negative)";
+
   function Section(opts, ...children) {
     const o = opts || {};
     const st = ZoZo.store.get();
@@ -393,6 +398,6 @@
     confirmarNoBotao,
     Button, IconButton, Field, Input, Select, Textarea, Toggle, Tag, CategoryLabel, PercentageChange, ProgressBar,
     FilterTabs, recortarSerie, Segmented, Card, Section, Skeleton, EmptyState, ErrorState, ColorPicker,
-    AccountIcon, INTERVALOS, refocus, Checkbox, alternarArvore, corpoArvore, alternarGrupo,
+    AccountIcon, INTERVALOS, refocus, Checkbox, alternarArvore, corpoArvore, alternarGrupo, CAMPO_PAINEL,
   };
 })(window.ZoZo);

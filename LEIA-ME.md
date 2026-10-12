@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.3.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.4.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,13 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.4.0
+
+- **Estrutura em Tailwind CSS:** menu lateral (com a gaveta do celular e o modo recolhido), barra superior (com a pesquisa), área principal, painel de informações (inclusive a gaveta sobreposta em telas estreitas), menus flutuantes e janelas modais. Visual idêntico, conferido elemento a elemento: a estrutura em 5 tamanhos de janela × 7 situações, 17 tipos de menu e 10 janelas no computador e no celular. ~690 linhas de CSS antigo a menos; as classes ficam em `components/estrutura.ts`.
+- **Categorias regulares:** o cabeçalho (Gasto/Reservado) usa a mesma grade das linhas em qualquer largura — com o painel aberto o título quebrava em duas linhas e "Gasto" ficava fora do lugar.
+- **Painel de informações:** as pílulas de Categoria e Perfil começam na mesma linha do "+" e dos outros valores; todos os campos de edição dos painéis (nome, valor, notas, orçamento, fechamento e vencimento) ficam sem borda e com fundo transparente também ao editar; clicar no valor põe o cursor no fim, sem deixar tudo selecionado (azul).
+- **Acertos:** contorno de foco do botão de filtro visível (era branco sobre a barra branca); código sem uso removido (formulário de grupo dentro do menu e uma opção que o painel ignorava).
 
 ## Novidades da versão 3.3.0
 

@@ -9,9 +9,11 @@
   <link rel="alternate icon" type="image/png" href="/assets/img/favicon.png">
 </head>
 <body>
-  <div id="app" data-auth="loading">
-    <div id="auth-root"></div>
-    <div class="app-shell" id="shell"></div>
+  <div id="app" class="tw:h-full" data-auth="loading">
+    <div id="auth-root" class="tw:in-data-[auth=authenticated]:hidden"></div>
+    <!-- Estrutura (Tailwind): menu lateral | [barra superior + área principal] | painel. data-menu="recolhido" e
+         data-gaveta="aberta" (celular) mudam o layout; as classes de cada parte estão em components/estrutura.js -->
+    <div id="shell" class="tw:group/shell tw:relative tw:hidden tw:in-data-[auth=authenticated]:grid tw:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] tw:h-full tw:min-w-0 tw:[transition:grid-template-columns_var(--duration-medium)_var(--easing)] tw:data-[menu=recolhido]:grid-cols-[0_minmax(0,1fr)] tw:gaveta:grid-cols-[minmax(0,1fr)] tw:gaveta:data-[menu=recolhido]:grid-cols-[minmax(0,1fr)] tw:motion-reduce:transition-none!"></div>
     <div id="boleto-root"></div>
     <div id="modal-root"></div>
     <div id="toast-root" aria-live="polite"></div>

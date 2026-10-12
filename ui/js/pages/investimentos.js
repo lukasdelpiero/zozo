@@ -16,10 +16,10 @@
       const desenhar = () => {
         const inv = ZoZo.store.get().data.investimentos;
         const excluidas = ZoZo.store.get().ui.invExcluidas || [];
-        ZoZo.dom.mount(el, h("div", { class: "menu__section" }, "Contas incluídas"),
-          (inv.contas || []).map((c) => h("div", { class: "menu__toggle" },
-            h("span", { class: "menu__swatch", style: { background: F.cor(c.cor, "var(--palette-16)") } }),
-            h("span", { class: "menu__label" }, L.nomeComDigitos(c.nome, c.ultimos4Digitos)),
+        ZoZo.dom.mount(el, h("div", { class: ZoZo.estrutura.menuSecao }, "Contas incluídas"),
+          (inv.contas || []).map((c) => h("div", { class: ZoZo.estrutura.menuInterruptor },
+            h("span", { class: ZoZo.estrutura.menuAmostra, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
+            h("span", { class: ZoZo.estrutura.menuInterruptorRotulo }, L.nomeComDigitos(c.nome, c.ultimos4Digitos)),
             UI.Toggle("", { checked: !excluidas.includes(c.id), onChange: (v) => {
               const atual = new Set(ZoZo.store.get().ui.invExcluidas || []);
               if (v) atual.delete(c.id); else atual.add(c.id);

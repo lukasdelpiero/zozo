@@ -171,7 +171,7 @@
       // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo)
       const input = h("input", { type: "text", inputmode: "decimal", class: ["lp-value", "money", ehVerde(d) && "money--income"], "aria-label": "Valor",
         value: F.moeda(d.valor || 0), "data-com-simbolo": "" });
-      input.addEventListener("focus", () => { input.value = d.valor ? F.valorParaEditar(input, d.valor) : ""; input.select(); });
+      input.addEventListener("focus", () => { input.value = d.valor ? F.valorParaEditar(input, d.valor) : ""; F.cursorNoFim(input); });   // sem selecionar tudo
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
       input.addEventListener("blur", () => {
         const v = F.parseMoeda(input.value);
@@ -202,7 +202,7 @@
           if (regular) d.tipo = v; else d.sentido = v;
           if (novo) desenhar(); else salvar(() => Object.assign(d, antes)).then(() => reabrir());
         },
-      })), { posicao: "direita", label: regular ? "Despesa ou estorno" : "Saída ou entrada", checkEsquerda: true, class: "menu--compacto" }));
+      })), { posicao: "direita", label: regular ? "Despesa ou estorno" : "Saída ou entrada", checkEsquerda: true, class: ZoZo.estrutura.menuCompacto }));
       return btn;
     }
 
@@ -253,20 +253,20 @@
     function menuCategorias(anchor) {
       ZoZo.menu.abrir(anchor, { largura: 280, render(el, api) {
         let termo = "";
-        const busca = h("input", { type: "search", class: "menu__search-input", placeholder: "Pesquisar", "aria-label": "Pesquisar categoria" });
-        const lista = h("div", { class: "menu__list menu__list--scroll" });
+        const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar categoria" });
+        const lista = h("div", { class: ZoZo.estrutura.menuListaRolagem });
         const escolher = (id) => { api.fechar(); const antes = d.categoriaId; d.categoriaId = id; if (novo) desenhar(); else salvar(() => { d.categoriaId = antes; }).then(() => reabrir()); };
-        const desenharLista = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) => h("div", { class: ["menu__item", "menu__item--split", c.id === d.categoriaId && "is-checked"] },
-          h("button", { type: "button", class: "menu__split-main", onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true })),
+        const desenharLista = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) => h("div", { class: [ZoZo.estrutura.menuItemDividido, c.id === d.categoriaId && "is-checked"] },
+          h("button", { type: "button", class: ZoZo.estrutura.menuDivididoPrincipal, onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true })),
           novo ? null : h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Ver categoria " + c.nome, title: "Ver categoria",
             onClick: () => { api.fechar(); ZoZo.categoriasShared.abrirDetalhe(c, ctx, { voltar: voltarParaCa }); } }, icon("chevron-right", { size: 14 })))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenharLista(); });
-        mount(el, h("div", { class: "menu__search" }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: "menu__sep" }),
-          d.categoriaId ? h("button", { type: "button", class: "menu__item", onClick: () => escolher(null) }, h("span", { class: "menu__label" }, "Sem categoria")) : null,
-          h("button", { type: "button", class: "menu__item", onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "",
+        mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: ZoZo.estrutura.menuSeparador }),
+          d.categoriaId ? h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => escolher(null) }, h("span", { class: ZoZo.estrutura.menuRotulo }, "Sem categoria")) : null,
+          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "",
             // recarrega as categorias antes de escolher: a nova já aparece selecionada no painel
             aoCriar: (c) => ctx.loadData("categorias", A.getCategorias, null, { force: true }).catch(() => null).then(() => escolher(c.id)) }); } },
-            icon("mais", { size: 16, class: "menu__icon" }), h("span", { class: "menu__label" }, "Nova categoria")));
+            icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria")));
         desenharLista();
         requestAnimationFrame(() => busca.focus());
       } }, { posicao: "esquerda", largura: 280, label: "Categoria", focar: false });
@@ -281,9 +281,9 @@
       const temRecorrencia = recorrente || !!pendenteRec;
       // a origem de uma série não pode entrar em outra série (os membros dela ficariam órfãos)
       const lista = origens().filter((o) => !ehOrig || o.id === original.id);
-      const itens = lista.map((o) => ({ render: (api) => h("div", { class: ["menu__item", "menu__item--split", o.id === atualId && "is-checked"] },
-        h("button", { type: "button", class: "menu__split-main", onClick: () => { api.fechar(); if (o.id !== atualId) vincular(o); } },
-          h("span", { class: "kind-badge" }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: "menu__label" }, o.descricao), h("small", { class: "menu__hint" }, rotuloRecorrencia(o))),
+      const itens = lista.map((o) => ({ render: (api) => h("div", { class: [ZoZo.estrutura.menuItemDividido, o.id === atualId && "is-checked"] },
+        h("button", { type: "button", class: ZoZo.estrutura.menuDivididoPrincipal, onClick: () => { api.fechar(); if (o.id !== atualId) vincular(o); } },
+          h("span", { class: "kind-badge" }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: ZoZo.estrutura.menuRotulo }, o.descricao), h("small", { class: ZoZo.estrutura.menuDica }, rotuloRecorrencia(o))),
         novo ? null : h("button", { type: "button", class: "icon-btn icon-btn--sm", "aria-label": "Ver recorrência " + o.descricao, onClick: () => { api.fechar(); abrirRecorrencia(o.id); } }, icon("chevron-right", { size: 14 }))) }));
       if (temRecorrencia) itens.push({ label: "Sem recorrência", onClick: semRecorrencia });
       // membro de uma série: "Nova recorrência" só depois de sair dela (Sem recorrência)
@@ -326,7 +326,7 @@
       const btn = p ? h("button", { type: "button", class: "lp-chip-btn", "aria-haspopup": "menu" }, UI.Tag(p.nome, p.cor, { class: "tag--upper" }))
         : h("button", { type: "button", class: "lp-add", "aria-label": "Adicionar perfil", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
       btn.addEventListener("click", () => ZoZo.menu.abrir(btn, perfis.filter((x) => !x.arquivado || x.id === d.perfilId).map((x) => ({
-        render: (api) => h("button", { type: "button", class: ["menu__item", x.id === d.perfilId && "is-checked"], onClick: () => {
+        render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, x.id === d.perfilId && "is-checked"], onClick: () => {
           api.fechar(); const antes = d.perfilId; d.perfilId = x.id; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
         } }, UI.Tag(x.nome, x.cor, { class: "tag--upper" })),
       })).concat([
@@ -448,7 +448,7 @@
       selected: novo ? null : { tipo: "lancamento", id: original.id },
       voltar: opts.voltar || null,
       botoes: novo ? [{ label: "Criar", icone: "check", primario: true, onClick: (e) => criar(e.currentTarget) }]
-        : podeDividir && d.divisao ? [{ label: "Editar divisão", icone: "dividir", onClick: abrirDivisao, classe: "detail__textbtn--split" }] : [],
+        : podeDividir && d.divisao ? [{ label: "Editar divisão", icone: "dividir", onClick: abrirDivisao }] : [],
       menu: novo ? null : [{ label: "Excluir transação", perigo: true, onClick: excluir }],
       render(body) { desenhar(); mount(body, corpo); },
     });

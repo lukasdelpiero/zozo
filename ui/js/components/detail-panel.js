@@ -4,6 +4,7 @@
    "Selecione para ver detalhes". O cabeçalho (título, ações e
    fechar) pertence ao próprio painel, o que permite que ele vire
    uma gaveta sobreposta em telas estreitas (tela dividida).
+   Visual em Tailwind (components/estrutura.ts).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -12,11 +13,12 @@
   const UI = ZoZo.ui;
 
   function create(workspaceEl, panelEl) {
-    const voltarEl = h("span", { class: "detail__back" });
-    const tituloEl = h("h2", { class: "detail__title", id: "detail-title" });
-    const acoesEl = h("div", { class: "detail__actions" });
-    const header = h("header", { class: "detail__header" }, h("div", { class: "detail__lead" }, voltarEl, tituloEl), acoesEl);
-    const corpo = h("div", { class: "detail__content" });
+    const E = ZoZo.estrutura;
+    const voltarEl = h("span", { class: E.painelVoltar });
+    const tituloEl = h("h2", { class: E.painelTitulo, id: "detail-title" });
+    const acoesEl = h("div", { class: E.painelAcoes });
+    const header = h("header", { class: E.painelTopo }, h("div", { class: E.painelInicio }, voltarEl, tituloEl), acoesEl);
+    const corpo = h("div", { class: E.painelConteudo });
     mount(panelEl, header, corpo);
 
     let atual = null;
@@ -27,8 +29,8 @@
       tituloEl.textContent = "";
       mount(voltarEl);
       mount(acoesEl);
-      mount(corpo, h("div", { class: "detail__placeholder" },
-        icon("lancamentos", { size: 26 }),
+      mount(corpo, h("div", { class: E.painelVazio },
+        icon("lancamentos", { size: 26, class: E.painelVazioIcone }),
         h("p", null, "Selecione para ver detalhes")));
       workspaceEl.dataset.conteudo = "nao";
     }
@@ -53,8 +55,8 @@
       // Título: texto ou elemento (ex.: seletor do tipo de lançamento)
       if (cfg.tituloNode) mount(tituloEl, cfg.tituloNode); else tituloEl.textContent = cfg.title || "";
       // Seta "voltar": retorna ao conteúdo anterior sem trocar de página
-      mount(voltarEl, cfg.voltar ? [UI.IconButton("seta-voltar", "Voltar", { onClick: cfg.voltar }), h("span", { class: "detail__divider", "aria-hidden": "true" })] : null);
-      const botoes = (cfg.botoes || []).map((b) => h("button", { type: "button", class: ["detail__textbtn", b.primario && "detail__textbtn--primary"], onClick: b.onClick, disabled: b.desabilitado },
+      mount(voltarEl, cfg.voltar ? [UI.IconButton("seta-voltar", "Voltar", { onClick: cfg.voltar }), h("span", { class: E.divisorVoltar, "aria-hidden": "true" })] : null);
+      const botoes = (cfg.botoes || []).map((b) => h("button", { type: "button", class: b.primario ? E.botaoTextoPrimario : E.botaoTexto, onClick: b.onClick, disabled: b.desabilitado },
         b.icone ? icon(b.icone, { size: 14, stroke: 2.25 }) : null, b.label));
       (cfg.acoes || []).forEach((a) => botoes.push(UI.IconButton(a.icone, a.rotulo, { class: a.perigo ? "icon-btn--danger" : null, onClick: a.onClick })));
       if (cfg.menu && cfg.menu.length) {
@@ -63,7 +65,7 @@
         btn.addEventListener("click", () => ZoZo.menu.abrir(btn, cfg.menu, { posicao: "direita", label: "Opções", checkEsquerda: true }));
         botoes.push(btn);
       }
-      if (botoes.length) botoes.push(h("span", { class: "detail__divider", "aria-hidden": "true" }));
+      if (botoes.length) botoes.push(h("span", { class: E.divisor, "aria-hidden": "true" }));
       botoes.push(UI.IconButton("fechar", "Fechar painel", { onClick: () => close() }));
       mount(acoesEl, botoes);
 
@@ -71,7 +73,8 @@
       const chave = cfg.selected ? cfg.selected.tipo + ":" + cfg.selected.id : null;
       const mesmo = chave && chave === chaveAtual;
       chaveAtual = chave;
-      const body = h("div", { class: ["detail__body", mesmo && "detail__body--estatico"], role: "region", "aria-labelledby": "detail-title" });
+      // reabrir o mesmo item (salvar no lugar) não repete a animação de entrada
+      const body = h("div", { class: mesmo ? E.painelCorpoEstatico : E.painelCorpo, role: "region", "aria-labelledby": "detail-title" });
       mount(corpo, body);
       const api = { close, setTitle: (t) => { tituloEl.textContent = t; } };
       cfg.render(body, api);

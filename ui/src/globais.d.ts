@@ -101,6 +101,7 @@ declare global {
     mascararValor(input: HTMLInputElement, digitado?: string | null, tipo?: string): void;
     completarValor(input: HTMLInputElement): void;
     valorParaEditar(input: HTMLInputElement, v: number): string;
+    cursorNoFim(input: HTMLInputElement): void;
     cor(v: unknown, padrao?: string | null): string | null;
     diaSemana(d: Date): string;
     rotuloDia(dataIso: string): string;
@@ -161,6 +162,8 @@ declare global {
     log: ZoZoLog;
     format: ZoZoFormat;
     busca: ZoZoBusca;
+    /** js/components/estrutura.ts — classes Tailwind do menu lateral, barra superior e painel */
+    estrutura: Readonly<Record<string, string>>;
     pix: ZoZoPix;
     // módulos ainda em JavaScript
     [modulo: string]: any;

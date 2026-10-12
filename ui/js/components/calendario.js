@@ -75,7 +75,7 @@
         h("div", { class: "cal__rodape" }, h("button", { type: "button", class: "cal__hoje", onClick: () => escolher(hoje) }, "Hoje"))));
       desenhar(atual && atual.getFullYear() === ano && atual.getMonth() === mes ? atual.getDate() : null);
       if (!grade.contains(document.activeElement)) requestAnimationFrame(() => { const f = grade.querySelector(".is-selected, .is-hoje, .cal__dia"); if (f) f.focus(); });
-    } }, { posicao: o.posicao || "esquerda", label: o.rotulo || "Calendário", focar: false, class: "menu--cal" });
+    } }, { posicao: o.posicao || "esquerda", label: o.rotulo || "Calendário", focar: false, class: ZoZo.estrutura.menuCalendario });
   }
 
   /** Campo de data (botão com dd/mm/aaaa) que abre o calendário */

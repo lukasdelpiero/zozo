@@ -15,15 +15,6 @@
   --t-24: 1.5rem;      /* 24px — Gasto mensal */
 }
 
-/* ================= Títulos das páginas (barra superior) ================= */
-.topbar__title { font-size: var(--t-15); font-weight: 620; }
-
-/* ================= Menu lateral ================= */
-.sidebar .nav-item { font-size: var(--t-15); font-weight: 550; }
-.sidebar .side-group__header { font-size: var(--t-15); font-weight: 620; }
-.sidebar .side-account__name { font-size: var(--t-15); font-weight: 450; }
-.sidebar .side-account__value { font-size: var(--t-15); font-weight: 450; }
-
 /* ================= Cards (o Dashboard em si está em Tailwind: pages/dashboard.js) ================= */
 .card__title { font-size: var(--t-15); font-weight: 550; }
 .card__link { font-size: var(--t-15); font-weight: 550; }
@@ -51,7 +42,7 @@
 .profile-row { min-height: 52px; }
 
 /* ================= Painel de informações ================= */
-.detail__title, .detail__title .tipo-select { font-size: var(--t-15); font-weight: 620; }
+.tipo-select { font-size: var(--t-15); font-weight: 620; }
 
 /* Topo em duas linhas (Contas, Investimentos, Recorrências) */
 .ph { display: flex; flex-direction: column; gap: 4px; padding-bottom: var(--space-4); }
@@ -94,50 +85,14 @@
 .pl-month__title, .pl-month__total { font-size: var(--t-15); font-weight: 620; }
 .pl-month + .pl-month { margin-top: var(--space-4); }
 
-/* ================= Menus suspensos: linhas de ponta a ponta ================= */
-.menu { padding: 6px 0; }
-.menu__item, .menu__split-main { border-radius: 0; padding: 0 14px; font-size: var(--t-15); font-weight: 450; }
-.menu__item--split { padding: 0 8px 0 0; border-radius: 0; }
-.menu__item--split .menu__split-main { padding-left: 14px; }
-.menu__section { padding: 8px 14px 4px; font-size: var(--t-13); }
-.menu__sep { margin: 6px 0; }
-.menu__search { padding: 4px 14px 8px; }
-.menu__label--2 small, .menu__hint { font-size: var(--t-13); }
-.menu__form { padding: var(--space-2) 14px; }
-.menu__segment { padding: 2px 14px 8px; }
-
 /* ================= Janelas modais ================= */
-.modal__title { font-size: var(--t-15); font-weight: 620; }
-.modal .field__label, .modal__text { font-size: var(--t-15); font-weight: 620; }
+.modal .field__label { font-size: var(--t-15); font-weight: 620; }
 .modal .field__hint, .modal .cfg-row__sub { font-size: var(--t-13); font-weight: 620; }
 .modal .input::placeholder { font-size: var(--t-15); font-weight: 450; }
 .modal .btn { font-size: var(--t-15); font-weight: 620; }
-.modal .modal__text { font-weight: 450; }
 /* listas de ponta a ponta */
-.zm-lanc, .freq-list__item { border-radius: 0; margin: 0 calc(-1 * var(--space-6)); padding-left: var(--space-6); padding-right: var(--space-6); }
-.zm-lanc__data, .zm-lanc__nome { font-size: var(--t-15); font-weight: 450; }
-.zm-lanc__valor { font-size: var(--t-15); font-weight: 620; }
+.freq-list__item { border-radius: 0; margin: 0 calc(-1 * var(--space-6)); padding-left: var(--space-6); padding-right: var(--space-6); }
 .freq-list__item { font-size: var(--t-15); }
-
-/* ================= Correções ================= */
-/* Linhas roxas ao filtrar: contorno de foco da área principal */
-.main:focus, .main:focus-visible { outline: none; }
-
-/* Barra de pesquisa (barra superior branca): lupa, texto e filtro visíveis */
-.topbar .topbar-search { background: var(--color-surface); border: 1px solid var(--color-border-strong); color: var(--color-text-muted); }
-.topbar .topbar-search:focus-within { background: var(--color-surface); border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); color: var(--color-text-secondary); }
-.topbar .topbar-search .icon { color: var(--color-text-muted); }
-.topbar .topbar-search__input { color: var(--color-text-primary); font-size: var(--t-15); }
-.topbar .topbar-search__input::placeholder { color: var(--color-text-muted); }
-.topbar .topbar-search__input::-webkit-search-cancel-button { filter: none; opacity: 0.6; }
-.topbar .topbar-search__filter { color: var(--color-text-secondary); background: transparent; }
-.topbar .topbar-search__filter .icon { color: currentColor; }
-.topbar .topbar-search__filter:hover, .topbar .topbar-search__filter.is-open { background: var(--color-surface-hover); color: var(--color-text-primary); }
-.topbar .topbar-search__filter.is-active { background: var(--color-primary-soft); color: var(--color-primary); }
-
-
-/* Ícones do menu mais nítidos (traço alinhado ao pixel) */
-.sidebar .nav-item .icon { width: 18px; height: 18px; shape-rendering: geometricPrecision; }
 
 /* =============================================================
    Espaçamento das listas de lançamentos
@@ -163,14 +118,9 @@
 :root { --radius-small: 8px; --radius-medium: 12px; --radius-large: 20px; }
 /* linhas, botões, selecionados e destaques: 8px
    (exceto lançamentos da página Lançamentos e das listas do painel, que vão de borda a borda) */
-.row, .btn, .icon-btn, .nav-item, .filter-tabs__item, .segmented__item,
-.lp-date, .lp-account, .lp-sub, .inline-input, .lp-name, .lp-value, .lp-notes,
-.topbar-search, .topbar-search__filter, .detail__textbtn, .tipo-select, .menu-toggle,
-.cfg-danger-btn, .icon-pick, .input, .select, .textarea, .zm__search { border-radius: 8px; }
+.row, .btn, .icon-btn, .nav-item, .filter-tabs__item, .segmented__item, .lp-date, .lp-account, .lp-sub, .inline-input, .lp-name, .lp-value, .lp-notes, .tipo-select, .cfg-danger-btn, .icon-pick, .input, .select, .textarea { border-radius: 8px; }
 .pl-row { border-radius: 0; }
 .card, .chart-card { border-radius: 20px; }              /* cards da área principal */
-.menu { border-radius: 12px; }                                          /* menus e submenus */
-.modal { border-radius: 16px; }                                         /* janelas modais */
 .color-picker { border-radius: 8px; overflow: hidden; }                 /* caixa de cores */
 .color-picker--4 .color-picker__swatch:nth-child(1) { border-top-left-radius: 8px; }
 .color-picker--4 .color-picker__swatch:nth-child(4) { border-top-right-radius: 8px; }
@@ -180,17 +130,6 @@
 /* Botão Excluir nas janelas modais */
 .modal .btn--danger { background: #ff1a1a; border-color: #ff1a1a; color: #fff; }
 .modal .btn--danger:hover:not(:disabled) { background: #e60000; border-color: #e60000; }
-
-/* Menus suspensos: destaque contornado (como no menu lateral), não de borda a borda */
-.menu { padding: 6px; }
-.menu__item, .menu__split-main { border-radius: 8px; padding: 0 10px; }
-.menu__item--split { padding: 0 4px 0 0; border-radius: 8px; }
-.menu__item--split .menu__split-main { padding-left: 10px; }
-.menu__section { padding: 8px 10px 4px; }
-.menu__search { padding: 4px 10px 8px; margin: 0 -6px 4px; padding-left: 16px; padding-right: 16px; }
-.menu__sep { margin: 6px -6px; }
-.menu__segment { padding: 2px 4px 8px; }
-.menu__form { padding: var(--space-2) 10px; }
 
 /* =============================================================
    Linhas de ponta a ponta
@@ -214,14 +153,6 @@
 /* Boleto: logo do tamanho do bloco "Boleto" + mês */
 .doc__head { align-items: center; }
 .doc__logo { width: 44px; height: 44px; display: block; border-radius: 8px; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.18); }
-
-/* Modais de exclusão: título .9375rem/550, texto .8125rem/450, sem sobra à direita */
-.modal--confirm { width: min(380px, calc(100vw - 32px)); }
-.modal--confirm .modal__header { padding: var(--space-5) var(--space-6) 0; }
-.modal--confirm .modal__body { padding: var(--space-2) var(--space-6) var(--space-5); }
-.modal--confirm .modal__title { font-size: var(--t-15); font-weight: 550; }
-.modal--confirm .modal__text { font-size: var(--t-13); font-weight: 450; max-width: none; text-wrap: pretty; color: var(--color-text-secondary); }
-.modal--confirm .modal__footer { padding: 0 var(--space-6) var(--space-5); }
 
 /* Configurações */
 .cfg-section { font-size: var(--t-15); font-weight: 550; }
@@ -274,7 +205,7 @@
 /* Recorrência e Divisão: mesmo tamanho das pílulas de Categoria e Perfil (24 px, .6875rem/620, maiúsculas),
    fundo branco com a borda do "+" */
 .lp-rec, .lp-split {
-  height: 24px; padding: 0 9px 0 5px; gap: 5px;
+  height: 24px; padding: 0 9px 0 5px; gap: 5px; margin-left: 0;   /* a própria pílula é o botão: começa na linha dos valores */
   background: var(--color-surface); color: var(--color-text-primary);
   border: 1px solid var(--color-border-strong); border-radius: var(--radius-pill);
   font-size: var(--t-11); font-weight: 620; letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
@@ -282,15 +213,10 @@
 .lp-rec .kind-badge { width: 14px; height: 14px; font-size: 8.5px; }
 .lp-rec:hover, .lp-split:hover { border-color: var(--color-primary); box-shadow: none; }
 .lp-split .icon { color: var(--color-text-secondary); }
-.detail__textbtn--split { font-size: var(--t-15); font-weight: 620; }
 
 /* =============================================================
    Janela "Dividir lançamento"
    ============================================================= */
-.modal--dividir { width: min(820px, calc(100vw - 32px)); }
-.modal--dividir .modal__header { justify-content: center; position: relative; }
-.modal--dividir .modal__title { width: 100%; text-align: center; font-size: var(--t-13); font-weight: 620; text-transform: uppercase; letter-spacing: 0.06em; }
-.modal--dividir .modal__header .icon-btn { position: absolute; right: 16px; }
 .dv { display: flex; flex-direction: column; padding-bottom: var(--space-5); }
 /* card do lançamento original */
 .dv__card {
@@ -378,15 +304,6 @@
   .recurrence-row:not(.recurrence-row--compact) .recurrence-row__category { display: none; }
 }
 
-/* Telas pequenas: o painel escondido fora da tela e a busca larga não podem alargar a página */
-.workspace { overflow-x: clip; }
-.topbar__actions { min-width: 0; flex: 0 1 auto; }
-.topbar-search--larga { width: clamp(140px, 32vw, 380px); min-width: 0; }
-@media (max-width: 520px) {
-  .topbar-search--larga { width: auto; flex: 1 1 auto; }
-  .topbar__actions { flex: 1 1 auto; }
-  .topbar__actions .topbar-search__input { min-width: 0; width: 100%; }
-}
 @container (max-width: 420px) {
   .recurrence-row__desc > .recurrence-row__type { display: none; }
   .allocation-row { grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) 56px; }
@@ -418,7 +335,6 @@
 .captcha { display: flex; justify-content: center; min-height: 65px; }
 
 /* Painel lateral do 2FA dentro da janela de Configurações: entra da direita para a esquerda */
-.modal--settings { position: relative; overflow: hidden; }
 .p2fa {
   position: absolute; top: 0; right: 0; bottom: 0; z-index: 5;
   width: min(372px, 100%); overflow-y: auto;
@@ -467,27 +383,6 @@
 .input-with-action--sm .input { width: 100%; padding-right: 34px; }
 .input-with-action--sm .input-reveal { width: 28px; height: 28px; }
 
-/* ---------- Rodapé do menu: foto + nome (esquerda) · Configurações (ícone, direita) ---------- */
-.sidebar__footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.sidebar__user {
-  display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto;
-  height: 40px; padding: 0 8px; border: 0; border-radius: 8px; background: none; cursor: pointer;
-  color: var(--sidebar-fg); font: inherit; font-size: var(--t-15); font-weight: 550; text-align: left;
-}
-.sidebar__user:hover, .sidebar__config:hover { background: var(--sidebar-hover); color: #fff; }
-.sidebar__user .avatar { flex: none; background: rgba(255, 255, 255, 0.92); color: var(--color-primary); }
-.sidebar__user-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar__config {
-  flex: none; width: 36px; height: 36px; display: grid; place-items: center;
-  border: 0; border-radius: 8px; background: none; color: var(--sidebar-fg); cursor: pointer;
-}
-.sidebar__user:focus-visible, .sidebar__config:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
-/* Menu estreito (só ícones): foto em cima, engrenagem embaixo */
-@media (max-width: 900px) {
-  .sidebar__footer { flex-direction: column; gap: 4px; }
-  .sidebar__user { justify-content: center; padding: 0; flex: none; width: 40px; }
-  .sidebar__user-name { display: none; }
-}
 /* Perfis: nome + contagem à esquerda, valor à direita (a grade antiga tinha 3 colunas para 2 itens e quebrava no celular) */
 .profile-row { grid-template-columns: minmax(0, 1fr) auto; }
 .profile-row__count, .profile-row__value { white-space: nowrap; }
@@ -523,14 +418,11 @@
   --botao-roxo-hover: linear-gradient(180deg, #7458EA 0%, #5F3FCF 100%);
   --sidebar-bg: #6948D8;
 }
-.btn--primary, .detail__textbtn--primary {
+.btn--primary {
   background: var(--botao-roxo); background-color: #6948D8; border-color: transparent; color: #fff;
 }
-.btn--primary:hover:not(:disabled), .detail__textbtn--primary:hover { background: var(--botao-roxo-hover); filter: none; }
+.btn--primary:hover:not(:disabled) { background: var(--botao-roxo-hover); filter: none; }
 .btn--primary:active:not(:disabled) { background: linear-gradient(180deg, #6948D8 0%, #5A3BC4 100%); }
-.sidebar__logo { width: 28px; height: 28px; border-radius: 5px; flex: none; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.25); }
-.sidebar__header { justify-content: space-between; }
-@media (max-width: 900px) { .sidebar__logo { display: none; } }
 
 /* =============================================================
    ZoZo 2.3 — acertos de layout
@@ -538,14 +430,6 @@
 
 /* ---------- Topo do menu: logo à esquerda (onde ficava o botão de recolher) e o botão
    de recolher/mostrar à direita (onde ficava o botão de atualizar, que saiu) ---------- */
-.sidebar__header { justify-content: flex-start; padding: 0 var(--space-3) 0 14px; }
-.menu-toggle { top: 12px; left: calc(var(--sidebar-width) - 44px); transition: left var(--duration-medium) var(--easing), background var(--duration-fast), color var(--duration-fast); }
-.app-shell[data-menu="recolhido"] .menu-toggle { left: 12px; }
-@media (max-width: 900px) {
-  /* menu estreito (só ícones): o botão fica centralizado no topo do menu */
-  .app-shell:not([data-menu="recolhido"]) .menu-toggle { left: 16px; top: 12px; }
-}
-@media (prefers-reduced-motion: reduce) { .menu-toggle { transition: none; } }
 
 /* ---------- Perfis: linha igual à de Contas, com ícone redondo na cor do perfil e a inicial ---------- */
 .profile-row { grid-template-columns: 36px minmax(0, 1fr) auto; min-height: var(--row-height-tall); column-gap: var(--space-3); }
@@ -563,14 +447,10 @@
 }
 .cfg-nota { margin: 4px 0 8px; font-size: var(--t-13); color: var(--color-text-secondary); }
 
-/* Dashboard que cabe na tela (o resto em Tailwind, pages/dashboard.js): a área principal não rola, nem durante a entrada */
-.main:has(> .page--dashboard.dash--na-tela) { overflow-y: hidden; }
-
 /* ---------- Celular: painel de informações em tela cheia e "Novo lançamento" empilhado ---------- */
 .lp-date { white-space: nowrap; }
 @media (max-width: 600px) {
-  .detail { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; z-index: 45; border-left: 0; }
-  .lp-top { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+    .lp-top { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
   .lp-top__right { flex-direction: row-reverse; align-items: center; justify-content: space-between; }
   .lp-name { font-size: var(--t-20); }
   .lp-value { text-align: left; }
@@ -616,65 +496,11 @@
 .boleto__header { background: #6948D8; }
 
 /* =============================================================
-   Celular (até 600 px)
-   ============================================================= */
-.gaveta-fundo { display: none; }
-@media (max-width: 600px) {
-  /* Menu lateral: oculto; abre como gaveta da esquerda para a direita e fecha da direita para a esquerda */
-  .app-shell, .app-shell[data-menu="recolhido"] { grid-template-columns: minmax(0, 1fr); }
-  .app-shell .sidebar, .app-shell[data-menu="recolhido"] .sidebar {
-    position: fixed; top: 0; bottom: 0; left: 0; z-index: 60;
-    width: min(280px, 84vw); visibility: visible; overflow: hidden;
-    transform: translateX(-100%); transition: transform 280ms var(--easing, ease), box-shadow 280ms;
-  }
-  .app-shell[data-gaveta="aberta"] .sidebar { transform: none; box-shadow: 8px 0 32px rgba(15, 39, 66, 0.28); }
-  .gaveta-fundo { display: block; position: fixed; inset: 0; z-index: 55; background: var(--color-overlay); opacity: 0; pointer-events: none; transition: opacity 280ms; }
-  .app-shell[data-gaveta="aberta"] .gaveta-fundo { opacity: 1; pointer-events: auto; }
-  /* dentro da gaveta o menu é o completo (com nomes, contas e logo) */
-  .sidebar__header { justify-content: flex-start; padding: 0 var(--space-3) 0 14px; }
-  .sidebar__logo { display: block; }
-  .sidebar__accounts { display: block; }
-  .sidebar__nav { flex: none; padding: var(--space-3); border-bottom: 1px solid var(--sidebar-divider); }
-  .sidebar .nav-item { justify-content: flex-start; padding: 0 10px; }
-  .sidebar .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
-  .sidebar__footer { flex-direction: row; padding: var(--space-3); }
-  .sidebar__user { justify-content: flex-start; width: auto; flex: 1 1 auto; padding: 0 8px; }
-  .sidebar__user-name { display: block; }
-  .sidebar .demo-badge { display: flex; }
-  /* botão de abrir/fechar: no topo da tela; com a gaveta aberta, no canto direito dela */
-  .menu-toggle, .app-shell[data-menu="recolhido"] .menu-toggle, .app-shell:not([data-menu="recolhido"]) .menu-toggle {
-    position: fixed; top: 12px; left: 12px; z-index: 65;
-    background: var(--color-surface); color: var(--color-text-secondary); box-shadow: inset 0 0 0 1px var(--color-border);
-  }
-  .app-shell[data-gaveta="aberta"] .menu-toggle { left: calc(min(280px, 84vw) - 44px); background: var(--sidebar-hover); color: #fff; box-shadow: none; }
-  .topbar, .app-shell[data-menu="recolhido"] .topbar { padding-left: 56px; }
-  @media (prefers-reduced-motion: reduce) { .app-shell .sidebar, .gaveta-fundo { transition: none; } }
-
-  /* Janelas modais centralizadas, na largura da tela, com os botões centralizados */
-  .modal-overlay { padding: 16px; }
-  .modal, .modal--nova-conta, .modal--nova-categoria, .modal--novo-perfil { width: 100%; max-width: 100%; }
-  .modal__footer, .zm__footer { justify-content: center; flex-wrap: wrap; }
-  .modal__footer > .btn { flex: 1 1 0; min-width: 0; max-width: 220px; }
-}
-
-/* =============================================================
    ZoZo 2.5 — animações e acertos
    ============================================================= */
-/* Recolher/mostrar o menu (computador): o menu desliza junto com o conteúdo */
-@media (min-width: 601px) {
-  .sidebar { width: var(--sidebar-width); transition: transform var(--duration-medium) var(--easing), visibility 0s linear 0s; }
-  .app-shell[data-menu="recolhido"] .sidebar {
-    transform: translateX(-100%); visibility: hidden;
-    transition: transform var(--duration-medium) var(--easing), visibility 0s linear var(--duration-medium);
-  }
-}
+
 /* O conteúdo acompanha o recuo do título da barra superior (abre espaço para o botão do menu recolhido):
    os dois mudam juntos, com a mesma curva — nada desalinha durante a animação */
-@media (min-width: 901px) {
-  .main > .page { transition: padding-left var(--duration-medium) var(--easing); }
-  .app-shell[data-menu="recolhido"] .main > .page { padding-left: 60px; }
-}
-@media (prefers-reduced-motion: reduce) { .sidebar, .app-shell, .main > .page, .topbar { transition: none !important; } }
 
 /* Grupos que abrem/fecham (animação em ui.js: alternarArvore/corpoArvore) */
 .arvore-grupo { display: flex; flex-direction: column; }
@@ -701,10 +527,7 @@
 
 /* Celular: o título do painel de informações (tela cheia) vai para o lado do botão do menu;
    na fatura (janela própria, com Fechar) o botão do menu sai */
-@media (max-width: 600px) {
-  .detail__header { padding-left: 56px; }
-  body.has-boleto .menu-toggle { display: none; }
-}
+
 /* Desativar 2FA: código atual do aplicativo */
 .desativar2fa .codigo6 { margin-top: 16px; }
 .desativar2fa .p2fa__erro { text-align: center; }
@@ -722,8 +545,6 @@
 .parcelas__previa { margin-top: 6px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
 
 /* Câmbio (menu lateral, acima da foto e da engrenagem) */
-.sidebar__cambio:empty { display: none; }
-.sidebar__cambio { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--sidebar-divider); }
 .cambio { display: grid; gap: 6px; }
 /* "Câmbio" igual aos títulos das divisões do menu (ex.: Conta bancária) */
 .cambio__titulo { font-size: var(--t-15); font-weight: 620; letter-spacing: normal; text-transform: none; color: var(--sidebar-fg-muted); padding-left: 4px; }
@@ -736,14 +557,10 @@
 @media (max-width: 900px) {
   .cambio__titulo { display: none; }
   .cambio__opcoes { grid-template-columns: 1fr; }
-  .sidebar__cambio { padding: var(--space-2); }
-}
+  }
 /* Janela "Usar transações em …" */
 .cambio__aviso { margin: 0 0 var(--space-3); }
-.modal--cambio .zm__list { overflow-x: hidden; }
-.zm-lanc.cambio__item { cursor: pointer; grid-template-columns: 18px 52px minmax(0, 1fr) auto; margin: 0; padding: 0 8px; }
 .cambio__check { width: 16px; height: 16px; accent-color: var(--color-primary); }
-
 
 /* =============================================================
    ZoZo 2.7
@@ -755,26 +572,9 @@
 /* Recorrências: check de pago sem o fundo circular */
 .recurrence-row__paid { background: transparent !important; width: 14px; flex: none; }   /* mesma largura com e sem o check: valores alinhados */
 
-/* Aviso de demonstração no menu: fundo laranja-claro, texto laranja */
-.demo-badge { background: #fff1e3; color: #e8730c; font-weight: 550; border-radius: 8px; }
-.demo-badge .icon { color: #e8730c; }
-
-/* Janelas de aviso (confirmação) mais largas */
-.modal--confirm { width: min(500px, calc(100vw - 32px)); }
-
-/* Configurações: janela maior — o conteúdo de Geral cabe sem rolagem */
-.modal--settings { width: min(980px, calc(100vw - 32px)); height: min(760px, calc(100vh - 32px)); }
-
 /* Menus: linha com interruptor (ex.: Investimentos › Contas incluídas) */
-.menu__toggle { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px; }
-.menu__toggle .menu__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu__toggle .toggle { flex: none; margin-left: auto; gap: 0; }
 .menu__toggle .toggle__label:empty { display: none; }
-.menu__swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.menu__item--estatico { cursor: default; }
-.menu__item--estatico:hover { background: none; }
-
-/* "+N" das categorias do grupo: clicável */
 
 /* Parcelas: valor total só para leitura (é o valor da transação) */
 .input--leitura, .input--leitura:hover, .input--leitura:focus { background: var(--color-background); color: var(--color-text-secondary); cursor: default; box-shadow: none; }
@@ -784,7 +584,6 @@
 .btn--primary .spinner--btn { border-color: rgba(255, 255, 255, 0.35); border-top-color: #fff; }
 
 /* Calendário do ZoZo (substitui o do navegador) */
-.menu--cal { padding: 10px; }
 .cal { display: grid; gap: 8px; }
 .cal__topo { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .cal__titulo { font-size: var(--t-15); font-weight: 550; text-transform: capitalize; }
@@ -805,9 +604,6 @@
 .cal__hoje:hover { background: var(--color-primary-soft); }
 .cal-campo { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; }
 .cal-campo .icon { color: var(--color-text-secondary); flex: none; }
-
-/* Barra de rolagem do menu lateral: trilho na cor do menu (o polegar continua o do sistema, claro) */
-.sidebar, .sidebar * { scrollbar-color: rgba(255, 255, 255, 0.45) var(--sidebar-bg); }
 
 /* =============================================================
    ZoZo 2.8 — animações
@@ -847,13 +643,11 @@
 
 /* Transferir entre moedas: Enviar | Importar e a moeda no canto inferior esquerdo */
 .cambio__modo { display: flex; justify-content: center; margin-bottom: var(--space-3); }
-.zm__footer-esquerda { margin-right: auto; }
 .cambio__moeda { display: inline-flex; align-items: center; gap: 6px; }
 
 /* Botões de alternar (ex.: Poupança | Corrente): centralizados, com o fundo cinza só do tamanho deles */
 .segmented--pilulas { display: inline-grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(104px, max-content);
   width: max-content; max-width: 100%; justify-self: center; align-self: center; margin-left: auto; margin-right: auto; }
-.zm__form > .segmented--pilulas { display: grid; }
 
 /* Investimentos › alocação: sem o ícone; a barra começa mais à esquerda */
 .allocation-row { grid-template-columns: minmax(96px, max-content) minmax(120px, 1fr) 64px; column-gap: var(--space-4); }
@@ -861,7 +655,6 @@
 /* Ícone da categoria (editar): o fundo do hover centralizado no emoji */
 .icon-pick { padding: 0; line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", var(--font-family); }
 .hero-edit .icon-pick { display: inline-grid; place-items: center; }
-
 
 /* =============================================================
    ZoZo 3.0

@@ -29,7 +29,8 @@
     // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo: ver format.mascararValor)
     const input = h("input", { type: "text", inputmode: "decimal", class: ["inline-input", "inline-input--money", "money", cfg.classe], value: F.moeda(atual),
       "data-com-simbolo": "", "aria-label": cfg.rotulo || "Valor" });
-    input.addEventListener("focus", () => { input.value = F.valorParaEditar(input, atual); input.select(); });
+    // ao clicar para editar o cursor vai para o fim (nada selecionado; Backspace apaga o último dígito)
+    input.addEventListener("focus", () => { input.value = F.valorParaEditar(input, atual); F.cursorNoFim(input); });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = F.valorParaEditar(input, atual); input.blur(); } });
     input.addEventListener("blur", () => {
       const v = F.parseMoeda(input.value);

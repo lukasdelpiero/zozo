@@ -13,7 +13,8 @@
      confirmação de e-mail (components/auth.js); Transações
      (pages/lancamentos.js) e a linha de transação (components/list.js);
      Categorias (pages/categorias.js, CategoryRow/CategoryGroupRow);
-     Contas (pages/contas.js, AccountRow) e Dashboard (pages/dashboard.js).
+     Contas (pages/contas.js, AccountRow); Dashboard (pages/dashboard.js);
+     a estrutura: menu lateral, barra superior e painel (components/estrutura.js).
    • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
      "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
    • Cuidado ao migrar: utilitário vence o legado também em :focus,
@@ -58,6 +59,13 @@
 /* Telas do ZoZo: celular (≤ 640 px) e janela baixa no computador — mesmos cortes do CSS legado */
 @custom-variant celular (@media (max-width: 640px));
 @custom-variant tela-baixa (@media (max-height: 640px) and (min-width: 641px));
+/* Estrutura (menu lateral, barra superior e painel; components/estrutura.js). Declaradas ANTES de "gaveta":
+   assim as regras do celular vêm depois no CSS gerado e vencem as das larguras maiores */
+@custom-variant computador (@media (min-width: 601px));
+@custom-variant largo (@media (min-width: 901px));
+@custom-variant painel-gaveta (@media (max-width: 1180px));   /* painel de informações vira gaveta sobreposta */
+@custom-variant estreito (@media (max-width: 900px));         /* menu lateral só com ícones */
+@custom-variant ate520 (@media (max-width: 520px));
 /* Menu lateral vira gaveta (≤ 600 px) */
 @custom-variant gaveta (@media (max-width: 600px));
 /* Largura da ÁREA (não da tela): .main, .detail__body e .dash-area são containers. Ex.: com o painel
@@ -110,4 +118,13 @@
   --animate-zz-desliza-150: zz-desliza 420ms var(--easing) 150ms both;
   @keyframes zz-bloco { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   @keyframes zz-desliza { from { transform: translateY(10px); } to { transform: none; } }
+
+  /* Estrutura: conteúdo do painel de informações entra da direita; o texto do painel vazio aparece suave */
+  --animate-zz-painel: zz-painel var(--duration-medium) var(--easing);
+  --animate-zz-surge: zz-surge var(--duration-medium) var(--easing);
+  @keyframes zz-painel { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-surge { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  /* Menus flutuantes surgem logo abaixo do botão */
+  --animate-zz-menu: zz-menu var(--duration-fast) var(--easing);
+  @keyframes zz-menu { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 }

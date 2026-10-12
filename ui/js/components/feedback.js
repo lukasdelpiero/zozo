@@ -59,14 +59,20 @@
       if (o.onClose) o.onClose(resultado);
     };
 
-    const dialog = h("div", { class: ["modal", o.class], role: o.alert ? "alertdialog" : "dialog", "aria-modal": "true", "aria-labelledby": tituloId },
-      h("header", { class: "modal__header" },
-        h("h2", { class: "modal__title", id: tituloId }, o.title || ""),
+    // Visual em Tailwind (components/estrutura.ts). O tipo vem das classes modal--x (que ficam como ganchos)
+    const E = ZoZo.estrutura;
+    const tem = (c) => String(o.class || "").split(/\s+/).includes(c);
+    const tipo = tem("modal--confirm") ? "Confirmacao" : tem("modal--settings") ? "Config" : tem("modal--dividir") ? "Dividir" : tem("modal--zm") ? "Janela" : "";
+    // ex.: modalTopoConfirmacao, senão modalTopo; a divisão é uma janela de criação (corpo igual ao das janelas)
+    const parte = (nome) => E[nome + tipo] || (tipo === "Dividir" && E[nome + "Janela"]) || E[nome];
+    const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", "aria-modal": "true", "aria-labelledby": tituloId },
+      h("header", { class: parte("modalTopo") },
+        h("h2", { class: parte("modalTitulo"), id: tituloId }, o.title || ""),
         h("button", { type: "button", class: "icon-btn", "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
-      h("div", { class: "modal__body" }, o.body || null),
-      o.actions ? h("footer", { class: "modal__footer" }, o.actions(fechar)) : null);
+      h("div", { class: parte("modalCorpo") }, o.body || null),
+      o.actions ? h("footer", { class: tipo === "Confirmacao" ? E.modalRodapeConfirmacao : E.modalRodape }, o.actions(fechar)) : null);
 
-    const overlay = h("div", { class: "modal-overlay", onMousedown: (e) => { if (e.target === overlay) fechar(false); } }, dialog);
+    const overlay = h("div", { class: E.modalFundo, onMousedown: (e) => { if (e.target === overlay) fechar(false); } }, dialog);
 
     const tecla = (e) => {
       // Só a janela do topo responde (janelas empilhadas)
@@ -90,7 +96,7 @@
     isolarFundo(true);
     requestAnimationFrame(() => {
       overlay.classList.add("is-visible");
-      const alvo = dialog.querySelector("[data-autofocus]") || dialog.querySelector(".modal__footer button");
+      const alvo = dialog.querySelector("[data-autofocus]") || dialog.querySelector("footer button");
       if (alvo) alvo.focus();
     });
     return { fechar };
@@ -104,7 +110,7 @@
         title: titulo,
         alert: true,
         class: "modal--confirm",
-        body: h("p", { class: "modal__text" }, mensagem),
+        body: h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, mensagem),
         onClose: (r) => resolve(!!r),
         actions: (fechar) => [
           Button(o.cancelar || "Cancelar", { variant: "secondary", onClick: () => fechar(false) }),
