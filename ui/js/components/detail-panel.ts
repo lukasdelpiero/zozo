@@ -59,10 +59,11 @@
       const botoes = (cfg.botoes || []).map((b) => h("button", { type: "button", class: b.primario ? E.botaoTextoPrimario : E.botaoTexto, onClick: b.onClick, disabled: b.desabilitado },
         b.icone ? icon(b.icone, { size: 14, stroke: 2.25 }) : null, b.label));
       (cfg.acoes || []).forEach((a) => botoes.push(UI.IconButton(a.icone, a.rotulo, { class: a.perigo ? "icon-btn--danger" : null, onClick: a.onClick })));
-      if (cfg.menu && cfg.menu.length) {
+      const itensMenu = cfg.menu;
+      if (itensMenu && itensMenu.length) {
         const btn = UI.IconButton("opcoes", "Mais opções", { expanded: false });
         btn.setAttribute("aria-haspopup", "menu");
-        btn.addEventListener("click", () => ZoZo.menu.abrir(btn, cfg.menu, { posicao: "direita", label: "Opções", checkEsquerda: true }));
+        btn.addEventListener("click", () => ZoZo.menu.abrir(btn, itensMenu, { posicao: "direita", label: "Opções", checkEsquerda: true }));
         botoes.push(btn);
       }
       if (botoes.length) botoes.push(h("span", { class: E.divisor, "aria-hidden": "true" }));

@@ -41,7 +41,6 @@
 /* linhas, botões, selecionados e destaques: 8px
    (exceto lançamentos da página Lançamentos e das listas do painel, que vão de borda a borda) */
 .row, .nav-item, .cfg-danger-btn { border-radius: 8px; }
-.chart-card { border-radius: 20px; }              /* cards da área principal */
 
 /* Botão Excluir nas janelas modais */
 
@@ -149,19 +148,6 @@
 .cfg-photo-center .cfg-photo__btn .avatar, .cfg-photo-center .cfg-photo__btn img { width: 72px; height: 72px; }
 /* Dividir: toggle centralizado; "+ Add divisão" igual ao botão "Alterar" (contorno sólido) */
 .dv__toggle { align-self: center; }
-
-/* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
-/* Área estreita (≤ 620px). As regras equivalentes em components.css nunca valiam: pages.css e este
-   arquivo carregam depois e redefiniam as grades com a mesma especificidade. Por isso ficam aqui, no fim. */
-
-@container (max-width: 420px) {
-    .allocation-row { grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) 56px; }
-}
-/* Resumos no topo das páginas (Contas, Categorias, Recorrências) em área estreita: valores menores e empilhados */
-@container (max-width: 460px) {
-  .chart-card__top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
-  .chart-card__value { font-size: var(--font-size-lg); }
-    }
 
 /* =============================================================
    2FA, CAPTCHA e código de 6 dígitos
@@ -426,9 +412,6 @@
 /* Transferir entre moedas: Enviar | Importar e a moeda no canto inferior esquerdo */
 .cambio__modo { display: flex; justify-content: center; margin-bottom: var(--space-3); }
 .cambio__moeda { display: inline-flex; align-items: center; gap: 6px; }
-
-/* Investimentos › alocação: sem o ícone; a barra começa mais à esquerda */
-.allocation-row { grid-template-columns: minmax(96px, max-content) minmax(120px, 1fr) 64px; column-gap: var(--space-4); }
 
 /* Ícone da categoria (editar): o fundo do hover centralizado no emoji */
 

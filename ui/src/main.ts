@@ -39,30 +39,30 @@ import "../js/components/estrutura.ts";
 import "../js/components/pecas.ts";               // classes Tailwind das peças compartilhadas
 import "../js/components/ui.js";
 import "../js/components/feedback.ts";
-import "../js/components/menu.js";
+import "../js/components/menu.ts";
 import "../js/components/calendario.ts";
 import "./emoji-picker.ts";                  // emoji-mart (carrega sob demanda)
 import "../js/components/modais.js";
 import "../js/components/inline.ts";
 import "../js/components/dividir.ts";
-import "../js/components/forms.js";
+import "../js/components/forms.ts";
 import "../js/components/charts.js";
 import "../js/components/list.js";
-import "../js/components/sidebar.js";
+import "../js/components/sidebar.ts";
 import "../js/components/topbar.ts";
 import "../js/components/cambio.js";
 import "../js/components/detail-panel.ts";
 import "./qrcode-global.ts";                 // window.qrcode (QR code do 2FA)
-import "../js/components/verificacao.js";
+import "../js/components/verificacao.ts";
 import "../js/components/auth.js";
 
 // Páginas
 import "../js/router.ts";
 import "../js/pages/comum.ts";
 import "../js/pages/contas.js";
-import "../js/pages/investimentos.js";
+import "../js/pages/investimentos.ts";
 import "../js/pages/categorias.js";
-import "../js/pages/recorrencias.js";
+import "../js/pages/recorrencias.ts";
 import "../js/pages/lancamentos.js";
 import "../js/pages/dashboard.js";
 import "../js/pages/perfil.js";

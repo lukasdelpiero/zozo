@@ -280,12 +280,20 @@
           : h("span", { class: RR.pago, "aria-hidden": "true" })));
   }
 
-  /* ---------- Alocação (seção 25) ---------- */
+  /* ---------- Alocação (seção 25) ----------
+     Visual em Tailwind: [tipo] [barra ........] [%]; a barra começa logo depois do nome.
+     Área estreita (≤ 420 px): colunas menores, sem passar da largura. allocation-row é gancho. */
+  const AL = {
+    linha: "allocation-row tw:grid tw:items-center tw:gap-x-4 tw:w-full tw:min-h-12 tw:px-4 tw:py-0 tw:rounded-lg tw:text-left tw:text-[15px] "
+      + "tw:grid-cols-[minmax(96px,max-content)_minmax(120px,1fr)_64px] tw:area420:grid-cols-[minmax(0,1fr)_minmax(48px,1fr)_56px]",
+    tipo: "tw:flex tw:items-center tw:gap-2.5 tw:min-w-0",
+    pct: "tw:[justify-self:end] tw:font-medium " + NUMEROS,
+  };
   function AllocationRow(a) {
-    return h("div", { class: "row allocation-row" },
-      h("span", { class: "allocation-row__lead" }, h("span", null, a.tipoInvestimento)),
-      h("span", { class: "allocation-row__bar" }, UI.ProgressBar(F.numero(a.percentual) / 100, { tone: "allocation", label: a.tipoInvestimento })),
-      h("span", { class: "allocation-row__pct" }, F.percentual(a.percentual)));
+    return h("div", { class: AL.linha },
+      h("span", { class: AL.tipo }, h("span", null, a.tipoInvestimento)),
+      h("span", null, UI.ProgressBar(F.numero(a.percentual) / 100, { tone: "allocation", label: a.tipoInvestimento })),
+      h("span", { class: AL.pct }, F.percentual(a.percentual)));
   }
 
   /* ---------- Sidebar: grupo de contas (seção 7) ---------- */

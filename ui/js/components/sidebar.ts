@@ -2,15 +2,15 @@
    ZoZo — Painel lateral (seções 5, 7, 8)
    Topo: logo (esquerda) e o botão de recolher/mostrar o menu (direita, criado em app.js)
    Superior: navegação · Central: resumo de contas · Inferior: foto + nome (esquerda) e Configurações (ícone, direita)
-   Visual em Tailwind (components/estrutura.ts).
+   Visual em Tailwind (components/estrutura.ts). TypeScript: tipos em src/globais.d.ts (ZoZoSidebar).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const UI = ZoZo.ui;
 
-  const NAV = [
+  const NAV: ItemNavegacao[] = [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
     { id: "lancamentos", label: "Transações", icon: "lancamentos" },
     { id: "contas", label: "Contas", icon: "contas" },
@@ -19,7 +19,7 @@
     { id: "recorrencias", label: "Recorrências", icon: "recorrencias" },
     { id: "perfil", label: "Perfis", icon: "perfil", recurso: "perfis" },   // só contas com o recurso de Perfis
   ];
-  const visivel = (n) => !n.recurso || ZoZo.recursos[n.recurso]();
+  const visivel = (n: ItemNavegacao) => !n.recurso || ZoZo.recursos[n.recurso]();
 
   // Ordem e títulos dos grupos da região central (seção 7)
   const GRUPOS = [
@@ -31,7 +31,7 @@
   ];
 
   const E = ZoZo.estrutura;
-  function navItem(item, atual, onNavigate) {
+  function navItem(item: ItemNavegacao, atual: string, onNavigate: (id: string) => void) {
     const ativo = item.id === atual;
     return h("button", {
       type: "button", class: [E.navItem, ativo ? E.navItemAtivo : E.navItemNormal], "aria-current": ativo ? "page" : undefined,
@@ -39,7 +39,7 @@
     }, icon(item.icon, { size: 16, class: ativo ? E.navIconeAtivo : E.navIcone }), h("span", { class: E.navRotulo }, item.label));
   }
 
-  function create(el, ctx) {
+  function create(el: HTMLElement, ctx: any): { render(state: EstadoZoZo): void } {
     const navEl = h("nav", { class: E.nav, "aria-label": "Navegação principal" });
     const contasEl = h("div", { class: E.contas, "aria-label": "Resumo das contas", role: "region", tabindex: "-1" });
     const footerEl = h("div", { class: E.rodape });
@@ -51,14 +51,15 @@
         h("img", { class: E.logo, src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" })),
       navEl, contasEl, avisoEl, cambioEl, footerEl);
 
-    let assinatura = null;
-    function render(state) {
+    let assinatura: unknown[] | null = null;
+    function render(state: EstadoZoZo) {
       const contas = state.data.contas && state.data.contas.contas;
-      const usuario = state.session.user || {};
+      const usuario: UsuarioSessao = state.session.user || {};
       const foto = state.data.config && state.data.config.foto;
       const cfg = state.data.config || {};
       const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto, String(!!cfg.multicambio), String(cfg.moeda)].map((x) => (typeof x === "object" ? x : String(x)));
-      if (assinatura && sig.every((v, i) => v === assinatura[i])) return;
+      const antes = assinatura;
+      if (antes && sig.every((v, i) => v === antes[i])) return;
       assinatura = sig;
 
       mount(navEl, NAV.filter(visivel).map((n) => navItem(n, state.currentPage, ctx.navigate)));
@@ -72,10 +73,10 @@
       if (!contas) {
         mount(contasEl, state.errors.contas ? h("p", { class: E.nota }, state.errors.contas) : UI.Skeleton(5, { class: "skeleton--sidebar" }));
       } else {
-        const grupos = GRUPOS.map((g) => ({ titulo: g.titulo, contas: contas.filter((c) => !c.oculta && g.tipos.includes(c.tipo)) })).filter((g) => g.contas.length);
+        const grupos = GRUPOS.map((g) => ({ titulo: g.titulo, contas: contas.filter((c: any) => !c.oculta && g.tipos.includes(c.tipo)) })).filter((g) => g.contas.length);
         mount(contasEl, grupos.length
           ? grupos.map((g) => ZoZo.list.SidebarAccountGroup(g.titulo, g.contas, {
-            onSelect: (c) => ctx.navigate(c.tipo === "investimento" ? "investimentos" : "contas", { select: { tipo: "conta", id: c.id } }),
+            onSelect: (c: any) => ctx.navigate(c.tipo === "investimento" ? "investimentos" : "contas", { select: { tipo: "conta", id: c.id } }),
           }))
           : h("p", { class: E.nota }, "Nenhuma conta cadastrada."));
       }
@@ -92,5 +93,6 @@
     return { render };
   }
 
-  ZoZo.sidebar = { create, NAV, visivel };
+  const api: ZoZoSidebar = { create, NAV, visivel };
+  ZoZo.sidebar = api;
 })(window.ZoZo);

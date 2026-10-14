@@ -8,12 +8,6 @@
 
 .muted { color: var(--color-text-muted); }
 
-/* ---------- Contas / Investimentos ---------- */
-
-.allocation-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 2fr) 72px; min-height: 48px; }
-.allocation-row__lead { display: flex; align-items: center; gap: 10px; }
-.allocation-row__pct { justify-self: end; font-variant-numeric: lining-nums proportional-nums; font-weight: var(--font-weight-medium); }
-
 /* Bolinha, seta e contador da categoria: usados na página Categorias e no Dashboard (Top categorias) */
 .category-row__dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .category-row__caret {
@@ -127,20 +121,6 @@
 .boleto-summary--doc .boleto-summary__total { border-top: 2px solid var(--color-text-primary); }
 .boleto-summary--doc .boleto-summary__total strong { font-size: 24px; }
 
-/* ---------- Formulários de cadastro (painel) ---------- */
-.entity-form { display: flex; flex-direction: column; gap: var(--space-5); min-height: 100%; }
-.form-notice {
-  display: flex; gap: var(--space-2); align-items: flex-start;
-  padding: var(--space-3);
-  border-radius: var(--radius-small);
-  background: var(--color-warning-soft);
-  color: var(--color-warning-text);
-  font-size: var(--font-size-sm);
-}
-.form-notice .icon { margin-top: 2px; }
-.form-notice--danger { background: var(--color-danger-soft); color: var(--color-negative); }
-.emoji-field { display: flex; flex-direction: column; gap: var(--space-2); }
-
 /* ---------- Avatar ---------- */
 .avatar {
   flex: none; display: grid; place-items: center; overflow: hidden;
@@ -156,10 +136,6 @@
 .profile-row__count { justify-self: start; }
 .profile-row__value { justify-self: end; }
 
-/* ---------- Investimentos: engrenagem e contas incluídas ---------- */
-.chart-card { position: relative; }
-.chart-card__gear { position: absolute; top: var(--space-4); right: var(--space-4); }
-.chart-card__badge { position: absolute; top: calc(var(--space-4) + 6px); right: calc(var(--space-4) + 40px); font-size: var(--font-size-xs); color: var(--color-text-muted); }
 /* Check de pago à direita do valor, na cor da categoria */
 
 .profile-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

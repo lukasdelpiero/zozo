@@ -7,16 +7,6 @@
 .form-row { display: grid; gap: var(--space-3); }
 .form-row--period { grid-template-columns: 1.4fr 1fr; }
 
-/* ---------- Card do gráfico ---------- */
-.chart-card { padding: var(--space-6) var(--space-6) var(--space-4); }
-.chart-card__top { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); max-width: 520px; margin: 0 auto; }
-.chart-card__top--single { grid-template-columns: 1fr; }
-.chart-card__half { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
-.chart-card__legend { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.chart-card__value { font-size: var(--font-size-3xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; line-height: 1.15; text-align: center; }
-.chart-card__chart { position: relative; margin: var(--space-4) 0 var(--space-2); }
-.chart-card__filters { display: flex; justify-content: center; }
-
 /* ---------- Linhas ---------- */
 .list { display: flex; flex-direction: column; }
 .row {

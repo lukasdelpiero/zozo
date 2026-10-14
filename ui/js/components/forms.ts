@@ -11,42 +11,51 @@
      excluir: { rotulo, titulo, mensagem, acao() → Promise } | null,
      aviso: "texto exibido acima do formulário" (opcional)
    })
+   Visual em Tailwind; TypeScript: tipos em src/globais.d.ts (ZoZoForms, CampoForm).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount, id: uid } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const UI = ZoZo.ui;
   const F = ZoZo.format;
+  const T = {
+    form: "tw:flex tw:flex-col tw:gap-5 tw:min-h-full",
+    aviso: "tw:flex tw:gap-2 tw:items-start tw:p-3 tw:rounded-lg tw:bg-zz-warning-soft tw:text-zz-warning-text tw:text-[13px] tw:[&_.icon]:mt-0.5",
+    avisoPerigo: "tw:flex tw:gap-2 tw:items-start tw:p-3 tw:rounded-lg tw:bg-(--color-danger-soft) tw:text-(--color-negative) tw:text-[13px] tw:[&_.icon]:mt-0.5",
+    emoji: "tw:flex tw:flex-col tw:gap-2",
+  };
 
+  /** Controle de um campo: el (o que entra no formulário), ler() e o elemento que recebe o foco */
+  type Controle = { el: HTMLElement; ler: () => unknown; foco: HTMLElement | null; input?: HTMLElement; prefixo?: string; semLabelFor?: boolean };
 
-  function controle(campo, valor, aoMudar) {
+  function controle(campo: CampoForm, valor: any, aoMudar: () => void): Controle {
     const t = campo.tipo || "texto";
     if (t === "selecao") {
-      const sel = UI.Select(campo.opcoes, { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
+      const sel: HTMLSelectElement = UI.Select(campo.opcoes, { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
       sel.addEventListener("change", aoMudar);
       return { el: sel, ler: () => sel.value, foco: sel };
     }
     if (t === "cor") {
       let atual = F.cor(valor, ZoZo.regras.paleta[9]);
-      const wrap = h("div", { class: "color-field" });
-      const desenhar = () => mount(wrap, UI.ColorPicker(atual, (c) => { atual = c; desenhar(); aoMudar(); }, { label: campo.rotulo }));
+      const wrap = h("div");
+      const desenhar = (): void => { mount(wrap, UI.ColorPicker(atual, (c: string) => { atual = c; desenhar(); aoMudar(); }, { label: campo.rotulo })); };
       desenhar();
       return { el: wrap, ler: () => atual, foco: null, semLabelFor: true };
     }
     if (t === "emoji") {
       let atual = valor || "📦";
       const btn = h("button", { type: "button", class: ZoZo.pecas.iconeEscolha, "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, atual);
-      btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e) => { atual = e; btn.textContent = e; aoMudar(); } }));
-      return { el: h("div", { class: "emoji-field" }, btn), ler: () => atual, foco: btn, input: btn };
+      btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e: string) => { atual = e; btn.textContent = e; aoMudar(); } }));
+      return { el: h("div", { class: T.emoji }, btn), ler: () => atual, foco: btn, input: btn };
     }
     if (t === "dinheiro") {
-      const input = UI.Input({ name: campo.nome, inputmode: "decimal", placeholder: "0,00", value: valor === undefined || valor === null || valor === "" ? "" : F.moedaEditavel(valor) });
+      const input: HTMLInputElement = UI.Input({ name: campo.nome, inputmode: "decimal", placeholder: "0,00", value: valor === undefined || valor === null || valor === "" ? "" : F.moedaEditavel(valor) });
       if (F.numero(valor) < 0) input.value = "-" + input.value;
       input.addEventListener("input", aoMudar);
       return { el: input, ler: () => F.parseMoeda(input.value), foco: input, input, prefixo: F.simbolo() };
     }
-    const input = UI.Input({
+    const input: HTMLInputElement = UI.Input({
       name: campo.nome, value: valor || "",
       type: t === "email" ? "email" : t === "senha" ? "password" : "text",
       autocomplete: t === "senha" ? (campo.autocomplete || "current-password") : t === "email" ? "email" : "off",
@@ -58,7 +67,7 @@
     if (t === "lista" && campo.opcoes && campo.opcoes.length) {
       const listId = uid("lista");
       input.setAttribute("list", listId);
-      const dl = h("datalist", { id: listId }, campo.opcoes.map((o) => h("option", { value: o })));
+      const dl = h("datalist", { id: listId }, campo.opcoes.map((o) => h("option", { value: String(o) })));
       input.addEventListener("input", aoMudar);
       return { el: h("div", null, input, dl), ler: () => input.value.trim(), foco: input, input };
     }
@@ -68,15 +77,15 @@
 
   /** cfg.voltar: aberto a partir de outro painel → seta e "Cancelar" voltam para ele, e salvar também
       (com os dados já atualizados) em vez de fechar o painel */
-  function abrir(ctx, cfg) {
+  function abrir(ctx: any, cfg: ConfigForm): ApiPainel {
     return ctx.detail.open({
       title: cfg.titulo,
       selected: cfg.selected || null,
       voltar: cfg.voltar || null,
-      render(body, api) {
-        const valores = Object.assign({}, cfg.valores || {});
-        const itens = [];
-        let atualizar = () => {};
+      render(body: HTMLElement, api: ApiPainel) {
+        const valores: Record<string, unknown> = Object.assign({}, cfg.valores || {});
+        const itens: Array<{ campo: CampoForm; c: Controle; wrap: HTMLElement }> = [];
+        let atualizar = (): void => {};
 
         cfg.campos.forEach((campo, i) => {
           const c = controle(campo, valores[campo.nome], () => { valores[campo.nome] = c.ler(); atualizar(); });
@@ -100,8 +109,8 @@
         const erroEl = h("div", { class: ZoZo.pecas.erroForm, role: "alert" });
         const salvar = h("button", { type: "submit", class: ZoZo.pecas.botaoPrimario }, icon("check", { size: 16 }), h("span", { class: ZoZo.pecas.rotuloBotao }, cfg.textoSalvar || "Salvar"));
 
-        const form = h("form", { class: "entity-form", novalidate: true },
-          cfg.aviso ? h("p", { class: ["form-notice", cfg.avisoPerigo && "form-notice--danger"] }, icon("alerta", { size: 16 }), h("span", null, cfg.aviso)) : null,
+        const form = h("form", { class: T.form, novalidate: true },
+          cfg.aviso ? h("p", { class: cfg.avisoPerigo ? T.avisoPerigo : T.aviso }, icon("alerta", { size: 16 }), h("span", null, cfg.aviso)) : null,
           h("div", { class: ZoZo.pecas.painelGrade }, itens.map((x) => x.wrap)),
           erroEl,
           h("footer", { class: ZoZo.pecas.painelRodape },
@@ -109,9 +118,11 @@
             h("div", { class: ZoZo.pecas.painelRodapeFim }, UI.Button("Cancelar", { onClick: () => (cfg.voltar ? cfg.voltar() : cfg.aoCancelar ? cfg.aoCancelar() : api.close()) }), salvar)));
 
         function excluir() {
-          ZoZo.feedback.confirmarExclusao(cfg.excluir.titulo, cfg.excluir.mensagem).then((ok) => {
+          const ex = cfg.excluir;
+          if (!ex) return;
+          ZoZo.feedback.confirmarExclusao(ex.titulo, ex.mensagem).then((ok) => {
             if (!ok) return;
-            cfg.excluir.acao().then(() => api.close({ silencioso: true })).catch((e) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }));
+            ex.acao().then(() => api.close({ silencioso: true })).catch((e: ErroPonte) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }));
           });
         }
 
@@ -129,18 +140,18 @@
             if (faltando[0].c.foco) faltando[0].c.foco.focus();
             return;
           }
-          const dados = {};
+          const dados: Record<string, unknown> = {};
           itens.forEach(({ campo, c, wrap }) => { dados[campo.nome] = wrap.hidden ? null : c.ler(); });
           const msg = cfg.validar ? cfg.validar(dados) : null;
           if (msg) { erroEl.textContent = msg; return; }
           erroEl.textContent = "";
-          salvar.disabled = true; salvar.classList.add("is-busy");
+          (salvar as HTMLButtonElement).disabled = true; salvar.classList.add("is-busy");
           Promise.resolve(cfg.salvar(dados)).then(() => {
             if (cfg.voltar) cfg.voltar();
             else if (!cfg.manterAberto) api.close({ silencioso: true });
-          }).catch((err) => {
+          }).catch((err: ErroPonte | undefined) => {
             erroEl.textContent = (err && err.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED;
-          }).finally(() => { if (salvar.isConnected) { salvar.disabled = false; salvar.classList.remove("is-busy"); } });
+          }).finally(() => { if (salvar.isConnected) { (salvar as HTMLButtonElement).disabled = false; salvar.classList.remove("is-busy"); } });
         });
 
         mount(body, form);
@@ -148,5 +159,6 @@
     });
   }
 
-  ZoZo.forms = { abrir };
+  const apiForms: ZoZoForms = { abrir };
+  ZoZo.forms = apiForms;
 })(window.ZoZo);

@@ -1,9 +1,7 @@
 /* =============================================================
    ZoZo — Contas (seções 18–22, 26–28)
    Visual em Tailwind (tabela T abaixo; a linha da conta está em
-   components/list.js). Continuam no CSS antigo as peças compartilhadas:
-   seção, cartão (.card), cabeçalho do painel (ph, também em Recorrências)
-   e o cartão de gráfico de Investimentos (chart-card).
+   components/list.js; peças compartilhadas em components/pecas.ts).
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -195,7 +193,7 @@
       render(body) {
         const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         const graficoEl = h("div", { class: ZoZo.pecas.painelGrafico });
-        const filtrosEl = h("div", { class: "chart-card__filters" });
+        const filtrosEl = h("div", { class: T.filtros });
         const difEl = h("span");
         let serie = [];
         const desenhar = () => {

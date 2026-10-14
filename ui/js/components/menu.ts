@@ -13,42 +13,46 @@
    Submenus abrem ao passar o mouse (ou com seta → / Enter) ao lado do
    menu, do lado que couber na tela. Visual em Tailwind (components/estrutura.ts:
    classes menu*, também usadas pelas páginas que montam conteúdo próprio).
+   TypeScript: tipos em src/globais.d.ts (ZoZoMenu, ItemMenu, OpcoesMenu).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const E = ZoZo.estrutura;
 
-  let ativo = null;   // { anchor, niveis: [painel], fora, tecla }
+  type Painel = { el: HTMLElement; nivel: number; origem?: HTMLElement; desenhar?: () => void };
+  type Ativo = { anchor: HTMLElement; niveis: Painel[]; fora?: (e: MouseEvent) => void; tecla?: (e: KeyboardEvent) => void; redimensionar?: () => void };
+  let ativo: Ativo | null = null;
 
-  function fechar(devolverFoco) {
+  function fechar(devolverFoco?: boolean) {
     if (!ativo) return;
     const a = ativo; ativo = null;
     a.niveis.forEach((p) => p.el.remove());
     a.anchor.setAttribute("aria-expanded", "false");
     a.anchor.classList.remove("is-open");
-    document.removeEventListener("mousedown", a.fora, true);
-    document.removeEventListener("keydown", a.tecla, true);
-    window.removeEventListener("resize", a.redimensionar);
+    if (a.fora) document.removeEventListener("mousedown", a.fora, true);
+    if (a.tecla) document.removeEventListener("keydown", a.tecla, true);
+    if (a.redimensionar) window.removeEventListener("resize", a.redimensionar);
     if (devolverFoco && a.anchor.isConnected) a.anchor.focus();
   }
 
   /** Fecha os níveis acima de "nivel" */
-  function fecharAcima(nivel) {
+  function fecharAcima(nivel: number) {
     while (ativo && ativo.niveis.length > nivel + 1) {
       const p = ativo.niveis.pop();
+      if (!p) break;
       p.el.remove();
       if (p.origem) p.origem.classList.remove("is-open");
     }
   }
 
-  function posicionar(el, ref, modo) {
+  function posicionar(el: HTMLElement, ref: HTMLElement, modo: string) {
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = el.offsetWidth, hgt = el.offsetHeight;
-    let left, top;
+    let left: number, top: number;
     if (modo === "lado") {                // submenu ao lado do item
-      const pai = ref.closest(".menu").getBoundingClientRect();
+      const pai = (ref.closest(".menu") || ref).getBoundingClientRect();
       const r = ref.getBoundingClientRect();
       left = pai.right + 4 + w <= vw - 8 ? pai.right + 4 : pai.left - w - 4;
       top = Math.min(Math.max(8, r.top - 6), vh - hgt - 8);
@@ -63,13 +67,13 @@
     el.style.top = Math.max(8, top) + "px";
   }
 
-  function resolver(sub) { return typeof sub === "function" ? sub() : sub; }
+  function resolver(sub: ItensMenu | undefined): ItemMenu[] | ConteudoMenu | undefined { return typeof sub === "function" ? sub() : sub; }
 
-  function criarPainel(itens, nivel, opts) {
+  function criarPainel(itens: ItensMenu, nivel: number, opts: OpcoesMenu): Painel {
     const el = h("div", { class: [E.menuFlutuante, opts.class], role: "menu", "aria-label": opts.label || "Menu" });
     if (opts.largura) el.style.width = opts.largura + "px";
-    const painel = { el, nivel };
-    const api = {
+    const painel: Painel = { el, nivel };
+    const api: ApiMenu = {
       fechar: () => fechar(true),
       atualizar: () => desenhar(),
       voltar: () => { fecharAcima(nivel - 1); },
@@ -77,7 +81,7 @@
 
     function desenhar() {
       const conteudo = resolver(itens);
-      if (conteudo && typeof conteudo.render === "function") {
+      if (conteudo && !Array.isArray(conteudo)) {
         mount(el);
         conteudo.render(el, api);
         return;
@@ -99,18 +103,22 @@
           it.submenu ? icon("chevron-right", { size: 14, class: E.menuSeta }) : null);
 
         if (it.submenu) {
-          let timer = null;
-          const abrirSub = (foco) => {
-            if (ativo && ativo.niveis[nivel + 1] && ativo.niveis[nivel + 1].origem === btn) return;
+          const sub = it.submenu;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const abrirSub = (foco: boolean) => {
+            if (!ativo) return;
+            if (ativo.niveis[nivel + 1] && ativo.niveis[nivel + 1].origem === btn) return;
             fecharAcima(nivel);
-            const subOpts = Object.assign({}, opts, { class: "menu--sub", largura: (resolver(it.submenu) || {}).largura || it.larguraSub || opts.larguraSub, checkEsquerda: it.checkEsquerda });
-            const filho = criarPainel(it.submenu, nivel + 1, subOpts);
+            const conteudoSub = resolver(sub);
+            const largura = (conteudoSub && !Array.isArray(conteudoSub) ? conteudoSub.largura : undefined) || it.larguraSub || opts.larguraSub;
+            const subOpts: OpcoesMenu = Object.assign({}, opts, { class: "menu--sub", largura, checkEsquerda: it.checkEsquerda });
+            const filho = criarPainel(sub, nivel + 1, subOpts);
             filho.origem = btn;
             btn.classList.add("is-open");
             document.body.appendChild(filho.el);
             ativo.niveis.push(filho);
             posicionar(filho.el, btn, "lado");
-            if (foco) { const f = filho.el.querySelector("input, button"); if (f) f.focus(); }
+            if (foco) { const f = filho.el.querySelector<HTMLElement>("input, button"); if (f) f.focus(); }
           };
           btn.addEventListener("mouseenter", () => { clearTimeout(timer); timer = setTimeout(() => abrirSub(false), 90); });
           btn.addEventListener("mouseleave", () => clearTimeout(timer));
@@ -132,26 +140,29 @@
     return painel;
   }
 
-  function abrir(anchor, itens, opts) {
+  function abrir(anchor: HTMLElement, itens: ItensMenu, opts?: OpcoesMenu): void {
     const o = opts || {};
     if (ativo && ativo.anchor === anchor) { fechar(); return; }
     fechar();
 
-    ativo = { anchor, niveis: [] };
+    const estado: Ativo = { anchor, niveis: [] };
+    ativo = estado;
     const raiz = criarPainel(itens, 0, o);
     document.body.appendChild(raiz.el);
-    ativo.niveis.push(raiz);
+    estado.niveis.push(raiz);
     posicionar(raiz.el, anchor, o.posicao || "direita");
     anchor.setAttribute("aria-expanded", "true");
     anchor.classList.add("is-open");
 
-    const fora = (e) => {
+    const fora = (e: MouseEvent) => {
       if (!ativo) return;
-      if (ativo.niveis.some((p) => p.el.contains(e.target)) || anchor.contains(e.target)) return;
+      const alvo = e.target as Node;
+      if (ativo.niveis.some((p) => p.el.contains(alvo)) || anchor.contains(alvo)) return;
       fechar();
     };
-    const tecla = (e) => {
+    const tecla = (e: KeyboardEvent) => {
       if (!ativo) return;
+      const focado = document.activeElement as HTMLElement | null;
       if (e.key === "Escape") {
         e.preventDefault(); e.stopPropagation();
         if (ativo.niveis.length > 1) {
@@ -161,8 +172,8 @@
         } else fechar(true);
         return;
       }
-      const painel = ativo.niveis.find((p) => p.el.contains(document.activeElement)) || ativo.niveis[ativo.niveis.length - 1];
-      if (e.key === "ArrowLeft" && painel.nivel > 0 && document.activeElement.tagName !== "INPUT") {
+      const painel = ativo.niveis.find((p) => p.el.contains(focado)) || ativo.niveis[ativo.niveis.length - 1];
+      if (e.key === "ArrowLeft" && painel.nivel > 0 && (!focado || focado.tagName !== "INPUT")) {
         e.preventDefault();
         const origem = painel.origem;
         fecharAcima(painel.nivel - 1);
@@ -170,32 +181,32 @@
         return;
       }
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      const itensFoco = Array.from(painel.el.querySelectorAll("button:not([disabled]), input"));
+      const itensFoco = Array.from(painel.el.querySelectorAll<HTMLElement>("button:not([disabled]), input"));
       if (!itensFoco.length) return;
       e.preventDefault();
-      const i = itensFoco.indexOf(document.activeElement);
+      const i = focado ? itensFoco.indexOf(focado) : -1;
       itensFoco[(i + (e.key === "ArrowDown" ? 1 : -1) + itensFoco.length) % itensFoco.length].focus();
     };
     const redimensionar = () => fechar();
     document.addEventListener("mousedown", fora, true);
     document.addEventListener("keydown", tecla, true);
     window.addEventListener("resize", redimensionar);
-    Object.assign(ativo, { fora, tecla, redimensionar });
-    requestAnimationFrame(() => { const f = raiz.el.querySelector("button:not([disabled])"); if (f && o.focar !== false) f.focus(); });
+    Object.assign(estado, { fora, tecla, redimensionar });
+    requestAnimationFrame(() => { const f = raiz.el.querySelector<HTMLElement>("button:not([disabled])"); if (f && o.focar !== false) f.focus(); });
   }
 
   /**
    * Lista pesquisável com marcação (submenus de filtro: Conta, Categoria, Perfil...)
    * cfg: { itens:[{ value, label, cor?, icone? }], marcados(): [values], alternar(value), topo?(api) → node, vazio }
    */
-  function listaMarcavel(cfg) {
+  function listaMarcavel(cfg: ConfigListaMarcavel): ConteudoMenu {
     return {
       largura: cfg.largura || 260,
       render(el, api) {
         let termo = "";
-        const busca = h("input", { type: "search", class: E.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar" });
+        const busca = h("input", { type: "search", class: E.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar" }) as HTMLInputElement;
         const lista = h("div", { class: E.menuLista, role: "group" });
-        const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const desenhar = () => {
           const marcados = cfg.marcados();
           const itens = cfg.itens.filter((it) => !termo || norm(it.label).includes(termo));
@@ -220,5 +231,6 @@
     };
   }
 
-  ZoZo.menu = { abrir, fechar, listaMarcavel };
+  const apiMenu: ZoZoMenu = { abrir, fechar, listaMarcavel };
+  ZoZo.menu = apiMenu;
 })(window.ZoZo);

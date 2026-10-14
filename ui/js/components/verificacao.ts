@@ -7,22 +7,23 @@
    • CampoCodigo(cfg): seis caixas de um dígito (avança sozinho, aceita
      colar o código inteiro, Backspace volta) → cfg.onCompleto(codigo).
    • QR(texto, px): QR code em SVG montado com ZoZo.dom (sem innerHTML),
-     usando a biblioteca local js/vendor/qrcode-generator.js.
+     usando a biblioteca qrcode-generator (npm, exposta em window.qrcode).
+   TypeScript: tipos em src/globais.d.ts (ZoZoVerificacao).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, s, mount } = ZoZo.dom;
   const TURNSTILE_JS = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
   /* ---------------- CAPTCHA ---------------- */
-  let carregando = null;
-  function carregarTurnstile() {
+  let carregando: Promise<Turnstile> | null = null;
+  function carregarTurnstile(): Promise<Turnstile> {
     if (window.turnstile) return Promise.resolve(window.turnstile);
     if (!carregando) {
-      carregando = new Promise((ok, falha) => {
+      carregando = new Promise<Turnstile>((ok, falha) => {
         const sc = document.createElement("script");
         sc.src = TURNSTILE_JS; sc.async = true;
-        sc.onload = () => (window.turnstile ? ok(window.turnstile) : falha(new Error("turnstile")));
+        sc.onload = () => { if (window.turnstile) ok(window.turnstile); else falha(new Error("turnstile")); };
         sc.onerror = () => { carregando = null; sc.remove(); falha(new Error("turnstile")); };
         document.head.appendChild(sc);
       });
@@ -30,14 +31,14 @@
     return carregando;
   }
 
-  function Captcha(sitekey) {
+  function Captcha(sitekey: string): CaptchaWidget {
     const el = h("div", { class: "captcha", "aria-live": "polite" });
-    let token = "", id = null;
+    let token = "", id: string | null = null;
     carregarTurnstile().then((ts) => {
       requestAnimationFrame(() => {                    // espera o elemento estar na página
         id = ts.render(el, {
           sitekey, language: "pt-br", appearance: "always", "refresh-expired": "auto",
-          callback: (t) => { token = t; },
+          callback: (t: string) => { token = t; },
           "expired-callback": () => { token = ""; },
           "error-callback": () => { token = ""; },
         });
@@ -51,16 +52,16 @@
   }
 
   /* ---------------- Código de 6 dígitos ---------------- */
-  function CampoCodigo(cfg) {
+  function CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6 {
     const c = cfg || {};
     const caixas = Array.from({ length: 6 }, (_, i) => h("input", {
       type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: "1", class: ["codigo6__caixa", c.classeCaixa],
       autocomplete: i === 0 ? "one-time-code" : "off", "aria-label": "Dígito " + (i + 1) + " de 6",
-    }));
+    }) as HTMLInputElement);
     const el = h("div", { class: "codigo6", role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);
     const valor = () => caixas.map((x) => x.value).join("");
     const conferir = () => { const v = valor(); if (/^\d{6}$/.test(v) && c.onCompleto) c.onCompleto(v); };
-    function preencher(inicio, texto) {
+    function preencher(inicio: number, texto: string) {
       const d = String(texto || "").replace(/\D/g, "").slice(0, 6 - inicio);
       d.split("").forEach((ch, k) => { caixas[inicio + k].value = ch; });
       caixas[Math.min(inicio + d.length, 5)].focus();
@@ -87,14 +88,14 @@
       el, valor,
       limpar() { caixas.forEach((x) => { x.value = ""; }); caixas[0].focus(); },
       foco() { caixas[0].focus(); },
-      desabilitar(v) { caixas.forEach((x) => { x.disabled = !!v; }); el.classList.toggle("is-ocupado", !!v); },
-      marcarErro(v) { el.classList.toggle("is-erro", !!v); },
+      desabilitar(v: boolean) { caixas.forEach((x) => { x.disabled = !!v; }); el.classList.toggle("is-ocupado", !!v); },
+      marcarErro(v: boolean) { el.classList.toggle("is-erro", !!v); },
     };
   }
 
   /* ---------------- QR code ---------------- */
   /** QR em SVG com a margem recomendada (4 módulos brancos). rotulo: o que o código é (leitor de tela) */
-  function QR(texto, px, rotulo) {
+  function QR(texto: string, px?: number, rotulo?: string): SVGElement {
     const q = window.qrcode(0, "M");
     q.addData(texto);
     q.make();
@@ -112,7 +113,7 @@
   /* ---------------- Senha: oculta por padrão, com "mostrar", e sem copiar ----------------
      Copiar/recortar/arrastar ficam bloqueados (inclusive com a senha visível), para a senha
      não parar na área de transferência. Colar continua permitido (gerenciadores de senha). */
-  function protegerSenha(input) {
+  function protegerSenha(input: HTMLInputElement): HTMLInputElement {
     ["copy", "cut", "dragstart"].forEach((ev) => input.addEventListener(ev, (e) => e.preventDefault()));
     input.setAttribute("autocapitalize", "off");
     input.setAttribute("autocorrect", "off");
@@ -121,7 +122,7 @@
   }
 
   /** Envolve um <input type="password"> com o botão de mostrar/ocultar */
-  function ComRevelar(input, classe) {
+  function ComRevelar(input: HTMLInputElement, classe?: string): HTMLElement {
     protegerSenha(input);
     const btn = h("button", { type: "button", class: ZoZo.pecas.revelar, "aria-label": "Mostrar senha", "aria-pressed": "false", title: "Mostrar senha" },
       ZoZo.icons.icon("olho", { size: 16 }));
@@ -137,5 +138,6 @@
     return h("div", { class: classe === "input-with-action--sm" ? ZoZo.pecas.comRevelarPequeno : [ZoZo.pecas.comRevelar, classe] }, input, btn);
   }
 
-  ZoZo.verificacao = { Captcha, CampoCodigo, QR, protegerSenha, ComRevelar };
+  const api: ZoZoVerificacao = { Captcha, CampoCodigo, QR, protegerSenha, ComRevelar };
+  ZoZo.verificacao = api;
 })(window.ZoZo);

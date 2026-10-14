@@ -298,7 +298,7 @@ declare global {
     voltar?: () => void;
     botoes?: Array<{ label: string; onClick?: () => void; primario?: boolean; desabilitado?: boolean; icone?: string }>;
     acoes?: Array<{ icone: string; rotulo: string; perigo?: boolean; onClick?: () => void }>;
-    menu?: unknown[];
+    menu?: ItemMenu[];
     selected?: { tipo: string; id: string } | null;
     render(body: HTMLElement, api: ApiPainel): void;
     onClose?: () => void;
@@ -313,6 +313,86 @@ declare global {
 
   /** js/components/dividir.ts — dividir uma transação entre perfis */
   interface ZoZoDividir { abrir(original: any, ctx: any, aoTerminar?: (id: string) => void): void }
+
+  /** js/components/menu.ts — menu suspenso com submenus */
+  interface ApiMenu { fechar(): void; atualizar(): void; voltar(): void }
+  interface ConteudoMenu { render(el: HTMLElement, api: ApiMenu): void; largura?: number }
+  interface ItemMenu {
+    label?: string; icone?: string; descricao?: string; valor?: string;
+    onClick?(api: ApiMenu): void;
+    perigo?: boolean; check?: boolean; desabilitado?: boolean; manterAberto?: boolean;
+    submenu?: ItensMenu; larguraSub?: number; checkEsquerda?: boolean;
+    separador?: boolean; secao?: string;
+    render?(api: ApiMenu): Node;
+  }
+  type ItensMenu = ItemMenu[] | ConteudoMenu | (() => ItemMenu[] | ConteudoMenu);
+  interface OpcoesMenu {
+    posicao?: "direita" | "esquerda" | "acima"; largura?: number; larguraSub?: number; label?: string;
+    class?: string; checkEsquerda?: boolean; focar?: boolean;
+  }
+  interface ConfigListaMarcavel {
+    itens: Array<{ value: string; label: string; cor?: string; icone?: string }>;
+    marcados(): string[];
+    alternar(value: string): void;
+    topo?(redesenhar: () => void): Node;
+    vazio?: string;
+    largura?: number;
+  }
+  interface ZoZoMenu {
+    abrir(anchor: HTMLElement, itens: ItensMenu, opts?: OpcoesMenu): void;
+    fechar(devolverFoco?: boolean): void;
+    listaMarcavel(cfg: ConfigListaMarcavel): ConteudoMenu;
+  }
+
+  /** js/components/sidebar.ts — menu lateral */
+  interface ItemNavegacao { id: string; label: string; icon: string; recurso?: keyof ZoZoRecursos }
+  interface ZoZoSidebar {
+    create(el: HTMLElement, ctx: any): { render(state: EstadoZoZo): void };
+    NAV: ItemNavegacao[];
+    visivel(n: ItemNavegacao): boolean;
+  }
+
+  /** js/components/forms.ts — formulário de cadastro no painel */
+  interface CampoForm {
+    nome: string; rotulo: string;
+    tipo?: "texto" | "email" | "senha" | "dinheiro" | "digitos4" | "selecao" | "cor" | "emoji" | "lista";
+    obrigatorio?: boolean; opcoes?: any[]; dica?: string; max?: number; placeholder?: string; autocomplete?: string;
+    mostrarSe?(valores: Record<string, unknown>): boolean;
+  }
+  interface ConfigForm {
+    titulo: string;
+    selected?: { tipo: string; id: string } | null;
+    voltar?: (() => void) | null;
+    campos: CampoForm[];
+    valores?: Record<string, unknown>;
+    validar?(valores: Record<string, unknown>): string | null;
+    salvar(valores: Record<string, unknown>): unknown;
+    textoSalvar?: string;
+    excluir?: { rotulo?: string; titulo: string; mensagem: string; acao(): Promise<unknown> } | null;
+    aviso?: string; avisoPerigo?: boolean;
+    aoCancelar?: () => void;
+    manterAberto?: boolean;
+  }
+  interface ZoZoForms { abrir(ctx: any, cfg: ConfigForm): ApiPainel }
+
+  /** js/components/verificacao.ts — CAPTCHA, código de 6 dígitos, QR e senha */
+  interface Turnstile {
+    render(el: HTMLElement, opts: Record<string, unknown>): string;
+    reset(id: string): void;
+  }
+  interface CaptchaWidget { el: HTMLElement; token(): string; reset(): void }
+  interface ConfigCodigo { rotulo?: string; classeCaixa?: string; onCompleto?(codigo: string): void; onDigitar?(): void }
+  interface CampoCodigo6 {
+    el: HTMLElement; valor(): string; limpar(): void; foco(): void;
+    desabilitar(v: boolean): void; marcarErro(v: boolean): void;
+  }
+  interface ZoZoVerificacao {
+    Captcha(sitekey: string): CaptchaWidget;
+    CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6;
+    QR(texto: string, px?: number, rotulo?: string): SVGElement;
+    protegerSenha(input: HTMLInputElement): HTMLInputElement;
+    ComRevelar(input: HTMLInputElement, classe?: string): HTMLElement;
+  }
 
   interface ZoZoGlobal {
     dom: ZoZoDom;
@@ -340,6 +420,10 @@ declare global {
     feedback: ZoZoFeedback;
     detailPanel: ZoZoDetailPanel;
     dividir: ZoZoDividir;
+    menu: ZoZoMenu;
+    sidebar: ZoZoSidebar;
+    forms: ZoZoForms;
+    verificacao: ZoZoVerificacao;
     // módulos ainda em JavaScript
     [modulo: string]: any;
   }
@@ -350,6 +434,7 @@ declare global {
   interface Window {
     ZoZo: ZoZoGlobal;
     qrcode: QrCodeFactory;
+    turnstile?: Turnstile;
     ZOZO_DEMO?: { nome?: string; email?: string; senha?: string };
   }
 }

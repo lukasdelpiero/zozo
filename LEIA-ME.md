@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.6.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.7.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,13 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.7.0
+
+- **Investimentos em Tailwind CSS:** card do gráfico (engrenagem das contas incluídas, aviso de contas ocultas, valor, variação, períodos), lista de contas e linhas de alocação. No computador, idêntico ao anterior (conferido elemento a elemento); em área estreita, duas correções: o valor do card fica no centro (antes saía para a esquerda) e o nome da alocação não quebra mais em duas linhas ("Tesouro Direto").
+- **Formulário do painel em Tailwind** (editar categoria, perfil): corpo, aviso e campo de ícone.
+- **TypeScript:** mais 6 módulos — menu suspenso, menu lateral, formulário do painel, verificação (CAPTCHA, código de 6 dígitos, QR, senha) e as páginas Investimentos e Recorrências.
+- ~50 linhas de CSS antigo a menos.
 
 ## Novidades da versão 3.6.0
 
