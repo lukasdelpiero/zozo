@@ -15,14 +15,6 @@
   --t-24: 1.5rem;      /* 24px — Gasto mensal */
 }
 
-/* ================= Perfis ================= */
-.profile-row__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 6px 0; }
-.profile-row__name { font-size: var(--t-15); font-weight: 450; }
-.profile-row__count { font-size: var(--t-13); font-weight: 450; color: var(--color-text-secondary); }
-.profile-row { min-height: 52px; }
-
-/* ================= Janelas modais ================= */
-.modal .cfg-row__sub { font-size: var(--t-13); font-weight: 620; }
 /* listas de ponta a ponta */
 
 /* =============================================================
@@ -40,21 +32,14 @@
 :root { --radius-small: 8px; --radius-medium: 12px; --radius-large: 20px; }
 /* linhas, botões, selecionados e destaques: 8px
    (exceto lançamentos da página Lançamentos e das listas do painel, que vão de borda a borda) */
-.row, .nav-item, .cfg-danger-btn { border-radius: 8px; }
 
 /* Botão Excluir nas janelas modais */
 
 /* =============================================================
    Linhas de ponta a ponta
    ============================================================= */
-/* Configurações: do canto direito do menu até a borda direita */
-.cfg-content { padding-left: 0; padding-right: 0; }
-.cfg-content > * { padding-left: var(--space-6); padding-right: var(--space-7); }
-.cfg-section { margin-left: 0; margin-right: 0; }
-.cfg-footer { border-top: 1px solid var(--color-border) !important; }
 
-/* Painel de informações: da borda esquerda à borda direita do painel */
-.cfg { gap: 0 !important; }   /* sem vão entre o menu e o conteúdo: linhas encostam no menu */
+   /* sem vão entre o menu e o conteúdo: linhas encostam no menu */
 
 /* =============================================================
    Ajustes: boleto, modais de exclusão, card Top categorias, Configurações
@@ -62,14 +47,6 @@
 /* Boleto: logo do tamanho do bloco "Boleto" + mês */
 .doc__head { align-items: center; }
 .doc__logo { width: 44px; height: 44px; display: block; border-radius: 8px; box-shadow: 0 1px 3px rgba(15, 39, 66, 0.18); }
-
-/* Configurações */
-.cfg-section { font-size: var(--t-15); font-weight: 550; }
-.cfg-row { min-height: 0; padding-top: 10px; padding-bottom: 10px; }
-.cfg-row__title { font-size: var(--t-15); font-weight: 450; }
-.cfg .cfg-row__sub { font-size: var(--t-13); font-weight: 450; }
-.cfg-readonly { font-size: var(--t-13); font-weight: 550; }
-.cfg-danger-btn { font-size: var(--t-13); font-weight: 550; }
 
 /* Botões toggle da janela de contas (Cartão de crédito · Poupança · Corrente): sem quebra de linha */
 
@@ -143,57 +120,15 @@
 /* =============================================================
    v1.3.1 — ajustes
    ============================================================= */
-/* Configurações › Conta: foto maior, centralizada, "Remover" abaixo */
-.cfg-photo-center { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: var(--space-2) 0 var(--space-3); }
-.cfg-photo-center .cfg-photo__btn .avatar, .cfg-photo-center .cfg-photo__btn img { width: 72px; height: 72px; }
 /* Dividir: toggle centralizado; "+ Add divisão" igual ao botão "Alterar" (contorno sólido) */
 .dv__toggle { align-self: center; }
 
 /* =============================================================
    2FA, CAPTCHA e código de 6 dígitos
    ============================================================= */
-/* Seis caixas do código */
-.codigo6 { display: flex; justify-content: center; gap: 8px; }
-.codigo6__caixa {
-  width: 46px; height: 50px; padding: 0; text-align: center;
-  font-size: 1.25rem; font-weight: 550; font-variant-numeric: tabular-nums; color: var(--color-text-primary);
-  background: var(--color-surface-hover, #f4f5f7); border: 1px solid var(--color-border); border-radius: 8px;
-  caret-color: var(--color-primary);
-}
-.codigo6__caixa:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-soft); background: var(--color-surface); }
-.codigo6.is-erro .codigo6__caixa { border-color: var(--color-danger); }
-.codigo6.is-ocupado { opacity: 0.6; }
 
 /* CAPTCHA (Turnstile) */
 .captcha { display: flex; justify-content: center; min-height: 65px; }
-
-/* Painel lateral do 2FA dentro da janela de Configurações: entra da direita para a esquerda */
-.p2fa {
-  position: absolute; top: 0; right: 0; bottom: 0; z-index: 5;
-  width: min(372px, 100%); overflow-y: auto;
-  background: var(--color-surface); border-left: 1px solid var(--color-border);
-  box-shadow: -12px 0 32px rgba(15, 39, 66, 0.12);
-  transform: translateX(100%); transition: transform 240ms var(--easing, ease);
-}
-.p2fa.is-aberto { transform: translateX(0); }
-@media (prefers-reduced-motion: reduce) { .p2fa { transition: none; } }
-.p2fa__topo { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 18px 16px 14px 20px; border-bottom: 1px solid var(--color-border); }
-.p2fa__h { margin: 0; font-size: var(--t-15); font-weight: 550; color: var(--color-text-primary); }
-.p2fa__passos { list-style: none; margin: 0; padding: 18px 20px 24px; display: flex; flex-direction: column; gap: 18px; }
-.p2fa__passo { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
-.p2fa__num { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--color-surface-hover, #f1f3f6); font-size: var(--t-13); font-weight: 550; color: var(--color-text-secondary); }
-.p2fa__titulo { margin: 1px 0 0; display: flex; align-items: center; gap: 8px; font-size: var(--t-15); font-weight: 450; color: var(--color-text-primary); }
-.p2fa__dica { margin: 4px 0 0; font-size: var(--t-13); color: var(--color-text-muted); }
-.p2fa__ok { width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--color-positive); color: #fff; flex: none; }
-.p2fa__ok[hidden] { display: none; }
-.p2fa__qr { width: 176px; min-height: 176px; margin: 12px 0 8px; display: grid; place-items: center; }
-.p2fa__qr .qr { display: block; border-radius: 8px; }
-.p2fa__chave-linha { display: flex; align-items: center; gap: 6px; }
-.p2fa__chave { font-size: var(--t-13); letter-spacing: 0.04em; color: var(--color-text-secondary); word-break: break-all; }
-.p2fa__passo .codigo6 { justify-content: flex-start; margin-top: 12px; gap: 6px; }
-.p2fa__passo .codigo6__caixa { width: 38px; height: 44px; font-size: 1.125rem; }
-.p2fa__erro { margin: 10px 0 0; font-size: 0.8125rem; font-weight: 450; color: var(--color-text-primary); }
-.p2fa__erro:empty { display: none; }
 
 /* ---------- Boleto: Pix no canto inferior direito ---------- */
 .doc__pix { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-top: 20px; break-inside: avoid; page-break-inside: avoid; }
@@ -202,38 +137,14 @@
 .boleto-editor__pix { margin: 8px 0 0; font-size: var(--t-13); color: var(--color-text-secondary); }
 .boleto-editor__pix:empty { display: none; }
 .boleto-editor__section--summary .btn[hidden] { display: none; }
-/* Configurações › Pix */
-.cfg-pix { display: grid; grid-template-columns: 104px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.7fr) auto; gap: 8px; width: 100%; align-items: center; }
-.cfg-pix__erro { margin: 6px 0 0; font-size: var(--t-13); color: var(--color-danger); }
-.cfg-pix__erro:empty { display: none; }
-.cfg-pix__acoes { display: flex; gap: 8px; justify-content: flex-end; }
-@container (max-width: 560px) { .cfg-pix { grid-template-columns: minmax(0, 1fr); } }
-.cfg-row.cfg-row--bloco { flex-direction: column; align-items: stretch; gap: 8px; }
 
-/* Perfis: nome + contagem à esquerda, valor à direita (a grade antiga tinha 3 colunas para 2 itens e quebrava no celular) */
-.profile-row { grid-template-columns: minmax(0, 1fr) auto; }
-.profile-row__count, .profile-row__value { white-space: nowrap; }
 /* Boleto em telas estreitas: editor em cima, folha A4 embaixo (inteira, em escala) */
 @media (max-width: 900px) {
   .boleto__body { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; overflow-y: auto; }
   .boleto__editor { overflow: visible; max-height: none; border-right: 0; }
   .boleto__preview { overflow: visible; padding: 16px; }
 }
-/* Configurações: as regras de área estreita (ex.: campos do Pix) valem pela largura do conteúdo da janela */
-.cfg-content { container-type: inline-size; }
 /* Configurações em telas estreitas: abas em cima (com texto), conteúdo na largura toda */
-@media (max-width: 700px) {
-  .cfg { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto minmax(0, 1fr); }
-  .cfg-nav { flex-direction: row; align-items: center; gap: 4px; padding: 10px 48px 10px 12px; border-right: 0; border-bottom: 1px solid var(--color-border); overflow-x: auto; }
-  .cfg-nav__title { display: none; }
-  .cfg-nav .nav-item { width: auto; flex: none; justify-content: flex-start; padding: 0 12px; }
-  .cfg-nav .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
-  .cfg-content > * { padding-left: 16px; padding-right: 16px; }
-  .cfg-row { flex-wrap: wrap; }
-  .cfg-row__right { flex: 1 1 100%; justify-content: flex-start; }
-  .cfg-password { flex-direction: column; align-items: stretch; width: 100%; }
-    .cfg-footer { padding-left: 16px; padding-right: 16px; }
-}
 
 /* =============================================================
    Identidade 2.3: botões roxos com gradiente da marca, menu #6948D8, nova logo
@@ -251,23 +162,7 @@
 /* ---------- Topo do menu: logo à esquerda (onde ficava o botão de recolher) e o botão
    de recolher/mostrar à direita (onde ficava o botão de atualizar, que saiu) ---------- */
 
-/* ---------- Perfis: linha igual à de Contas, com ícone redondo na cor do perfil e a inicial ---------- */
-.profile-row { grid-template-columns: 36px minmax(0, 1fr) auto; min-height: var(--row-height-tall); column-gap: var(--space-3); }
-.profile-avatar { font-size: var(--t-15); font-weight: 620; line-height: 1; text-transform: uppercase; user-select: none; }
-.profile-row__text { padding: 0; }
-
-/* ---------- Configurações › Conta: "Alterar senha" com o título em cima e os campos na largura toda ---------- */
-.cfg-row--bloco .cfg-password { display: flex; flex-direction: row; align-items: center; gap: 8px; width: 100%; }
-.cfg-row--bloco .cfg-password > .btn { flex: none; }
-@container (max-width: 480px) {
-  .cfg-row--bloco .cfg-password { flex-direction: column; align-items: stretch; }
-  .cfg-row--bloco .cfg-password > .btn { align-self: flex-end; }
-}
-.cfg-nota { margin: 4px 0 8px; font-size: var(--t-13); color: var(--color-text-secondary); }
-
 /* Configurações: as abas mantêm o texto em qualquer largura (a regra do menu estreito escondia os rótulos) */
-.cfg-nav .nav-item { justify-content: flex-start; padding: 0 10px; }
-.cfg-nav .nav-item span { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
 
 /* =============================================================
    Fatura (antigo boleto): documento A4 e editor
@@ -323,8 +218,6 @@
    na fatura (janela própria, com Fechar) o botão do menu sai */
 
 /* Desativar 2FA: código atual do aplicativo */
-.desativar2fa .codigo6 { margin-top: 16px; }
-.desativar2fa .p2fa__erro { text-align: center; }
 
 /* =============================================================
    ZoZo 2.6 — Débito, Câmbio, grupos de categorias e seleção
@@ -418,8 +311,6 @@
 /* =============================================================
    ZoZo 3.0
    ============================================================= */
-/* Texto só para leitores de tela */
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 /* Confirmação no próprio botão (ex.: "Código Pix copiado") */
 .is-confirmado, .is-confirmado .icon { color: var(--color-positive) !important; }
 

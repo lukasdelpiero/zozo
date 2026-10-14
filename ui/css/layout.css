@@ -29,31 +29,6 @@
 .page--entrar { animation: page-in var(--duration-medium) var(--easing); }
 @keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-/* Abas das Configurações (cfg-nav) */
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 34px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--radius-small);
-  background: transparent;
-  color: #3b465e;
-  font-size: var(--font-size-md);
-  text-align: left;
-  position: relative;
-  transition: background var(--duration-fast) var(--easing), color var(--duration-fast) var(--easing);
-}
-.nav-item .icon { color: var(--color-text-secondary); }
-.nav-item:hover { background: var(--color-surface-hover); }
-.nav-item.is-active {
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  font-weight: var(--font-weight-semibold);
-}
-.nav-item.is-active .icon { color: var(--color-primary); }
-
 /* Cabeçalho da fatura (boleto) */
 .boleto__header {
   background: var(--color-surface);

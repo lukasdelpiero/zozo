@@ -25,13 +25,6 @@
   font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold);
 }
 
-/* ---------- Perfil ---------- */
-.profile-row { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 48px; }
-.profile-row__count { color: var(--color-text-secondary); font-size: var(--font-size-sm); justify-self: end; }
-
-/* ---------- Configurações ---------- */
-.page--config { max-width: 640px; display: flex; flex-direction: column; gap: var(--space-4); }
-
 /* ---------- Boleto ---------- */
 .boleto {
   position: fixed; inset: 0;
@@ -120,23 +113,4 @@
 .boleto-summary--doc { width: 320px; margin-left: auto; font-size: 13px; break-inside: avoid; }
 .boleto-summary--doc .boleto-summary__total { border-top: 2px solid var(--color-text-primary); }
 .boleto-summary--doc .boleto-summary__total strong { font-size: 24px; }
-
-/* ---------- Avatar ---------- */
-.avatar {
-  flex: none; display: grid; place-items: center; overflow: hidden;
-  border-radius: 50%;
-  background: var(--color-primary-soft); color: var(--color-primary);
-  font-weight: var(--font-weight-semibold);
-  box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--color-border);
-}
-.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-/* ---------- Perfil ---------- */
-.profile-row { grid-template-columns: minmax(0, max-content) minmax(0, 1fr) 130px; }
-.profile-row__count { justify-self: start; }
-.profile-row__value { justify-self: end; }
-
-/* Check de pago à direita do valor, na cor da categoria */
-
-.profile-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

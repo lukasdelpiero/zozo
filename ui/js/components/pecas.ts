@@ -346,7 +346,7 @@
       + "tw:base:bg-transparent tw:base:[font:inherit] tw:base:text-inherit tw:base:text-ellipsis tw:base:outline-none tw:base:focus:[box-shadow:none]",
     noLugarValor: "tw:base:text-right tw:base:ml-0 tw:base:-mr-[7px]",
     // nome do usuário nas Configurações: 220 px alinhado à direita; até 700 px ocupa a linha toda
-    cfgNoLugar: "tw:w-[220px] tw:text-right tw:ml-0 tw:-mr-[7px] tw:text-[13px] tw:font-[550] tw:max-[700px]:w-full tw:max-[700px]:text-left tw:max-[700px]:m-0",
+    cfgNoLugar: "tw:w-[220px] tw:text-right tw:ml-0 tw:-mr-[7px] tw:text-[13px] tw:font-[550] tw:ate700:w-full tw:ate700:text-left tw:ate700:m-0",
     // divisão entre perfis: nome, valor e percentual de cada parte
     dvNome: "tw:text-[15px] tw:font-[450]",
     dvValor: "tw:text-[15px] tw:font-[550] tw:text-right tw:m-0",
@@ -413,6 +413,16 @@
     plCategoria: "tw:col-start-5 tw:ml-2.5 tw:min-w-7 tw:h-[22px] tw:px-1.5 tw:grid tw:place-items-center tw:rounded-(--radius-pill) "
       + "tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] tw:text-[12px] tw:leading-none tw:mr-0.5",
     plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[15px] tw:font-[620] tw:whitespace-nowrap",
+
+    /* ---------- Configurações (pages/perfil.js e a seção do câmbio em components/cambio.js) ----------
+       [título / explicação ........ controle]; até 700 px o controle desce para a linha de baixo */
+    cfgSecao: "tw:text-[15px] tw:font-[550] tw:pt-4 tw:pb-2 tw:mx-0 tw:mb-2 tw:border-b tw:border-zz-border tw:first:pt-0",
+    cfgLinha: "tw:flex tw:items-center tw:justify-between tw:gap-5 tw:py-2.5 tw:ate700:flex-wrap",
+    cfgLinhaBloco: "tw:flex tw:flex-col tw:items-stretch tw:justify-between tw:gap-2 tw:py-2.5 tw:ate700:flex-wrap",     // título em cima e os campos embaixo (Pix, senha)
+    cfgTexto: "tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0",
+    cfgTitulo: "tw:text-[15px] tw:font-[450]",
+    cfgSub: "tw:text-zz-secondary tw:text-[13px] tw:font-[450]",
+    cfgDireita: "tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-none tw:ate700:flex-[1_1_100%] tw:ate700:justify-start",
 
     /* ---------- Listas, título com menu e formulários das janelas ---------- */
     listaLinhas: "tw:flex tw:flex-col",

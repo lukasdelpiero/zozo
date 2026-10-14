@@ -233,11 +233,12 @@
 
   /** Configurações › Geral › Multicâmbio */
   function SecaoConfig(ctx, cfg) {
-    return h("div", { class: "cfg-row" },
-      h("div", { class: "cfg-row__text" },
-        h("span", { class: "cfg-row__title" }, "Ativar multicâmbio"),
-        h("span", { class: "cfg-row__sub" }, "Trabalhar com diferentes câmbios (Real, Euro e Dólar)")),
-      h("div", { class: ["cfg-row__right", ZoZo.pecas.ctxInterruptorAjustado] }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v) => ctx.bridge.request(A.updateConfig, { multicambio: v })
+    const P = ZoZo.pecas;
+    return h("div", { class: P.cfgLinha },
+      h("div", { class: P.cfgTexto },
+        h("span", { class: P.cfgTitulo }, "Ativar multicâmbio"),
+        h("span", { class: P.cfgSub }, "Trabalhar com diferentes câmbios (Real, Euro e Dólar)")),
+      h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v) => ctx.bridge.request(A.updateConfig, { multicambio: v })
         .then(() => ctx.loadData("config", A.getConfig, null, { force: true }))
         .then((c) => { ctx.toast(v ? "Multicâmbio ativado: escolha a moeda no menu lateral." : "Multicâmbio desativado"); return aplicarMoeda(ctx, (c && c.moeda) || "BRL"); })
         .catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar multicâmbio")));

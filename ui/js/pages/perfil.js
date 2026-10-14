@@ -1,5 +1,8 @@
 /* =============================================================
    ZoZo — Perfil (seções 5.3, 32, 33) e Configurações
+   Visual em Tailwind (tabelas PR e CF abaixo; linhas das Configurações
+   em components/pecas.ts). Ganchos sem CSS: profile-row, p2fa (o painel
+   do 2FA aberto), codigo6.
    ============================================================= */
 (function (ZoZo) {
   "use strict";
@@ -12,6 +15,76 @@
   const A = ZoZo.messages.ACTIONS;
   const FR = ZoZo.messages.FRIENDLY;
   const store = ZoZo.store;
+
+  /* Linha de perfil (como a de Contas): [ícone] nome / quantidade ........ gasto no mês */
+  const PR = {
+    linha: "profile-row tw:grid tw:items-center tw:gap-x-3 tw:gap-y-4 tw:w-full tw:min-h-(--row-height-tall) tw:px-4 tw:py-0 tw:[border:0] tw:rounded-lg "
+      + "tw:text-inherit tw:text-left tw:text-[15px] tw:grid-cols-[36px_minmax(0,1fr)_auto] tw:focus-visible:outline-offset-[-2px] "
+      + "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
+    normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
+    selecionada: "tw:bg-zz-primary-soft",
+    inicial: "tw:text-[15px] tw:font-[620] tw:leading-none tw:uppercase tw:select-none",
+    texto: "tw:flex tw:flex-col tw:gap-px tw:min-w-0",
+    nome: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-[15px] tw:font-[450]",
+    quantidade: "tw:[justify-self:start] tw:whitespace-nowrap tw:text-zz-secondary tw:text-[13px] tw:font-[450]",
+    valor: "money tw:[justify-self:end] tw:whitespace-nowrap",
+  };
+
+  /* Configurações: abas à esquerda (em cima até 700 px), conteúdo rolando e Sair/Excluir conta fixos no rodapé */
+  const NAV_ITEM = "tw:flex tw:items-center tw:justify-start tw:gap-2.5 tw:h-[34px] tw:w-full tw:px-2.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-[15px] tw:text-left "
+    + "tw:relative tw:[transition:background_var(--duration-fast)_var(--easing),color_var(--duration-fast)_var(--easing)] tw:ate700:w-auto tw:ate700:flex-none";
+  const CF = {
+    raiz: "tw:grid tw:grid-cols-[220px_minmax(0,1fr)] tw:h-full tw:gap-0 tw:ate700:grid-cols-[minmax(0,1fr)] tw:ate700:grid-rows-[auto_minmax(0,1fr)]",
+    nav: "tw:flex tw:flex-col tw:gap-0.5 tw:py-4 tw:px-3 tw:border-r tw:border-zz-border tw:bg-zz-surface tw:rounded-l-[20px] "
+      + "tw:ate700:flex-row tw:ate700:items-center tw:ate700:gap-1 tw:ate700:pt-2.5 tw:ate700:pr-12 tw:ate700:pb-2.5 tw:ate700:pl-3 tw:ate700:border-r-0 "
+      + "tw:ate700:border-b tw:ate700:overflow-x-auto",
+    navTitulo: "tw:pt-1 tw:px-2.5 tw:pb-2 tw:text-[11.5px] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-zz-muted tw:ate700:hidden",
+    navItem: NAV_ITEM + " tw:bg-transparent tw:text-[#3b465e] tw:hover:bg-zz-surface-hover tw:[&_.icon]:text-zz-secondary",
+    navItemAtivo: NAV_ITEM + " tw:bg-zz-primary-soft tw:text-zz-primary tw:font-semibold tw:[&_.icon]:text-zz-primary",
+    principal: "tw:flex tw:flex-col tw:min-h-0 tw:h-full",
+    // cada bloco do conteúdo traz o próprio respiro lateral (as linhas e títulos vão de ponta a ponta)
+    conteudo: "tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:pt-5 tw:pb-6 tw:px-0 tw:[container-type:inline-size] tw:*:pl-6 tw:*:pr-8 tw:ate700:*:px-4",
+    rodape: "tw:flex tw:justify-between tw:items-center tw:flex-none tw:m-0 tw:py-4 tw:pl-6 tw:pr-8 tw:border-t tw:border-zz-border tw:bg-zz-surface "
+      + "tw:rounded-br-[20px] tw:ate700:px-4",
+    excluirConta: "tw:h-[34px] tw:py-0 tw:px-3.5 tw:border tw:border-zz-border-strong tw:rounded-lg tw:bg-zz-surface tw:text-(--color-danger) tw:text-[13px] "
+      + "tw:font-[550] tw:hover:bg-(--color-danger-soft) tw:hover:border-[color-mix(in_srgb,var(--color-danger)_40%,var(--color-border))]",
+    leitura: "tw:text-zz-secondary tw:text-[13px] tw:font-[550]",
+    nota: "tw:mt-1 tw:mx-0 tw:mb-2 tw:text-[13px] tw:text-zz-secondary",
+    ok: "tw:text-zz-positive",
+    alerta: "tw:text-zz-warning-text",
+    // foto: clique para trocar (a câmera aparece ao passar o mouse ou com o foco)
+    foto: "tw:flex tw:flex-col tw:items-center tw:gap-2.5 tw:pt-2 tw:pb-3 tw:px-0! tw:ate700:px-4!",      // centralizada (sem o respiro lateral maior)
+    fotoBotao: "tw:group/foto tw:relative tw:[border:0] tw:p-0 tw:bg-transparent tw:rounded-[50%] tw:cursor-pointer tw:focus-visible:outline-2 "
+      + "tw:focus-visible:outline-(--color-focus) tw:focus-visible:outline-offset-2",
+    fotoCamera: "tw:absolute tw:inset-0 tw:grid tw:place-items-center tw:rounded-[50%] tw:bg-[rgba(22,33,58,0.45)] tw:text-white tw:opacity-0 "
+      + "tw:[transition:opacity_var(--duration-fast)_var(--easing)] tw:group-hover/foto:opacity-100 tw:group-focus-visible/foto:opacity-100",
+    // senha atual · nova senha · Alterar (área estreita: um embaixo do outro)
+    senha: "tw:flex tw:flex-row tw:items-center tw:gap-2 tw:w-full tw:[&>.btn]:flex-none tw:area480:flex-col tw:area480:items-stretch tw:area480:[&>.btn]:self-end",
+    // tipo · chave · nome · cidade · [Remover] Salvar — tudo numa linha (área estreita: um embaixo do outro)
+    pix: "tw:grid tw:grid-cols-[104px_minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] tw:gap-2 tw:w-full tw:items-center tw:area560:grid-cols-[minmax(0,1fr)]",
+    pixAcoes: "tw:flex tw:gap-2 tw:justify-end",
+    pixErro: "tw:mt-1.5 tw:mx-0 tw:mb-0 tw:text-[13px] tw:text-(--color-danger) tw:empty:hidden",
+  };
+  /* Painel do 2FA: desliza por cima do conteúdo da janela, da direita */
+  const P2 = {
+    painel: "p2fa tw:absolute tw:inset-y-0 tw:right-0 tw:z-5 tw:w-[min(372px,100%)] tw:overflow-y-auto tw:bg-zz-surface tw:border-l tw:border-zz-border "
+      + "tw:[box-shadow:-12px_0_32px_rgba(15,39,66,0.12)] tw:[transform:translateX(100%)] tw:[transition:transform_240ms_var(--easing,ease)] "
+      + "tw:[&.is-aberto]:[transform:translateX(0)] tw:motion-reduce:[transition:none]",
+    topo: "tw:flex tw:items-center tw:justify-between tw:gap-2 tw:pt-[18px] tw:pr-4 tw:pb-3.5 tw:pl-5 tw:border-b tw:border-zz-border",
+    titulo: "tw:m-0 tw:text-[15px] tw:font-[550] tw:text-zz-text",
+    passos: "tw:list-none tw:m-0 tw:pt-[18px] tw:px-5 tw:pb-6 tw:flex tw:flex-col tw:gap-[18px]",
+    passo: "tw:grid tw:grid-cols-[22px_minmax(0,1fr)] tw:gap-2.5 tw:items-start",
+    numero: "tw:size-[22px] tw:grid tw:place-items-center tw:rounded-md tw:bg-(--color-surface-hover,#f1f3f6) tw:text-[13px] tw:font-[550] tw:text-zz-secondary",
+    passoTitulo: "tw:mt-px tw:mx-0 tw:mb-0 tw:flex tw:items-center tw:gap-2 tw:text-[15px] tw:font-[450] tw:text-zz-text",
+    dica: "tw:mt-1 tw:mx-0 tw:mb-0 tw:text-[13px] tw:text-zz-muted",
+    ok: "tw:size-[18px] tw:inline-grid tw:place-items-center tw:rounded-[50%] tw:bg-zz-positive tw:text-white tw:flex-none tw:[&[hidden]]:hidden",
+    qr: "tw:w-[176px] tw:min-h-[176px] tw:mt-3 tw:mx-0 tw:mb-2 tw:grid tw:place-items-center tw:[&_.qr]:block tw:[&_.qr]:rounded-lg",
+    chaveLinha: "tw:flex tw:items-center tw:gap-1.5",
+    chave: "tw:text-[13px] tw:tracking-[0.04em] tw:text-zz-secondary tw:break-all",
+    erro: "tw:mt-2.5 tw:mx-0 tw:mb-0 tw:text-[13px] tw:font-[450] tw:text-zz-text tw:empty:hidden",
+    codigo: "tw:justify-start tw:mt-3 tw:gap-1.5",
+    caixa: "tw:w-[38px] tw:h-[44px] tw:text-[18px]",
+  };
 
   const mesAbrev = (mesIso) => F.mesAbrev((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
   const mesInteiro = (mesIso) => F.mesNome((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
@@ -116,17 +189,17 @@
   /** Ícone redondo do perfil: fundo na cor do perfil e a inicial do nome (mesmo formato do ícone das contas) */
   function AvatarPerfil(p) {
     const inicial = (Array.from(String(p.nome || "").trim())[0] || "?").toLocaleUpperCase("pt-BR");
-    return h("span", { class: [ZoZo.pecas.iconeConta, "profile-avatar"], style: { "--account-color": F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }, inicial);
+    return h("span", { class: [ZoZo.pecas.iconeConta, PR.inicial], style: { "--account-color": F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }, inicial);
   }
 
   /** Linha como a de Contas: [ícone] nome / quantidade de lançamentos ........ gasto no mês */
   function linhaPerfil(p, sel, ctx) {
-    return h("button", { type: "button", class: ["row", "row--interactive", "profile-row", p.id === sel && "is-selected"], "aria-current": p.id === sel ? "true" : undefined, onClick: () => abrirDetalhe(p, ctx) },
+    return h("button", { type: "button", class: [PR.linha, p.id === sel ? PR.selecionada : PR.normal], "aria-current": p.id === sel ? "true" : undefined, onClick: () => abrirDetalhe(p, ctx) },
       AvatarPerfil(p),
-      h("span", { class: "profile-row__text" },
-        h("span", { class: "profile-row__name" }, p.nome),
-        h("span", { class: "profile-row__count" }, p.quantidade === 1 ? "1 transação" : (p.quantidade || 0) + " transações")),
-      h("span", { class: "profile-row__value money" }, F.moeda(p.gasto || 0)));
+      h("span", { class: PR.texto },
+        h("span", { class: PR.nome }, p.nome),
+        h("span", { class: PR.quantidade }, p.quantidade === 1 ? "1 transação" : (p.quantidade || 0) + " transações")),
+      h("span", { class: PR.valor }, F.moeda(p.gasto || 0)));
   }
 
   ZoZo.pages.perfil = {
@@ -157,9 +230,9 @@
           segmentos: ativos.map((p) => ({ label: p.nome, cor: p.cor, valor: p.gasto })),
         }),
         UI.Section({ key: "perfil:lista", title: "Perfis" },
-          ativos.length ? h("div", { class: "list" }, ativos.map((p) => linhaPerfil(p, sel, ctx))) : UI.EmptyState("Todos os perfis estão arquivados.", { icon: "perfil" })),
+          ativos.length ? h("div", { class: ZoZo.pecas.listaLinhas }, ativos.map((p) => linhaPerfil(p, sel, ctx))) : UI.EmptyState("Todos os perfis estão arquivados.", { icon: "perfil" })),
         arquivados.length ? UI.Section({ key: "perfil:arquivados", title: "Perfis arquivados" },
-          h("div", { class: "list" }, arquivados.map((p) => linhaPerfil(p, sel, ctx)))) : null);
+          h("div", { class: ZoZo.pecas.listaLinhas }, arquivados.map((p) => linhaPerfil(p, sel, ctx)))) : null);
     },
   };
 
@@ -196,7 +269,9 @@
   /** Avatar redondo: foto do usuário ou iniciais */
   function Avatar(foto, nome, tamanho) {
     const iniciais = String(nome || "?").trim().split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase();
-    return h("span", { class: "avatar", style: { width: (tamanho || 40) + "px", height: (tamanho || 40) + "px", fontSize: Math.round((tamanho || 40) * 0.38) + "px" }, "aria-hidden": "true" },
+    // base com especificidade zero: o menu lateral troca fundo e cor (inicial clara sobre o roxo)
+    return h("span", { class: "tw:base:flex-none tw:base:grid tw:base:place-items-center tw:base:overflow-hidden tw:base:rounded-[50%] tw:base:bg-zz-primary-soft "
+      + "tw:base:text-zz-primary tw:base:font-semibold tw:base:[box-shadow:0_0_0_2px_#fff,0_0_0_3px_var(--color-border)] tw:[&>img]:size-full tw:[&>img]:object-cover tw:[&>img]:block", style: { width: (tamanho || 40) + "px", height: (tamanho || 40) + "px", fontSize: Math.round((tamanho || 40) * 0.38) + "px" }, "aria-hidden": "true" },
       foto && /^data:image\/jpeg;base64,/.test(foto) ? h("img", { src: foto, alt: "" }) : iniciais);
   }
 
@@ -280,16 +355,16 @@
     };
     const tecla = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(); } };
 
-    const check = h("span", { class: "p2fa__ok", "aria-hidden": "true", hidden: true }, icon("check", { size: 12 }));
-    const erro = h("p", { class: "p2fa__erro", role: "alert" });
-    const qrArea = h("div", { class: "p2fa__qr", "aria-busy": "true" }, h("span", { class: ZoZo.pecas.girando, "aria-hidden": "true" }));
-    const chaveTexto = h("code", { class: "p2fa__chave" }, "");
+    const check = h("span", { class: P2.ok, "aria-hidden": "true", hidden: true }, icon("check", { size: 12 }));
+    const erro = h("p", { class: P2.erro, role: "alert" });
+    const qrArea = h("div", { class: P2.qr, "aria-busy": "true" }, h("span", { class: ZoZo.pecas.girando, "aria-hidden": "true" }));
+    const chaveTexto = h("code", { class: P2.chave }, "");
     let chave = "";
     const copiar = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Copiar chave de configuração", title: "Copiar",
       onClick: (e) => { const b = e.currentTarget; navigator.clipboard.writeText(chave).then(() => UI.confirmarNoBotao(b, "Chave copiada"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } },
       icon("copiar", { size: 15 }));
     const campo = V.CampoCodigo({
-      rotulo: "Código de 6 dígitos do aplicativo 2FA",
+      rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: P2.codigo, classeCaixa: P2.caixa,
       onDigitar: () => { campo.marcarErro(false); },
       onCompleto: (codigo) => {
         campo.desabilitar(true);
@@ -307,18 +382,18 @@
       },
     });
 
-    const passo = (n, titulo, extra) => h("li", { class: "p2fa__passo" },
-      h("span", { class: "p2fa__num", "aria-hidden": "true" }, String(n)),
-      h("div", { class: "p2fa__corpo" }, h("p", { class: "p2fa__titulo" }, titulo, n === 4 ? check : null), extra || null));
+    const passo = (n, titulo, extra) => h("li", { class: P2.passo },
+      h("span", { class: P2.numero, "aria-hidden": "true" }, String(n)),
+      h("div", null, h("p", { class: P2.passoTitulo }, titulo, n === 4 ? check : null), extra || null));
 
-    const painel = h("aside", { class: "p2fa", role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
-      h("header", { class: "p2fa__topo" },
-        h("h3", { class: "p2fa__h" }, "Autenticação de Dois Fatores"),
+    const painel = h("aside", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
+      h("header", { class: P2.topo },
+        h("h3", { class: P2.titulo }, "Autenticação de Dois Fatores"),
         h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),
-      h("ol", { class: "p2fa__passos" },
-        passo(1, PASSOS_2FA[0], h("p", { class: "p2fa__dica" }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator, Authy ou o do seu gerenciador de senhas.")),
+      h("ol", { class: P2.passos },
+        passo(1, PASSOS_2FA[0], h("p", { class: P2.dica }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator, Authy ou o do seu gerenciador de senhas.")),
         passo(2, PASSOS_2FA[1]),
-        passo(3, PASSOS_2FA[2], h("div", null, qrArea, h("div", { class: "p2fa__chave-linha" }, chaveTexto, copiar))),
+        passo(3, PASSOS_2FA[2], h("div", null, qrArea, h("div", { class: P2.chaveLinha }, chaveTexto, copiar))),
         passo(4, PASSOS_2FA[3], h("div", null, campo.el, erro))));
 
     janelaEl.appendChild(painel);
@@ -332,15 +407,15 @@
       mount(qrArea, V.QR(r.uri, 176));
       qrArea.removeAttribute("aria-busy");
       campo.foco();
-    }).catch((e) => { mount(qrArea, h("p", { class: "p2fa__erro" }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
+    }).catch((e) => { mount(qrArea, h("p", { class: P2.erro }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
   }
 
   /** Desativar o 2FA pede um código ATUAL do aplicativo (o servidor confere): sessão aberta não basta */
   function desativar2FA(ctx) {
-    const erro = h("p", { class: "p2fa__erro", role: "alert" });
+    const erro = h("p", { class: [P2.erro, "tw:text-center"], role: "alert" });
     let erros = 0;
     const campo = ZoZo.verificacao.CampoCodigo({
-      rotulo: "Código de 6 dígitos do aplicativo 2FA",
+      rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-4",
       onDigitar: () => campo.marcarErro(false),
       onCompleto: (codigo) => {
         campo.desabilitar(true);
@@ -357,7 +432,7 @@
     });
     const janela = ZoZo.feedback.modal({
       title: "Desativar 2FA?", class: "modal--confirm",
-      body: h("div", { class: "desativar2fa" },
+      body: h("div", null,
         h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA."),
         campo.el, erro),
     });
@@ -392,7 +467,7 @@
     const chave = entrada("", "", 77, "Chave Pix");
     const nome = entrada("Nome do recebedor", pix ? pix.nome : String(u.nomeUsuario || "").replace(/[^\p{L} ]/gu, "").slice(0, 25), 25, "Nome do recebedor");
     const cidade = entrada("Cidade", pix ? pix.cidade : "", 15, "Cidade do recebedor");
-    const erro = h("p", { class: "cfg-pix__erro", role: "alert" });
+    const erro = h("p", { class: CF.pixErro, role: "alert" });
     const tipoSel = UI.Select(Object.keys(TIPOS_CHAVE).map((k) => ({ value: k, label: TIPOS_CHAVE[k].rotulo })), { value: tipo, ariaLabel: "Tipo de chave Pix", class: "select--sm" });
     const aplicarTipo = () => { const t = TIPOS_CHAVE[tipo]; chave.placeholder = t.ph; chave.inputMode = t.modo; chave.value = t.formatar(chave.value); };
     tipoSel.addEventListener("change", () => { tipo = tipoSel.value; chave.value = ""; erro.textContent = ""; aplicarTipo(); atualizarBotao(); });
@@ -431,13 +506,14 @@
         .finally(() => { atualizarBotao(); });
     };
     atualizarBotao();
-    return h("div", { class: "cfg-row cfg-row--bloco" },
-      h("div", { class: "cfg-row__text" },
-        h("span", { class: "cfg-row__title" }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
-        h("span", { class: "cfg-row__sub" }, "Definir chave Pix para o QRCode.")),
+    const P = ZoZo.pecas;
+    return h("div", { class: P.cfgLinhaBloco },
+      h("div", { class: P.cfgTexto },
+        h("span", { class: P.cfgTitulo }, pix ? "Chave cadastrada: " + mascarar(pix.chave) : "Nenhuma chave cadastrada"),
+        h("span", { class: P.cfgSub }, "Definir chave Pix para o QRCode.")),
       // tipo · chave · nome · cidade · [Remover] Salvar — tudo numa linha
-      h("div", { class: ["cfg-pix", ZoZo.pecas.ctxListaPix] }, tipoSel, chave, nome, cidade,
-        h("div", { class: "cfg-pix__acoes" },
+      h("div", { class: [CF.pix, P.ctxListaPix] }, tipoSel, chave, nome, cidade,
+        h("div", { class: CF.pixAcoes },
           pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
             .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => { erro.textContent = e.friendly; }) }) : null,
           salvarBtn)),
@@ -448,9 +524,10 @@
   let abaConfig = "geral";
 
   function linhaConfig(titulo, sub, direita) {
-    return h("div", { class: "cfg-row" },
-      h("div", { class: "cfg-row__text" }, h("span", { class: "cfg-row__title" }, titulo), sub ? h("span", { class: "cfg-row__sub" }, sub) : null),
-      h("div", { class: ["cfg-row__right", ZoZo.pecas.ctxInterruptorAjustado] }, direita));
+    const P = ZoZo.pecas;
+    return h("div", { class: P.cfgLinha },
+      h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, titulo), sub ? h("span", { class: P.cfgSub }, sub) : null),
+      h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, direita));
   }
 
   ZoZo.pages.configuracoes = {
@@ -464,16 +541,16 @@
       const demo = ZoZo.recursos.demo();       // conta de demonstração: nome, senha, 2FA, apagar e excluir não existem
       const redesenhar = ctx.redesenharConfig || (() => {});
 
-      const nav = h("nav", { class: "cfg-nav", "aria-label": "Seções das configurações" },
-        h("p", { class: "cfg-nav__title" }, "Configurações"),
+      const P = ZoZo.pecas;
+      const nav = h("nav", { class: CF.nav, "aria-label": "Seções das configurações" },
+        h("p", { class: CF.navTitulo }, "Configurações"),
         [["geral", "configuracoes", "Geral"], ["conta", "perfil", "Conta"], ["sobre", "info", "Sobre"]].map(([id, ic, rot]) => h("button", {
-          type: "button", class: ["nav-item", abaConfig === id && "is-active"], "aria-current": abaConfig === id ? "page" : undefined,
+          type: "button", class: abaConfig === id ? CF.navItemAtivo : CF.navItem, "aria-current": abaConfig === id ? "page" : undefined,
           onClick: () => { abaConfig = id; redesenhar(); },
         }, icon(ic, { size: 16 }), h("span", null, rot))));
 
       let conteudo;
       if (abaConfig === "sobre") {
-        // 1ª tela em Tailwind CSS (classes tw:, ver src/estilos.css); as outras abas ainda usam css/
         const linha = (titulo, valor) => h("div", { class: "tw:flex tw:items-center tw:justify-between tw:gap-(--space-5) tw:py-2.5" },
           h("span", { class: "tw:text-(length:--t-15) tw:font-[450] tw:text-zz-text" }, titulo),
           h("span", { class: "tw:text-(length:--t-13) tw:font-[550] tw:text-zz-secondary" }, valor));
@@ -484,26 +561,26 @@
         ];
       } else if (abaConfig === "geral") {
         conteudo = [
-          h("h3", { class: "cfg-section" }, "Orçamento"),
+          h("h3", { class: P.cfgSecao }, "Orçamento"),
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
               .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar orçamento")),
           // Pix das faturas: só contas com o recurso
-          ZoZo.recursos.pix() ? h("h3", { class: "cfg-section" }, "Pix das faturas") : null,
+          ZoZo.recursos.pix() ? h("h3", { class: P.cfgSecao }, "Pix das faturas") : null,
           ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
-          h("h3", { class: "cfg-section" }, "Multicâmbio"),
+          h("h3", { class: P.cfgSecao }, "Multicâmbio"),
           ZoZo.cambio.SecaoConfig(ctx, cfg),
-          h("h3", { class: "cfg-section" }, "Armazenamento"),
+          h("h3", { class: P.cfgSecao }, "Armazenamento"),
           linhaConfig(
             ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador."
               : demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
               : disponivel ? "Seus dados são criptografados." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
             demo ? "Ao sair ou recarregar a página, novos dados são sorteados." : "Última gravação: " + quando(cfg.ultimaGravacao) + ".",
-            icon(disponivel ? "nuvem" : "alerta", { size: 18, class: disponivel ? "cfg-ok" : "cfg-alerta" })),
+            icon(disponivel ? "nuvem" : "alerta", { size: 18, class: disponivel ? CF.ok : CF.alerta })),
         ];
       } else {
         // Foto
-        const arquivo = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif,image/bmp", class: "visually-hidden", "aria-label": "Escolher foto" });
+        const arquivo = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif,image/bmp", class: "tw:sr-only", "aria-label": "Escolher foto" });
         arquivo.addEventListener("change", () => {
           const f = arquivo.files && arquivo.files[0];
           arquivo.value = "";
@@ -540,30 +617,30 @@
             .catch((e) => ctx.toast(e.friendly, { tone: "error" })));
 
         conteudo = [
-          h("h3", { class: "cfg-section" }, "Informação"),
+          h("h3", { class: P.cfgSecao }, "Informação"),
           // Foto centralizada (clique para trocar) e "Remover" logo abaixo
-          h("div", { class: "cfg-photo-center" },
-            h("button", { type: "button", class: "cfg-photo__btn", title: cfg.foto ? "Trocar foto" : "Escolher foto", "aria-label": cfg.foto ? "Trocar foto" : "Escolher foto", onClick: () => arquivo.click() },
-              Avatar(cfg.foto, u.nomeUsuario, 72), h("span", { class: "cfg-photo__overlay", "aria-hidden": "true" }, icon("camera", { size: 20 }))),
+          h("div", { class: CF.foto },
+            h("button", { type: "button", class: CF.fotoBotao, title: cfg.foto ? "Trocar foto" : "Escolher foto", "aria-label": cfg.foto ? "Trocar foto" : "Escolher foto", onClick: () => arquivo.click() },
+              Avatar(cfg.foto, u.nomeUsuario, 72), h("span", { class: CF.fotoCamera, "aria-hidden": "true" }, icon("camera", { size: 20 }))),
             cfg.foto ? UI.Button("Remover", { size: "sm", onClick: () => ctx.bridge.request(A.updateConfig, { foto: null })
               .then(() => ctx.loadData("config", A.getConfig, null, { force: true })) }) : null,
             arquivo),
-          demo ? linhaConfig("Nome", null, h("span", { class: "cfg-readonly" }, u.nomeUsuario || "")) : linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: ZoZo.pecas.cfgNoLugar,
+          demo ? linhaConfig("Nome", null, h("span", { class: CF.leitura }, u.nomeUsuario || "")) : linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: ZoZo.pecas.cfgNoLugar,
             aoSalvar: (v) => ZoZo.modais.confirmarComSenha({ titulo: "Confirmar alteração", botao: "Salvar", mensagem: "Digite sua senha para alterar o nome." })
               .then((senha) => {
                 if (!senha) throw new ZoZo.messages.BridgeError("CANCELADO", "Alteração cancelada.");
                 return ctx.bridge.request(A.updateUser, { nomeUsuario: v, email: u.email, senhaAtual: senha });
               }).then((sessao) => { store.set({ session: { user: sessao.user } }); ctx.toast("Nome alterado."); }) })),
-          linhaConfig("E-mail", null, h("span", { class: "cfg-readonly" }, u.email || "")),
-          demo ? h("p", { class: "cfg-nota" }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
+          linhaConfig("E-mail", null, h("span", { class: CF.leitura }, u.email || "")),
+          demo ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
           // Senha: título em cima e, abaixo, senha atual · nova senha · Alterar (sem espremer o título ao lado)
-          demo ? null : h("div", { class: "cfg-row cfg-row--bloco" },
-            h("div", { class: "cfg-row__text" }, h("span", { class: "cfg-row__title" }, "Alterar senha")),
-            h("div", { class: "cfg-password" }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
+          demo ? null : h("div", { class: P.cfgLinhaBloco },
+            h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Alterar senha")),
+            h("div", { class: CF.senha }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
           demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
-          h("h3", { class: "cfg-section" }, "Ações"),
+          h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + ({ BRL: "Real", EUR: "Euro", USD: "Dólar" }[cfg.moeda] || "Real") : "Exportar todas as transações",
             "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : ""), UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
@@ -571,13 +648,13 @@
         ];
       }
       // Sair e Excluir conta ficam fixos no rodapé da janela (aba Conta)
-      const rodape = abaConfig === "conta" ? h("div", { class: "cfg-footer" },
+      const rodape = abaConfig === "conta" ? h("div", { class: CF.rodape },
         UI.Button("Sair", { onClick: () => ctx.logout() }),
-        demo ? null : h("button", { type: "button", class: "cfg-danger-btn", onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
+        demo ? null : h("button", { type: "button", class: CF.excluirConta, onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
           mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." })
           .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
             .catch((e) => ctx.toast(e.friendly, { tone: "error" }))) }, "Excluir conta")) : null;
-      return h("div", { class: ["page page--config cfg", ZoZo.pecas.ctxConfig] }, nav, h("div", { class: "cfg-main" }, h("div", { class: "cfg-content" }, conteudo), rodape));
+      return h("div", { class: [CF.raiz, P.ctxConfig] }, nav, h("div", { class: CF.principal }, h("div", { class: CF.conteudo }, conteudo), rodape));
     },
   };
 
@@ -590,7 +667,7 @@
      própria janela, com "Voltar" para a tela principal.
      ============================================================= */
   function abrirConfiguracoes(ctx, aba) {
-    const area = h("div", { class: "settings-modal" });
+    const area = h("div", { class: "tw:h-full" });
     let cancelar = null;
     const ctxModal = Object.assign({}, ctx);
     function principal() {

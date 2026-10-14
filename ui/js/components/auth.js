@@ -109,7 +109,7 @@
   }
   /** E-mail presente (oculto) no formulário da senha: é por ele que o navegador sabe de qual conta é a senha */
   const emailOculto = () => h("input", { type: "email", name: "email", id: "email", autocomplete: "username", value: estado.email,
-    class: "visually-hidden", tabindex: "-1", "aria-hidden": "true", readonly: true });
+    class: "tw:sr-only", tabindex: "-1", "aria-hidden": "true", readonly: true });
 
   const botao = (texto) => h("button", { type: "submit", class: C.botao }, h("span", { class: "btn__label" }, texto));
   const aviso = (msg) => h("p", { class: C.erro, role: "alert" }, msg || "");

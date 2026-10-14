@@ -54,11 +54,16 @@
   /* ---------------- Código de 6 dígitos ---------------- */
   function CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6 {
     const c = cfg || {};
+    // base com especificidade zero: quem usa ajusta tamanho e espaçamento (c.classe / c.classeCaixa); erro: borda vermelha
     const caixas = Array.from({ length: 6 }, (_, i) => h("input", {
-      type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: "1", class: ["codigo6__caixa", c.classeCaixa],
+      type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: "1",
+      class: ["codigo6__caixa tw:base:w-[46px] tw:base:h-[50px] tw:base:p-0 tw:base:text-center tw:base:text-[20px] tw:base:font-[550] "
+        + "tw:base:[font-variant-numeric:tabular-nums] tw:base:text-zz-text tw:base:bg-(--color-surface-hover,#f4f5f7) tw:base:border tw:base:border-zz-border "
+        + "tw:base:rounded-lg tw:base:[caret-color:var(--color-primary)] tw:base:focus:outline-none tw:base:focus:border-zz-primary "
+        + "tw:base:focus:[box-shadow:0_0_0_3px_var(--color-primary-soft)] tw:base:focus:bg-zz-surface tw:in-[.is-erro]:border-(--color-danger)!", c.classeCaixa],
       autocomplete: i === 0 ? "one-time-code" : "off", "aria-label": "Dígito " + (i + 1) + " de 6",
     }) as HTMLInputElement);
-    const el = h("div", { class: "codigo6", role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);
+    const el = h("div", { class: ["codigo6 tw:base:flex tw:base:justify-center tw:base:gap-2 tw:[&.is-ocupado]:opacity-60", c.classe], role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);
     const valor = () => caixas.map((x) => x.value).join("");
     const conferir = () => { const v = valor(); if (/^\d{6}$/.test(v) && c.onCompleto) c.onCompleto(v); };
     function preencher(inicio: number, texto: string) {

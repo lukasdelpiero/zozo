@@ -405,7 +405,7 @@
     if (rotulo) rotulo.textContent = texto; else btn.setAttribute("aria-label", texto);
     btn.classList.add("is-confirmado");
     const vivo = document.getElementById("toast-root");
-    if (vivo) { const aviso = h("span", { class: "sr-only" }, texto); vivo.appendChild(aviso); setTimeout(() => aviso.remove(), 1600); }
+    if (vivo) { const aviso = h("span", { class: "tw:sr-only" }, texto); vivo.appendChild(aviso); setTimeout(() => aviso.remove(), 1600); }
     clearTimeout(btn._confirmar);
     btn._confirmar = setTimeout(() => {
       if (iconeAntes) ok.replaceWith(iconeAntes);

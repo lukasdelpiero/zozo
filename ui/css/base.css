@@ -78,11 +78,6 @@ button:disabled { cursor: not-allowed; }
 
 /* Barra de rolagem: a do sistema (Windows 11: polegar cinza arredondado com setas), sem personalização */
 
-.visually-hidden {
-  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
-  clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; margin: -1px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
