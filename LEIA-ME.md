@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.8.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.9.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,12 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.9.0
+
+- **Fatura, Divisão entre perfis, Calendário e Câmbio em Tailwind CSS:** editor e folha A4 da fatura (lista, ajustes, resumo, Pix), janela de dividir transação, calendário (dias, hoje, escolhido, teclado), seletor de moedas do menu lateral e janelas de transferir entre moedas. Visual conferido elemento a elemento em 1280, 760 e 375 px (idêntico). A impressão da fatura continua em `css/print.css`. Mais ~210 linhas de CSS antigo a menos (`components.css` deixou de existir); o que resta (427 linhas): tokens de cor e espaço, a base (reset, `.page`, dinheiro, ícones, foco), CAPTCHA, seletor de emoji, lista aberta do campo de seleção, animações de entrada e a impressão da fatura.
+- **Testes antes da conversão do serviço e do host:** 41 testes novos (78 no total). Serviço de dados: entrada inválida, fatura, perfis (inclusive arquivados e sem o recurso), exclusões, recorrências (pagar duas vezes não duplica), divisão, lote, gravação que falha ou entra em conflito, documento mais novo ou sumido. Host web: a API falsa confere que a senha e o conteúdo nunca saem legíveis; derivação das chaves (Argon2id e PBKDF2 → HKDF) e formato do documento conferidos com uma implementação independente; adulteração, AAD (outra versão/outra conta), versão mais antiga, conflito, chave guardada só com o envelope da sessão, troca de senha, senha vazada (só 5 caracteres do hash saem), rebaixamento de parâmetros, proteção do Cloudflare.
+- **Correções encontradas pelos testes:** o serviço de dados aceitava como ação nomes herdados de `Object` (`constructor`, `toString`…) — agora só as ações da tabela; a fatura aceitava mês/ano como `"3x"` — agora só número inteiro.
 
 ## Novidades da versão 3.8.0
 
@@ -229,7 +235,7 @@ ZoZo/
 │   │   ├── bridge/           messages.js (contrato) · host-web.js (criptografia + API) · transporte.js
 │   │   ├── components/       … · verificacao.js (CAPTCHA, código de 6 dígitos, QR code — qrcode-generator do npm) · cambio.js
 │   │   ├── pages/ · router.js · app.js
-│   ├── tests/                testes do serviço de dados (node --test)
+│   ├── tests/                testes do serviço de dados e do host web (node --test)
 │   └── mock/                 modo demonstração (só no npm run dev; nunca no build)
 └── api/                      ← back-end (Python 3)
     ├── src/entry.py          ponto de entrada no Cloudflare (D1, fetch, cookies)
@@ -286,7 +292,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 ## Testar no seu computador
 
 - **Primeira vez:** `npm ci` na pasta `ZoZo` (instala Vite, TypeScript e Tailwind nas versões do `package-lock.json`).
-- **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados) · `npm run typecheck` (TypeScript).
+- **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados e host web, com a criptografia) · `npm run typecheck` (TypeScript).
 - **E-mail no computador:** `$env:ZOZO_DEV_EMAIL = "console"` antes do `python api/dev/servidor_local.py` liga a confirmação e **mostra os e-mails no terminal** (nada é enviado). `$env:ZOZO_DEV_BANCO` aponta para outro arquivo SQLite (ex.: um banco descartável).
 - **Aplicativo completo com a API Python:** `python api/dev/servidor_local.py` (http://127.0.0.1:8787, serve a interface montada por `npm run build`). Para mexer na interface: `npm run dev` → http://127.0.0.1:5173 (recarga instantânea; repassa `/api/*` para o servidor Python). Cadastre uma conta; o CAPTCHA usa as chaves de teste da Cloudflare, que sempre aprovam.
 - **Modo demonstração (só interface, dados no navegador):** `npm run dev` e abra http://127.0.0.1:5173/?mock=1. A conta é definida por você:

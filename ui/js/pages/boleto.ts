@@ -15,6 +15,84 @@
 
   let atual: { close(): void; carregar(): void } | null = null; // instância aberta
 
+  /* ---------------- Classes (Tailwind) ----------------
+     Ficam como ganchos da impressão (css/print.css): boleto, boleto__header, boleto__editor, boleto__body,
+     boleto__preview, paper-scaler, paper, doc, doc__table, doc__block-title, doc__rodape, doc__pix, boleto-summary--doc */
+  const SECAO = "tw:py-4 tw:px-0 tw:flex tw:flex-col tw:[&+&]:border-t tw:[&+&]:border-t-zz-border";
+  const TD = "tw:[&_tr]:break-inside-avoid tw:[&_td]:border-b tw:[&_td]:border-b-zz-border tw:[&_td]:align-top";
+  const NUM = "tw:text-right! tw:[font-variant-numeric:lining-nums_proportional-nums] tw:whitespace-nowrap";
+  const LINHA_DOC = "tw:m-0 tw:text-[15px] tw:leading-[1.3] tw:text-zz-text tw:tracking-[0.02em]";
+  const TOTAL = "tw:flex tw:justify-between tw:items-baseline tw:mt-2 tw:pt-3 tw:font-[600] "
+    + "tw:[&_strong]:text-[24px] tw:[&_strong]:text-[#6948D8] tw:[&_strong]:tracking-[-0.02em]";
+  const T = {
+    // janela em tela cheia: entra subindo um pouco (sem movimento com "reduzir movimento")
+    janela: "boleto tw:fixed tw:inset-0 tw:z-60 tw:grid tw:grid-rows-[var(--topbar-height)_minmax(0,1fr)] tw:bg-(--color-background) tw:opacity-0 "
+      + "tw:[transform:translateY(16px)_scale(0.99)] tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] "
+      + "tw:[&.is-open]:opacity-100 tw:[&.is-open]:[transform:none] tw:motion-reduce:[transform:none] tw:motion-reduce:[transition:opacity_120ms_linear]",
+    cabecalho: "boleto__header tw:flex tw:items-center tw:justify-between tw:py-0 tw:pr-4 tw:pl-6 tw:bg-[#6948D8] tw:text-(--color-on-primary) "
+      + "tw:border-b tw:border-b-zz-border tw:[box-shadow:none] tw:[&_:focus-visible]:outline-white",
+    // editor à esquerda e a folha A4 à direita; até 900 px um embaixo do outro, com uma rolagem só
+    corpo: "boleto__body tw:grid tw:grid-cols-[var(--boleto-editor-width)_minmax(0,1fr)] tw:min-h-0 "
+      + "tw:estreito:grid-cols-[minmax(0,1fr)] tw:estreito:auto-rows-max tw:estreito:overflow-y-auto",
+    editor: "boleto__editor tw:overflow-y-auto tw:bg-zz-surface tw:border-r tw:border-r-zz-border tw:pt-2 tw:px-6 tw:pb-6 "
+      + "tw:estreito:overflow-visible tw:estreito:max-h-none tw:estreito:border-r-0",
+    secao: SECAO + " tw:gap-3",
+    secaoResumo: SECAO + " tw:gap-4 tw:[&>[hidden]]:hidden",
+    secaoTitulo: "tw:flex tw:items-center tw:gap-2 tw:text-[15px] tw:font-[600]",
+    contador: "tw:not-empty:min-w-[22px] tw:not-empty:h-5 tw:not-empty:px-1.5 tw:not-empty:inline-grid tw:not-empty:place-items-center tw:not-empty:rounded-(--radius-pill) "
+      + "tw:not-empty:bg-zz-primary-soft tw:not-empty:text-zz-primary tw:not-empty:text-[11.5px]",
+    periodo: "tw:grid tw:gap-3 tw:grid-cols-[1.4fr_1fr]",
+    avisoPix: "tw:mt-2 tw:mx-0 tw:mb-0 tw:text-[13px] tw:text-zz-secondary tw:empty:hidden",
+    // lista de transações do editor
+    lista: "tw:max-h-[260px] tw:overflow-y-auto tw:-mx-2 tw:my-0",
+    item: "tw:grid tw:grid-cols-[46px_minmax(0,1fr)_auto_auto] tw:gap-3 tw:items-center tw:min-h-8 tw:py-0 tw:px-2 tw:text-[13px] "
+      + "tw:odd:bg-(--color-background) tw:odd:rounded-md",
+    itemData: "tw:text-zz-secondary tw:[font-variant-numeric:lining-nums_proportional-nums] tw:uppercase",
+    itemDesc: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:flex tw:items-baseline tw:gap-1.5 tw:min-w-0",
+    itemDigitos: "tw:flex-none tw:text-zz-secondary tw:[font-variant-numeric:lining-nums_tabular-nums]",
+    itemNome: "tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
+    itemParcela: "tw:text-zz-secondary tw:[font-variant-numeric:lining-nums_tabular-nums]",
+    // contribuições, descontos e arredondamentos
+    ajustes: "tw:flex tw:flex-col tw:gap-2 tw:items-start",
+    ajustesLista: "tw:flex tw:flex-col tw:gap-2 tw:w-full",
+    ajustesLinha: "tw:grid tw:grid-cols-[minmax(0,1fr)_132px_32px] tw:gap-2 tw:items-center tw:w-full",
+    // resumo (editor) e o do documento
+    resumo: "tw:flex tw:flex-col tw:gap-1",
+    resumoDoc: "boleto-summary--doc tw:flex tw:flex-col tw:gap-1 tw:w-[320px] tw:ml-auto tw:text-[13px] tw:break-inside-avoid",
+    resumoLinha: "tw:flex tw:justify-between tw:text-zz-secondary tw:min-h-[26px] tw:items-center tw:[&_.money]:text-zz-text",
+    resumoTotal: TOTAL + " tw:border-t tw:border-t-zz-border-strong",
+    resumoTotalDoc: TOTAL + " tw:border-t-2 tw:border-t-zz-text",
+    // pré-visualização: folha A4 (794 × 1123 px) sobre fundo cinza
+    previa: "boleto__preview tw:overflow-auto tw:p-8 tw:bg-[#e9eaef] tw:estreito:overflow-visible tw:estreito:p-4",
+    escala: "paper-scaler tw:w-[794px] tw:mx-auto tw:my-0",
+    papel: "paper tw:w-[794px] tw:min-h-[1123px] tw:py-16 tw:px-[68px] tw:bg-white tw:[box-shadow:var(--shadow-paper)] tw:text-zz-text",
+    // documento
+    doc: "doc tw:flex tw:flex-col tw:gap-7 tw:text-[13px]",
+    docTopo: "tw:flex tw:justify-between tw:items-center tw:pb-5 tw:border-b-[3px] tw:border-b-[#6948D8]",
+    docMarca: "tw:flex tw:items-center tw:gap-2 tw:font-[600] tw:text-[15px]",
+    docLogo: "tw:size-11 tw:block tw:rounded-[10px] tw:[box-shadow:none]",
+    docTitulo: "tw:text-right tw:flex tw:flex-col tw:gap-1",
+    docPerfil: LINHA_DOC + " tw:font-[620]",
+    docFatura: LINHA_DOC,
+    docFaturaRotulo: "tw:font-[620]",
+    docFaturaData: "tw:font-[400]",
+    docBlocoTitulo: "doc__block-title tw:text-[13px] tw:font-[600] tw:mb-2",
+    docTabelaAjuste: "doc__table tw:w-full tw:border-collapse " + TD + " tw:[&_td]:py-[7px] tw:[&_td]:px-2 tw:[&_td:first-child]:text-zz-text",
+    docTabelaTransacoes: "doc__table tw:w-full tw:border-collapse " + TD + " tw:[&_td]:py-2 tw:[&_td]:px-1.5",
+    docNum: NUM,
+    docNumTransacao: NUM + " tw:w-[120px]",
+    docData: "tw:whitespace-nowrap tw:text-zz-secondary tw:[font-variant-numeric:lining-nums_proportional-nums] tw:w-16 tw:uppercase tw:font-[400]",
+    docDesc: "tw:w-auto",
+    docDigitos: "tw:mr-1.5 tw:font-[400] tw:text-zz-secondary tw:[font-variant-numeric:lining-nums_tabular-nums]",
+    docNome: "tw:text-zz-text",
+    docParcela: "tw:w-14 tw:text-right tw:whitespace-nowrap tw:text-zz-secondary tw:[font-variant-numeric:lining-nums_tabular-nums]",
+    docVazio: "tw:text-zz-muted tw:py-2 tw:px-0",
+    // rodapé: Pix à esquerda e o resumo à direita
+    docRodape: "doc__rodape tw:flex tw:justify-between tw:items-end tw:gap-6 tw:break-inside-avoid",
+    docPix: "doc__pix tw:flex tw:justify-start tw:items-start tw:gap-3 tw:m-0 tw:break-inside-avoid tw:[&>.qr]:flex-none",
+    docPixTexto: "tw:mt-0.5 tw:mx-0 tw:mb-0 tw:max-w-[150px] tw:text-left tw:text-[12px] tw:font-[620] tw:leading-[1.35] tw:text-[#6948D8]",
+  };
+
   /* ---------------- Cálculo (regras configuráveis em js/config/regras.js) ---------------- */
   function sinalDoTipo(tipo: any) {
     const s = R().sinalPorTipo[tipo];
@@ -59,25 +137,25 @@
     if (st.erro) return UI.ErrorState(st.erro, () => { if (atual) atual.carregar(); });
     if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil", class: "tw:min-h-[90px]! tw:p-4!" });
     if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito ou empréstimo deste perfil no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
-    return h("ul", { class: "boleto-list" }, st.lancamentos.map((l: any) => h("li", { class: "boleto-list__item" },
-      h("span", { class: "boleto-list__date" }, diaMes(l.data)),
-      h("span", { class: "boleto-list__desc" },
-        l.ultimos4Digitos ? h("span", { class: "boleto-list__digits" }, l.ultimos4Digitos) : null,
-        h("span", { class: "boleto-list__name" }, l.descricao)),
-      h("span", { class: "boleto-list__parcel" }, parcela(l)),
-      h("span", { class: ["boleto-list__value", "money", sinalDoTipo(l.tipo) < 0 && "money--income"] }, comSinal(F.numero(l.valor) * sinalDoTipo(l.tipo))))));
+    return h("ul", null, st.lancamentos.map((l: any) => h("li", { class: T.item },
+      h("span", { class: T.itemData }, diaMes(l.data)),
+      h("span", { class: T.itemDesc },
+        l.ultimos4Digitos ? h("span", { class: T.itemDigitos }, l.ultimos4Digitos) : null,
+        h("span", { class: T.itemNome }, l.descricao)),
+      h("span", { class: T.itemParcela }, parcela(l)),
+      h("span", { class: ["money", sinalDoTipo(l.tipo) < 0 && "money--income"] }, comSinal(F.numero(l.valor) * sinalDoTipo(l.tipo))))));
   }
 
   /* ---------------- Contribuições / descontos / arredondamentos ---------------- */
   function Ajustes(lista: any, cfg: any) {
-    const wrap = h("div", { class: "adjustments" });
+    const wrap = h("div", { class: T.ajustes });
     const desenhar = () => {
       mount(wrap,
-        lista.length ? h("div", { class: "adjustments__list" }, lista.map((item: any, i: any) => {
-          const desc = UI.Input({ value: item.descricao, placeholder: "Nome", class: "adjustments__desc", maxlength: String(ZoZo.regras.limiteNome) });
+        lista.length ? h("div", { class: T.ajustesLista }, lista.map((item: any, i: any) => {
+          const desc = UI.Input({ value: item.descricao, placeholder: "Nome", maxlength: String(ZoZo.regras.limiteNome) });
           desc.setAttribute("aria-label", cfg.rotulo + " " + (i + 1) + ": nome");
           desc.dataset.fk = cfg.chave + ":d:" + item.id;
-          const valor = UI.Input({ value: item.valorTexto || "", placeholder: "0,00", inputmode: "decimal", class: "adjustments__value" });
+          const valor = UI.Input({ value: item.valorTexto || "", placeholder: "0,00", inputmode: "decimal" });
           valor.setAttribute("aria-label", cfg.rotulo + " " + (i + 1) + ": valor");
           desc.addEventListener("input", () => { item.descricao = desc.value; cfg.onChange(); });
           valor.addEventListener("input", () => {
@@ -90,7 +168,7 @@
             if (item.invalido) valor.setAttribute("aria-invalid", "true"); else valor.removeAttribute("aria-invalid");
             cfg.onChange();
           });
-          return h("div", { class: "adjustments__row" },
+          return h("div", { class: T.ajustesLinha },
             desc,
             h("div", { class: ZoZo.pecas.afixoPequeno }, h("span", { class: ZoZo.pecas.prefixo, "aria-hidden": "true" }, cfg.prefixo), valor),
             UI.IconButton("excluir", "Excluir " + cfg.rotulo.toLowerCase(), { class: "icon-btn--danger", onClick: () => { lista.splice(i, 1); desenhar(); cfg.onChange(); } }));
@@ -109,13 +187,13 @@
   function Resumo(st: any, opts?: any) {
     const t = calcular(st);
     const o = opts || {};
-    const linha = (rotulo: any, valor: any) => h("div", { class: "boleto-summary__line" }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
-    return h("div", { class: ["boleto-summary", o.doc && "boleto-summary--doc"] },
+    const linha = (rotulo: any, valor: any) => h("div", { class: T.resumoLinha }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
+    return h("div", { class: o.doc ? T.resumoDoc : T.resumo },
       linha("Total das transações", t.lancamentos),
       linha("Contribuições", t.contribuicoes),
       linha("Descontos", t.descontos),
       linha("Arredondamentos", t.arredondamentos),
-      h("div", { class: "boleto-summary__total" }, h("span", null, "Total a pagar"), h("strong", { class: "money" }, comSinal(t.total))));
+      h("div", { class: o.doc ? T.resumoTotalDoc : T.resumoTotal }, h("span", null, "Total a pagar"), h("strong", { class: "money" }, comSinal(t.total))));
   }
 
   /* ---------------- Pix (QR code no canto inferior esquerdo, ao lado do resumo) ----------------
@@ -129,9 +207,9 @@
     const codigo = ZoZo.pix.payload({ chave: st.pix.chave, nome: st.pix.nome, cidade: st.pix.cidade, valor: t.total });
     if (!codigo) return null;
     st.pixCodigo = codigo;
-    return h("section", { class: "doc__pix", "aria-label": "Pagamento por Pix" },
-      ZoZo.verificacao.QR(codigo, 112, "Código QR do Pix para pagar " + F.moeda(t.total)),
-      h("p", { class: "doc__pix-texto" }, "Leia o QR no celular e pague por Pix"));
+    return h("section", { class: T.docPix, "aria-label": "Pagamento por Pix" },
+      ZoZo.verificacao.QR(codigo, 132, "Código QR do Pix para pagar " + F.moeda(t.total)),
+      h("p", { class: T.docPixTexto }, "Leia o QR no celular e pague por Pix"));
   }
 
   /* ---------------- Pré-visualização (documento A4) ---------------- */
@@ -141,34 +219,34 @@
     const ajustes = (titulo: any, lista: any, valor: any) => {
       const validos = lista.filter((x: any) => x.descricao.trim() || F.numero(x.valor));
       if (!validos.length) return null;
-      return h("section", { class: "doc__block" },
-        h("h3", { class: "doc__block-title" }, titulo),
-        h("table", { class: "doc__table doc__table--adjust" }, h("tbody", null, validos.map((x: any) => h("tr", null,
+      return h("section", null,
+        h("h3", { class: T.docBlocoTitulo }, titulo),
+        h("table", { class: T.docTabelaAjuste }, h("tbody", null, validos.map((x: any) => h("tr", null,
           h("td", null, x.descricao.trim() || titulo.replace(/ões$/, "ão").replace(/s$/, "")),
-          h("td", { class: "doc__num" }, comSinal(valor(x))))))));
+          h("td", { class: T.docNum }, comSinal(valor(x))))))));
     };
     const transacoes = ok && st.lancamentos.length
-      ? h("table", { class: "doc__table doc__table--transacoes" },
+      ? h("table", { class: T.docTabelaTransacoes },
         h("tbody", null, st.lancamentos.map((l: any) => h("tr", null,
-          h("td", { class: "doc__date" }, diaMes(l.data)),
-          h("td", { class: "doc__desc" },
-            l.ultimos4Digitos ? h("span", { class: "doc__digits" }, l.ultimos4Digitos) : null,
-            h("span", { class: "doc__name" }, l.descricao)),
-          h("td", { class: "doc__parcel" }, parcela(l)),
-          h("td", { class: "doc__num" }, comSinal(F.numero(l.valor) * sinalDoTipo(l.tipo)))))))
-      : h("p", { class: "doc__empty" }, !st.perfilId ? "Selecione um perfil." : ok ? "Nenhuma transação no período." : "Carregando as transações…");
+          h("td", { class: T.docData }, diaMes(l.data)),
+          h("td", { class: T.docDesc },
+            l.ultimos4Digitos ? h("span", { class: T.docDigitos }, l.ultimos4Digitos) : null,
+            h("span", { class: T.docNome }, l.descricao)),
+          h("td", { class: T.docParcela }, parcela(l)),
+          h("td", { class: T.docNumTransacao }, comSinal(F.numero(l.valor) * sinalDoTipo(l.tipo)))))))
+      : h("p", { class: T.docVazio }, !st.perfilId ? "Selecione um perfil." : ok ? "Nenhuma transação no período." : "Carregando as transações…");
 
-    return h("article", { class: "doc", "aria-label": "Pré-visualização da fatura", "aria-busy": ok ? "false" : "true" },
-      h("header", { class: "doc__head" },
-        h("div", { class: "doc__brand" }, h("img", { class: "doc__logo", src: LOGO_FATURA, alt: "ZoZo", width: "44", height: "44", decoding: "sync" })),
-        h("div", { class: "doc__title-wrap" },
-          h("p", { class: "doc__perfil" }, maiusculas(st.perfil ? st.perfil.nome : "—")),
-          h("p", { class: "doc__fatura" }, h("span", { class: "doc__fatura-rotulo" }, "FATURA"), " ", h("span", { class: "doc__fatura-data" }, diaMesAno(st.dataFatura))))),
-      h("section", { class: "doc__block" }, h("h3", { class: "doc__block-title" }, "Transações"), transacoes),
+    return h("article", { class: T.doc, "aria-label": "Pré-visualização da fatura", "aria-busy": ok ? "false" : "true" },
+      h("header", { class: T.docTopo },
+        h("div", { class: T.docMarca }, h("img", { class: T.docLogo, src: LOGO_FATURA, alt: "ZoZo", width: "44", height: "44", decoding: "sync" })),
+        h("div", { class: T.docTitulo },
+          h("p", { class: T.docPerfil }, maiusculas(st.perfil ? st.perfil.nome : "—")),
+          h("p", { class: T.docFatura }, h("span", { class: T.docFaturaRotulo }, "FATURA"), " ", h("span", { class: T.docFaturaData }, diaMesAno(st.dataFatura))))),
+      h("section", null, h("h3", { class: T.docBlocoTitulo }, "Transações"), transacoes),
       ajustes("Contribuições", st.contribuicoes, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalContribuicao),
       ajustes("Descontos", st.descontos, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalDesconto),
       ajustes("Arredondamentos", st.arredondamentos, (x: any) => F.numero(x.valor) * R().sinalArredondamento),
-      h("div", { class: "doc__rodape" }, FaturaPix(st), Resumo(st, { doc: true })));
+      h("div", { class: T.docRodape }, FaturaPix(st), Resumo(st, { doc: true })));
   }
 
   /* ---------------- Impressão ----------------
@@ -210,12 +288,12 @@
     const anterior = document.activeElement as HTMLElement | null;
     let token = 0;
 
-    const listaEl = h("div", { class: "boleto-editor__list" });
+    const listaEl = h("div", { class: T.lista });
     const resumoEl = h("div");
-    const docEl = h("div", { class: "paper" });
-    const contadorEl = h("span", { class: "boleto-editor__count" });
+    const docEl = h("div", { class: T.papel });
+    const contadorEl = h("span", { class: T.contador });
 
-    const avisoPix = h("p", { class: "boleto-editor__pix" });
+    const avisoPix = h("p", { class: T.avisoPix });
     const copiarPix = UI.Button("Copiar Pix copia e cola", { size: "sm", variant: "secondary", icon: "copiar", class: "btn--block",
       onClick: (e) => { const b = e.currentTarget as HTMLElement; if (pronto(st) && st.pixCodigo) navigator.clipboard.writeText(st.pixCodigo).then(() => UI.confirmarNoBotao(b, "Código Pix copiado"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } });
     const imprimirBtn = UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
@@ -284,30 +362,30 @@
       imprimirDocumento(st);
     }
 
-    const secaoAjuste = (titulo: any, lista: any, cfg: any) => h("section", { class: "boleto-editor__section" },
-      h("h3", { class: "boleto-editor__title" }, titulo), Ajustes(lista, Object.assign({ onChange: atualizarResumo }, cfg)));
+    const secaoAjuste = (titulo: any, lista: any, cfg: any) => h("section", { class: T.secao },
+      h("h3", { class: T.secaoTitulo }, titulo), Ajustes(lista, Object.assign({ onChange: atualizarResumo }, cfg)));
 
-    const editor = h("div", { class: "boleto__editor" },
-      h("section", { class: "boleto-editor__section" },
+    const editor = h("div", { class: T.editor },
+      h("section", { class: T.secao },
         UI.Field("Perfil", perfilSel),
-        h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Período"), h("div", { class: "form-row form-row--period" }, mesSel, anoSel)),
+        h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Período"), h("div", { class: T.periodo }, mesSel, anoSel)),
         UI.Field("Data da fatura", dataInput)),
-      h("section", { class: "boleto-editor__section" },
-        h("h3", { class: "boleto-editor__title" }, "Transações", contadorEl),
+      h("section", { class: T.secao },
+        h("h3", { class: T.secaoTitulo }, "Transações", contadorEl),
         listaEl),
       secaoAjuste("Contribuições", st.contribuicoes, { chave: "contrib", rotulo: "Contribuição", adicionar: "Adicionar contribuição", prefixo: F.simbolo(), aceitaNegativo: false }),
       secaoAjuste("Descontos", st.descontos, { chave: "desc", rotulo: "Desconto", adicionar: "Adicionar desconto", prefixo: "− " + F.simbolo(), aceitaNegativo: false }),
       secaoAjuste("Arredondamentos", st.arredondamentos, { chave: "arr", rotulo: "Arredondamento", adicionar: "Adicionar arredondamento", prefixo: F.simbolo(), aceitaNegativo: R().arredondamentoAceitaNegativo }),
-      h("section", { class: "boleto-editor__section boleto-editor__section--summary" }, resumoEl, avisoPix, copiarPix, imprimirBtn));
+      h("section", { class: T.secaoResumo }, resumoEl, avisoPix, copiarPix, imprimirBtn));
 
-    const preview = h("div", { class: "boleto__preview" }, h("div", { class: "paper-scaler" }, docEl));
+    const preview = h("div", { class: T.previa }, h("div", { class: T.escala }, docEl));
 
-    const el = h("div", { class: "boleto", role: "dialog", "aria-modal": "true", "aria-labelledby": "boleto-titulo" },
-      h("header", { class: ["boleto__header", ZoZo.pecas.ctxCabecalhoFatura] },
+    const el = h("div", { class: T.janela, role: "dialog", "aria-modal": "true", "aria-labelledby": "boleto-titulo" },
+      h("header", { class: [T.cabecalho, ZoZo.pecas.ctxCabecalhoFatura] },
         h("h1", { class: ZoZo.estrutura.barraTitulo, id: "boleto-titulo" }, "Criar fatura"),
         h("div", { class: ZoZo.estrutura.barraAcoes },
           UI.IconButton("fechar", "Fechar", { onPrimary: true, onClick: () => close() }))),
-      h("div", { class: "boleto__body" }, editor, preview));
+      h("div", { class: T.corpo }, editor, preview));
 
     mount(root, el);
     document.body.classList.add("has-boleto");

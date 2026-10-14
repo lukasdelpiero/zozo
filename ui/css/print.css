@@ -51,7 +51,7 @@
     box-shadow: none !important;
   }
 
-  .doc { gap: 22px; }
+  .doc { gap: 22px !important; }      /* !important: vence a classe tw:gap-7 da tela */
   .doc__table tr,
   .boleto-summary--doc, .doc__rodape, .doc__pix,
   .doc__block-title { break-inside: avoid; page-break-inside: avoid; }

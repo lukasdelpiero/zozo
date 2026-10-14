@@ -1,8 +1,0 @@
-/* =============================================================
-   ZoZo — Componentes (CSS antigo que ainda resta)
-   O resto já está em Tailwind (components/pecas.ts e estrutura.ts).
-   ============================================================= */
-
-/* Linhas de formulário da fatura (pages/boleto.js) */
-.form-row { display: grid; gap: var(--space-3); }
-.form-row--period { grid-template-columns: 1.4fr 1fr; }

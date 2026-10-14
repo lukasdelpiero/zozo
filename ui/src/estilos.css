@@ -25,7 +25,6 @@
 @import "../css/tokens.css" layer(legado);
 @import "../css/base.css" layer(legado);
 @import "../css/layout.css" layer(legado);
-@import "../css/components.css" layer(legado);
 @import "../css/pages.css" layer(legado);
 @import "../css/tipografia.css" layer(legado);
 @import "../css/print.css" layer(legado);

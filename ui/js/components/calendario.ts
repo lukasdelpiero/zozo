@@ -19,6 +19,26 @@
   const pad = (n: number) => String(n).padStart(2, "0");
   const isoDe = (a: number, m: number, d: number) => a + "-" + pad(m + 1) + "-" + pad(d);
 
+  /* Classes (Tailwind); is-selected e is-hoje ficam como estado dos dias */
+  const FONTE_HERDADA = "tw:[font-family:inherit] tw:[font-style:inherit] tw:[line-height:inherit]";
+  const T = {
+    cal: "tw:grid tw:gap-2",
+    topo: "tw:flex tw:items-center tw:justify-between tw:gap-1.5",
+    titulo: "tw:text-[15px] tw:font-[550] tw:capitalize",
+    grade: "tw:grid tw:grid-cols-[repeat(7,1fr)] tw:gap-0.5",
+    semana: "tw:grid tw:place-items-center tw:h-[26px] tw:text-[11px] tw:font-[600] tw:text-zz-muted",
+    // dia: roxo claro ao passar o mouse; o escolhido em roxo cheio; hoje em roxo (negrito)
+    dia: "tw:h-[34px] tw:[border:0] tw:rounded-lg tw:bg-transparent tw:cursor-pointer " + FONTE_HERDADA + " tw:text-[13px] tw:font-[450] tw:text-zz-text "
+      + "tw:[transition:background-color_120ms_var(--easing),color_120ms_var(--easing)] "
+      + "tw:[&:not(.is-selected):hover]:bg-zz-primary-soft tw:[&:not(.is-selected):hover]:text-zz-primary "
+      + "tw:[&.is-hoje:not(.is-selected)]:font-[650] tw:[&.is-hoje:not(.is-selected)]:text-zz-primary "
+      + "tw:[&.is-selected]:bg-zz-primary tw:[&.is-selected]:text-white tw:[&.is-selected]:font-[600] "
+      + "tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-1",
+    rodape: "tw:flex tw:justify-end tw:border-t tw:border-t-zz-border tw:pt-2",
+    hoje: "tw:[border:0] tw:bg-transparent tw:rounded-lg tw:py-1 tw:px-2.5 " + FONTE_HERDADA + " tw:text-[13px] tw:font-[550] tw:text-zz-primary tw:cursor-pointer "
+      + "tw:hover:bg-zz-primary-soft",
+  };
+
   function abrir(anchor: HTMLElement, valor: string | null | undefined, aoEscolher: (iso: string) => void, opts?: OpcoesCalendario): void {
     const o = opts || {};
     const atual = F.parseData(valor);
@@ -27,8 +47,8 @@
     const hoje = F.iso(new Date());
 
     ZoZo.menu.abrir(anchor, { largura: 280, render(el: HTMLElement, api: { fechar(): void }) {
-      const titulo = h("span", { class: "cal__titulo", "aria-live": "polite" });
-      const grade = h("div", { class: "cal__grade", role: "group", "aria-label": "Dias do mês" });
+      const titulo = h("span", { class: T.titulo, "aria-live": "polite" });
+      const grade = h("div", { class: T.grade, role: "group", "aria-label": "Dias do mês" });
       const escolher = (iso: string) => { api.fechar(); if (iso !== valor) aoEscolher(iso); };
       const dia = (n: number) => grade.querySelector<HTMLElement>('[data-dia="' + n + '"]');
 
@@ -36,11 +56,11 @@
         titulo.textContent = F.mesNome(mes) + " " + ano;
         const vazios = new Date(ano, mes, 1).getDay();
         const total = new Date(ano, mes + 1, 0).getDate();
-        const celulas = SEMANA.map((s) => h("span", { class: "cal__semana", "aria-hidden": "true" }, s));
-        for (let i = 0; i < vazios; i++) celulas.push(h("span", { class: "cal__vazio", "aria-hidden": "true" }));
+        const celulas = SEMANA.map((s) => h("span", { class: T.semana, "aria-hidden": "true" }, s));
+        for (let i = 0; i < vazios; i++) celulas.push(h("span", { "aria-hidden": "true" }));
         for (let dia = 1; dia <= total; dia++) {
           const iso = isoDe(ano, mes, dia);
-          celulas.push(h("button", { type: "button", class: ["cal__dia", iso === valor && "is-selected", iso === hoje && "is-hoje"],
+          celulas.push(h("button", { type: "button", class: [T.dia, iso === valor && "is-selected", iso === hoje && "is-hoje"],
             "data-dia": String(dia), "aria-label": F.dataExtenso(iso), "aria-pressed": String(iso === valor), onClick: () => escolher(iso) }, String(dia)));
         }
         mount(grade, celulas);
@@ -53,7 +73,7 @@
         desenhar(focarDia);
       }
       grade.addEventListener("keydown", (e) => {
-        const b = (e.target as Element).closest<HTMLElement>(".cal__dia");
+        const b = (e.target as Element).closest<HTMLElement>("[data-dia]");
         if (!b) return;
         const atualDia = Number(b.dataset.dia), total = new Date(ano, mes + 1, 0).getDate();
         const passo = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 } as Record<string, number>)[e.key];
@@ -68,15 +88,15 @@
         }
       });
 
-      mount(el, h("div", { class: "cal" },
-        h("div", { class: "cal__topo" },
-          h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "cal__nav"], "aria-label": "Mês anterior", onClick: () => trocarMes(-1) }, icon("chevron-left", { size: 15 })),
+      mount(el, h("div", { class: T.cal },
+        h("div", { class: T.topo },
+          h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Mês anterior", onClick: () => trocarMes(-1) }, icon("chevron-left", { size: 15 })),
           titulo,
-          h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "cal__nav"], "aria-label": "Próximo mês", onClick: () => trocarMes(1) }, icon("chevron-right", { size: 15 }))),
+          h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Próximo mês", onClick: () => trocarMes(1) }, icon("chevron-right", { size: 15 }))),
         grade,
-        h("div", { class: "cal__rodape" }, h("button", { type: "button", class: "cal__hoje", onClick: () => escolher(hoje) }, "Hoje"))));
+        h("div", { class: T.rodape }, h("button", { type: "button", class: T.hoje, onClick: () => escolher(hoje) }, "Hoje"))));
       desenhar(atual && atual.getFullYear() === ano && atual.getMonth() === mes ? atual.getDate() : null);
-      if (!grade.contains(document.activeElement)) requestAnimationFrame(() => { const f = grade.querySelector<HTMLElement>(".is-selected, .is-hoje, .cal__dia"); if (f) f.focus(); });
+      if (!grade.contains(document.activeElement)) requestAnimationFrame(() => { const f = grade.querySelector<HTMLElement>(".is-selected, .is-hoje, [data-dia]"); if (f) f.focus(); });
     } }, { posicao: o.posicao || "esquerda", label: o.rotulo || "Calendário", focar: false, class: ZoZo.estrutura.menuCalendario });
   }
 
@@ -85,7 +105,7 @@
     let valor = cfg.valor;
     const texto = () => { const d = F.parseData(valor); return d ? pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() : "Escolher data"; };
     // campo com a cara de um input; o ícone do calendário à direita
-    const btn = h("button", { type: "button", class: [ZoZo.pecas.entrada, "cal-campo tw:inline-flex tw:items-center tw:justify-between tw:gap-2 tw:cursor-pointer tw:text-left tw:[&_.icon]:text-zz-secondary tw:[&_.icon]:flex-none", cfg.classe], "aria-haspopup": "dialog", "aria-label": cfg.rotulo || "Data" },
+    const btn = h("button", { type: "button", class: [ZoZo.pecas.entrada, "tw:inline-flex tw:items-center tw:justify-between tw:gap-2 tw:cursor-pointer tw:text-left tw:[&_.icon]:text-zz-secondary tw:[&_.icon]:flex-none", cfg.classe], "aria-haspopup": "dialog", "aria-label": cfg.rotulo || "Data" },
       h("span", null, texto()), icon("calendario", { size: 15 }));
     btn.addEventListener("click", () => abrir(btn, valor, (iso) => { valor = iso; btn.firstChild!.textContent = texto(); cfg.aoMudar(iso); }, { rotulo: cfg.rotulo }));
     return btn;

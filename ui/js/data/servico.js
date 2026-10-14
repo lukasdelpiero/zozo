@@ -884,8 +884,8 @@
     /** Fatura de um perfil no mês: SÓ transações feitas em cartão de crédito ou empréstimo */
     [A.getBoletoData]: (d) => {
       exigir(boletoLiberado() && avancado());
-      const ano = inteiro(d.ano), mes = inteiro(d.mes);
-      if (!(ano >= 2000 && ano <= 2100 && mes >= 1 && mes <= 12)) throw erro("OPERATION_FAILED");
+      const ano = numero(d.ano), mes = numero(d.mes);                    // só número inteiro ("3x" é recusado)
+      if (!(Number.isInteger(ano) && Number.isInteger(mes) && ano >= 2000 && ano <= 2100 && mes >= 1 && mes <= 12)) throw erro("OPERATION_FAILED");
       const prefixo = ano + "-" + pad(mes);
       const perfil = doc.perfis.find((p) => p.id === d.perfilId) || null;
       const naFatura = new Set(doc.contas.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo").map((c) => c.id));
@@ -1392,7 +1392,10 @@
     },
   };
 
-  function atende(action) { return action in LEITURAS || action in ESCRITAS; }
+  // Só as ações da própria tabela: "in" também acharia nomes herdados de Object (constructor, toString…)
+  const ehLeitura = (action) => Object.hasOwn(LEITURAS, action);
+  const ehEscrita = (action) => Object.hasOwn(ESCRITAS, action);
+  function atende(action) { return ehLeitura(action) || ehEscrita(action); }
 
   /** Falha inesperada (ex.: dado antigo num formato que a regra não previa) vira erro amigável com o código */
   function amigavel(e) {
@@ -1417,12 +1420,12 @@
 
   function handle(action, data) {
     const d = data || {};
-    if (action in LEITURAS) {
+    if (ehLeitura(action)) {
       // getConfig e a lista para transferir entre moedas enxergam o documento inteiro; o resto, só a moeda escolhida
       const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas;
       return aplicadas.then(() => garantirCarregado()).then(() => (inteiro ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
     }
-    if (action in ESCRITAS) {
+    if (ehEscrita(action)) {
       return alterar(() => clone(ESCRITAS[action](d))).catch((e) => { throw amigavel(e); });
     }
     return Promise.reject(erro("OPERATION_FAILED"));

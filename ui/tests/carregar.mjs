@@ -1,6 +1,7 @@
 // Carrega os módulos da interface (scripts globais em window.ZoZo) num contexto isolado do Node,
 // com o "host" simulado em memória: permite testar o serviço de dados sem navegador.
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { stripTypeScriptTypes } from "node:module";
 import vm from "node:vm";
 import { webcrypto } from "node:crypto";
@@ -35,4 +36,36 @@ export function carregar({ recursos = { perfis: true, boleto: true, pix: true, c
   const A = Z.messages.ACTIONS;
   const req = (acao, dados) => Z.servico.handle(acao, dados);
   return { Z, A, req, eventos, salvos, documento: () => atual };
+}
+
+/**
+ * Carrega o host da versão web (bridge/host-web) com fetch e localStorage simulados.
+ * O argon2 (hash-wasm) é importado de verdade: as chaves derivadas são as mesmas do navegador.
+ */
+export function carregarHost({ fetch, armazenamento = new Map() } = {}) {
+  const eventos = [];
+  const localStorage = {
+    getItem: (k) => (armazenamento.has(k) ? armazenamento.get(k) : null),
+    setItem: (k, v) => { armazenamento.set(k, String(v)); },
+    removeItem: (k) => { armazenamento.delete(k); },
+  };
+  const ctx = {
+    console, crypto: webcrypto, TextEncoder, TextDecoder, btoa, atob, Blob, Response, Headers, CompressionStream, DecompressionStream,
+    setTimeout, clearTimeout, fetch, localStorage,
+    CustomEvent: class { constructor(tipo, o) { this.type = tipo; this.detail = o && o.detail; } },
+    dispatchEvent: (e) => { eventos.push(e); return true; },
+  };
+  ctx.window = ctx;
+  ctx.ZoZo = {};
+  vm.createContext(ctx);
+  const m = "bridge/host-web.js";
+  vm.runInContext(codigo(m), ctx, { filename: fileURLToPath(new URL(m, RAIZ)), importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER });
+  const host = ctx.ZoZo.webHost;
+  /** Chama uma ação; erro do host vira exceção com o código */
+  const chamar = async (action, data) => {
+    const r = await host.handle({ action, requestId: "t", data });
+    if (!r.success) throw Object.assign(new Error(r.error.code), { code: r.error.code });
+    return structuredClone(r.data);                // objetos do contexto isolado viram objetos comuns (comparação)
+  };
+  return { host, chamar, eventos, armazenamento };
 }

@@ -24,10 +24,29 @@
     { codigo: "USD", nome: "Dólar", simbolo: "$" },
   ];
 
+  /* Classes (Tailwind) */
+  const T = {
+    // seletor do menu lateral: três bandeiras lado a lado; com o menu só de ícones (≤ 900 px), uma embaixo da outra e sem o título
+    seletor: "tw:grid tw:gap-1.5",
+    seletorTitulo: "tw:text-[15px] tw:font-[620] tw:tracking-normal tw:normal-case tw:text-(--sidebar-fg-muted) tw:pl-1 tw:estreito:hidden",
+    opcoes: "tw:grid tw:grid-cols-[repeat(3,minmax(0,1fr))] tw:gap-1 tw:estreito:grid-cols-[1fr]",
+    opcao: "tw:h-8 tw:grid tw:place-items-center tw:[border:0] tw:rounded-lg tw:bg-transparent tw:cursor-pointer "
+      + "tw:[&:not([aria-pressed=true]):hover]:bg-(--sidebar-hover) tw:aria-pressed:bg-[rgba(255,255,255,0.18)] "
+      + "tw:focus-visible:outline-2 tw:focus-visible:outline-white tw:focus-visible:-outline-offset-2",
+    bandeira: "tw:block tw:rounded-[2px] tw:[box-shadow:0_0_0_1px_rgba(0,0,0,.12)]",
+    // janelas de transferência
+    aviso: "tw:mt-0 tw:mx-0 tw:mb-3",
+    avisoLaranja: "tw:flex tw:items-start tw:gap-2 tw:mt-0 tw:mx-0 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-(--color-alerta-soft) tw:text-(--color-alerta) "
+      + "tw:text-[13px] tw:font-[550] tw:leading-[1.4] tw:[&_.icon]:flex-none tw:[&_.icon]:mt-px",
+    modo: "tw:flex tw:justify-center tw:mb-3",
+    moeda: "tw:inline-flex tw:items-center tw:gap-1.5",
+    marcar: "tw:size-4 tw:[accent-color:var(--color-primary)]",
+  };
+
   /* Bandeiras desenhadas em SVG (o Windows não mostra emoji de bandeira) */
   /** Moeda pelo código (desconhecido: Real) */
   const moedaDe = (codigo: unknown): Moeda => MOEDAS.find((m) => m.codigo === codigo) || MOEDAS[0];
-  const svg = (...filhos: FilhoDom[]) => s("svg", { viewBox: "0 0 20 14", width: "20", height: "14", class: "bandeira", "aria-hidden": "true" }, ...filhos);
+  const svg = (...filhos: FilhoDom[]) => s("svg", { viewBox: "0 0 20 14", width: "20", height: "14", class: T.bandeira, "aria-hidden": "true" }, ...filhos);
   const BANDEIRAS: Record<string, () => SVGElement> = {
     BRL: () => svg(s("rect", { width: "20", height: "14", rx: "2", fill: "#009c3b" }),
       s("polygon", { points: "10,1.6 18.4,7 10,12.4 1.6,7", fill: "#ffdf00" }),
@@ -98,11 +117,11 @@
       titulo: "Transferir entre moedas",
       classe: "modal--recorrencia modal--cambio",
       passo: function passo(api: any) {
-        const descricao = h("p", { class: [ZoZo.estrutura.modalTexto, "cambio__aviso"] });
+        const descricao = h("p", { class: [ZoZo.estrutura.modalTexto, T.aviso] });
         const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" }) as HTMLInputElement;
         const itensEl = h("div", { class: ZoZo.estrutura.janelaListaSemRolagemLateral });
-        const alternar = h("div", { class: "cambio__modo" });
-        const moedaBtn = h("button", { type: "button", class: [ZoZo.pecasFn.botao("secondary", true), "cambio__moeda"], "aria-haspopup": "menu" });
+        const alternar = h("div", { class: T.modo });
+        const moedaBtn = h("button", { type: "button", class: [ZoZo.pecasFn.botao("secondary", true), T.moeda], "aria-haspopup": "menu" });
         let botao: HTMLButtonElement | null = null;
         const contar = () => { if (botao) botao.disabled = !marcadas.size; };
         const origem = () => (modo === "importar" ? outra : atual);
@@ -120,7 +139,7 @@
           if (!lista) { mount(itensEl, UI.Skeleton(4, { short: true })); return; }
           const itens = lista.filter((l: any) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
           mount(itensEl, itens.length ? itens.map((l: any) => {
-            const cb = h("input", { type: "checkbox", class: "cambio__check", "aria-label": "Transferir " + l.descricao }) as HTMLInputElement;
+            const cb = h("input", { type: "checkbox", class: T.marcar, "aria-label": "Transferir " + l.descricao }) as HTMLInputElement;
             cb.checked = marcadas.has(l.id);
             cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
             return h("label", { class: ZoZo.estrutura.janelaLancMarcavel }, cb,
@@ -149,7 +168,7 @@
           titulo: "Transferir entre moedas",
           corpo: h("div", { class: ZoZo.estrutura.janelaEscolha },
             descricao,
-            h("p", { class: "aviso-laranja", role: "note" }, ZoZo.icons.icon("alerta", { size: 14 }), "O valor numérico não será convertido, apenas a moeda será alterada."),
+            h("p", { class: T.avisoLaranja, role: "note" }, ZoZo.icons.icon("alerta", { size: 14 }), "O valor numérico não será convertido, apenas a moeda será alterada."),
             alternar,
             h("div", { class: ZoZo.estrutura.janelaPesquisa }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           rodapeEsquerda: moedaBtn,
@@ -190,7 +209,7 @@
         const desenhar = () => {
           const itens = lista.filter((l: any) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
           mount(itensEl, itens.length ? itens.map((l: any) => {
-            const cb = h("input", { type: "checkbox", class: "cambio__check", "aria-label": "Transferir " + l.descricao }) as HTMLInputElement;
+            const cb = h("input", { type: "checkbox", class: T.marcar, "aria-label": "Transferir " + l.descricao }) as HTMLInputElement;
             cb.checked = marcadas.has(l.id);
             cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
             return h("label", { class: ZoZo.estrutura.janelaLancMarcavel }, cb,
@@ -204,7 +223,7 @@
         return {
           titulo: o.primeiraVez ? "Usar transações em " + destino.nome + "?" : "Trazer transações para " + destino.nome,
           corpo: h("div", { class: ZoZo.estrutura.janelaEscolha },
-            h("p", { class: [ZoZo.estrutura.modalTexto, "cambio__aviso"] }, "Selecione as transações que deseja transferir para sua conta em " + destino.nome + "."),
+            h("p", { class: [ZoZo.estrutura.modalTexto, T.aviso] }, "Selecione as transações que deseja transferir para sua conta em " + destino.nome + "."),
             h("div", { class: ZoZo.estrutura.janelaPesquisa }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           botoes: [
             { label: o.primeiraVez ? "Agora não" : "Cancelar", onClick: () => api.fechar() },
@@ -226,10 +245,10 @@
   function Seletor(ctx: ContextoApp) {
     if (!ligado()) return null;
     const atual = config().moeda || "BRL";
-    return h("div", { class: "cambio", role: "group", "aria-label": "Câmbio" },
-      h("span", { class: "cambio__titulo" }, "Câmbio"),
-      h("div", { class: "cambio__opcoes" }, MOEDAS.map((m) => h("button", {
-        type: "button", class: ["cambio__opcao", m.codigo === atual && "is-active"], "aria-pressed": String(m.codigo === atual),
+    return h("div", { class: T.seletor, role: "group", "aria-label": "Câmbio" },
+      h("span", { class: T.seletorTitulo }, "Câmbio"),
+      h("div", { class: T.opcoes }, MOEDAS.map((m) => h("button", {
+        type: "button", class: T.opcao, "aria-pressed": String(m.codigo === atual),
         title: m.nome + " (" + m.simbolo + ")", "aria-label": m.nome, onClick: () => trocar(ctx, m.codigo),
       }, BANDEIRAS[m.codigo]()))));
   }

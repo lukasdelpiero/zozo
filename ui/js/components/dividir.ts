@@ -25,6 +25,38 @@
   const pct = (c: number, total: number) => (total ? (c / total) * 100 : 0);
   const fmtPct = (v: number) => (Math.round(v * 100) / 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
 
+  /* Classes (Tailwind). A transação original fica num cartão no topo, ligada por um tracejado às partes */
+  const CARTAO_COLUNA = "tw:flex tw:flex-col tw:gap-1.5 tw:min-w-0";
+  const T = {
+    corpo: "tw:flex tw:flex-col tw:pb-5",
+    cartao: "tw:self-center tw:w-[min(440px,100%)] tw:grid tw:grid-cols-[minmax(0,1fr)_auto] tw:gap-y-1.5 tw:gap-x-4 tw:py-3.5 tw:px-4 "
+      + "tw:border tw:border-zz-border tw:rounded-xl tw:bg-zz-surface tw:[box-shadow:0_1px_2px_rgba(22,33,58,0.05)]",
+    cartaoEsquerda: CARTAO_COLUNA,
+    cartaoDireita: CARTAO_COLUNA + " tw:items-end tw:text-right",
+    cartaoPilulas: "tw:flex tw:gap-1.5 tw:flex-wrap",
+    cartaoNome: "tw:text-[15px] tw:font-[550] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
+    cartaoData: "tw:text-[15px] tw:font-[450] tw:text-zz-secondary",
+    cartaoValor: "tw:flex tw:gap-2.5 tw:text-[15px] tw:font-[550]",
+    ligacao: "tw:self-center tw:w-0.5 tw:h-7 tw:[background:repeating-linear-gradient(to_bottom,var(--color-border-strong)_0_6px,transparent_6px_9px,var(--color-border-strong)_9px_11px,transparent_11px_14px)]",
+    linhaGrade: "tw:h-px tw:bg-zz-border tw:mt-0 tw:-mx-6 tw:mb-4",
+    lista: "tw:flex tw:flex-col",
+    // nome | data | categoria | perfil | valor | % | remover
+    linha: "tw:grid tw:grid-cols-[minmax(0,1fr)_104px_auto_auto_116px_72px_28px] tw:gap-2.5 tw:items-center tw:min-h-11 tw:border-b tw:border-b-zz-surface-hover",
+    data: "tw:[border:0] tw:bg-transparent tw:py-1 tw:px-1.5 tw:rounded-lg tw:text-[15px] tw:font-[450] tw:text-zz-secondary tw:text-right tw:[justify-self:end] "
+      + "tw:whitespace-nowrap tw:hover:bg-zz-surface-hover",
+    pilula: "tw:[border:0] tw:bg-transparent tw:p-0 tw:[justify-self:end] tw:rounded-(--radius-pill) tw:hover:[box-shadow:0_0_0_2px_var(--color-primary-soft)]",
+    faltando: "tw:inline-flex tw:items-center tw:h-[22px] tw:py-0 tw:px-2 tw:border tw:border-dashed tw:border-(--color-danger) tw:rounded-(--radius-pill) "
+      + "tw:text-(--color-danger) tw:text-[11px] tw:font-[620] tw:uppercase",
+    remover: "tw:[justify-self:end]",
+    erros: "tw:mt-3 tw:py-2.5 tw:px-3.5 tw:rounded-lg tw:bg-(--color-danger-soft) tw:text-(--color-danger) tw:text-[13px] tw:font-[450] tw:empty:hidden "
+      + "tw:[&_ul]:m-0 tw:[&_ul]:p-0 tw:[&_ul]:list-none tw:[&_ul]:grid tw:[&_ul]:gap-1 tw:[&_li]:m-0 tw:[&_li]:text-left tw:[&_li]:leading-[1.4] "
+      + "tw:[&_p]:m-0 tw:[&_p]:text-left tw:[&_p]:leading-[1.4]",
+    rodape: "tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-5",
+    restante: "tw:flex tw:items-center tw:gap-2.5 tw:text-[15px] tw:font-[550]",
+    restanteValor: "money tw:text-(--color-income) tw:font-[550] tw:[&.is-negative]:text-(--color-negative)",
+    acoes: "tw:flex tw:gap-2",
+  };
+
   function abrir(original: any, ctx: ContextoApp, aoTerminar?: (id: string) => void): void {
     const st = store.get();
     const todos = (st.data.lancamentos && st.data.lancamentos.lancamentos) || [];
@@ -45,14 +77,14 @@
     };
     if (modo === "igual") igualar();
 
-    const corpo = h("div", { class: "dv" });
-    const lista = h("div", { class: "dv__list" });
-    const erroEl = h("div", { class: "dv__errors", role: "alert" });
-    const restanteEl = h("span", { class: "dv__rest-value money" });
+    const corpo = h("div", { class: T.corpo });
+    const lista = h("div", { class: T.lista });
+    const erroEl = h("div", { class: T.erros, role: "alert" });
+    const restanteEl = h("span", { class: T.restanteValor });
     let alternar: HTMLElement | undefined;
 
-    const pillCategoria = (id: string | null) => { const c = cats.find((x: any) => x.id === id); return c ? UI.CategoryLabel(c, { pill: true }) : h("span", { class: "dv__missing" }, "Categoria"); };
-    const pillPerfil = (id: string | null) => { const p = perfis.find((x) => x.id === id) || ((st.data.perfis && st.data.perfis.perfis) || []).find((x: any) => x.id === id); return p ? UI.Tag(p.nome, p.cor, { class: "tag--upper" }) : h("span", { class: "dv__missing" }, "Perfil"); };
+    const pillCategoria = (id: string | null) => { const c = cats.find((x: any) => x.id === id); return c ? UI.CategoryLabel(c, { pill: true }) : h("span", { class: T.faltando }, "Categoria"); };
+    const pillPerfil = (id: string | null) => { const p = perfis.find((x) => x.id === id) || ((st.data.perfis && st.data.perfis.perfis) || []).find((x: any) => x.id === id); return p ? UI.Tag(p.nome, p.cor, { class: "tag--upper" }) : h("span", { class: T.faltando }, "Perfil"); };
 
     /* Menus iguais aos do painel do lançamento: pesquisa, lista com altura limitada e "+ Nova…" */
     const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -86,17 +118,17 @@
     }
 
     function linha(parte: Parte, i: number) {
-      const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: ZoZo.regras.limiteNome, classe: "dv__name " + ZoZo.pecas.dvNome,
+      const nome = ZoZo.inline.texto({ valor: parte.descricao, rotulo: "Nome da parte " + (i + 1), max: ZoZo.regras.limiteNome, classe: ZoZo.pecas.dvNome,
         aoSalvar: (v) => { parte.descricao = v; } });
-      const dataBtn = h("button", { type: "button", class: "dv__date" }, dataCurta(parte.data));
+      const dataBtn = h("button", { type: "button", class: T.data }, dataCurta(parte.data));
       dataBtn.addEventListener("click", () => ZoZo.calendario.abrir(dataBtn, parte.data, (v) => { parte.data = v; desenhar(); }, { rotulo: "Data da parte " + (i + 1) }));
-      const catBtn = h("button", { type: "button", class: "dv__pill", "aria-haspopup": "menu", "aria-label": "Categoria" }, pillCategoria(parte.categoriaId));
+      const catBtn = h("button", { type: "button", class: T.pilula, "aria-haspopup": "menu", "aria-label": "Categoria" }, pillCategoria(parte.categoriaId));
       catBtn.addEventListener("click", () => menuCategoria(catBtn, parte));
-      const perfBtn = h("button", { type: "button", class: "dv__pill", "aria-haspopup": "menu", "aria-label": "Perfil" }, pillPerfil(parte.perfilId));
+      const perfBtn = h("button", { type: "button", class: T.pilula, "aria-haspopup": "menu", "aria-label": "Perfil" }, pillPerfil(parte.perfilId));
       perfBtn.addEventListener("click", () => menuPerfil(perfBtn, parte));
-      const valor = ZoZo.inline.dinheiro({ valor: parte.c / 100, rotulo: "Valor da parte " + (i + 1), classe: "dv__value " + ZoZo.pecas.dvValor,
+      const valor = ZoZo.inline.dinheiro({ valor: parte.c / 100, rotulo: "Valor da parte " + (i + 1), classe: ZoZo.pecas.dvValor,
         aoSalvar: (v) => { mudarParaPersonalizado(); fixar(i, Math.round(v * 100)); desenhar(); } });
-      const pctInput = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, "dv__pct", ZoZo.pecas.dvPct], value: fmtPct(pct(parte.c, total)), "aria-label": "Percentual da parte " + (i + 1), "data-sem-mascara": "1" }) as HTMLInputElement;
+      const pctInput = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, ZoZo.pecas.dvPct], value: fmtPct(pct(parte.c, total)), "aria-label": "Percentual da parte " + (i + 1), "data-sem-mascara": "1" }) as HTMLInputElement;
       pctInput.addEventListener("focus", () => { pctInput.value = String(Math.round(pct(parte.c, total) * 100) / 100).replace(".", ","); pctInput.select(); });
       pctInput.addEventListener("keydown", (e) => { if (e.key === "Enter") pctInput.blur(); });
       pctInput.addEventListener("blur", () => {
@@ -107,9 +139,9 @@
         }
         desenhar();
       });
-      const remover = h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "dv__remove"], "aria-label": "Remover parte " + (i + 1), disabled: partes.length <= 1,
+      const remover = h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), T.remover], "aria-label": "Remover parte " + (i + 1), disabled: partes.length <= 1,
         onClick: () => { partes.splice(i, 1); if (modo === "igual") igualar(); else repartir(partes.map((_, k) => k), total); desenhar(); } }, icon("fechar", { size: 14 }));
-      return h("div", { class: ["dv__row", ZoZo.pecas.ctxPilulasDivisao] }, nome, dataBtn, catBtn, perfBtn, valor, pctInput, remover);
+      return h("div", { class: [T.linha, ZoZo.pecas.ctxPilulasDivisao] }, nome, dataBtn, catBtn, perfBtn, valor, pctInput, remover);
     }
 
     /** Personalizado usa os valores que o usuário definiu (guardados em cP); partes novas ficam como estão */
@@ -153,7 +185,7 @@
     function desenhar() {
       if (modo === "igual") igualar();
       mount(lista, partes.map(linha),
-        UI.Button("Add divisão", { size: "sm", icon: "mais", class: "dv__add tw:self-start tw:mt-2.5", onClick: () => {
+        UI.Button("Add divisão", { size: "sm", icon: "mais", class: "tw:self-start tw:mt-2.5", onClick: () => {
           const nova = Object.assign({}, partes[partes.length - 1]);          // repete a última parte (inclusive o perfil)
           partes.push(nova);
           if (modo === "igual") { igualar(); nova.cP = undefined; }
@@ -180,20 +212,20 @@
       return erros;
     }
 
-    const card = h("div", { class: "dv__card" },
-      h("div", { class: "dv__card-left" },
-        h("div", { class: ["dv__card-pills", ZoZo.pecas.ctxPilulasDivisao] }, pillCategoria(base.categoriaId), pillPerfil(base.perfilId)),
-        h("span", { class: "dv__card-name" }, base.descricao)),
-      h("div", { class: "dv__card-right" },
-        h("span", { class: "dv__card-date" }, dataCurta(data)),
-        h("span", { class: "dv__card-value" }, h("span", { class: "money" }, F.moeda(total / 100)))));
+    const card = h("div", { class: T.cartao },
+      h("div", { class: T.cartaoEsquerda },
+        h("div", { class: [T.cartaoPilulas, ZoZo.pecas.ctxPilulasDivisao] }, pillCategoria(base.categoriaId), pillPerfil(base.perfilId)),
+        h("span", { class: T.cartaoNome }, base.descricao)),
+      h("div", { class: T.cartaoDireita },
+        h("span", { class: T.cartaoData }, dataCurta(data)),
+        h("span", { class: T.cartaoValor }, h("span", { class: "money" }, F.moeda(total / 100)))));
 
     ZoZo.modais.janela({
       titulo: "Dividir transação",
       classe: "modal--dividir",
       passo: (api: { fechar(): void }) => {
         const seletor: HTMLElement = UI.Segmented([{ value: "igual", label: "Igualmente" }, { value: "personalizado", label: "Personalizado" }], modo,
-          (v: string) => { if (v === "personalizado") mudarParaPersonalizado(true); else modo = "igual"; desenhar(); }, { label: "Forma de divisão", class: "segmented--pilulas dv__toggle tw:mb-3 tw:[&_.segmented-item]:px-4" });
+          (v: string) => { if (v === "personalizado") mudarParaPersonalizado(true); else modo = "igual"; desenhar(); }, { label: "Forma de divisão", class: "segmented--pilulas tw:grid-cols-[repeat(2,auto)] tw:mb-3 tw:[&_.segmented-item]:px-4" });
         seletor.querySelectorAll<HTMLElement>(".segmented-item").forEach((b, i) => { b.dataset.v = i === 0 ? "igual" : "personalizado"; });
         alternar = seletor;
         const salvar = (btn: HTMLButtonElement) => {
@@ -205,11 +237,11 @@
             .then(() => { api.fechar(); ctx.toast(partes.length > 1 ? "Transação dividida." : "Divisão desfeita."); return ctx.recarregarTudo().then(() => aoTerminar && aoTerminar(base.id)); })
             .catch((e: ErroPonte) => { btn.disabled = false; mount(erroEl, h("p", null, e.friendly)); });
         };
-        mount(corpo, card, h("div", { class: "dv__connector", "aria-hidden": "true" }), h("div", { class: "dv__grid-line" }),
+        mount(corpo, card, h("div", { class: T.ligacao, "aria-hidden": "true" }), h("div", { class: T.linhaGrade }),
           alternar, lista, erroEl,
-          h("div", { class: "dv__footer" },
-            h("div", { class: "dv__rest" }, h("span", { class: "dv__rest-label" }, "Restante para dividir"), restanteEl),
-            h("div", { class: "dv__actions" },
+          h("div", { class: T.rodape },
+            h("div", { class: T.restante }, h("span", null, "Restante para dividir"), restanteEl),
+            h("div", { class: T.acoes },
               UI.Button("Cancelar", { onClick: () => api.fechar() }),
               UI.Button("Salvar", { variant: "primary", onClick: (e: MouseEvent) => salvar(e.currentTarget as HTMLButtonElement) }))));
         desenhar();
