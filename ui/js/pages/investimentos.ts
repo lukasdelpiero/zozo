@@ -27,7 +27,7 @@
   };
 
   /** Engrenagem: "Contas incluídas" com toggles (filtra o gráfico e as alocações) */
-  function abrirContasIncluidas(btn: HTMLElement, ctx: any) {
+  function abrirContasIncluidas(btn: HTMLElement, ctx: ContextoApp) {
     ZoZo.menu.abrir(btn, { largura: 290, render(el) {
       const desenhar = () => {
         const inv = ZoZo.store.get().data.investimentos;
@@ -47,7 +47,7 @@
     } }, { posicao: "direita", largura: 290, label: "Contas incluídas" });
   }
 
-  function EvolucaoCard(state: EstadoZoZo, ctx: any) {
+  function EvolucaoCard(state: EstadoZoZo, ctx: ContextoApp) {
     const resumo = state.data.investimentos.resumo;
     const intervalo = state.ui.intervaloInvestimentos;
     const serie = UI.recortarSerie(resumo.serie, intervalo);
@@ -99,8 +99,7 @@
             : UI.EmptyState("Nenhuma alocação para exibir.", { icon: "categorias" })));
     },
     selecionar(sel, ctx) {
-      const id = (sel as { id?: string } | null)?.id;
-      const c = (ZoZo.store.get().data.investimentos.contas || []).find((x: any) => x.id === id);
+      const c = (ZoZo.store.get().data.investimentos.contas || []).find((x: any) => x.id === sel.id);
       if (c) ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos");
     },
   };

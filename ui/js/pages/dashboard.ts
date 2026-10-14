@@ -6,7 +6,7 @@
    (card, card__link, bolinha/seta/contador da categoria, linha de
    recorrência, estado vazio, esqueleto do card).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h } = ZoZo.dom;
   const { icon } = ZoZo.icons;
@@ -84,22 +84,22 @@
   };
 
   /** Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado */
-  function topCategorias(cats, state, ctx) {
+  function topCategorias(cats: any, state: any, ctx: ContextoApp) {
     const blocos = ZoZo.categoriasShared.estruturar(cats, ((state.data.dashboard || {}).categorias || {}).grupos)
-      .map((b) => (b.tipo === "categoria" ? { ...b, gasto: F.numero(b.cat.gasto) } : b))
-      .sort((a, b) => F.numero(b.gasto) - F.numero(a.gasto)).slice(0, 5);
+      .map((b: any) => (b.tipo === "categoria" ? { ...b, gasto: F.numero(b.cat.gasto) } : b))
+      .sort((a: any, b: any) => F.numero(b.gasto) - F.numero(a.gasto)).slice(0, 5);
     const abertos = state.ui.dashGruposAbertos || {};
-    const abrir = (c) => ctx.navigate("categorias", { select: { tipo: "categoria", id: c.id } });
-    const linha = (lead, icone, nome, gasto, reservado, o) => h("div", Object.assign({ class: [T.top, o.item && T.topItem] }, o.attrs),
+    const abrir = (c: any) => ctx.navigate("categorias", { select: { tipo: "categoria", id: c.id } });
+    const linha = (lead: any, icone: any, nome: any, gasto: any, reservado: any, o: any) => h("div", Object.assign({ class: [T.top, o.item && T.topItem] }, o.attrs),
       h("span", { class: T.topLead }, lead), h("span", { class: o.filho ? T.topIconeFilho : T.topIcone }, icone),
       h("span", { class: o.filho ? T.topNomeFilho : T.topNome }, nome),
       h("span", { class: T.topGasto }, F.moeda(gasto)), h("span", { class: T.topReservado }, F.moeda(reservado)));
-    const filho = (c, sub) => linha(sub ? null : h("span", { class: T.topPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
+    const filho = (c: any, sub: any) => linha(sub ? null : h("span", { class: T.topPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
       c.icone || "•", c.nome, c.gasto, c.reservado,
       { item: true, filho: sub, attrs: { role: "button", tabindex: "0", onClick: () => abrir(c),
-        onKeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(c); } } } });
-    const out = [];
-    blocos.forEach((b) => {
+        onKeydown: (e: any) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(c); } } } });
+    const out: HTMLElement[] = [];
+    blocos.forEach((b: any) => {
       if (b.tipo === "categoria") { out.push(filho(b.cat, false)); return; }
       const aberto = !!abertos[b.nome];
       const chave = "dash:grp:" + b.nome;
@@ -107,15 +107,15 @@
         onClick: () => UI.alternarArvore(chave, () => ZoZo.store.set({ ui: { dashGruposAbertos: Object.assign({}, ZoZo.store.get().ui.dashGruposAbertos || {}, { [b.nome]: !aberto }) } })) },
         icon(aberto ? "chevron-down" : "chevron-right", { size: 14, stroke: 2.25 })),
         h("span", { class: T.topQtd }, String(b.quantidade)), b.nome, b.gasto, b.reservado, {}));
-      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: "arvore-grupo" }, b.itens.map((c) => filho(c, true)))));
+      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: "arvore-grupo" }, b.itens.map((c: any) => filho(c, true)))));
     });
     return h("div", { class: T.tops, "data-dash-lista": "" }, out);
   }
 
-  function linkPara(label, onClick) {
+  function linkPara(label: any, onClick: any) {
     return h("button", { type: "button", class: ZoZo.pecas.cardLink, onClick }, label, icon("chevron-right", { size: 14 }));
   }
-  function Card(titulo, link, onClick, estica, ...children) {
+  function Card(titulo: string, link: string | null, onClick: (() => void) | null, estica: boolean, ...children: FilhoDom[]) {
     return h("section", { class: [T.card, estica ? T.cardEstica : T.cardFixo], "aria-label": titulo },
       h("header", { class: T.cardCab }, h("h3", { class: T.cardTitulo }, titulo), link ? linkPara(link, onClick) : null),
       ...children);
@@ -132,20 +132,21 @@
     const pagina = document.querySelector(".page--dashboard");
     const grade = pagina && pagina.querySelector("[data-dash-grade]");
     if (!grade) return;
-    const listas = Array.from(grade.querySelectorAll("[data-dash-lista]"));
-    listas.forEach((l) => Array.from(l.children).forEach((x) => { x.hidden = false; }));
+    const listas = Array.from(grade.querySelectorAll<HTMLElement>("[data-dash-lista]"));
+    listas.forEach((l) => Array.from(l.children as HTMLCollectionOf<HTMLElement>).forEach((x) => { x.hidden = false; }));
     const duasColunas = getComputedStyle(grade).gridTemplateColumns.trim().split(/\s+/).length >= 2;
-    pagina.classList.toggle("dash--na-tela", duasColunas && innerHeight >= ALTURA_MINIMA);
+    (pagina as HTMLElement).classList.toggle("dash--na-tela", duasColunas && innerHeight >= ALTURA_MINIMA);
     if (!pagina.classList.contains("dash--na-tela")) return;
     listas.forEach((l) => {
       const card = l.closest(".card");
+      if (!card) return;
       const limite = card.getBoundingClientRect().bottom - parseFloat(getComputedStyle(card).paddingBottom || "0");
-      const itens = Array.from(l.children);
+      const itens = Array.from(l.children as HTMLCollectionOf<HTMLElement>);
       // esconde de baixo para cima o que não cabe inteiro (sempre sobra ao menos a primeira linha)
       for (let i = itens.length - 1; i > 0 && itens[i].getBoundingClientRect().bottom > limite + 0.5; i--) itens[i].hidden = true;
     });
   }
-  let observador = null;
+  let observador: ResizeObserver | null = null;
   function acompanharTela() {
     queueMicrotask(ajustarNaTela);            // logo depois de a página entrar no lugar (o router monta em seguida)
     if (observador || !window.ResizeObserver) return;
@@ -156,17 +157,17 @@
   }
 
   /** Gasto acumulado do mês × ritmo do orçamento (linha tracejada) */
-  function GastoMensal(g) {
+  function GastoMensal(g: any) {
     const acima = g.orcamento > 0 && g.total > g.orcamento;
     const diferenca = Math.abs(g.total - g.orcamento);
     const chart = h("div", { class: T.grafico });
     const cs = getComputedStyle(document.documentElement);
-    const series = [{ name: "Gasto", color: cs.getPropertyValue(acima ? "--color-progress-over" : "--color-primary").trim(), points: g.dias, area: true }];
+    const series: SerieGrafico[] = [{ name: "Gasto", color: cs.getPropertyValue(acima ? "--color-progress-over" : "--color-primary").trim(), points: g.dias, area: true }];
     if (g.orcamento > 0 && g.dias.length) {
       series.push({ name: "Orçamento", color: cs.getPropertyValue("--color-text-muted").trim(), tracejado: true,
-        points: g.dias.map((d) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
+        points: g.dias.map((d: any) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
     }
-    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), area: true, ariaLabel: "Gasto acumulado no mês" });
+    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês" });
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
     return h("div", null,
@@ -213,26 +214,26 @@
         ZoZo.contasShared.ContasChartCard({ data: { contas: d.contas }, ui: state.ui }, ctx, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
           intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
-      const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
+      const cats = d.categorias ? (d.categorias.categorias || []).filter((c: any) => c.status === "regular") : [];
       const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"), false,
         cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria cadastrada.", { icon: "categorias", class: T.vazio }));
 
-      const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
+      const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r: any) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
       const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"), false,
         recs.length
-          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r) => L.RecurrenceRow(r, { compacta: true, class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r: any) => L.RecurrenceRow(r, { compacta: true, class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
           : UI.EmptyState("Nenhuma transação prevista para este mês.", { icon: "recorrencias", class: T.vazio }));
 
       const ultimos = d.ultimosLancamentos || [];
       const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"), false,
         ultimos.length
-          ? h("div", { class: T.lista, "data-dash-lista": "" }, ultimos.map((l) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, ultimos.map((l: any) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
           : UI.EmptyState("Nenhuma transação cadastrada.", { class: T.vazio }));
 
       // Áreas na ordem da página; a entrada em sequência segue a posição de cada uma (0, 50, 100, 150 ms)
-      const areas = [["gasto", cardGasto, true], ["patrimonio", cardPatrimonio, true], ["recentes", cardLanc], ["top", cardCats], ["proximos", cardRec]]
-        .filter((a) => a[1])
-        .map(([nome, el, grafico], i) => h("div", { class: [T.area, T.areas[nome], (grafico ? T.entradaGrafico : T.entrada)[Math.min(i, 3)]] }, el));
+      const lista: Array<[string, HTMLElement | null, boolean?]> = [["gasto", cardGasto, true], ["patrimonio", cardPatrimonio, true], ["recentes", cardLanc], ["top", cardCats], ["proximos", cardRec]];
+      const areas = lista.filter((a) => a[1])
+        .map(([nome, el, grafico], i) => h("div", { class: [T.area, (T.areas as Record<string, string>)[nome], (grafico ? T.entradaGrafico : T.entrada)[Math.min(i, 3)]] }, el));
       acompanharTela();
       return C.pagina(T.pagina, saudacao, h("div", { class: T.grade, "data-dash-grade": "" }, areas));
     },

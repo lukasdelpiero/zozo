@@ -11,7 +11,7 @@
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
 
-  function abrirDetalhe(r: any, ctx: any, opts?: { voltar?: () => void }): unknown {
+  function abrirDetalhe(r: any, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown {
     // A origem da série (lançamento que define nome, valor, categoria e frequência)
     const lancs = ZoZo.store.get().data.lancamentos;
     if (!lancs) return ctx.loadData("lancamentos", A.getLancamentos).then(() => abrirDetalhe(r, ctx, opts));
@@ -129,7 +129,7 @@
     });
   }
 
-  const novaRecorrencia = (ctx: any) => ZoZo.modais.novaRecorrencia(ctx);
+  const novaRecorrencia = (ctx: ContextoApp) => ZoZo.modais.novaRecorrencia(ctx);
 
   const pagina: PaginaZoZo = {
     titulo: "Recorrências",

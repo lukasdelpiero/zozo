@@ -10,7 +10,7 @@
   "use strict";
   const { mount } = ZoZo.dom;
 
-  function create(ctx: any, topbar: BarraSuperior, mainEl: HTMLElement): Roteador {
+  function create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador {
     let page: PaginaZoZo | null = null;
     let assinatura: unknown[] | null = null;
     let entrada = false;
@@ -58,7 +58,7 @@
       topbar.setPage(page.titulo, page.topbar ? page.topbar(ctx) : [], page.prefixo ? page.prefixo(ctx) : null);
     }
 
-    function navigate(id: string, opts?: { force?: boolean; select?: unknown }) {
+    function navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }) {
       const o = opts || {};
       const alvo = ZoZo.pages[id];
       if (!alvo) return;

@@ -4,7 +4,7 @@
    em components/pecas.ts). Ganchos sem CSS: profile-row, p2fa (o painel
    do 2FA aberto), codigo6.
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
@@ -86,17 +86,17 @@
     caixa: "tw:w-[38px] tw:h-[44px] tw:text-[18px]",
   };
 
-  const mesAbrev = (mesIso) => F.mesAbrev((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
-  const mesInteiro = (mesIso) => F.mesNome((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
+  const mesAbrev = (mesIso: any) => F.mesAbrev((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
+  const mesInteiro = (mesIso?: any) => F.mesNome((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
 
-  function verLancamentos(p, ctx) {
+  function verLancamentos(p: any, ctx: ContextoApp) {
     ZoZo.lancamentosShared.setFiltros(Object.assign(ZoZo.lancamentosShared.FILTROS_VAZIOS(), { perfis: [p.id] }));
     store.set({ ui: { busca: "" } });
     ctx.navigate("lancamentos");
   }
 
   /* ---------------- Cadastro / edição ---------------- */
-  function abrirFormPerfil(ctx, p, voltar) {
+  function abrirFormPerfil(ctx: ContextoApp, p: any, voltar: any) {
     const novo = !p;
     return ctx.loadData("perfis", A.getPerfis).catch(() => null).then(() => ZoZo.forms.abrir(ctx, {
       titulo: novo ? "Novo perfil" : "Editar perfil",
@@ -107,14 +107,14 @@
         { nome: "nome", rotulo: "Nome do perfil", obrigatorio: true, placeholder: "Ex.: Casa, Mãe, Trabalho", max: ZoZo.regras.limiteNome },
         { nome: "cor", rotulo: "Cor da tag", tipo: "cor" },
       ],
-      aoCancelar: p ? () => abrirDetalhe(p, ctx) : null,
+      aoCancelar: p ? () => abrirDetalhe(p, ctx) : undefined,
       salvar: (d) => {
         d.orcamento = (p && p.orcamento) || 0;
         const req = novo ? ctx.bridge.request(A.createPerfil, { perfil: d }) : ctx.bridge.request(A.updatePerfil, { id: p.id, perfil: d });
-        return req.then((r) => {
+        return req.then((r: any) => {
           ctx.toast(novo ? "Perfil criado." : "Perfil salvo.");
           return ctx.recarregarTudo().then(() => {
-            const atual = ((store.get().data.perfis || {}).perfis || []).find((x) => x.id === (novo ? r.perfil.id : p.id));
+            const atual = ((store.get().data.perfis || {}).perfis || []).find((x: any) => x.id === (novo ? r.perfil.id : p.id));
             if (atual && store.get().currentPage === "perfil") abrirDetalhe(atual, ctx);
           });
         });
@@ -122,25 +122,25 @@
     }));
   }
 
-  function excluirPerfil(p, ctx) {
+  function excluirPerfil(p: any, ctx: ContextoApp) {
     ZoZo.feedback.confirmarExclusao("Excluir perfil?", "Tem certeza de que deseja excluir este perfil?")
       .then((ok) => ok && ctx.bridge.request(A.deletePerfil, { id: p.id }).then(() => {
         ctx.detail.close({ silencioso: true }); ctx.toast("Perfil excluído."); return ctx.recarregarTudo();
-      }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
+      }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" })));
   }
 
-  function arquivar(p, ctx) {
+  function arquivar(p: any, ctx: ContextoApp) {
     ctx.bridge.request(A.arquivarPerfil, { id: p.id, arquivar: !p.arquivado }).then(() => {
       ctx.toast(p.arquivado ? "Perfil desarquivado." : "Perfil arquivado.");
       return ctx.recarregarTudo().then(() => {
-        const atual = ((store.get().data.perfis || {}).perfis || []).find((x) => x.id === p.id);
+        const atual = ((store.get().data.perfis || {}).perfis || []).find((x: any) => x.id === p.id);
         if (atual) abrirDetalhe(atual, ctx);
       });
-    }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+    }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
   /* ---------------- Painel do perfil ---------------- */
-  function abrirDetalhe(p, ctx, opts) {
+  function abrirDetalhe(p: any, ctx: ContextoApp, opts?: any) {
     const o = opts || {};
     ctx.detail.open({
       title: "Perfil",
@@ -151,13 +151,13 @@
         ZoZo.recursos.boleto() ? { label: "Gerar fatura", onClick: () => ZoZo.boleto.open(ctx, { perfilId: p.id }) } : null,
         // Cancelar/salvar voltam para este painel (com os dados atualizados)
         { label: "Editar perfil", onClick: () => abrirFormPerfil(ctx, p, () => {
-          const atual = ((store.get().data.perfis || {}).perfis || []).find((x) => x.id === p.id);
+          const atual = ((store.get().data.perfis || {}).perfis || []).find((x: any) => x.id === p.id);
           if (atual) abrirDetalhe(atual, ctx, opts); else ctx.detail.close({ silencioso: true });
         }) },
         { separador: true },
         { label: "Excluir perfil", perigo: true, onClick: () => excluirPerfil(p, ctx) },
       ].filter(Boolean),
-      render(body) {
+      render(body: any) {
         const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         mount(body,
           h("div", { class: ZoZo.pecas.painelTopo },
@@ -175,25 +175,25 @@
             p.arquivado ? h("p", { class: ZoZo.pecas.campoDica }, "Perfil arquivado: continua nas transações e nos totais, mas não pode ser usado em novas transações.") : null),
           C.detalheSecao("Últimas transações", listaEl,
             h("div", { class: ZoZo.pecas.painelAcoesFim }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
-        ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
-          const itens = d.lancamentos.filter((l) => l.perfilId === p.id).slice(0, 10);
+        ctx.loadData("lancamentos", A.getLancamentos).then((d: any) => {
+          const itens = d.lancamentos.filter((l: any) => l.perfilId === p.id).slice(0, 10);
           mount(listaEl, itens.length
             // a transação abre aqui mesmo, com a seta para voltar a este perfil
-            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe((((ZoZo.store.get().data.perfis || {}).perfis) || []).find((x) => x.id === p.id) || p, ctx, opts) }) })
+            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe((((ZoZo.store.get().data.perfis || {}).perfis) || []).find((x: any) => x.id === p.id) || p, ctx, opts) }) })
             : UI.EmptyState("Nenhuma transação com este perfil."));
-        }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
+        }).catch((e: any) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });
   }
 
   /** Ícone redondo do perfil: fundo na cor do perfil e a inicial do nome (mesmo formato do ícone das contas) */
-  function AvatarPerfil(p) {
+  function AvatarPerfil(p: any) {
     const inicial = (Array.from(String(p.nome || "").trim())[0] || "?").toLocaleUpperCase("pt-BR");
     return h("span", { class: [ZoZo.pecas.iconeConta, PR.inicial], style: { "--account-color": F.cor(p.cor, "var(--palette-16)") }, "aria-hidden": "true" }, inicial);
   }
 
   /** Linha como a de Contas: [ícone] nome / quantidade de lançamentos ........ gasto no mês */
-  function linhaPerfil(p, sel, ctx) {
+  function linhaPerfil(p: any, sel: any, ctx: ContextoApp) {
     return h("button", { type: "button", class: [PR.linha, p.id === sel ? PR.selecionada : PR.normal], "aria-current": p.id === sel ? "true" : undefined, onClick: () => abrirDetalhe(p, ctx) },
       AvatarPerfil(p),
       h("span", { class: PR.texto },
@@ -205,7 +205,7 @@
   ZoZo.pages.perfil = {
     titulo: "Perfis",
     recurso: "perfis",                 // a página só existe para contas com o recurso (router.js)
-    topbar: (ctx) => [UI.IconButton("mais", "Novo perfil", { onPrimary: true, onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (p) => abrirDetalhe(Object.assign({ gasto: 0, quantidade: 0 }, p), ctx) }) })],
+    topbar: (ctx) => [UI.IconButton("mais", "Novo perfil", { onPrimary: true, onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (p: any) => abrirDetalhe(Object.assign({ gasto: 0, quantidade: 0 }, p), ctx) }) })],
     carregar: (ctx, force) => ctx.loadData("perfis", A.getPerfis, null, { force }),
     deps: (s) => [s.data.perfis, s.errors.perfis, s.selectedItem, s.ui.gruposFechados],
     render(state, ctx) {
@@ -213,8 +213,8 @@
       if (espera) return C.pagina("page--perfil", espera);
       const d = state.data.perfis;
       const perfis = d.perfis || [];
-      const ativos = perfis.filter((p) => !p.arquivado);
-      const arquivados = perfis.filter((p) => p.arquivado);
+      const ativos = perfis.filter((p: any) => !p.arquivado);
+      const arquivados = perfis.filter((p: any) => p.arquivado);
       const sel = state.selectedItem && state.selectedItem.tipo === "perfil" ? state.selectedItem.id : null;
 
       if (!perfis.length) {
@@ -227,23 +227,23 @@
           ariaLabel: "Gastos do mês por perfil",
           esquerda: { valor: d.resumo ? d.resumo.gasto : 0, label: "gasto em " + mesAbrev(d.mes) },
           direita: { texto: String(d.resumo ? d.resumo.lancamentosMes : 0), label: "transações em " + mesAbrev(d.mes) },
-          segmentos: ativos.map((p) => ({ label: p.nome, cor: p.cor, valor: p.gasto })),
+          segmentos: ativos.map((p: any) => ({ label: p.nome, cor: p.cor, valor: p.gasto })),
         }),
         UI.Section({ key: "perfil:lista", title: "Perfis" },
-          ativos.length ? h("div", { class: ZoZo.pecas.listaLinhas }, ativos.map((p) => linhaPerfil(p, sel, ctx))) : UI.EmptyState("Todos os perfis estão arquivados.", { icon: "perfil" })),
+          ativos.length ? h("div", { class: ZoZo.pecas.listaLinhas }, ativos.map((p: any) => linhaPerfil(p, sel, ctx))) : UI.EmptyState("Todos os perfis estão arquivados.", { icon: "perfil" })),
         arquivados.length ? UI.Section({ key: "perfil:arquivados", title: "Perfis arquivados" },
-          h("div", { class: ZoZo.pecas.listaLinhas }, arquivados.map((p) => linhaPerfil(p, sel, ctx)))) : null);
+          h("div", { class: ZoZo.pecas.listaLinhas }, arquivados.map((p: any) => linhaPerfil(p, sel, ctx)))) : null);
     },
   };
 
-  ZoZo.perfilShared = { abrirFormPerfil, AvatarPerfil, abrirDetalhe: (...a) => abrirDetalhe(...a) };
+  ZoZo.perfilShared = { abrirFormPerfil, AvatarPerfil, abrirDetalhe: (p: any, ctx: ContextoApp, opts?: any) => abrirDetalhe(p, ctx, opts) };
 
   /* =============================================================
      Configurações (região inferior do painel lateral — seção 8)
      ============================================================= */
 
   /** Reduz a foto a 256×256 (JPEG) no próprio aplicativo: remove metadados e qualquer conteúdo embutido */
-  function processarFoto(arquivo) {
+  function processarFoto(arquivo: any) {
     return new Promise((resolve, reject) => {
       if (!arquivo || !/^image\/(png|jpeg|webp|gif|bmp)$/.test(arquivo.type) || arquivo.size > 15 * 1024 * 1024) { reject(new Error("formato")); return; }
       const leitor = new FileReader();
@@ -256,18 +256,19 @@
           const cv = document.createElement("canvas");
           cv.width = cv.height = 256;
           const g = cv.getContext("2d");
+          if (!g) { reject(new Error("canvas")); return; }
           g.fillStyle = "#fff"; g.fillRect(0, 0, 256, 256);
           g.drawImage(img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, 256, 256);
           resolve(cv.toDataURL("image/jpeg", 0.86));
         };
-        img.src = leitor.result;
+        img.src = String(leitor.result);
       };
       leitor.readAsDataURL(arquivo);
     });
   }
 
   /** Avatar redondo: foto do usuário ou iniciais */
-  function Avatar(foto, nome, tamanho) {
+  function Avatar(foto: any, nome: any, tamanho: any) {
     const iniciais = String(nome || "?").trim().split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase();
     // base com especificidade zero: o menu lateral troca fundo e cor (inicial clara sobre o roxo)
     return h("span", { class: "tw:base:flex-none tw:base:grid tw:base:place-items-center tw:base:overflow-hidden tw:base:rounded-[50%] tw:base:bg-zz-primary-soft "
@@ -276,24 +277,24 @@
   }
 
   /** CSV das transações (separador ";" para o Excel em português). Multicâmbio: coluna Moeda (só a moeda escolhida) */
-  function gerarCsv(lancamentos, moeda) {
+  function gerarCsv(lancamentos: any, moeda: any) {
     // Texto: aspas duplicadas e proteção contra fórmulas (=, +, -, @, tab, CR — inclusive após espaços)
-    const texto = (v) => {
+    const texto = (v: any) => {
       let t = String(v === null || v === undefined ? "" : v);
       if (/^\s*[=+\-@\t\r]/.test(t)) t = "'" + t;
       return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
     };
     // Número: sempre gerado aqui (nunca vem do usuário), fica numérico no Excel
-    const numero = (v) => v.toFixed(2).replace(".", ",");
-    const entra = (l) => ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
-    const tipos = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno" };
+    const numero = (v: any) => v.toFixed(2).replace(".", ",");
+    const entra = (l: any) => ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
+    const tipos: Record<string, string> = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno" };
     const freq = ZoZo.servico.FREQUENCIAS;
     const comPerfil = ZoZo.recursos.perfis();             // coluna Perfil só para contas com o recurso
     const linhas = [["Data", "Nome", "Valor"].concat(moeda ? ["Moeda"] : [], ["Tipo", "Conta", "Categoria"], comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
-    lancamentos.slice().sort((a, b) => a.data.localeCompare(b.data)).forEach((l) => {
+    lancamentos.slice().sort((a: any, b: any) => a.data.localeCompare(b.data)).forEach((l: any) => {
       const recorrencia = l.tipo !== "recorrente" ? "" : l.recorrencia === "parcelada" ? "Parcelada" : (freq[l.recorrencia] || freq.mensal).rotulo;
       linhas.push([
-        texto(F.parseData(l.data).toLocaleDateString("pt-BR")), texto(l.descricao), numero((entra(l) ? 1 : -1) * F.numero(l.valor)),
+        texto((F.parseData(l.data) || new Date()).toLocaleDateString("pt-BR")), texto(l.descricao), numero((entra(l) ? 1 : -1) * F.numero(l.valor)),
       ].concat(moeda ? [moeda] : [], [texto(tipos[l.tipo] || l.tipo), texto(l.nomeConta), texto(l.categoria ? l.categoria.nome : "")], comPerfil ? [texto(l.perfil ? l.perfil.nome : "")] : [], [
         texto(recorrencia), texto(l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : ""), texto(l.notas),
       ]).join(";"));
@@ -302,7 +303,7 @@
   }
 
   /** Gera o CSV no próprio navegador e baixa (nada passa pelo servidor). Atenção: o arquivo baixado NÃO é cifrado. */
-  function exportarCsv(ctx, botao) {
+  function exportarCsv(ctx: ContextoApp, botao: any) {
     if (botao.disabled) return;
     // Carregando: ícone animado no lugar do ícone do botão (pelo menos 600 ms, para dar para ver)
     const iconeOriginal = botao.querySelector("svg");
@@ -311,7 +312,7 @@
     botao.disabled = true;
     botao.setAttribute("aria-busy", "true");
     const minimo = new Promise((r) => setTimeout(r, 600));
-    ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
+    ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d: any) => {
       const cfg = store.get().data.config || {};
       const moeda = cfg.multicambio ? (["BRL", "EUR", "USD"].includes(cfg.moeda) ? cfg.moeda : "BRL") : null;
       const conteudo = gerarCsv(d.lancamentos || [], moeda);
@@ -320,18 +321,18 @@
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }).catch((e) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
+    }).catch((e: any) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
       .then(() => minimo)
       .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); });
   }
 
   /** Ações de conta esperam as gravações em andamento (evita conflito de versão com elas) */
-  const depoisDasGravacoes = (fn) => ZoZo.servico.aguardarGravacoes().then(fn);
+  const depoisDasGravacoes = (fn: any) => ZoZo.servico.aguardarGravacoes().then(fn);
 
-  function quando(isoDataHora) {
+  function quando(isoDataHora: any) {
     if (!isoDataHora) return "ainda não houve gravação";
     const d = new Date(isoDataHora);
-    if (isNaN(d)) return "—";
+    if (isNaN(d.getTime())) return "—";
     const hoje = new Date(); const ontem = new Date(); ontem.setDate(hoje.getDate() - 1);
     const hora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
     if (d.toDateString() === hoje.toDateString()) return "hoje às " + hora;
@@ -342,7 +343,7 @@
   /* ---------------- 2FA: painel lateral dentro da janela de Configurações ---------------- */
   const PASSOS_2FA = ["Abra seu aplicativo 2FA", "Clique em + ou Adicionar", "Escaneie o QR code ou insira a chave de configuração", "Insira o código de seis dígitos."];
 
-  function abrirPainel2FA(ctx, janelaEl, aoAtivar) {
+  function abrirPainel2FA(ctx: ContextoApp, janelaEl: any, aoAtivar?: any) {
     if (!janelaEl || janelaEl.querySelector(".p2fa")) return;
     const V = ZoZo.verificacao;
     let erros = 0, fechado = false;
@@ -353,7 +354,7 @@
       setTimeout(() => painel.remove(), 260);
       document.removeEventListener("keydown", tecla, true);
     };
-    const tecla = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(); } };
+    const tecla = (e: any) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(); } };
 
     const check = h("span", { class: P2.ok, "aria-hidden": "true", hidden: true }, icon("check", { size: 12 }));
     const erro = h("p", { class: P2.erro, role: "alert" });
@@ -361,20 +362,20 @@
     const chaveTexto = h("code", { class: P2.chave }, "");
     let chave = "";
     const copiar = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Copiar chave de configuração", title: "Copiar",
-      onClick: (e) => { const b = e.currentTarget; navigator.clipboard.writeText(chave).then(() => UI.confirmarNoBotao(b, "Chave copiada"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } },
+      onClick: (e: any) => { const b = e.currentTarget; navigator.clipboard.writeText(chave).then(() => UI.confirmarNoBotao(b, "Chave copiada"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } },
       icon("copiar", { size: 15 }));
     const campo = V.CampoCodigo({
       rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: P2.codigo, classeCaixa: P2.caixa,
       onDigitar: () => { campo.marcarErro(false); },
       onCompleto: (codigo) => {
         campo.desabilitar(true);
-        ctx.bridge.request(A.confirmar2FA, { codigo }).then((r) => {
+        ctx.bridge.request(A.confirmar2FA, { codigo }).then((r: any) => {
           erro.textContent = "";
           check.hidden = false;                                     // ✓ ao lado de "Insira o código de seis dígitos."
           store.set({ session: { user: r.user } });
           if (aoAtivar) aoAtivar();
           setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); }, 700);
-        }).catch((e) => {
+        }).catch((e: any) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
           campo.desabilitar(false); campo.marcarErro(true); campo.limpar();
@@ -382,7 +383,7 @@
       },
     });
 
-    const passo = (n, titulo, extra) => h("li", { class: P2.passo },
+    const passo = (n: any, titulo: any, extra?: any) => h("li", { class: P2.passo },
       h("span", { class: P2.numero, "aria-hidden": "true" }, String(n)),
       h("div", null, h("p", { class: P2.passoTitulo }, titulo, n === 4 ? check : null), extra || null));
 
@@ -401,17 +402,17 @@
     requestAnimationFrame(() => requestAnimationFrame(() => painel.classList.add("is-aberto")));   // desliza da direita para a esquerda
 
     // QR code e chave gerados no servidor a cada abertura (o anterior, se não confirmado, é descartado)
-    ctx.bridge.request(A.iniciar2FA).then((r) => {
+    ctx.bridge.request(A.iniciar2FA).then((r: any) => {
       chave = r.chave;
       chaveTexto.textContent = r.chave.replace(/(.{4})/g, "$1 ").trim();
       mount(qrArea, V.QR(r.uri, 176));
       qrArea.removeAttribute("aria-busy");
       campo.foco();
-    }).catch((e) => { mount(qrArea, h("p", { class: P2.erro }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
+    }).catch((e: any) => { mount(qrArea, h("p", { class: P2.erro }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
   }
 
   /** Desativar o 2FA pede um código ATUAL do aplicativo (o servidor confere): sessão aberta não basta */
-  function desativar2FA(ctx) {
+  function desativar2FA(ctx: ContextoApp) {
     const erro = h("p", { class: [P2.erro, "tw:text-center"], role: "alert" });
     let erros = 0;
     const campo = ZoZo.verificacao.CampoCodigo({
@@ -419,11 +420,11 @@
       onDigitar: () => campo.marcarErro(false),
       onCompleto: (codigo) => {
         campo.desabilitar(true);
-        ctx.bridge.request(A.desativar2FA, { codigo }).then((r) => {
+        ctx.bridge.request(A.desativar2FA, { codigo }).then((r: any) => {
           janela.fechar(true);
           store.set({ session: { user: r.user } });
           ctx.toast("Autenticação de dois fatores desativada.");
-        }).catch((e) => {
+        }).catch((e: any) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
           campo.desabilitar(false); campo.marcarErro(true); campo.limpar();
@@ -440,30 +441,31 @@
   }
 
   /* ---------------- Pix das faturas (fica no documento cifrado) ---------------- */
-  const mascarar = (c) => (/^\d{11}$/.test(c) ? "***." + c.slice(3, 6) + "." + c.slice(6, 9) + "-**"
+  const mascarar = (c: any) => (/^\d{11}$/.test(c) ? "***." + c.slice(3, 6) + "." + c.slice(6, 9) + "-**"
     : /^\+55\d{11}$/.test(c) ? "+55 (" + c.slice(3, 5) + ") *****-" + c.slice(10) : c.replace(/^(.{3}).*(@.*)$/, "$1***$2"));
 
   /* Chave Pix: tipo escolhido (CPF · Celular · E-mail), máscara enquanto digita e validação antes de salvar.
      A mesma regra vale no serviço de dados (ZoZo.pix.normalizarChave / nomeValido). */
-  const TIPOS_CHAVE = {
+  type TipoChave = { rotulo: string; ph: string; modo: string; formatar: (v: string) => string; ler: (v: string) => string };
+  const TIPOS_CHAVE: Record<string, TipoChave> = {
     cpf: { rotulo: "CPF", ph: "000.000.000-00", modo: "numeric",
-      formatar: (v) => { const d = v.replace(/\D/g, "").slice(0, 11); return d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2"); },
-      ler: (v) => v.replace(/\D/g, "") },
+      formatar: (v: any) => { const d = v.replace(/\D/g, "").slice(0, 11); return d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2"); },
+      ler: (v: any) => v.replace(/\D/g, "") },
     celular: { rotulo: "Celular", ph: "+55 (00) 90000-0000", modo: "numeric",
-      formatar: (v) => {
+      formatar: (v: any) => {
         const d = v.replace(/^\+55\s*/, "").replace(/\D/g, "").slice(0, 11);
         if (!d) return "";
         return "+55 (" + d.slice(0, 2) + (d.length > 2 ? ") " + d.slice(2, 7) : "") + (d.length > 7 ? "-" + d.slice(7) : "");
       },
-      ler: (v) => "+55" + v.replace(/^\+55\s*/, "").replace(/\D/g, "") },
-    email: { rotulo: "E-mail", ph: "nome@exemplo.com", modo: "email", formatar: (v) => v.replace(/\s/g, "").toLowerCase(), ler: (v) => v.trim().toLowerCase() },
+      ler: (v: any) => "+55" + v.replace(/^\+55\s*/, "").replace(/\D/g, "") },
+    email: { rotulo: "E-mail", ph: "nome@exemplo.com", modo: "email", formatar: (v: any) => v.replace(/\s/g, "").toLowerCase(), ler: (v: any) => v.trim().toLowerCase() },
   };
-  const tipoDaChave = (c) => (!c ? "cpf" : c.includes("@") ? "email" : c.startsWith("+") ? "celular" : "cpf");
+  const tipoDaChave = (c: any) => (!c ? "cpf" : c.includes("@") ? "email" : c.startsWith("+") ? "celular" : "cpf");
 
-  function SecaoPix(ctx, cfg, u) {
+  function SecaoPix(ctx: ContextoApp, cfg: any, u: any) {
     const pix = cfg.pix || null;
     let tipo = tipoDaChave(pix && pix.chave);
-    const entrada = (ph, valor, max, rotulo) => h("input", { class: [ZoZo.pecas.entrada, ZoZo.pecas.entradaPequena], placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo });
+    const entrada = (ph: any, valor: any, max: any, rotulo: any) => h("input", { class: [ZoZo.pecas.entrada, ZoZo.pecas.entradaPequena], placeholder: ph, value: valor || "", maxlength: String(max), autocomplete: "off", "aria-label": rotulo });
     const chave = entrada("", "", 77, "Chave Pix");
     const nome = entrada("Nome do recebedor", pix ? pix.nome : String(u.nomeUsuario || "").replace(/[^\p{L} ]/gu, "").slice(0, 25), 25, "Nome do recebedor");
     const cidade = entrada("Cidade", pix ? pix.cidade : "", 15, "Cidade do recebedor");
@@ -496,13 +498,13 @@
     // Salvar só fica ativo com TODOS os campos válidos (sem precisar enviar para descobrir o erro)
     const salvarBtn = UI.Button(pix ? "Atualizar" : "Salvar", { size: "sm", variant: "primary", onClick: (e) => salvar(e.currentTarget) });
     function atualizarBotao() { salvarBtn.disabled = typeof validar() === "string"; }
-    const salvar = (btn) => {
+    const salvar = (btn: any) => {
       const r = validar();
       if (typeof r === "string") { erro.textContent = r; return; }
       btn.disabled = true;
       ctx.bridge.request(A.updateConfig, { pix: { chave: r.chave, nome: nome.value.trim(), cidade: cidade.value } })
         .then(() => { chave.value = ""; return ctx.loadData("config", A.getConfig, null, { force: true }); })
-        .catch((e) => { erro.textContent = e.friendly; })
+        .catch((e: any) => { erro.textContent = e.friendly; })
         .finally(() => { atualizarBotao(); });
     };
     atualizarBotao();
@@ -515,7 +517,7 @@
       h("div", { class: [CF.pix, P.ctxListaPix] }, tipoSel, chave, nome, cidade,
         h("div", { class: CF.pixAcoes },
           pix ? UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => ctx.bridge.request(A.updateConfig, { pix: null })
-            .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e) => { erro.textContent = e.friendly; }) }) : null,
+            .then(() => ctx.loadData("config", A.getConfig, null, { force: true })).catch((e: any) => { erro.textContent = e.friendly; }) }) : null,
           salvarBtn)),
       erro);
   }
@@ -523,7 +525,7 @@
   /* ---------------- Configurações: Geral | Conta ---------------- */
   let abaConfig = "geral";
 
-  function linhaConfig(titulo, sub, direita) {
+  function linhaConfig(titulo: any, sub: any, direita: any) {
     const P = ZoZo.pecas;
     return h("div", { class: P.cfgLinha },
       h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, titulo), sub ? h("span", { class: P.cfgSub }, sub) : null),
@@ -551,7 +553,7 @@
 
       let conteudo;
       if (abaConfig === "sobre") {
-        const linha = (titulo, valor) => h("div", { class: "tw:flex tw:items-center tw:justify-between tw:gap-(--space-5) tw:py-2.5" },
+        const linha = (titulo: any, valor: any) => h("div", { class: "tw:flex tw:items-center tw:justify-between tw:gap-(--space-5) tw:py-2.5" },
           h("span", { class: "tw:text-(length:--t-15) tw:font-[450] tw:text-zz-text" }, titulo),
           h("span", { class: "tw:text-(length:--t-13) tw:font-[550] tw:text-zz-secondary" }, valor));
         conteudo = [
@@ -564,7 +566,7 @@
           h("h3", { class: P.cfgSecao }, "Orçamento"),
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
-              .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e) => ctx.toast(e.friendly, { tone: "error" })), "Ativar orçamento")),
+              .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e: any) => ctx.toast(e.friendly, { tone: "error" })), "Ativar orçamento")),
           // Pix das faturas: só contas com o recurso
           ZoZo.recursos.pix() ? h("h3", { class: P.cfgSecao }, "Pix das faturas") : null,
           ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
@@ -594,19 +596,19 @@
         const novaSenha = h("input", { type: "password", class: [ZoZo.pecas.entrada, ZoZo.pecas.entradaPequena], name: "new-password", placeholder: "Nova senha", autocomplete: "new-password", "aria-label": "Nova senha", minlength: "8" });
         const senhaAtualCampo = ZoZo.verificacao.ComRevelar(senhaAtual, "input-with-action--sm");   // ocultas, com "mostrar" e sem copiar
         const novaSenhaCampo = ZoZo.verificacao.ComRevelar(novaSenha, "input-with-action--sm");
-        const alterarSenha = (btn) => {
+        const alterarSenha = (btn: any) => {
           if (!senhaAtual.value) { senhaAtual.focus(); return; }
           if (novaSenha.value.length < 8) { ctx.toast("Use uma nova senha com pelo menos 8 caracteres.", { tone: "error" }); novaSenha.focus(); return; }
           btn.disabled = true;
           const dados = { senhaAtual: senhaAtual.value, novaSenha: novaSenha.value };
           depoisDasGravacoes(() => ctx.bridge.request(A.changePassword, dados, { timeout: 120000 }))
             .then(() => { senhaAtual.value = ""; novaSenha.value = ""; ctx.toast("Senha alterada."); })
-            .catch((e) => ctx.toast(e.friendly, { tone: "error" }))
+            .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }))
             .finally(() => { btn.disabled = false; });
         };
         const apagarDados = () => ZoZo.modais.confirmarComSenha({ titulo: "Apagar todos os dados?", botao: "Apagar dados",
           mensagem: "Transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
-          .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha })).then(() => {
+          .then((senha: any) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha })).then(() => {
             ZoZo.servico.reset();
             // Filtros, seleção e preferências apontavam para itens que não existem mais
             store.set({ ui: { filtros: null, selecionados: [], busca: "", invExcluidas: [], mostrarOcultas: {}, gruposFechados: {} }, selectedItem: null });
@@ -614,7 +616,7 @@
             ctx.toast("Dados apagados.");
             return ctx.recarregarTudo();
           })
-            .catch((e) => ctx.toast(e.friendly, { tone: "error" })));
+            .catch((e: any) => ctx.toast(e.friendly, { tone: "error" })));
 
         conteudo = [
           h("h3", { class: P.cfgSecao }, "Informação"),
@@ -627,10 +629,10 @@
             arquivo),
           demo ? linhaConfig("Nome", null, h("span", { class: CF.leitura }, u.nomeUsuario || "")) : linhaConfig("Nome", null, ZoZo.inline.texto({ valor: u.nomeUsuario, rotulo: "Nome do usuário", max: 80, classe: ZoZo.pecas.cfgNoLugar,
             aoSalvar: (v) => ZoZo.modais.confirmarComSenha({ titulo: "Confirmar alteração", botao: "Salvar", mensagem: "Digite sua senha para alterar o nome." })
-              .then((senha) => {
+              .then((senha: any) => {
                 if (!senha) throw new ZoZo.messages.BridgeError("CANCELADO", "Alteração cancelada.");
                 return ctx.bridge.request(A.updateUser, { nomeUsuario: v, email: u.email, senhaAtual: senha });
-              }).then((sessao) => { store.set({ session: { user: sessao.user } }); ctx.toast("Nome alterado."); }) })),
+              }).then((sessao: any) => { store.set({ session: { user: sessao.user } }); ctx.toast("Nome alterado."); }) })),
           linhaConfig("E-mail", null, h("span", { class: CF.leitura }, u.email || "")),
           demo ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
           // Senha: título em cima e, abaixo, senha atual · nova senha · Alterar (sem espremer o título ao lado)
@@ -639,9 +641,9 @@
             h("div", { class: CF.senha }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget) }))),
           demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
-            : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, e.currentTarget.closest(".modal")) })),
+            : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
           h("h3", { class: P.cfgSecao }, "Ações"),
-          linhaConfig(cfg.multicambio ? "Exportar as transações em " + ({ BRL: "Real", EUR: "Euro", USD: "Dólar" }[cfg.moeda] || "Real") : "Exportar todas as transações",
+          linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda] || "Real") : "Exportar todas as transações",
             "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : ""), UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
@@ -652,8 +654,8 @@
         UI.Button("Sair", { onClick: () => ctx.logout() }),
         demo ? null : h("button", { type: "button", class: CF.excluirConta, onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
           mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." })
-          .then((senha) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
-            .catch((e) => ctx.toast(e.friendly, { tone: "error" }))) }, "Excluir conta")) : null;
+          .then((senha: any) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
+            .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }))) }, "Excluir conta")) : null;
       return h("div", { class: [CF.raiz, P.ctxConfig] }, nav, h("div", { class: CF.principal }, h("div", { class: CF.conteudo }, conteudo), rodape));
     },
   };
@@ -666,9 +668,9 @@
      Os formulários (nome, senha, apagar dados…) abrem dentro da
      própria janela, com "Voltar" para a tela principal.
      ============================================================= */
-  function abrirConfiguracoes(ctx, aba) {
+  function abrirConfiguracoes(ctx: ContextoApp, aba: any) {
     const area = h("div", { class: "tw:h-full" });
-    let cancelar = null;
+    let cancelar: (() => unknown) | null = null;
     const ctxModal = Object.assign({}, ctx);
     function principal() {
       const st = store.get();
@@ -677,16 +679,18 @@
     }
     ctxModal.redesenharConfig = principal;
     const janela = ZoZo.feedback.modal({ title: "Configurações", class: "modal--settings", body: area, onClose: () => { if (cancelar) cancelar(); } });
-    ctxModal.logout = (msg) => { janela.fechar(); ctx.logout(msg); };
+    ctxModal.logout = (msg: any) => { janela.fechar(); ctx.logout(msg); };
     ctxModal.encerrarSessao = () => { janela.fechar(); ctx.encerrarSessao(); };
-    let ultimo = null;
+    let ultimo: unknown[] | null = null;
     cancelar = store.subscribe((st) => {
       const chave = [st.session.user, st.data.config, st.session.authenticated];
-      if (ultimo && chave.every((v, k) => v === ultimo[k])) return;
+      const antes = ultimo;
+      if (antes && chave.every((v, k) => v === antes[k])) return;
       ultimo = chave;
       if (!st.session.authenticated) { janela.fechar(); return; }
       // não redesenha enquanto o usuário digita (ex.: senha)
-      if (!area.contains(document.activeElement) || document.activeElement.tagName !== "INPUT") principal();
+      const ativo = document.activeElement;
+      if (!ativo || !area.contains(ativo) || ativo.tagName !== "INPUT") principal();
     });
     abaConfig = aba === "conta" || aba === "sobre" ? aba : "geral";
     principal();

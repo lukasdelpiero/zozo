@@ -105,6 +105,7 @@
   let uid = 0;
   function id(prefix?: string): string { uid += 1; return (prefix || "zz") + "-" + uid; }
 
-  const api: ZoZoDom = { h, s, clear, mount, append, id };
+  // h é declarado em globais.d.ts com o tipo exato de cada tag (o elemento criado é sempre o da tag pedida)
+  const api: ZoZoDom = { h: h as ZoZoDom["h"], s, clear, mount, append, id };
   ZoZo.dom = api;
 })((window.ZoZo = window.ZoZo || ({} as ZoZoGlobal)));

@@ -25,7 +25,7 @@
   const pct = (c: number, total: number) => (total ? (c / total) * 100 : 0);
   const fmtPct = (v: number) => (Math.round(v * 100) / 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
 
-  function abrir(original: any, ctx: any, aoTerminar?: (id: string) => void): void {
+  function abrir(original: any, ctx: ContextoApp, aoTerminar?: (id: string) => void): void {
     const st = store.get();
     const todos = (st.data.lancamentos && st.data.lancamentos.lancamentos) || [];
     const cats = ((st.data.categorias && st.data.categorias.categorias) || []);

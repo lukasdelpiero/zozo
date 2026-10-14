@@ -39,7 +39,7 @@
     }, icon(item.icon, { size: 16, class: ativo ? E.navIconeAtivo : E.navIcone }), h("span", { class: E.navRotulo }, item.label));
   }
 
-  function create(el: HTMLElement, ctx: any): { render(state: EstadoZoZo): void } {
+  function create(el: HTMLElement, ctx: ContextoApp): { render(state: EstadoZoZo): void } {
     const navEl = h("nav", { class: E.nav, "aria-label": "Navegação principal" });
     const contasEl = h("div", { class: E.contas, "aria-label": "Resumo das contas", role: "region", tabindex: "-1" });
     const footerEl = h("div", { class: E.rodape });

@@ -32,7 +32,7 @@
   function controle(campo: CampoForm, valor: any, aoMudar: () => void): Controle {
     const t = campo.tipo || "texto";
     if (t === "selecao") {
-      const sel: HTMLSelectElement = UI.Select(campo.opcoes, { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
+      const sel: HTMLSelectElement = UI.Select(campo.opcoes || [], { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
       sel.addEventListener("change", aoMudar);
       return { el: sel, ler: () => sel.value, foco: sel };
     }
@@ -77,11 +77,11 @@
 
   /** cfg.voltar: aberto a partir de outro painel → seta e "Cancelar" voltam para ele, e salvar também
       (com os dados já atualizados) em vez de fechar o painel */
-  function abrir(ctx: any, cfg: ConfigForm): ApiPainel {
+  function abrir(ctx: ContextoApp, cfg: ConfigForm): ApiPainel {
     return ctx.detail.open({
       title: cfg.titulo,
       selected: cfg.selected || null,
-      voltar: cfg.voltar || null,
+      voltar: cfg.voltar || undefined,
       render(body: HTMLElement, api: ApiPainel) {
         const valores: Record<string, unknown> = Object.assign({}, cfg.valores || {});
         const itens: Array<{ campo: CampoForm; c: Controle; wrap: HTMLElement }> = [];

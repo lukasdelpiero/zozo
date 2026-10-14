@@ -7,7 +7,7 @@
    components/list.js). Classes sem tw: que sobraram são ganchos
    (selbar: impressão; page--lancamentos: página atual).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
@@ -76,9 +76,11 @@
 
 
   /* ---------------- Filtros ---------------- */
-  const FILTROS_VAZIOS = () => ({ contas: [], categorias: [], statusCategoria: "ambos", perfis: [], periodo: null, recorrencias: [], tipos: [], ordem: "data-desc" });
-  const filtros = () => Object.assign(FILTROS_VAZIOS(), store.get().ui.filtros || {});
-  const setFiltros = (patch, ctx) => {
+  const FILTROS_VAZIOS = (): FiltrosLancamentos => ({ contas: [], categorias: [], statusCategoria: "ambos", perfis: [], periodo: null, recorrencias: [], tipos: [], ordem: "data-desc" });
+  /** Listas de ids dentro dos filtros (conta, categoria, perfil, recorrência, tipo) */
+  type ChaveLista = "contas" | "categorias" | "perfis" | "recorrencias" | "tipos";
+  const filtros = (): FiltrosLancamentos => Object.assign(FILTROS_VAZIOS(), store.get().ui.filtros || {});
+  const setFiltros = (patch: Partial<FiltrosLancamentos>, ctx: ContextoApp) => {
     store.set({ ui: { filtros: Object.assign(filtros(), patch), selecionados: [] } });
     if (ctx) ctx.refreshTopbar();
   };
@@ -108,9 +110,9 @@
     { value: "recorrente", label: "Recorrente" },
   ];
 
-  function intervalo(periodo) {
+  function intervalo(periodo: any) {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const d = (y, m, dd) => new Date(y, m, dd);
+    const d = (y: any, m: any, dd: any) => new Date(y, m, dd);
     const Y = hoje.getFullYear(), M = hoje.getMonth();
     const inicioSemana = new Date(hoje); inicioSemana.setDate(hoje.getDate() - hoje.getDay());   // domingo
     switch (periodo) {
@@ -126,23 +128,23 @@
     return null;
   }
 
-  const normalizar = (t) => ZoZo.busca.normalizar(t);
+  const normalizar = (t: any) => ZoZo.busca.normalizar(t);
 
   /* ---------------- Pesquisa (busca local: js/core/busca.ts) ----------------
      Os dados são cifrados de ponta a ponta, então a busca roda aqui. Campos e pesos: descrição pesa
      mais; valor e data entram em vários formatos ("1.234,56", "1234", "11/10", "outubro"). */
-  const TIPO_BUSCA = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito" };
-  function valorBusca(v) {
+  const TIPO_BUSCA: Record<string, string> = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito" };
+  function valorBusca(v: any) {
     const n = Math.abs(F.numero(v)), inteiro = Math.trunc(n);
     return [F.moedaEditavel(n), n.toFixed(2).replace(".", ","), n.toFixed(2), String(inteiro), F.moedaEditavel(inteiro).replace(/,00$/, "")].join(" ");
   }
-  function dataBusca(iso) {
+  function dataBusca(iso: any) {
     const [a, m, d] = String(iso || "").split("-");
     if (!d) return "";
     const mes = Number(m), dia = Number(d);
     return [d + "/" + m, d + "/" + m + "/" + a, dia + "/" + mes, dia + "/" + mes + "/" + a, F.mesNome(mes - 1), a].join(" ");
   }
-  const camposBusca = (comPerfis) => (l) => [
+  const camposBusca = (comPerfis: boolean) => (l: any): CampoBusca[] => [
     [l.descricao, 3],
     [l.categoria && l.categoria.nome, 2], [l.nomeConta, 2], [l.ultimos4Digitos, 2],
     [comPerfis && l.perfil ? l.perfil.nome : null, 1.5],
@@ -152,19 +154,19 @@
     [(TIPO_BUSCA[l.tipo] || "") + (l.recorrencia === "parcelada" ? " parcelado parcela" : "") + (l.parcelaTotal ? " " + l.parcelaAtual + "/" + l.parcelaTotal : ""), 1],
   ];
   /** Índice da lista atual (montado uma vez por lista e guardado enquanto ela existir) */
-  const indiceBusca = (lancamentos, comPerfis) => ZoZo.busca.indice(lancamentos, camposBusca(comPerfis), comPerfis ? "perfis" : "");
+  const indiceBusca = (lancamentos: any, comPerfis: any) => ZoZo.busca.indice(lancamentos, camposBusca(comPerfis), comPerfis ? "perfis" : "");
 
-  function aplicarFiltros(lancamentos, st) {
+  function aplicarFiltros(lancamentos: any, st: any) {
     const hoje = F.iso(new Date());
     const f = filtros();
     const termo = String(st.ui.busca || "").trim();
     const cats = (st.data.categorias && st.data.categorias.categorias) || [];
-    const statusDe = (id) => { const c = cats.find((x) => x.id === id); return c ? c.status : null; };
-    const faixa = f.periodo ? intervalo(f.periodo).map(F.iso) : null;
+    const statusDe = (id: any) => { const c = cats.find((x: any) => x.id === id); return c ? c.status : null; };
+    const faixa = f.periodo ? (intervalo(f.periodo) || []).map(F.iso) : null;
     const comPerfis = ZoZo.recursos.perfis();            // filtro de perfil só existe para contas com o recurso
     // Área principal mostra só até HOJE; pesquisando, também acha parcelas e agendamentos futuros
-    lancamentos = termo ? indiceBusca(lancamentos, comPerfis).buscar(termo).itens : lancamentos.filter((l) => l.data <= hoje);
-    let out = lancamentos.filter((l) => {
+    lancamentos = termo ? indiceBusca(lancamentos, comPerfis).buscar(termo).itens : lancamentos.filter((l: any) => l.data <= hoje);
+    let out = lancamentos.filter((l: any) => {
       if (f.contas.length && !f.contas.includes(l.contaId)) return false;
       if (f.categorias.length && !f.categorias.includes(l.categoriaId)) return false;
       if (f.statusCategoria !== "ambos" && statusDe(l.categoriaId) !== (f.statusCategoria === "excluidas" ? "excluida" : "regular")) return false;
@@ -176,19 +178,19 @@
     });
     const [campo, dir] = f.ordem.split("-");
     const k = dir === "asc" ? 1 : -1;
-    out = out.slice().sort((a, b) => k * (campo === "valor" ? a.valor - b.valor : a.data.localeCompare(b.data) || a.id.localeCompare(b.id)));
+    out = out.slice().sort((a: any, b: any) => k * (campo === "valor" ? a.valor - b.valor : a.data.localeCompare(b.data) || a.id.localeCompare(b.id)));
     return out;
   }
 
-  function temFiltro(st) {
+  function temFiltro(st: any) {
     const f = filtros();
     return !!(f.contas.length || f.categorias.length || f.statusCategoria !== "ambos" || (ZoZo.recursos.perfis() && f.perfis.length) || f.periodo || f.recorrencias.length || f.tipos.length || f.ordem !== "data-desc" || (st.ui.busca || "").trim());
   }
 
-  function totais(itens) {
+  function totais(itens: any) {
     const T = ZoZo.regras.totais;
-    const gasto = itens.reduce((s, l) => s + (T.gasto[l.tipo] || 0) * l.valor, 0);
-    const recebido = itens.reduce((s, l) => s + (T.recebido[l.tipo] || 0) * l.valor, 0);
+    const gasto = itens.reduce((s: any, l: any) => s + (T.gasto[l.tipo] || 0) * l.valor, 0);
+    const recebido = itens.reduce((s: any, l: any) => s + (T.recebido[l.tipo] || 0) * l.valor, 0);
     return { gasto, recebido, liquido: recebido - gasto };
   }
 
@@ -197,66 +199,66 @@
    * O que aparece nos filtros: só contas, categorias, perfis, recorrências e tipos presentes nas transações
    * da página (até hoje — as mesmas que Transações lista sem pesquisa). Os já marcados ficam, para poder desmarcar.
    */
-  function opcoesFiltro(st) {
+  function opcoesFiltro(st: any) {
     const hoje = F.iso(new Date());
-    const base = ((st.data.lancamentos && st.data.lancamentos.lancamentos) || []).filter((l) => l.data <= hoje);
+    const base = ((st.data.lancamentos && st.data.lancamentos.lancamentos) || []).filter((l: any) => l.data <= hoje);
     const f = filtros();
-    const usados = (campo, marcados) => new Set(base.map((l) => l[campo]).filter(Boolean).concat(marcados));
+    const usados = (campo: any, marcados: any) => new Set(base.map((l: any) => l[campo]).filter(Boolean).concat(marcados));
     const contasUsadas = usados("contaId", f.contas), catsUsadas = usados("categoriaId", f.categorias), perfisUsados = usados("perfilId", f.perfis);
-    const tiposUsados = new Set(base.map((l) => l.tipo).concat(f.tipos));
+    const tiposUsados = new Set(base.map((l: any) => l.tipo).concat(f.tipos));
     // recorrência = série: a transação de origem (recorrente com frequência) e as ocorrências (serieId)
-    const serieDe = (l) => (l.serieId && !String(l.serieId).startsWith("removida:") ? l.serieId : (l.tipo === "recorrente" && l.recorrencia ? l.id : null));
+    const serieDe = (l: any) => (l.serieId && !String(l.serieId).startsWith("removida:") ? l.serieId : (l.tipo === "recorrente" && l.recorrencia ? l.id : null));
     const series = new Map();
-    base.forEach((l) => {
+    base.forEach((l: any) => {
       const sid = serieDe(l); if (!sid) return;
-      const origem = base.find((x) => x.id === sid) || l;
+      const origem = base.find((x: any) => x.id === sid) || l;
       if (!series.has(sid) || origem.id === sid) series.set(sid, origem);
     });
     const recs = (st.data.recorrencias && st.data.recorrencias.recorrencias) || [];
     const FREQ = (ZoZo.servico && ZoZo.servico.FREQUENCIAS) || {};
-    const rotuloSerie = (sid, l) => {
-      const r = recs.find((x) => x.serieId === sid);
+    const rotuloSerie = (sid: any, l: any) => {
+      const r = recs.find((x: any) => x.serieId === sid);
       if (r) return r.descricao + " · " + r.tipoRecorrencia;
       const freq = l.recorrencia === "parcelada" ? "Parcelado" : (FREQ[l.recorrencia] || {}).rotulo;
       return l.descricao + (freq ? " · " + freq : "");
     };
-    f.recorrencias.forEach((sid) => { if (!series.has(sid)) { const r = recs.find((x) => x.serieId === sid); if (r) series.set(sid, r); } });
-    const icone = (l) => (l.categoria && l.categoria.icone) || ((st.data.categorias && st.data.categorias.categorias) || []).find((c) => c.id === l.categoriaId)?.icone;
+    f.recorrencias.forEach((sid) => { if (!series.has(sid)) { const r = recs.find((x: any) => x.serieId === sid); if (r) series.set(sid, r); } });
+    const icone = (l: any) => (l.categoria && l.categoria.icone) || ((st.data.categorias && st.data.categorias.categorias) || []).find((c: any) => c.id === l.categoriaId)?.icone;
     return {
-      contas: ((st.data.contas && st.data.contas.contas) || []).filter((c) => contasUsadas.has(c.id)),
-      cats: ((st.data.categorias && st.data.categorias.categorias) || []).filter((c) => catsUsadas.has(c.id)),
-      perfis: ((st.data.perfis && st.data.perfis.perfis) || []).filter((p) => perfisUsados.has(p.id)),
+      contas: ((st.data.contas && st.data.contas.contas) || []).filter((c: any) => contasUsadas.has(c.id)),
+      cats: ((st.data.categorias && st.data.categorias.categorias) || []).filter((c: any) => catsUsadas.has(c.id)),
+      perfis: ((st.data.perfis && st.data.perfis.perfis) || []).filter((p: any) => perfisUsados.has(p.id)),
       recorrencias: Array.from(series, ([sid, l]) => ({ value: sid, label: rotuloSerie(sid, l), icone: icone(l) })).sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
       tipos: TIPOS_FILTRO.filter((t) => tiposUsados.has(t.value)),
     };
   }
 
-  function abrirMenuFiltros(anchor, ctx, posicao) {
+  function abrirMenuFiltros(anchor: any, ctx: ContextoApp, posicao: any) {
     const st = store.get();
     const { contas, cats, perfis, recorrencias, tipos } = opcoesFiltro(st);
     const LM = ZoZo.menu.listaMarcavel;
 
-    const alternar = (chave) => (valor) => {
-      const lista = filtros()[chave].slice();
+    const alternar = (chave: any) => (valor: any) => {
+      const lista = filtros()[chave as ChaveLista].slice();
       const i = lista.indexOf(valor);
       if (i >= 0) lista.splice(i, 1); else lista.push(valor);
       setFiltros({ [chave]: lista }, ctx);
     };
-    const marcados = (chave) => () => filtros()[chave];
-    const qtd = (n) => (n ? String(n) : "");
-    const unico = (chave, opcoes) => () => opcoes.map((o) => ({
-      label: o.label, check: filtros()[chave] === o.value, manterAberto: true,
-      onClick: () => setFiltros({ [chave]: chave === "periodo" && filtros()[chave] === o.value ? null : o.value }, ctx),
+    const marcados = (chave: ChaveLista) => () => filtros()[chave];
+    const qtd = (n: any) => (n ? String(n) : "");
+    const unico = (chave: any, opcoes: any) => () => opcoes.map((o: any) => ({
+      label: o.label, check: filtros()[chave as keyof FiltrosLancamentos] === o.value, manterAberto: true,
+      onClick: () => setFiltros({ [chave]: chave === "periodo" && filtros()[chave as keyof FiltrosLancamentos] === o.value ? null : o.value }, ctx),
     }));
 
     // Categoria: Regulares / Excluídas / Ambos acima da lista
-    const statusCategoria = (redesenhar) => h("div", { class: ZoZo.estrutura.menuSegmento, role: "radiogroup", "aria-label": "Tipo de categoria" },
+    const statusCategoria = (redesenhar: any) => h("div", { class: ZoZo.estrutura.menuSegmento, role: "radiogroup", "aria-label": "Tipo de categoria" },
       [["regulares", "Regulares"], ["excluidas", "Excluídas"], ["ambos", "Ambos"]].map(([v, t]) => h("button", {
         type: "button", role: "radio", "aria-checked": String(filtros().statusCategoria === v),
         class: [ZoZo.estrutura.menuSegmentoItem, filtros().statusCategoria === v && "is-active"],
-        onClick: (e) => {
+        onClick: (e: any) => {
           setFiltros({ statusCategoria: v }, ctx);
-          e.currentTarget.parentNode.querySelectorAll("button").forEach((b) => { const on = b === e.currentTarget; b.classList.toggle("is-active", on); b.setAttribute("aria-checked", String(on)); });
+          e.currentTarget.parentNode.querySelectorAll("button").forEach((b: any) => { const on = b === e.currentTarget; b.classList.toggle("is-active", on); b.setAttribute("aria-checked", String(on)); });
           redesenhar();
         },
       }, t)));
@@ -264,11 +266,11 @@
     ZoZo.menu.abrir(anchor, () => [
       { secao: "Filtrar por" },
       { icone: "contas", label: "Conta", valor: qtd(filtros().contas.length),
-        submenu: LM({ itens: contas.map((c) => ({ value: c.id, label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), cor: c.cor })), marcados: marcados("contas"), alternar: alternar("contas"), vazio: "Nenhuma conta nas transações." }) },
+        submenu: LM({ itens: contas.map((c: any) => ({ value: c.id, label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), cor: c.cor })), marcados: marcados("contas"), alternar: alternar("contas"), vazio: "Nenhuma conta nas transações." }) },
       { icone: "categorias", label: "Categoria", valor: qtd(filtros().categorias.length + (filtros().statusCategoria !== "ambos" ? 1 : 0)),
-        submenu: LM({ itens: cats.map((c) => ({ value: c.id, label: c.nome, icone: c.icone })), marcados: marcados("categorias"), alternar: alternar("categorias"), topo: statusCategoria, vazio: "Nenhuma categoria nas transações." }) },
+        submenu: LM({ itens: cats.map((c: any) => ({ value: c.id, label: c.nome, icone: c.icone })), marcados: marcados("categorias"), alternar: alternar("categorias"), topo: statusCategoria, vazio: "Nenhuma categoria nas transações." }) },
       ...(ZoZo.recursos.perfis() ? [{ icone: "perfil", label: "Perfil", valor: qtd(filtros().perfis.length),
-        submenu: LM({ itens: perfis.map((p) => ({ value: p.id, label: p.nome + (p.arquivado ? " (arquivado)" : ""), cor: p.cor })), marcados: marcados("perfis"), alternar: alternar("perfis"), vazio: "Nenhum perfil nas transações." }) }] : []),
+        submenu: LM({ itens: perfis.map((p: any) => ({ value: p.id, label: p.nome + (p.arquivado ? " (arquivado)" : ""), cor: p.cor })), marcados: marcados("perfis"), alternar: alternar("perfis"), vazio: "Nenhum perfil nas transações." }) }] : []),
       { icone: "calendario", label: "Data", valor: filtros().periodo ? "1" : "", submenu: unico("periodo", PERIODOS) },
       { icone: "recorrencias", label: "Recorrência", valor: qtd(filtros().recorrencias.length),
         submenu: LM({ itens: recorrencias, marcados: marcados("recorrencias"), alternar: alternar("recorrencias"), vazio: "Nenhuma recorrência nas transações." }) },
@@ -284,15 +286,15 @@
   }
 
   /** Chips dos filtros ativos (abaixo da barra superior) */
-  function chipsFiltros(st, ctx) {
+  function chipsFiltros(st: any, ctx: ContextoApp) {
     const f = filtros();
     const contas = (st.data.contas && st.data.contas.contas) || [];
     const cats = (st.data.categorias && st.data.categorias.categorias) || [];
     const perfis = (st.data.perfis && st.data.perfis.perfis) || [];
     const recs = (st.data.recorrencias && st.data.recorrencias.recorrencias) || [];
-    const nomes = (ids, lista, campo) => ids.map((id) => { const x = lista.find((y) => (y.id || y.serieId) === id); return x ? x[campo || "nome"] : "—"; }).join(", ");
-    const chips = [];
-    const chip = (rotulo, valor, limpar) => chips.push(h("span", { class: T.chip },
+    const nomes = (ids: any, lista: any, campo?: any) => ids.map((id: any) => { const x = lista.find((y: any) => (y.id || y.serieId) === id); return x ? x[campo || "nome"] : "—"; }).join(", ");
+    const chips: HTMLElement[] = [];
+    const chip = (rotulo: any, valor: any, limpar: any) => chips.push(h("span", { class: T.chip },
       h("span", { class: T.chipRotulo }, rotulo + ": "), h("span", { class: T.chipValor }, valor),
       h("button", { type: "button", class: T.chipRemover, "aria-label": "Remover filtro " + rotulo, onClick: limpar }, icon("fechar", { size: 12, stroke: 2.25 }))));
     if (f.contas.length) chip("Conta", nomes(f.contas, contas), () => setFiltros({ contas: [] }, ctx));
@@ -300,7 +302,7 @@
     if (f.statusCategoria !== "ambos") chip("Categorias", f.statusCategoria === "excluidas" ? "Excluídas" : "Regulares", () => setFiltros({ statusCategoria: "ambos" }, ctx));
     if (ZoZo.recursos.perfis() && f.perfis.length) chip("Perfil", nomes(f.perfis, perfis), () => setFiltros({ perfis: [] }, ctx));
     if (f.periodo) chip("Data", (PERIODOS.find((p) => p.value === f.periodo) || {}).label, () => setFiltros({ periodo: null }, ctx));
-    if (f.recorrencias.length) chip("Recorrência", f.recorrencias.map((sid) => { const r = recs.find((x) => x.serieId === sid); return r ? r.descricao : "—"; }).join(", "), () => setFiltros({ recorrencias: [] }, ctx));
+    if (f.recorrencias.length) chip("Recorrência", f.recorrencias.map((sid) => { const r = recs.find((x: any) => x.serieId === sid); return r ? r.descricao : "—"; }).join(", "), () => setFiltros({ recorrencias: [] }, ctx));
     if (f.tipos.length) chip("Tipo", f.tipos.map((t) => (TIPOS_FILTRO.find((x) => x.value === t) || {}).label).join(", "), () => setFiltros({ tipos: [] }, ctx));
     if (f.ordem !== "data-desc") chip("Ordem", (ORDENS.find((o) => o.value === f.ordem) || {}).grupo + " · " + (ORDENS.find((o) => o.value === f.ordem) || {}).label, () => setFiltros({ ordem: "data-desc" }, ctx));
     if ((st.ui.busca || "").trim()) chip("Pesquisa", st.ui.busca.trim(), () => { store.set({ ui: { busca: "" } }); ctx.refreshTopbar(); });
@@ -309,10 +311,10 @@
     return h("div", { class: T.chips }, chips, add);
   }
 
-  function barraInformacoes(itens) {
+  function barraInformacoes(itens: any) {
     const t = totais(itens);
     // valores na cor do texto; só o saldo negativo fica vermelho
-    const valor = (v, negativo) => h("strong", { class: ["money", T.infoValor, negativo && "money--negative"] }, v);
+    const valor = (v: any, negativo?: any) => h("strong", { class: ["money", T.infoValor, negativo && "money--negative"] }, v);
     return h("div", { class: T.info, role: "status" },
       h("span", { class: T.infoQtd }, itens.length === 1 ? "1 transação" : itens.length + " transações"),
       h("span", { class: T.infoTotais },
@@ -325,23 +327,23 @@
   const rotuloDia = F.rotuloDia;
 
   /* ---------------- Recarregamento após alterações (seção 54) ---------------- */
-  function aposAlterar(ctx) { return ctx.recarregarTudo(); }
+  function aposAlterar(ctx: ContextoApp) { return ctx.recarregarTudo(); }
 
   /* ---------------- Painel do lançamento (js/pages/lancamento-painel.js) ---------------- */
-  function abrirVisualizacao(l, ctx, opts) { return ZoZo.lancamentoPainel.abrir(l, ctx, opts); }
-  function abrirFormulario(l, ctx, preset) { return ZoZo.lancamentoPainel.abrir(l, ctx, l ? {} : { preset }); }
+  function abrirVisualizacao(l: any, ctx: ContextoApp, opts?: any) { return ZoZo.lancamentoPainel.abrir(l, ctx, opts); }
+  function abrirFormulario(l: any, ctx: ContextoApp, preset?: any) { return ZoZo.lancamentoPainel.abrir(l, ctx, l ? {} : { preset }); }
 
   /* ---------------- Barra de seleção (ações em lote) ---------------- */
-  function barraSelecao(st, ctx, visiveis) {
+  function barraSelecao(st: any, ctx: ContextoApp, visiveis: any) {
     const sel = st.ui.selecionados || [];
     if (!sel.length) return null;
     const limpar = () => store.set({ ui: { selecionados: [] } });
-    const aplicar = (dados, msg) => ctx.bridge.request(A.updateLancamentosEmLote, Object.assign({ ids: sel }, dados))
+    const aplicar = (dados: any, msg: any) => ctx.bridge.request(A.updateLancamentosEmLote, Object.assign({ ids: sel }, dados))
       .then(() => { ctx.toast(msg); limpar(); return aposAlterar(ctx); })
-      .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+      .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
 
     // no celular só o ícone aparece (o nome continua no aria-label)
-    const botao = (icone, texto) => h("button", { type: "button", class: T.selbarBtn, "aria-haspopup": "menu", "aria-label": texto, title: texto },
+    const botao = (icone: any, texto: any) => h("button", { type: "button", class: T.selbarBtn, "aria-haspopup": "menu", "aria-label": texto, title: texto },
       icon(icone, { size: 15 }), h("span", { class: T.selbarTxt }, texto));
 
     const categoriaBtn = botao("categorias", "Categoria");
@@ -349,15 +351,15 @@
       const cats = (store.get().data.categorias && store.get().data.categorias.categorias) || [];
       ZoZo.menu.abrir(categoriaBtn, { largura: 250, render(el, api) {
         let termo = "";
-        const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const norm = (t: any) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const lista = h("div", { class: ZoZo.estrutura.menuListaRolagem });
         const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar categoria", "aria-label": "Pesquisar categoria" });
-        const desenhar = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) =>
+        const desenhar = () => mount(lista, cats.filter((c: any) => !termo || norm(c.nome).includes(termo)).map((c: any) =>
           h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); aplicar({ categoriaId: c.id }, "Categoria definida."); } }, UI.CategoryLabel(c, { pill: true }))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         // + Nova categoria (como nos outros menus de categoria): já é aplicada às selecionadas
         const nova = h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar();
-          ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => aplicar({ categoriaId: c.id }, "Categoria criada e definida.") }); } },
+          ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c: any) => aplicar({ categoriaId: c.id }, "Categoria criada e definida.") }); } },
           icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria"));
         mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: ZoZo.estrutura.menuSeparador }), nova);
         desenhar();
@@ -372,15 +374,15 @@
 
     const perfilBtn = ZoZo.recursos.perfis() ? botao("perfil", "Perfil") : null;      // só contas com o recurso de Perfis
     if (perfilBtn) perfilBtn.addEventListener("click", () => {
-      const perfis = ((store.get().data.perfis && store.get().data.perfis.perfis) || []).filter((p) => !p.arquivado);
-      ZoZo.menu.abrir(perfilBtn, perfis.map((p) => ({ render: (api) => h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); aplicar({ perfilId: p.id }, "Perfil definido."); } }, UI.Tag(p.nome, p.cor, { class: "tag--upper" })) }))
+      const perfis = ((store.get().data.perfis && store.get().data.perfis.perfis) || []).filter((p: any) => !p.arquivado);
+      ZoZo.menu.abrir(perfilBtn, perfis.map((p: any) => ({ render: (api: any) => h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); aplicar({ perfilId: p.id }, "Perfil definido."); } }, UI.Tag(p.nome, p.cor, { class: "tag--upper" })) }))
         .concat([{ separador: true },
-          { icone: "mais", label: "Criar novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => aplicar({ perfilId: np.id }, "Perfil criado e definido.") }) }]), { posicao: "acima", label: "Definir perfil" });
+          { icone: "mais", label: "Criar novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np: any) => aplicar({ perfilId: np.id }, "Perfil criado e definido.") }) }]), { posicao: "acima", label: "Definir perfil" });
     });
 
     const maisBtn = h("button", { type: "button", class: T.selbarIcone, "aria-label": "Mais ações", "aria-haspopup": "menu" }, icon("opcoes", { size: 16 }));
     maisBtn.addEventListener("click", () => ZoZo.menu.abrir(maisBtn, [
-      { label: "Marcar todas", onClick: () => store.set({ ui: { selecionados: visiveis.map((l) => l.id) } }) },
+      { label: "Marcar todas", onClick: () => store.set({ ui: { selecionados: visiveis.map((l: any) => l.id) } }) },
       { label: "Desmarcar todas", onClick: limpar },
       { separador: true },
       { label: "Excluir", perigo: true, onClick: () => {
@@ -388,7 +390,7 @@
           sel.length === 1 ? "Tem certeza de que deseja excluir esta transação?" : "Tem certeza de que deseja excluir estas " + sel.length + " transações?")
           .then((ok) => ok && ctx.bridge.request(A.deleteLancamentos, { ids: sel }).then(() => {
             ctx.detail.close({ silencioso: true }); limpar(); ctx.toast("Transações excluídas."); return aposAlterar(ctx);
-          }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
+          }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" })));
       } },
     ], { posicao: "acima", label: "Mais ações", class: ZoZo.estrutura.menuCompacto }));
 
@@ -402,11 +404,11 @@
     return barra;
   }
 
-  function navegarBarra(e) {
-    const botoes = Array.from(e.currentTarget.querySelectorAll(":scope > button"));
-    const i = botoes.indexOf(document.activeElement);
+  function navegarBarra(e: KeyboardEvent) {
+    const botoes = Array.from((e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>(":scope > button"));
+    const i = botoes.indexOf(document.activeElement as HTMLElement);
     if (i < 0) return;
-    const alvo = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: botoes.length - 1 }[e.key];
+    const alvo = ({ ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: botoes.length - 1 } as Record<string, number>)[e.key];
     if (alvo === undefined) return;
     e.preventDefault();
     const proximo = botoes[(alvo + botoes.length) % botoes.length];
@@ -415,28 +417,28 @@
   }
 
   /* ---------------- Ações da barra superior ---------------- */
-  let buscaTimer = null;
-  let ultimaBusca = null;        // a lista entra com animação quando o termo pesquisado muda
+  let buscaTimer: ReturnType<typeof setTimeout> | undefined;
+  let ultimaBusca: string | null = null;        // a lista entra com animação quando o termo pesquisado muda
   /* O campo é criado uma vez só: a barra superior se redesenha (dados recarregados, atualização de outra
      aba, filtros) e antes o campo era trocado no meio da digitação — perdia o foco e as últimas letras. */
-  let campoBusca = null;
+  let campoBusca: HTMLInputElement | null = null;
   function campoPesquisa() {
     if (campoBusca) return campoBusca;
-    const aplicar = (v) => { clearTimeout(buscaTimer); store.set({ ui: { busca: v, selecionados: [] } }); };
+    const aplicar = (v: any) => { clearTimeout(buscaTimer); store.set({ ui: { busca: v, selecionados: [] } }); };
     campoBusca = h("input", {
       type: "search", class: T.pesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações",
       title: "Nome, categoria, conta, valor ou data — ex.: mercado outubro · >100 · 11/10 (atalho: / ou Ctrl+K)",
       "aria-keyshortcuts": "/ Control+K", autocomplete: "off", spellcheck: "false", enterkeyhint: "search",
-      onInput: (e) => { clearTimeout(buscaTimer); const v = e.target.value; buscaTimer = setTimeout(() => aplicar(v), 120); },
+      onInput: (e: any) => { clearTimeout(buscaTimer); const v = e.target.value; buscaTimer = setTimeout(() => aplicar(v), 120); },
       // Enter pesquisa na hora; Esc limpa (e só depois, com o campo vazio, fecha o painel)
-      onKeydown: (e) => {
+      onKeydown: (e: any) => {
         if (e.key === "Enter") aplicar(e.target.value);
         else if (e.key === "Escape" && e.target.value) { e.preventDefault(); e.target.value = ""; aplicar(""); }
       },
     });
     return campoBusca;
   }
-  function acoes(ctx) {
+  function acoes(ctx: ContextoApp) {
     const st = store.get();
     const busca = campoPesquisa();
     const comFoco = document.activeElement === busca;
@@ -447,7 +449,8 @@
     }
     // Filtro ativo = algum filtro diferente do padrão (a pesquisa tem o próprio campo)
     const padrao = FILTROS_VAZIOS();
-    const ativos = Object.keys(padrao).some((k) => JSON.stringify(filtros()[k]) !== JSON.stringify(padrao[k]));
+    const atual = filtros();
+    const ativos = (Object.keys(padrao) as Array<keyof FiltrosLancamentos>).some((k) => JSON.stringify(atual[k]) !== JSON.stringify(padrao[k]));
     const filtroBtn = h("button", { type: "button", class: [T.pesquisaFiltro, ativos ? T.pesquisaFiltroAtivo : T.pesquisaFiltroNormal], "aria-label": "Filtrar", title: "Filtrar",
       "aria-haspopup": "menu", "aria-expanded": "false" }, icon("filtrar", { size: 16 }));
     filtroBtn.addEventListener("click", () => abrirMenuFiltros(filtroBtn, ctx, "direita"));
@@ -462,12 +465,12 @@
   }
 
   /* Checkbox ao lado do título: seleciona todos os lançamentos visíveis */
-  let checkTodos = null;
+  let checkTodos: HTMLInputElement | null = null;
   function prefixo() {
     const box = UI.Checkbox(false, (marcar) => {
       const st = store.get();
       const visiveis = aplicarFiltros((st.data.lancamentos && st.data.lancamentos.lancamentos) || [], st);
-      store.set({ ui: { selecionados: marcar ? visiveis.map((l) => l.id) : [] } });
+      store.set({ ui: { selecionados: marcar ? visiveis.map((l: any) => l.id) : [] } });
     }, { label: "Selecionar todas as transações", class: "topbar-check" });
     checkTodos = box.querySelector("input");
     return box;
@@ -496,17 +499,17 @@
       const itens = aplicarFiltros(todos, state);
       const termoAtual = normalizar(state.ui.busca).trim();
       const animarBusca = ultimaBusca !== null && termoAtual !== ultimaBusca;
-      const anim = (i) => (animarBusca ? T.busca[Math.min(i, 2)] : null);
+      const anim = (i: number) => (animarBusca ? T.busca[Math.min(i, 2)] : undefined);
       ultimaBusca = termoAtual;
       const filtrando = temFiltro(state);
       const selId = state.selectedItem && state.selectedItem.tipo === "lancamento" ? state.selectedItem.id : null;
       const marcados = new Set(state.ui.selecionados || []);
       if (checkTodos) {
-        const todosMarcados = itens.length > 0 && itens.every((l) => marcados.has(l.id));
+        const todosMarcados = itens.length > 0 && itens.every((l: any) => marcados.has(l.id));
         checkTodos.checked = todosMarcados;
-        checkTodos.indeterminate = !todosMarcados && itens.some((l) => marcados.has(l.id));
+        checkTodos.indeterminate = !todosMarcados && itens.some((l: any) => marcados.has(l.id));
       }
-      const alternarMarca = (id, v) => {
+      const alternarMarca = (id: any, v: any) => {
         const atual = new Set(store.get().ui.selecionados || []);
         if (v) atual.add(id); else atual.delete(id);
         store.set({ ui: { selecionados: Array.from(atual) } });
@@ -521,12 +524,12 @@
       }
 
       const termosBusca = termoAtual ? ZoZo.busca.consulta(state.ui.busca).termos : [];
-      const destacar = termosBusca.length ? (t) => ZoZo.busca.destacar(t, termosBusca) : null;
-      const linha = (l, comData) => L.LaunchRow(l, {
+      const destacar = termosBusca.length ? (t: any) => ZoZo.busca.destacar(t, termosBusca) : null;
+      const linha = (l: any, comData: any) => L.LaunchRow(l, {
         destacar,
         selected: l.id === selId,
         marcado: marcados.has(l.id),
-        onMarcar: (v) => alternarMarca(l.id, v),
+        onMarcar: (v: any) => alternarMarca(l.id, v),
         mostrarData: comData,
         onClick: () => abrirVisualizacao(l, ctx),
       });
@@ -535,13 +538,14 @@
       if (filtros().ordem.startsWith("valor")) {
         blocos.push(h("section", { class: anim(0) },
           h("h2", { class: T.mesTituloSolto }, "Ordenado por valor"),
-          h("div", { class: T.lista }, itens.map((l) => linha(l, true)))));
+          h("div", { class: T.lista }, itens.map((l: any) => linha(l, true)))));
       } else {
-        let mesAtual = null, diaAtual = null, secao = null, lista = null;
+        let mesAtual: string | null = null, diaAtual: string | null = null;
+        let secao: HTMLElement = h("section"), lista: HTMLElement = h("div");
         // transações de cada mês numa única passada (antes: a lista inteira era filtrada de novo a cada mês)
         const porMes = new Map();
-        itens.forEach((x) => { const m = x.data.slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(x); });
-        itens.forEach((l) => {
+        itens.forEach((x: any) => { const m = x.data.slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(x); });
+        itens.forEach((l: any) => {
           const mes = l.data.slice(0, 7);
           if (mes !== mesAtual) {
             mesAtual = mes; diaAtual = null;
@@ -566,7 +570,7 @@
       return C.pagina(T.pagina, topo, blocos, barraSelecao(state, ctx, itens));
     },
     selecionar(sel, ctx) {
-      const l = (store.get().data.lancamentos.lancamentos || []).find((x) => x.id === sel.id);
+      const l = (store.get().data.lancamentos.lancamentos || []).find((x: any) => x.id === sel.id);
       if (l) {
         abrirVisualizacao(l, ctx);
         requestAnimationFrame(() => {

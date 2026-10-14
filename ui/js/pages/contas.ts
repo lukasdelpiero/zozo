@@ -3,7 +3,7 @@
    Visual em Tailwind (tabela T abaixo; a linha da conta está em
    components/list.js; peças compartilhadas em components/pecas.ts).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const UI = ZoZo.ui;
@@ -56,14 +56,14 @@
   ];
 
   /* ---------- Card do gráfico de Contas (Ativos × Passivos) ---------- */
-  function metade(ponto, titulo, dados, embutido) {
+  function metade(ponto: any, titulo: any, dados: any, embutido: any) {
     return h("div", { class: T.metade },
       h("span", { class: T.legenda }, h("span", { class: ponto, "aria-hidden": "true" }), titulo),
       h("span", { class: embutido ? T.valorEmbutido : T.valor }, F.moeda(dados.valor)),
       UI.PercentageChange(dados.variacaoPercentual));
   }
 
-  function ContasChartCard(state, ctx, opts) {
+  function ContasChartCard(state: any, ctx: ContextoApp, opts?: any) {
     const o = opts || {};
     const resumo = state.data.contas.resumo;
     const intervalo = o.intervalo || state.ui.intervaloContas;
@@ -86,7 +86,7 @@
   }
 
   /** "+" da barra superior: escolhe o tipo de conta (como no Copilot) */
-  function botaoNovaConta(ctx) {
+  function botaoNovaConta(ctx: ContextoApp) {
     const btn = UI.IconButton("mais", "Nova conta", { onPrimary: true, expanded: false });
     btn.setAttribute("aria-haspopup", "menu");
     btn.addEventListener("click", () => ZoZo.menu.abrir(btn, [
@@ -106,13 +106,13 @@
    *   Fechamento (dia)  Vencimento (dia)
    * Os DOIS são obrigatórios (não dá para mudar só um); a mesma regra vale no serviço de dados.
    */
-  function areaCiclo(conta, ctx, aoSalvar) {
+  function areaCiclo(conta: any, ctx: ContextoApp, aoSalvar: any) {
     const hoje = new Date();
     const meses = Array.from({ length: 13 }, (_, i) => { const d = new Date(hoje.getFullYear(), hoje.getMonth() + i - 1, 1); return F.iso(d).slice(0, 7); });
     const soEsteMes = !!(conta.cicloAtual && conta.cicloAtual.soEsteMes);
     let modo = soEsteMes ? "mes" : "fixo", mes = meses[1];
     const ciclo = () => (modo === "mes" && conta.ciclos && conta.ciclos[mes]) || { fechamento: conta.fechamento, vencimento: conta.vencimento };
-    const dia = (rotulo) => { const i = UI.Input({ inputmode: "numeric", placeholder: "1–31", class: T.cicloInput }); i.maxLength = 2; i.setAttribute("aria-label", rotulo); return i; };
+    const dia = (rotulo: any) => { const i = UI.Input({ inputmode: "numeric", placeholder: "1–31", class: T.cicloInput }); i.maxLength = 2; i.setAttribute("aria-label", rotulo); return i; };
     const fech = dia("Dia do fechamento"), venc = dia("Dia do vencimento");
     const erro = h("p", { class: T.cicloErro, role: "alert" });
     const modoBtn = h("button", { type: "button", class: T.cicloModo, "aria-haspopup": "menu" });
@@ -129,25 +129,25 @@
     ], { posicao: "direita", checkEsquerda: true, largura: 300, label: "Tipo de fechamento" }));
     mesSel.addEventListener("change", () => { mes = mesSel.value; preencher(); });
     pintar();
-    const valido = (v) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
+    const valido = (v: any) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
     [fech, venc].forEach((i) => i.addEventListener("input", () => { i.value = i.value.replace(/\D/g, ""); i.removeAttribute("aria-invalid"); erro.textContent = ""; }));
-    const campo = (rotulo, input) => h("label", { class: T.cicloCampo }, h("span", { class: T.cicloRotulo }, rotulo), input);
+    const campo = (rotulo: any, input: any) => h("label", { class: T.cicloCampo }, h("span", { class: T.cicloRotulo }, rotulo), input);
     requestAnimationFrame(() => { fech.focus(); F.cursorNoFim(fech); });
     return {
       el: h("div", { class: T.cicloArea }, modoBtn, mesSel, h("div", { class: T.cicloDias }, campo("Fechamento (dia)", fech), campo("Vencimento (dia)", venc)), erro),
-      salvar(btn) {
+      salvar(btn: any) {
         const ruins = [fech, venc].filter((i) => !valido(i.value));
         if (ruins.length) { ruins.forEach((i) => i.setAttribute("aria-invalid", "true")); ruins[0].focus(); erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
         if (btn) btn.disabled = true;
         ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: fech.value.trim(), vencimento: venc.value.trim(), modo, mes: modo === "mes" ? mes : undefined })
-          .then((r) => ctx.recarregarTudo().then(() => aoSalvar(r.conta)))
-          .catch((e) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
+          .then((r: any) => ctx.recarregarTudo().then(() => aoSalvar(r.conta)))
+          .catch((e: any) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
       },
     };
   }
 
   /** 4 últimos dígitos editáveis no lugar: um clique e já é um campo (sem borda, fundo transparente) */
-  function campoDigitos(conta, ctx) {
+  function campoDigitos(conta: any, ctx: ContextoApp) {
     let atual = conta.ultimos4Digitos || "";
     const input = h("input", { type: "text", inputmode: "numeric", autocomplete: "off", maxlength: "4", placeholder: "0000", value: atual,
       class: T.digitos, "aria-label": "4 últimos dígitos" });
@@ -159,49 +159,49 @@
       if (v && !/^\d{4}$/.test(v)) { input.setAttribute("aria-invalid", "true"); ctx.toast(ZoZo.messages.FRIENDLY.DIGITS_INVALID, { tone: "error" }); input.value = atual; return; }
       const antes = atual; atual = v;
       ctx.bridge.request(A.updateConta, { id: conta.id, ultimos4Digitos: v }).then(() => ctx.recarregarTudo())
-        .catch((e) => { atual = antes; input.value = antes; ctx.toast(e.friendly, { tone: "error" }); });
+        .catch((e: any) => { atual = antes; input.value = antes; ctx.toast(e.friendly, { tone: "error" }); });
     });
     return input;
   }
 
-  function abrirDetalheConta(conta, ctx, origem, opts) {
+  function abrirDetalheConta(conta: any, ctx: ContextoApp, origem: any, opts?: any) {
     let intervalo = conta.tipo === "investimento" ? "1M" : "3M";
     const editandoCiclo = !!(opts && opts.editandoCiclo) && conta.tipo === "cartao";
-    const reabrir = (extra, atual) => abrirDetalheConta(atual || conta, ctx, origem, Object.assign({}, opts, extra));
-    const ciclo = editandoCiclo ? areaCiclo(conta, ctx, (c) => reabrir({ editandoCiclo: false }, Object.assign({}, conta, c))) : null;
+    const reabrir = (extra: any, atual?: any) => abrirDetalheConta(atual || conta, ctx, origem, Object.assign({}, opts, extra));
+    const ciclo = editandoCiclo ? areaCiclo(conta, ctx, (c: any) => reabrir({ editandoCiclo: false }, Object.assign({}, conta, c))) : null;
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir conta?", "Tem certeza de que deseja excluir esta conta?")
       .then((ok) => ok && ctx.bridge.request(A.deleteConta, { id: conta.id }).then(() => { ctx.detail.close({ silencioso: true }); ctx.toast("Conta excluída."); return ctx.recarregarTudo(); })
-        .catch((e) => ctx.toast(e.friendly, { tone: "error" })));
+        .catch((e: any) => ctx.toast(e.friendly, { tone: "error" })));
     const ocultar = () => ctx.bridge.request(A.updateConta, { id: conta.id, oculta: !conta.oculta }).then(() => {
       ctx.toast(conta.oculta ? "Conta visível novamente." : "Conta oculta: ela não entra mais nos totais.");
       ctx.detail.close({ silencioso: true });
       return ctx.recarregarTudo();
-    }).catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+    }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
     ctx.detail.open({
       title: conta.tipo === "investimento" ? "Investimento" : conta.tipo === "cartao" ? "Cartão de crédito"
         : (L.SUBTITULO_CONTA[conta.tipo] ? "Conta " + L.SUBTITULO_CONTA[conta.tipo].toLowerCase() : "Conta"),
       selected: { tipo: "conta", id: conta.id },
       voltar: opts && opts.voltar,
       botoes: editandoCiclo
-        ? [{ label: "Cancelar", onClick: () => reabrir({ editandoCiclo: false }) }, { label: "Salvar fechamento", primario: true, onClick: (e) => ciclo.salvar(e.currentTarget) }]
+        ? [{ label: "Cancelar", onClick: () => reabrir({ editandoCiclo: false }) }, { label: "Salvar fechamento", primario: true, onClick: (e: MouseEvent) => { if (ciclo) ciclo.salvar(e.currentTarget as HTMLButtonElement); } }]
         : conta.tipo === "cartao" ? [{ label: "Editar fechamento", onClick: () => reabrir({ editandoCiclo: true }) }] : [],
       menu: [
         { label: conta.oculta ? "Mostrar conta" : "Ocultar conta", onClick: ocultar },
         { separador: true },
         { label: "Excluir conta", perigo: true, onClick: excluir },
       ],
-      render(body) {
+      render(body: any) {
         const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         const graficoEl = h("div", { class: ZoZo.pecas.painelGrafico });
         const filtrosEl = h("div", { class: T.filtros });
         const difEl = h("span");
-        let serie = [];
+        let serie: any[] = [];
         const desenhar = () => {
           const recorte = UI.recortarSerie(serie, intervalo);
           const subiu = recorte.length > 1 && recorte[recorte.length - 1].valor >= recorte[0].valor;
           const cs = getComputedStyle(document.documentElement);
           ZoZo.charts.renderLineChart(graficoEl, [{ name: conta.nome, color: cs.getPropertyValue(subiu ? "--color-chart-up" : "--color-chart-down").trim(), points: recorte.map((p) => ({ data: p.data, valor: p.valor })) }],
-            { height: 160, area: true, ariaLabel: "Evolução do saldo" });
+            { height: 160, ariaLabel: "Evolução do saldo" });
           mount(filtrosEl, UI.FilterTabs(intervalo, (v) => { intervalo = v; desenhar(); }, { label: "Período do gráfico da conta" }));
         };
         mount(body,
@@ -218,7 +218,7 @@
               ZoZo.inline.texto({ valor: conta.nome, rotulo: "Nome da conta", max: ZoZo.regras.limiteNome, classe: ZoZo.pecas.phNome,
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) }),
               // editando o fechamento, o saldo dá lugar ao combobox e aos dias
-              editandoCiclo ? ciclo.el : ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: ZoZo.pecas.phValor,
+              editandoCiclo && ciclo ? ciclo.el : ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: ZoZo.pecas.phValor,
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, saldo: v }).then(() => { ctx.toast("Saldo atualizado."); return ctx.recarregarTudo(); }) })),
             conta.limite && !editandoCiclo ? h("div", { class: ZoZo.pecas.phExtra }, F.moeda(conta.limite) + " de limite") : null,
             // empréstimo: o contrato (parcelas, valor contratado e 1º vencimento)
@@ -233,20 +233,20 @@
           graficoEl, filtrosEl,
           C.detalheSecao("Transações", listaEl));
 
-        ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r) => {
+        ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r: any) => {
           serie = r.serie;
           const dif = r.diferenca;
           mount(difEl, h("span", { class: dif > 0 ? ZoZo.pecas.pctSobe : dif < 0 ? ZoZo.pecas.pctDesce : ZoZo.pecas.pctIgual }, (dif > 0 ? "+ " : dif < 0 ? "− " : "") + F.moeda(dif)));
           desenhar();
         }).catch(() => mount(graficoEl, h("p", { class: "muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
 
-        ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
-          const itens = d.lancamentos.filter((l) => l.contaId === conta.id).slice(0, 8);
+        ctx.loadData("lancamentos", A.getLancamentos).then((d: any) => {
+          const itens = d.lancamentos.filter((l: any) => l.contaId === conta.id).slice(0, 8);
           mount(listaEl, itens.length
             // a transação abre aqui mesmo, com a seta para voltar a esta conta
-            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta((((ZoZo.store.get().data.contas || {}).contas) || []).find((x) => x.id === conta.id) || conta, ctx, origem, opts) }) })
+            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta((((ZoZo.store.get().data.contas || {}).contas) || []).find((x: any) => x.id === conta.id) || conta, ctx, origem, opts) }) })
             : UI.EmptyState("Nenhuma transação nesta conta."));
-        }).catch((e) => mount(listaEl, UI.ErrorState(e.friendly)));
+        }).catch((e: any) => mount(listaEl, UI.ErrorState(e.friendly)));
         void origem;
       },
     });
@@ -266,22 +266,22 @@
       const contas = state.data.contas.contas || [];
       const sel = state.selectedItem && state.selectedItem.tipo === "conta" ? state.selectedItem.id : null;
 
-      const mostrar = state.ui.mostrarOcultas || {};
+      const mostrar: Record<string, boolean> = (state.ui.mostrarOcultas as Record<string, boolean>) || {};
       const secoes = GRUPOS.map((g) => {
-        const doGrupo = contas.filter((c) => g.tipos.includes(c.tipo));
+        const doGrupo = contas.filter((c: any) => g.tipos.includes(c.tipo));
         if (!doGrupo.length) return null;
-        const temOcultas = doGrupo.some((c) => c.oculta);
+        const temOcultas = doGrupo.some((c: any) => c.oculta);
         const exibindo = !!mostrar[g.key];
-        const itens = doGrupo.filter((c) => !c.oculta || exibindo);
+        const itens = doGrupo.filter((c: any) => !c.oculta || exibindo);
         const olho = temOcultas ? h("button", {
           type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), exibindo ? T.olhoAtivo : T.olho],
           "aria-pressed": String(exibindo), title: exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
           "aria-label": exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
-          onClick: (e) => { e.stopPropagation(); ZoZo.store.set({ ui: { mostrarOcultas: Object.assign({}, mostrar, { [g.key]: !exibindo }) } }); },
+          onClick: (e: any) => { e.stopPropagation(); ZoZo.store.set({ ui: { mostrarOcultas: Object.assign({}, mostrar, { [g.key]: !exibindo }) } }); },
         }, ZoZo.icons.icon(exibindo ? "olho" : "olho-fechado", { size: 15 })) : null;
         return UI.Section({ key: "contas:" + g.key, title: g.titulo, adorno: olho, class: T.secao },
           itens.length ? null : h("p", { class: T.aviso }, "Todas as contas deste grupo estão ocultas."),
-          h("div", { class: T.lista }, itens.map((c) => L.AccountRow(c, {
+          h("div", { class: T.lista }, itens.map((c: any) => L.AccountRow(c, {
             selected: c.id === sel,
             onClick: () => abrirDetalheConta(c, ctx, "contas"),
           }))));
@@ -293,7 +293,7 @@
           : UI.EmptyState("Nenhuma conta cadastrada.", { icon: "contas", action: { label: "Nova conta", icon: "mais", onClick: () => ZoZo.modais.novaConta(ctx, "corrente") } }));
     },
     selecionar(sel, ctx) {
-      const c = (ZoZo.store.get().data.contas.contas || []).find((x) => x.id === sel.id);
+      const c = (ZoZo.store.get().data.contas.contas || []).find((x: any) => x.id === sel.id);
       if (c) abrirDetalheConta(c, ctx, "contas");
     },
   };

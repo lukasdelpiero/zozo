@@ -2,7 +2,7 @@
    ZoZo — Inicialização
    Sessão → (Login | Cadastro) → Shell → páginas
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const store = ZoZo.store;
@@ -10,19 +10,21 @@
   const A = ZoZo.messages.ACTIONS;
   const FR = ZoZo.messages.FRIENDLY;
 
-  const authRoot = document.getElementById("auth-root");
-  const shellRoot = document.getElementById("shell");
+  const authRoot = document.getElementById("auth-root") as HTMLElement;     // existem sempre no index.html
+  const shellRoot = document.getElementById("shell") as HTMLElement;
+  const raizApp = () => document.getElementById("app") as HTMLElement;
 
   /* ---------------- Contexto compartilhado com as páginas ---------------- */
-  const inflight = {};
+  const inflight: Partial<Record<string, Promise<any>>> = {};
   let geracao = 0;          // muda a cada entrada/saída: resposta de uma sessão anterior é descartada
-  const ordem = {};         // número da carga mais recente de cada coleção (respostas fora de ordem são ignoradas)
+  const ordem: Record<string, number> = {};         // número da carga mais recente de cada coleção (respostas fora de ordem são ignoradas)
+  // router, detail, refreshTopbar, encerrarSessao e logout entram logo abaixo, ao montar a interface
   const ctx = {
     bridge,
-    toast: (...a) => ZoZo.feedback.toast(...a),
+    toast: (mensagem: string, opts?: OpcoesAviso) => ZoZo.feedback.toast(mensagem, opts),
 
     /** Carrega uma coleção para state.data[key] (com loading e erro amigável) */
-    loadData(key, action, payload, opts) {
+    loadData(key: string, action: string, payload?: unknown, opts?: { force?: boolean }): Promise<any> {
       const o = opts || {};
       const st = store.get();
       if (!o.force && st.data[key] && !st.stale[key]) return Promise.resolve(st.data[key]);
@@ -53,14 +55,14 @@
     },
 
     /** Marca coleções como desatualizadas (recarregam na próxima visita) */
-    invalidate(keys) {
+    invalidate(keys: string[]) {
       const stale = Object.assign({}, store.get().stale);
       keys.forEach((k) => { stale[k] = true; });
       store.set({ stale });
     },
 
-    navigate: (id, opts) => ctx.router.navigate(id, opts),
-    abrirConfiguracoes: (aba) => ZoZo.configuracoes.abrir(ctx, aba),
+    navigate: (id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }) => ctx.router.navigate(id, opts),
+    abrirConfiguracoes: (aba?: string) => ZoZo.configuracoes.abrir(ctx, aba),
 
     /** Após qualquer alteração de dados: tudo fica desatualizado; recarrega a página atual e a sidebar */
     recarregarTudo() {
@@ -71,19 +73,19 @@
         page ? page.carregar(ctx, true) : null,
       ]);
     },
-  };
+  } as ContextoApp;
 
   /* ---------------- Autenticação ---------------- */
-  let authErro = null, authEmail = "";
-  let authAviso = null;           // aviso na tela de entrada (ex.: "entre para confirmar o e-mail")
-  let authConfirmacao = null;     // token do link do e-mail: vai junto no próximo login (link + senha ativam a conta)
-  let turnstile = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
+  let authErro: string | null = null, authEmail = "";
+  let authAviso: string | null = null;           // aviso na tela de entrada (ex.: "entre para confirmar o e-mail")
+  let authConfirmacao: string | null = null;     // token do link do e-mail: vai junto no próximo login (link + senha ativam a conta)
+  let turnstile: string | null = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
   let googleAtivo = false;       // "Continuar com Google" configurado no servidor
   let captchaLogin = false;      // o servidor pediu CAPTCHA para a próxima tentativa de login
   let errosCodigo = 0;           // erros seguidos do código 2FA (1º: "não funcionou"; depois: "algo deu errado")
 
   /** Mensagem do bloqueio com o tempo que falta, quando o servidor informa */
-  function textoBloqueio(e) {
+  function textoBloqueio(e: any) {
     const s = Number(e && e.espera) || 0;
     if (!s) return FR.TOO_MANY_ATTEMPTS;
     if (s >= 3600) { const hs = Math.ceil(s / 3600); return "Muitas tentativas. Por segurança, tente novamente em " + hs + (hs === 1 ? " hora." : " horas."); }
@@ -99,8 +101,8 @@
       turnstile, captchaLogin, google: googleAtivo,
       onIrCadastro: () => { authErro = null; authAviso = null; store.set({ session: { status: "register" } }); },
       onVoltar: () => { authErro = null; authAviso = null; store.set({ session: { status: "login" } }); },
-      onErro: (msg, email) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
-      onLogin: (cred) => {
+      onErro: (msg: any, email: any) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
+      onLogin: (cred: any) => {
         authEmail = cred.email;
         ZoZo.auth.carregando(authRoot, "Entrando no ZoZo");
         bridge.request(A.login, authConfirmacao ? Object.assign({}, cred, { confirmacao: authConfirmacao }) : cred).then((r) => {
@@ -119,14 +121,14 @@
         });
       },
       /** Código do 2FA no login → Promise<mensagem de erro | null> */
-      onCodigo: (codigo) => bridge.request(A.verificar2FA, { codigo }).then((r) => { errosCodigo = 0; entrar(r); return null; }).catch((e) => {
+      onCodigo: (codigo: any) => bridge.request(A.verificar2FA, { codigo }).then((r) => { errosCodigo = 0; entrar(r); return null; }).catch((e) => {
         if (e.code === "SESSION_EXPIRED") { authErro = FR.SESSION_EXPIRED; store.set({ session: { status: "login" } }); renderAuth(); return null; }
         if (e.code === "TOO_MANY_ATTEMPTS" || e.espera) return textoBloqueio(e);
         errosCodigo += 1;
         return errosCodigo === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN;
       }),
       onCancelar2FA: () => { ZoZo.auth.reiniciar(); bridge.request(A.logout).catch(() => null); authErro = null; store.set({ session: { status: "login" } }); },
-      onCadastro: (dados) => {
+      onCadastro: (dados: any) => {
         ZoZo.auth.carregando(authRoot, "Preparando sua conta...");
         bridge.request(A.registerUser, dados).then((r) => {
           salvarCredencial(dados.email, dados.senha, dados.nomeUsuario);
@@ -142,7 +144,7 @@
   }
 
   /** Tela "Confirme seu e-mail" (depois do cadastro ou ao tentar entrar sem confirmar) */
-  function aguardarConfirmacao(email) {
+  function aguardarConfirmacao(email: any) {
     ZoZo.auth.aguardandoEmail(authRoot, email, {
       onReenviar: () => bridge.request(A.reenviarConfirmacao, { email }),
       onEntrar: () => { authErro = null; ZoZo.auth.reiniciar(); store.set({ session: { status: "login" } }); renderAuth(); },
@@ -162,10 +164,11 @@
   }
 
   /** Oferece salvar no gerenciador de senhas do navegador (Chrome/Edge; os demais detectam pelo formulário) */
-  function salvarCredencial(email, senha, nome) {
+  function salvarCredencial(email: any, senha: any, nome?: any) {
     try {
-      if (!window.PasswordCredential || !navigator.credentials || !email || !senha) return;
-      navigator.credentials.store(new window.PasswordCredential({ id: email, password: senha, name: nome || email })).catch(() => null);
+      const Credencial = (window as any).PasswordCredential;      // Chrome/Edge: oferece salvar no gerenciador de senhas
+      if (!Credencial || !navigator.credentials || !email || !senha) return;
+      navigator.credentials.store(new Credencial({ id: email, password: senha, name: nome || email })).catch(() => null);
     } catch (e) { /* navegador sem suporte */ }
   }
 
@@ -174,7 +177,7 @@
     const r = new URLSearchParams(location.search).get("google");
     if (!r) return Promise.resolve();
     history.replaceState(null, "", location.pathname);
-    const textos = { erro: "Não foi possível entrar com o Google. Tente de novo ou continue com e-mail.", cancelado: "Login com Google cancelado.",
+    const textos: Record<string, string> = { erro: "Não foi possível entrar com o Google. Tente de novo ou continue com e-mail.", cancelado: "Login com Google cancelado.",
       indisponivel: "O login com Google ainda não está disponível. Continue com e-mail." };
     if (r !== "ok") { authErro = textos[r] || textos.erro; return Promise.resolve(); }
     return bridge.request(A.getGoogle).then((d) => {
@@ -185,7 +188,7 @@
     }).catch(() => { authErro = textos.erro; });
   }
 
-  function entrar(sessao) {
+  function entrar(sessao: any) {
     geracao += 1;
     authErro = null; authAviso = null;
     if (ZoZo.servico) ZoZo.servico.reset();
@@ -203,7 +206,7 @@
     store.reset();
   };
 
-  ctx.logout = function (mensagem) {
+  ctx.logout = function (mensagem: any) {
     geracao += 1;
     ZoZo.auth.reiniciar();
     bridge.request(A.logout).catch(() => null).finally(() => {
@@ -244,7 +247,7 @@
       toggleMenu.title = texto;
       toggleMenu.setAttribute("aria-expanded", String(aberto));
     };
-    const gaveta = (abrir) => { shellRoot.dataset.gaveta = abrir ? "aberta" : ""; rotularToggle(); };
+    const gaveta = (abrir: any) => { shellRoot.dataset.gaveta = abrir ? "aberta" : ""; rotularToggle(); };
     toggleMenu.addEventListener("click", () => {
       if (celular.matches) { gaveta(shellRoot.dataset.gaveta !== "aberta"); return; }
       const fechar = shellRoot.dataset.menu !== "recolhido";
@@ -255,7 +258,8 @@
     fundoGaveta.addEventListener("click", () => gaveta(false));
     // Escolheu um item do menu (página, conta, perfil, configurações): a gaveta fecha
     sidebarEl.addEventListener("click", (e) => {
-      if (celular.matches && e.target.closest("button") && !e.target.closest(".side-group__header")) gaveta(false);
+      const alvo = e.target as Element;
+      if (celular.matches && alvo.closest("button") && !alvo.closest(".side-group__header")) gaveta(false);
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shellRoot.dataset.gaveta === "aberta") { e.preventDefault(); gaveta(false); } });
     celular.addEventListener("change", () => gaveta(false));
@@ -273,14 +277,14 @@
 
     // "/" ou Ctrl+K (⌘K): pesquisar transações, de qualquer página
     document.addEventListener("keydown", (e) => {
-      const alvo = e.target;
+      const alvo = e.target as HTMLElement | null;
       const digitando = alvo && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName));
       const atalho = (e.key === "/" && !digitando && !e.ctrlKey && !e.metaKey && !e.altKey)
         || ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k");
       if (!atalho || e.defaultPrevented || document.querySelector(".modal-overlay")) return;
       e.preventDefault();
-      if (document.getElementById("app").dataset.pagina !== "lancamentos") ctx.router.navigate("lancamentos");
-      setTimeout(() => { const c = document.querySelector(".topbar-search__input"); if (c) { c.focus(); c.select(); } });   // depois de a página montar
+      if (raizApp().dataset.pagina !== "lancamentos") ctx.router.navigate("lancamentos");
+      setTimeout(() => { const c = document.querySelector<HTMLInputElement>(".topbar-search__input"); if (c) { c.focus(); c.select(); } });   // depois de a página montar
     });
 
     // Escape fecha o painel de detalhes
@@ -292,12 +296,12 @@
   }
 
   /* ---------------- Reação ao estado de sessão ---------------- */
-  let statusAnterior = null;
+  let statusAnterior: string | null = null;
   store.subscribe((s) => {
     const status = s.session.status;
     if (status === statusAnterior) return;
     statusAnterior = status;
-    document.getElementById("app").dataset.auth = status;
+    raizApp().dataset.auth = status;
     if (status === "authenticated") {
       mount(authRoot);
       montarShell();
@@ -314,7 +318,8 @@
   window.addEventListener("zozo:dados-revertidos", () => { if (store.get().session.authenticated) ctx.recarregarTudo(); });
   window.addEventListener("zozo:dados-alterados", (e) => {
     if (!store.get().session.authenticated) return;
-    ctx.toast(FR[(e.detail && e.detail.codigo) || "DATA_CHANGED"] || FR.DATA_CHANGED, { tone: "error", duration: 9000 });
+    const detalhe = (e as CustomEvent).detail;
+    ctx.toast(FR[(detalhe && detalhe.codigo) || "DATA_CHANGED"] || FR.DATA_CHANGED, { tone: "error", duration: 9000 });
     ctx.recarregarTudo();
   });
   window.addEventListener("zozo:aviso-dados", (e) => {
@@ -325,7 +330,8 @@
       AUTOSAVE_FAILED: "As parcelas automáticas não foram salvas (sem conexão com o servidor). Elas serão criadas de novo na próxima vez.",
       DOCUMENT_INVALID_LOCKED: ZoZo.messages.FRIENDLY.DOCUMENT_INVALID_LOCKED,
     };
-    const texto = textos[e.detail && e.detail.codigo];
+    const detalhe = (e as CustomEvent).detail;
+    const texto = (textos as Record<string, string>)[detalhe && detalhe.codigo];
     if (texto) ctx.toast(texto, { tone: "error", duration: 12000 });
   });
 
@@ -351,7 +357,8 @@
 
   // Sessão encerrada no servidor (saiu em outro lugar, senha trocada em outro dispositivo, expirou): volta ao login
   window.addEventListener("zozo:sessao-expirada", (e) => {
-    const codigo = e.detail && e.detail.codigo;
+    const detalhe = (e as CustomEvent).detail;
+    const codigo = detalhe && detalhe.codigo;
     if (store.get().session.authenticated) ctx.logout(FR[codigo] || FR.SESSION_EXPIRED);
   });
 
@@ -391,15 +398,15 @@
   });
 
   // Campos de valor: os dígitos entram pelos centavos, como numa maquininha (1200 → 12,00; 120000 → 1.200,00)
-  const campoValor = (t) => t instanceof HTMLInputElement && t.inputMode === "decimal" && !t.dataset.semMascara && !t.readOnly;
-  document.addEventListener("input", (e) => { if (campoValor(e.target)) ZoZo.format.mascararValor(e.target, e.data, e.inputType); }, true);
+  const campoValor = (t: EventTarget | null): t is HTMLInputElement => t instanceof HTMLInputElement && t.inputMode === "decimal" && !t.dataset.semMascara && !t.readOnly;
+  document.addEventListener("input", (e) => { if (campoValor(e.target)) ZoZo.format.mascararValor(e.target, (e as InputEvent).data, (e as InputEvent).inputType); }, true);
   document.addEventListener("focusout", (e) => { if (campoValor(e.target)) ZoZo.format.completarValor(e.target); }, true);
 
   ZoZo.ctx = ctx;
 
   /* ---------------- Boot ---------------- */
   function boot() {
-    document.getElementById("app").dataset.auth = "loading";
+    raizApp().dataset.auth = "loading";
     renderAuth();
     Promise.all([
       bridge.request(A.getArmazenamento).catch(() => null),

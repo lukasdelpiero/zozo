@@ -16,6 +16,8 @@ declare global {
   /** Propriedades: atributos, class (texto ou lista), text, dataset, style (objeto), on… (função), ref, value */
   type PropsDom = Record<string, unknown> | null | undefined;
   interface ZoZoDom {
+    /** o tipo do elemento segue a tag: h("input") é HTMLInputElement, h("button") é HTMLButtonElement… */
+    h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: PropsDom, ...filhos: FilhoDom[]): HTMLElementTagNameMap[K];
     h(tag: string, props?: PropsDom, ...filhos: FilhoDom[]): HTMLElement;
     s(tag: string, props?: PropsDom, ...filhos: FilhoDom[]): SVGElement;
     clear<T extends Node | null | undefined>(el: T): T;
@@ -39,8 +41,13 @@ declare global {
     user: UsuarioSessao | null;
     storageAvailable: boolean | null;
   }
+  /** Filtros da página Transações (pages/lancamentos.ts) */
+  interface FiltrosLancamentos {
+    contas: string[]; categorias: string[]; statusCategoria: string; perfis: string[]; periodo: string | null;
+    recorrencias: string[]; tipos: string[]; ordem: string;
+  }
   interface EstadoUi {
-    filtros: Record<string, unknown> | null;
+    filtros: Partial<FiltrosLancamentos> | null;
     selecionados: string[];
     invExcluidas: string[];
     busca: string;
@@ -62,7 +69,7 @@ declare global {
     ui: EstadoUi;
   }
   /** set() mescla o 1º e o 2º nível: { ui: { busca: "x" } } muda só ui.busca */
-  type ParcialEstado = { [K in keyof EstadoZoZo]?: EstadoZoZo[K] extends Record<string, unknown> ? Partial<EstadoZoZo[K]> : EstadoZoZo[K] };
+  type ParcialEstado = { [K in keyof EstadoZoZo]?: EstadoZoZo[K] extends object ? Partial<EstadoZoZo[K]> : EstadoZoZo[K] };
   type OuvinteEstado = (atual: EstadoZoZo, anterior: EstadoZoZo) => void;
   interface ZoZoStore {
     get(): EstadoZoZo;
@@ -258,19 +265,19 @@ declare global {
   interface PaginaZoZo {
     titulo: string;
     recurso?: keyof ZoZoRecursos;
-    carregar(ctx: any, force: boolean): unknown;
+    carregar(ctx: ContextoApp, force: boolean): unknown;
     deps(state: EstadoZoZo): unknown[];
-    render(state: EstadoZoZo, ctx: any): HTMLElement;
-    topbar?(ctx: any): FilhoDom;
-    prefixo?(ctx: any): FilhoDom;
-    selecionar?(sel: unknown, ctx: any): void;
+    render(state: EstadoZoZo, ctx: ContextoApp): HTMLElement;
+    topbar?(ctx: ContextoApp): FilhoDom;
+    prefixo?(ctx: ContextoApp): FilhoDom;
+    selecionar?(sel: { tipo: string; id: string }, ctx: ContextoApp): void;
   }
   interface Roteador {
-    navigate(id: string, opts?: { force?: boolean; select?: unknown }): void;
+    navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
     refreshTopbar(): void;
     current(): PaginaZoZo | null;
   }
-  interface ZoZoRouter { create(ctx: any, topbar: BarraSuperior, mainEl: HTMLElement): Roteador }
+  interface ZoZoRouter { create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador }
 
   /** js/components/feedback.ts — aviso (toast), janela modal e confirmação */
   interface OpcoesAviso { tone?: "default" | "success" | "aviso" | "error"; duration?: number }
@@ -283,7 +290,7 @@ declare global {
     onClose?: (resultado: unknown) => void;
   }
   interface JanelaModal { fechar(resultado?: unknown): void }
-  interface OpcoesConfirmacao { confirmar?: string; cancelar?: string; variante?: string }
+  interface OpcoesConfirmacao { confirmar?: string; cancelar?: string; variante?: OpcoesBotao["variant"] }
   interface ZoZoFeedback {
     toast(mensagem: string, opts?: OpcoesAviso): void;
     modal(opts: OpcoesModal): JanelaModal;
@@ -296,9 +303,9 @@ declare global {
     title?: string;
     tituloNode?: FilhoDom;
     voltar?: () => void;
-    botoes?: Array<{ label: string; onClick?: () => void; primario?: boolean; desabilitado?: boolean; icone?: string }>;
+    botoes?: Array<{ label: string; onClick?: (e: MouseEvent) => void; primario?: boolean; desabilitado?: boolean; icone?: string }>;
     acoes?: Array<{ icone: string; rotulo: string; perigo?: boolean; onClick?: () => void }>;
-    menu?: ItemMenu[];
+    menu?: Array<ItemMenu | null | false>;     // itens nulos (condicionais) são ignorados
     selected?: { tipo: string; id: string } | null;
     render(body: HTMLElement, api: ApiPainel): void;
     onClose?: () => void;
@@ -312,7 +319,7 @@ declare global {
   interface ZoZoDetailPanel { create(workspaceEl: HTMLElement, panelEl: HTMLElement): PainelInformacoes }
 
   /** js/components/dividir.ts — dividir uma transação entre perfis */
-  interface ZoZoDividir { abrir(original: any, ctx: any, aoTerminar?: (id: string) => void): void }
+  interface ZoZoDividir { abrir(original: any, ctx: ContextoApp, aoTerminar?: (id: string) => void): void }
 
   /** js/components/menu.ts — menu suspenso com submenus */
   interface ApiMenu { fechar(): void; atualizar(): void; voltar(): void }
@@ -347,7 +354,7 @@ declare global {
   /** js/components/sidebar.ts — menu lateral */
   interface ItemNavegacao { id: string; label: string; icon: string; recurso?: keyof ZoZoRecursos }
   interface ZoZoSidebar {
-    create(el: HTMLElement, ctx: any): { render(state: EstadoZoZo): void };
+    create(el: HTMLElement, ctx: ContextoApp): { render(state: EstadoZoZo): void };
     NAV: ItemNavegacao[];
     visivel(n: ItemNavegacao): boolean;
   }
@@ -373,7 +380,7 @@ declare global {
     aoCancelar?: () => void;
     manterAberto?: boolean;
   }
-  interface ZoZoForms { abrir(ctx: any, cfg: ConfigForm): ApiPainel }
+  interface ZoZoForms { abrir(ctx: ContextoApp, cfg: ConfigForm): ApiPainel }
 
   /** js/components/verificacao.ts — CAPTCHA, código de 6 dígitos, QR e senha */
   interface Turnstile {
@@ -392,6 +399,136 @@ declare global {
     QR(texto: string, px?: number, rotulo?: string): SVGElement;
     protegerSenha(input: HTMLInputElement): HTMLInputElement;
     ComRevelar(input: HTMLInputElement, classe?: string): HTMLElement;
+  }
+
+  /** js/components/ui.ts — peças do design system */
+  interface OpcoesBotao {
+    variant?: "primary" | "secondary" | "danger" | "danger-ghost" | "text"; size?: "sm"; type?: "button" | "submit";
+    class?: string | null; onClick?: (e: MouseEvent) => void; disabled?: boolean; pressed?: boolean; title?: string; icon?: string;
+  }
+  interface OpcoesBotaoIcone {
+    class?: string | null; onPrimary?: boolean; active?: boolean; onClick?: (e: MouseEvent) => void; disabled?: boolean;
+    pressed?: boolean; expanded?: boolean; size?: number;
+  }
+  interface OpcoesEntrada {
+    class?: string; type?: string; name?: string; id?: string; value?: string | number | null; placeholder?: string; autocomplete?: string;
+    inputmode?: string; maxlength?: string; "aria-label"?: string; required?: boolean; disabled?: boolean; invalid?: boolean;
+    onInput?: (e: Event) => void; onChange?: (e: Event) => void; onKeydown?: (e: KeyboardEvent) => void;
+  }
+  type OpcaoLista = { value: string; label: string } | { group: string; options: Array<{ value: string; label: string }> };
+  interface OpcoesLista { class?: string; name?: string; disabled?: boolean; onChange?: (e: Event) => void; ariaLabel?: string; value?: string | null }
+  interface CategoriaRotulo { nome: string; icone?: string | null; cor?: string | null }
+  interface ItemSegmentado { value: string; label: string; icon?: string }
+  interface OpcoesSecao { key?: string; title?: FilhoDom; class?: string; classeCabecalho?: string; classeLead?: string; adorno?: FilhoDom; aside?: FilhoDom }
+  interface ZoZoUI {
+    confirmarNoBotao(btn: HTMLElement, texto: string): void;
+    Button(label: FilhoDom, opts?: OpcoesBotao): HTMLButtonElement;
+    IconButton(iconName: string, label: string, opts?: OpcoesBotaoIcone): HTMLButtonElement;
+    Field(label: FilhoDom, control: HTMLElement, opts?: { class?: string; prefix?: string; hint?: FilhoDom }): HTMLElement;
+    Input(opts?: OpcoesEntrada): HTMLInputElement;
+    Select(options: OpcaoLista[], opts?: OpcoesLista): HTMLSelectElement;
+    Textarea(opts?: { class?: string; name?: string; rows?: number; placeholder?: string; ariaLabel?: string; value?: string }): HTMLTextAreaElement;
+    Toggle(label: string, opts?: { checked?: boolean; onChange?: (ligado: boolean) => void }): HTMLElement;
+    Tag(nome: string | null | undefined, cor: unknown, opts?: { class?: string; placeholder?: string; onClick?: (e: MouseEvent) => void; title?: string }): HTMLElement | null;
+    CategoryLabel(cat: CategoriaRotulo | null | undefined, opts?: { pill?: boolean; class?: string; vazio?: string }): HTMLElement | null;
+    PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string }): HTMLElement;
+    ProgressBar(ratio: unknown, opts?: { tone?: "ok" | "over" | "allocation"; grande?: boolean; class?: string; label?: string }): HTMLElement;
+    FilterTabs(valor: string, onChange: (v: string, teclado?: boolean) => void, opts?: { itens?: string[]; label?: string }): HTMLElement;
+    /** pontos com { data, … } (os demais campos variam: valor, ativos, passivos…) */
+    recortarSerie(serie: any[] | null | undefined, intervalo: string): any[];
+    Segmented(itens: ItemSegmentado[], valor: string, onChange: (v: string, teclado?: boolean) => void, opts?: { class?: string; label?: string }): HTMLElement;
+    Card(opts: { class?: string; label?: string; title?: string; link?: { label: string; onClick: () => void } } | null, ...children: FilhoDom[]): HTMLElement;
+    Section(opts: OpcoesSecao | null, ...children: FilhoDom[]): HTMLElement;
+    Skeleton(linhas?: number, opts?: { class?: string; short?: boolean }): HTMLElement;
+    EmptyState(mensagem: FilhoDom, opts?: { class?: string; icon?: string; action?: { label: string; onClick: () => void; icon?: string } }): HTMLElement;
+    ErrorState(mensagem: FilhoDom, onRetry?: (() => void) | null): HTMLElement;
+    ColorPicker(valor: string | null | undefined, onChange: (cor: string) => void, opts?: { colunas?: number; cheio?: boolean; altura?: number; label?: string }): HTMLElement;
+    AccountIcon(conta: { cor?: string | null; tipo?: string }): HTMLElement;
+    INTERVALOS: string[];
+    refocus(key: string): void;
+    Checkbox(checked: boolean, onChange: (marcado: boolean) => void, opts?: { label?: string; class?: string; texto?: string }): HTMLElement;
+    alternarArvore(chave: string, aplicar: () => void): void;
+    corpoArvore(chave: string, el: HTMLElement): HTMLElement;
+    alternarGrupo(chave: string): void;
+    CAMPO_PAINEL: string;
+  }
+  /** js/components/pecas.ts — classes montadas por função (variante do botão) */
+  interface ZoZoPecasFn { botao(variante?: string, pequeno?: boolean, cheio?: boolean): string; botaoIcone(tom?: string, pequeno?: boolean): string }
+
+  /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
+  interface ZoZoList {
+    ListaPainel(itens: any[], opts?: { onClick?: (l: any) => void }): HTMLElement;
+    LaunchRow(l: any, opts?: Record<string, unknown>): HTMLElement;
+    AccountRow(c: any, opts?: Record<string, unknown>): HTMLElement;
+    CategoryRow(cat: any, opts?: Record<string, unknown>): HTMLElement;
+    CategoryGroupRow(grupo: any, opts?: Record<string, unknown>): HTMLElement;
+    RecurrenceRow(r: any, opts?: Record<string, unknown>): HTMLElement;
+    AllocationRow(a: any): HTMLElement;
+    SidebarAccountGroup(titulo: string, contas: any[], opts?: { onSelect?: (conta: any) => void }): HTMLElement;
+    nomeComDigitos(nome: string, digitos?: string | null, cls?: string): HTMLElement;
+    SUBTITULO_CONTA: Record<string, string>;
+  }
+
+  /** js/components/charts.ts — gráficos (linha, rosca, barras) */
+  interface PontoGrafico { data: string; valor: number; vazio?: boolean }
+  interface SerieGrafico { name?: string; color?: string; colorBySlope?: boolean; points: PontoGrafico[]; area?: boolean; tracejado?: boolean; pontos?: boolean }
+  interface OpcoesGraficoLinha {
+    height?: number; ariaLabel?: string; animar?: boolean; semEixo?: boolean; independentScale?: boolean;
+    formatValue?: (v: number) => string; rotuloX?: (p: PontoGrafico) => string; rotuloTooltip?: (p: PontoGrafico) => string;
+  }
+  interface OpcoesRosca { size?: number; thickness?: number; ariaLabel?: string; onClick?: () => void; progresso?: number; corProgresso?: string; tituloProgresso?: string }
+  interface BarraGrafico { valor: unknown; rotulo?: string; rotuloMes?: string; rotuloAno?: string; titulo?: string; destaque?: boolean }
+  interface OpcoesGraficoBarras { height?: number; ariaLabel?: string; limite?: number; nomeValor?: string }
+  interface ZoZoCharts {
+    renderLineChart(container: HTMLElement, series: SerieGrafico[], options?: OpcoesGraficoLinha): { destroy(): void };
+    renderDonutChart(container: HTMLElement, segments: SegmentoRosca[] | null | undefined, options?: OpcoesRosca): SVGElement;
+    renderBarChart(container: HTMLElement, barras: BarraGrafico[], options?: OpcoesGraficoBarras): { destroy(): void };
+    /** o roteador liga/desliga a animação de entrada e informa de onde continuar */
+    permitirAnimacao: boolean;
+    continuarDe: number | null;
+    ultimoInicio: number | null;
+  }
+
+  /** js/components/modais.ts — janela de passos (criar conta, categoria, recorrência…) */
+  interface BotaoJanela { label: string; primario?: boolean; perigo?: boolean; desabilitado?: boolean; onClick: (btn: HTMLButtonElement) => void; ref?: (btn: HTMLButtonElement) => void }
+  interface ApiJanela { fechar(): void; ir(passo: PassoJanela): void }
+  type PassoJanela = (api: ApiJanela) => { titulo?: string; corpo: FilhoDom; rodapeEsquerda?: FilhoDom; botoes?: BotaoJanela[] };
+  interface ConfigJanela { titulo: string; classe?: string; passo: PassoJanela; onClose?: (resultado: unknown) => void }
+
+  interface ZoZoModais {
+    janela(cfg: ConfigJanela): ApiJanela;
+    seletorIcone(valor: string | null | undefined, aoMudar: (emoji: string) => void): HTMLElement;
+    Interruptor(rotulo: string, ligado: boolean, aoMudar: (ligado: boolean) => void, nomeAcessivel?: string): HTMLElement;
+    /** criar perfil, categoria, grupo, conta e recorrência; confirmar com senha */
+    [acao: string]: any;
+  }
+  /** js/components/cambio.ts — multicâmbio (Real, Euro, Dólar: só o símbolo muda, nunca os números) */
+  interface ZoZoCambio {
+    MOEDAS: Array<{ codigo: CodigoMoeda; nome: string; simbolo: string }>;
+    aplicarMoeda(ctx: ContextoApp, codigo: string): Promise<unknown>;
+    trocar(ctx: ContextoApp, codigo: string): Promise<unknown>;
+    disponivelTransferir(): boolean;
+    abrirTransferencia(ctx: ContextoApp): void;
+    Seletor(ctx: ContextoApp): HTMLElement | null;
+    SecaoConfig(ctx: ContextoApp, cfg: any): HTMLElement;
+  }
+
+  /** js/app.ts — contexto compartilhado com páginas e componentes (ctx) */
+  interface ContextoApp {
+    bridge: ZoZoBridge;
+    toast(mensagem: string, opts?: OpcoesAviso): void;
+    loadData(key: string, action: string, payload?: unknown, opts?: { force?: boolean }): Promise<any>;
+    invalidate(keys: string[]): void;
+    navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
+    abrirConfiguracoes(aba?: string): void;
+    recarregarTudo(): Promise<unknown>;
+    router: Roteador;
+    detail: PainelInformacoes;
+    refreshTopbar(): void;
+    encerrarSessao(): void;
+    logout(msg?: string): void;
+    /** só dentro da janela de Configurações */
+    redesenharConfig?: () => void;
   }
 
   interface ZoZoGlobal {
@@ -424,6 +561,12 @@ declare global {
     sidebar: ZoZoSidebar;
     forms: ZoZoForms;
     verificacao: ZoZoVerificacao;
+    ui: ZoZoUI;
+    pecasFn: ZoZoPecasFn;
+    list: ZoZoList;
+    charts: ZoZoCharts;
+    modais: ZoZoModais;
+    cambio: ZoZoCambio;
     // módulos ainda em JavaScript
     [modulo: string]: any;
   }

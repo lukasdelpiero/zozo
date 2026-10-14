@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.7.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.8.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,12 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.8.0
+
+- **Perfis e Configurações em Tailwind CSS:** linhas de perfil, abas das Configurações, linhas (inclusive a do multicâmbio), foto, senha, Pix, rodapé (Sair / Excluir conta), painel do 2FA e o código de 6 dígitos (também no login e ao desativar o 2FA). Visual conferido elemento a elemento em 1280, 760 e 375 px. ~200 linhas de CSS antigo a menos; o que resta do CSS antigo é Fatura, Divisão, Calendário, câmbio (seletor do menu), login/2FA, seletor de emoji e a base (`.page`, dinheiro, animações).
+- **TypeScript em toda a interface:** todos os módulos estão em `.ts`, menos `data/servico.js` (regras financeiras) e `bridge/host-web.js` (criptografia e API), que ficam por último, com testes antes. Tipos novos: peças (`ZoZoUI`), linhas, gráficos, janelas, menus, contexto das páginas (`ContextoApp`), filtros de Transações; `h("input")` já devolve `HTMLInputElement`.
+- **Correções encontradas pelo TypeScript:** o campo do orçamento no painel da categoria ficava sem nome para leitores de tela (o `aria-label` era descartado) e o limite de caracteres dos itens da fatura não valia; opções de gráfico que não existiam foram removidas; menus do painel ignoram itens condicionais vazios.
 
 ## Novidades da versão 3.7.0
 

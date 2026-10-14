@@ -14,7 +14,7 @@
    mesma caixa, logo, título, primeiro campo e botão no mesmo lugar em todas as
    etapas (no celular e em janelas baixas a caixa acompanha o conteúdo).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, s, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
@@ -78,7 +78,7 @@
     spinnerEspera: ZoZo.pecas.girando + " tw:size-[30px]! tw:border-[3px]!",
   };
   // Animações do cartão: [logo, título (2º filho), 3º filho, 4º em diante]
-  const ANIM = {
+  const ANIM: Record<string, { cartao: string; filhos: string[] }> = {
     entrar: { cartao: "tw:animate-zz-auth-cartao tw:motion-reduce:animate-none", filhos: ["tw:animate-zz-auth-logo tw:motion-reduce:animate-none", "", "", ""] },
     frente: { cartao: "", filhos: ["", "tw:animate-zz-auth-frente tw:motion-reduce:animate-none",
       "tw:animate-zz-auth-frente-40 tw:motion-reduce:animate-none", "tw:animate-zz-auth-frente-70 tw:motion-reduce:animate-none"] },
@@ -86,24 +86,25 @@
       "tw:animate-zz-auth-tras-40 tw:motion-reduce:animate-none", "tw:animate-zz-auth-tras-70 tw:motion-reduce:animate-none"] },
   };
   /** Cartão com os filhos animados conforme a posição (o 1º é sempre o logo) */
-  function cartao(animacao, filhos) {
-    const a = ANIM[animacao];
-    const lista = filhos.filter(Boolean);
+  function cartao(animacao: string | null, filhos: Array<HTMLElement | null>) {
+    const a = animacao ? ANIM[animacao] : null;
+    const lista = filhos.filter((el): el is HTMLElement => !!el);
     if (a) lista.forEach((el, i) => { const c = a.filhos[Math.min(i, 3)]; if (c) el.classList.add(...c.split(" ")); });
     return h("div", { class: C.raiz }, h("div", { class: C.centro }, h("div", { class: [C.cartao, a && a.cartao] }, lista)));
   }
 
   // Etapa atual (sobrevive aos redesenhos após um erro). Login: 0 início · 1 e-mail · 2 senha
-  let estado = { modo: null, etapa: 0, email: "", nome: "", google: false };
-  let ultimoPasso = null, ultimaEtapa = 0;   // para animar só quando a etapa muda
+  type Estado = { modo: string | null; etapa: number; email: string; nome: string; google: boolean };
+  let estado: Estado = { modo: null, etapa: 0, email: "", nome: "", google: false };
+  let ultimoPasso: string | null = null, ultimaEtapa = 0;   // para animar só quando a etapa muda
 
-  function campo(cfg) {
+  function campo(cfg: any) {
     const input = UI.Input(Object.assign({ class: C.input, required: true }, cfg));
     input.setAttribute("aria-label", cfg.rotulo);
     return input;
   }
 
-  function campoSenha(autocomplete) {
+  function campoSenha(autocomplete: any) {
     const input = campo({ type: "password", name: "password", id: "password", autocomplete, placeholder: "Insira sua senha", rotulo: "Senha" });
     return { input, wrap: V().ComRevelar(input) };
   }
@@ -111,13 +112,13 @@
   const emailOculto = () => h("input", { type: "email", name: "email", id: "email", autocomplete: "username", value: estado.email,
     class: "tw:sr-only", tabindex: "-1", "aria-hidden": "true", readonly: true });
 
-  const botao = (texto) => h("button", { type: "submit", class: C.botao }, h("span", { class: "btn__label" }, texto));
-  const aviso = (msg) => h("p", { class: C.erro, role: "alert" }, msg || "");
-  const rodape = (pergunta, acao, onClick) => h("p", { class: C.rodape },
+  const botao = (texto: string) => h("button", { type: "submit", class: C.botao }, h("span", { class: "btn__label" }, texto)) as HTMLButtonElement;
+  const aviso = (msg: any) => h("p", { class: C.erro, role: "alert" }, msg || "");
+  const rodape = (pergunta: any, acao: any, onClick: any) => h("p", { class: C.rodape },
     h("span", null, pergunta + " "), h("button", { type: "button", class: C.link, onClick }, acao));
 
   /** Logo oficial "G" do Google (cores da marca) */
-  function logoGoogle(classe) {
+  function logoGoogle(classe?: string) {
     return s("svg", { class: classe || "tw:flex-none", viewBox: "0 0 48 48", width: "18", height: "18", "aria-hidden": "true" },
       s("path", { fill: "#EA4335", d: "M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" }),
       s("path", { fill: "#4285F4", d: "M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" }),
@@ -133,7 +134,7 @@
   }
 
   /** Tela do 2FA no login: mesmo cartão, título "Autentique sua conta" e seis campos */
-  function corpo2FA(cfg) {
+  function corpo2FA(cfg: any) {
     const erro = h("p", { class: C.erro2fa, role: "alert" }, cfg.erro || "");
     const campoCod = V().CampoCodigo({
       rotulo: "Código de 6 dígitos do aplicativo 2FA",
@@ -158,7 +159,7 @@
   }
 
   /** Primeira tela: Continuar com e-mail · Continuar com Google · Inscreva-se */
-  function corpoInicio(root, cfg, erro) {
+  function corpoInicio(root: any, cfg: any, erro: any) {
     const area = h("div", { class: C.opcoes });
     const msg = aviso(erro);
     const google = () => {
@@ -175,7 +176,7 @@
     return h("div", { class: C.form }, area, msg, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro));
   }
 
-  function render(root, cfg) {
+  function render(root: any, cfg: any) {
     const st = ZoZo.store.get().session;
     const modo = st.status === "register" ? "register" : st.status === "loading" ? "loading" : st.status === "2fa" ? "2fa" : "login";
 
@@ -189,7 +190,7 @@
 
     // Erros de senha errada viram a mensagem padrão; os demais (ex.: bloqueio) aparecem como vieram
     const erro = cfg.erro ? (cfg.erro === FR.INVALID_CREDENTIALS ? ERRO_LOGIN : cfg.erro) : null;
-    const voltar = (etapa) => () => { estado.etapa = etapa; estado.google = false; render(root, Object.assign({}, cfg, { erro: null })); };
+    const voltar = (etapa: any) => () => { estado.etapa = etapa; estado.google = false; render(root, Object.assign({}, cfg, { erro: null })); };
     let titulo, corpo;
 
     if (modo === "2fa") {
@@ -203,7 +204,7 @@
       const email = campo({ type: "email", name: "email", id: "email", autocomplete: "username", inputmode: "email", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: estado.email });
       email.dataset.autofocus = "";
       const msg = aviso(erro);
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
         e.preventDefault();
         if (!EMAIL_OK.test(email.value.trim())) { msg.textContent = "Insira um e-mail válido."; email.focus(); return; }
         estado.email = email.value.trim(); estado.etapa = 2;
@@ -217,11 +218,11 @@
       const captcha = cfg.captchaLogin && cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile) : null;
       const msg = aviso(erro);
       const nota = estado.google ? h("p", { class: C.nota }, "E-mail confirmado pelo Google. Digite sua senha do ZoZo: é ela que protege seus dados com criptografia.") : null;
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
         e.preventDefault();
         if (!senha.input.value) { senha.input.focus(); return; }
         if (captcha && !captcha.token()) { msg.textContent = FR.CAPTCHA_REQUIRED; return; }
-        if (senha.input.type === "text") senha.wrap.querySelector(".input-reveal").click();     // volta a ocultar
+        if (senha.input.type === "text") senha.wrap.querySelector<HTMLElement>(".input-reveal")?.click();     // volta a ocultar
         enviar.disabled = true; enviar.classList.add("is-busy");
         cfg.onLogin({ email: estado.email, senha: senha.input.value, turnstile: captcha ? captcha.token() : undefined });
       } }, nota, h("div", { class: C.campos }, emailOculto(), senha.wrap), captcha ? captcha.el : null, enviar, msg,
@@ -233,7 +234,7 @@
       nome.maxLength = 80;
       const email = campo({ type: "email", name: "email", id: "email", autocomplete: "username", inputmode: "email", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: estado.email });
       const msg = aviso(erro);
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
         e.preventDefault();
         if (!nome.value.trim()) { msg.textContent = "Insira seu primeiro nome."; nome.focus(); return; }
         if (!EMAIL_OK.test(email.value.trim())) { msg.textContent = "Insira um e-mail válido."; email.focus(); return; }
@@ -249,11 +250,11 @@
       const captcha = cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile) : null;   // Google já confirmou a pessoa
       const msg = aviso(erro);
       const nota = estado.google ? h("p", { class: C.nota }, "E-mail confirmado pelo Google. Crie a senha do ZoZo: ela é a chave da criptografia dos seus dados e não pode ser recuperada.") : null;
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
         e.preventDefault();
         if (senha.input.value.length < 8) { msg.textContent = "Use pelo menos 8 caracteres."; senha.input.focus(); return; }
         if (captcha && !captcha.token()) { msg.textContent = FR.CAPTCHA_REQUIRED; return; }
-        if (senha.input.type === "text") senha.wrap.querySelector(".input-reveal").click();
+        if (senha.input.type === "text") senha.wrap.querySelector<HTMLElement>(".input-reveal")?.click();
         enviar.disabled = true; enviar.classList.add("is-busy");
         cfg.onCadastro({ nomeUsuario: estado.nome, email: estado.email, senha: senha.input.value, turnstile: captcha ? captcha.token() : undefined });
       } }, nota, h("div", { class: C.campos }, emailOculto(), senha.wrap), captcha ? captcha.el : null, enviar, msg,
@@ -283,7 +284,7 @@
   }
 
   /** Cartão de espera durante o login/cadastro: logo, texto ("Entrando no ZoZo" / "Preparando sua conta...") e carregando */
-  function carregando(root, texto) {
+  function carregando(root: any, texto: any) {
     // o carregando gira por conta própria: só o texto desliza
     const frase = h("p", { class: [C.tituloEspera, ANIM.frente.filhos[1]] }, texto);
     mount(root, h("div", { class: C.raiz },
@@ -296,7 +297,7 @@
   function reiniciar() { estado = { modo: null, etapa: 0, email: "", nome: "", google: false }; }
 
   /** Depois do Google: pula direto para a senha (conta existente) ou para "Crie sua senha" (cadastro) */
-  function prepararGoogle(dados) {
+  function prepararGoogle(dados: any) {
     estado = dados.contaExiste
       ? { modo: "login", etapa: 2, email: dados.email, nome: "", google: true }
       : { modo: "register", etapa: 2, email: dados.email, nome: dados.nome || dados.email.split("@")[0], google: true };
@@ -306,10 +307,10 @@
    * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar): explica, permite
    * reenviar o link (com espera de 60 s entre envios) e voltar para entrar.
    */
-  function aguardandoEmail(root, email, cfg) {
+  function aguardandoEmail(root: any, email: any, cfg: any) {
     const situacao = h("p", { class: C.situacao, role: "status", "aria-live": "polite" });
-    const reenviar = h("button", { type: "button", class: C.opcaoEmail }, "Reenviar link");
-    let espera = 0, timer = null;
+    const reenviar = h("button", { type: "button", class: C.opcaoEmail }, "Reenviar link") as HTMLButtonElement;
+    let espera = 0, timer: ReturnType<typeof setTimeout> | undefined;
     const contar = () => {
       reenviar.disabled = espera > 0;
       reenviar.textContent = espera > 0 ? "Reenviar link (" + espera + " s)" : "Reenviar link";

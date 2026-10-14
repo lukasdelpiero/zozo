@@ -7,7 +7,7 @@
    • Conta, categoria e recorrência abrem no próprio painel com "voltar"
    • Histórico do mesmo nome no mesmo formato da lista principal
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
@@ -17,10 +17,10 @@
   const A = ZoZo.messages.ACTIONS;
   const store = ZoZo.store;
 
-  const NOMES = { regular: "Regular", estorno: "Regular", interno: "Transferência", receita: "Receita", debito: "Débito", recorrente: "Recorrente" };
+  const NOMES: Record<string, string> = { regular: "Regular", estorno: "Regular", interno: "Transferência", receita: "Receita", debito: "Débito", recorrente: "Recorrente" };
 
   /** Tipos para os quais uma transação pode mudar */
-  function tiposPermitidos(l, novo) {
+  function tiposPermitidos(l: any, novo: any) {
     if (novo) return ["regular", "interno", "receita", "debito"];
     if (l.tipo === "recorrente") return [];                           // permanece "Recorrente"
     if (l.tipo === "regular" || l.tipo === "estorno") return ["regular", "interno", "receita", "debito"];
@@ -29,18 +29,18 @@
     if (l.tipo === "debito") return ["debito", "regular", "interno", "receita"];
     return [];
   }
-  const ehVerde = (d) => d.tipo === "receita" || d.tipo === "estorno" || (d.tipo === "interno" && d.sentido === "entrada");
+  const ehVerde = (d: any) => d.tipo === "receita" || d.tipo === "estorno" || (d.tipo === "interno" && d.sentido === "entrada");
   // Débito: como Receita, mas é saída (sem verde) e tem Categoria e Recorrência
-  const temCategoria = (d) => d.tipo === "regular" || d.tipo === "estorno" || d.tipo === "recorrente" || d.tipo === "debito";
-  const ehDebito = (d) => d.tipo === "debito" || (d.tipo === "recorrente" && d.debito === true);
-  const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const temCategoria = (d: any) => d.tipo === "regular" || d.tipo === "estorno" || d.tipo === "recorrente" || d.tipo === "debito";
+  const ehDebito = (d: any) => d.tipo === "debito" || (d.tipo === "recorrente" && d.debito === true);
+  const norm = (t: any) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-  function dataLonga(iso) {
+  function dataLonga(iso: any) {
     const d = F.parseData(iso);
     return d ? F.diaSemana(d) + ", " + d.getDate() + " " + F.mesAbrev(d.getMonth()) + " " + d.getFullYear() : "";
   }
 
-  function carregarBase(ctx) {
+  function carregarBase(ctx: ContextoApp) {
     return Promise.all([
       ["perfis", A.getPerfis], ["categorias", A.getCategorias], ["contas", A.getContas], ["lancamentos", A.getLancamentos], ["recorrencias", A.getRecorrencias],
     ].map(([k, a]) => ctx.loadData(k, a).catch(() => null)));
@@ -49,23 +49,23 @@
   /** Recorrências existentes (origens), para o menu de vínculo */
   function origens() {
     const ls = (store.get().data.lancamentos && store.get().data.lancamentos.lancamentos) || [];
-    return ls.filter((l) => l.tipo === "recorrente" && l.recorrencia && (!l.serieId || l.serieId === l.id));
+    return ls.filter((l: any) => l.tipo === "recorrente" && l.recorrencia && (!l.serieId || l.serieId === l.id));
   }
-  function rotuloRecorrencia(r) {
+  function rotuloRecorrencia(r: any) {
     if (!r) return "";
     if (r.recorrencia === "parcelada") return "Parcelado" + (r.parcelaTotal ? " · " + r.parcelaAtual + "/" + r.parcelaTotal : "");
     const f = ZoZo.servico.FREQUENCIAS[r.recorrencia];
     return f ? f.rotulo : "Mensal";
   }
 
-  function abrir(l, ctx, opts) {
+  function abrir(l: any, ctx: ContextoApp, opts: any) {
     return carregarBase(ctx).then(() => {
-      const atual = l ? ((store.get().data.lancamentos || {}).lancamentos || []).find((x) => x.id === l.id) || l : null;
+      const atual = l ? ((store.get().data.lancamentos || {}).lancamentos || []).find((x: any) => x.id === l.id) || l : null;
       renderizar(atual, ctx, opts || {});
     });
   }
 
-  function renderizar(original, ctx, opts) {
+  function renderizar(original: any, ctx: ContextoApp, opts: any) {
     const novo = !original;
     const st = store.get();
     // Listas lidas de novo a cada desenho: uma categoria/perfil criado no meio da transação aparece na hora
@@ -77,13 +77,13 @@
     const d = novo
       ? Object.assign({
         tipo: "regular", data: F.iso(new Date()), descricao: "", valor: 0,
-        contaId: (contas.find((c) => !c.oculta) || {}).id || null,
-        categoriaId: (cats.find((c) => c.status === "regular") || {}).id || null,
+        contaId: (contas.find((c: any) => !c.oculta) || {}).id || null,
+        categoriaId: (cats.find((c: any) => c.status === "regular") || {}).id || null,
         perfilId: comPerfis && filtroPerfil.length === 1 ? filtroPerfil[0] : null, notas: "", sentido: "saida",
       }, opts.preset || {})
       : Object.assign({}, original);
     d.sentido = d.sentido || "saida";
-    let pendenteRec = null;      // recorrência escolhida antes de criar o lançamento
+    let pendenteRec: any = null;      // recorrência escolhida antes de criar o lançamento
     const semEntrada = Object.assign({}, opts, { recemCriada: false });
     const reabrir = () => abrir(novo ? null : { id: original.id }, ctx, semEntrada);
     const voltarParaCa = () => abrir(novo ? null : { id: original.id }, ctx, semEntrada);
@@ -98,14 +98,14 @@
         sentido: d.tipo === "interno" ? d.sentido : null, debito: d.tipo === "recorrente" && d.debito === true ? true : undefined,
       };
     }
-    let fila = Promise.resolve();
-    function salvar(desfazer) {
+    let fila: Promise<unknown> = Promise.resolve();
+    function salvar(desfazer: any) {
       if (novo) return Promise.resolve();
       if (!d.descricao.trim() || !(d.valor > 0)) { if (desfazer) desfazer(); statusEl.textContent = "Nome e valor são obrigatórios."; statusEl.className = ZoZo.pecas.lpSituacaoErro; return Promise.resolve(); }
       statusEl.textContent = "Salvando…"; statusEl.className = ZoZo.pecas.lpSituacao;
       fila = fila.then(() => ctx.bridge.request(A.updateLancamento, { id: original.id, lancamento: payload() })
         .then(() => { statusEl.textContent = "Salvo"; statusEl.className = ZoZo.pecas.lpSituacaoOk; return ctx.recarregarTudo(); })
-        .catch((e) => { if (desfazer) desfazer(); statusEl.textContent = e.friendly; statusEl.className = ZoZo.pecas.lpSituacaoErro; }));
+        .catch((e: any) => { if (desfazer) desfazer(); statusEl.textContent = e.friendly; statusEl.className = ZoZo.pecas.lpSituacaoErro; }));
       return fila;
     }
 
@@ -125,9 +125,9 @@
           // Débito sai de uma CONTA (cartão não vale): com um cartão escolhido — ao criar ou ao editar —
           // troca para a primeira conta disponível; sem nenhuma, avisa em vez de falhar calado
           if (t === "debito") {
-            const c = contas.find((x) => x.id === d.contaId);
+            const c = contas.find((x: any) => x.id === d.contaId);
             if (!c || c.tipo === "cartao") {
-              const conta = contas.find((x) => !x.oculta && x.tipo !== "cartao");
+              const conta = contas.find((x: any) => !x.oculta && x.tipo !== "cartao");
               if (!conta) { Object.assign(d, antes); ctx.toast(ZoZo.messages.FRIENDLY.DEBIT_ACCOUNT, { tone: "error" }); return; }
               d.contaId = conta.id;
               if (!novo) ctx.toast("Débito sai de uma conta: a transação passou para " + conta.nome + ".");
@@ -209,7 +209,7 @@
 
     /** Seta ao lado de uma pílula: mostra no painel de informações a conta, categoria, perfil ou recorrência
         (com "voltar" para esta transação). Não mexe nos filtros da lista de Transações. */
-    function seta(rotulo, abrirPainel) {
+    function seta(rotulo: any, abrirPainel: any) {
       if (novo) return null;
       return h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "lp-ver", ZoZo.pecas.setaVer], "aria-label": "Ver " + rotulo, title: "Ver " + rotulo,
         onClick: abrirPainel }, icon("chevron-right", { size: 14 }));
@@ -217,12 +217,12 @@
 
     /** Conta: escolhida no menu (ao criar e depois, em qualquer tipo); a seta ao lado lista as transações dela */
     function campoConta() {
-      const conta = contas.find((c) => c.id === d.contaId);
+      const conta = contas.find((c: any) => c.id === d.contaId);
       const conteudo = [h("span", { class: ZoZo.pecas.lpContaPonto, style: { background: F.cor(conta && conta.cor, "var(--palette-16)") } }),
         h("span", null, conta ? conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "") : "Sem conta")];
       const btn = h("button", { type: "button", class: ZoZo.pecas.lpConta, "aria-haspopup": "menu", title: "Trocar conta" }, conteudo);   // clicar na conta abre a lista
-      const escolhiveis = contas.filter((c) => (!c.oculta || c.id === d.contaId) && (!ehDebito(d) || c.tipo !== "cartao"));   // débito: cartão não
-      btn.addEventListener("click", () => ZoZo.menu.abrir(btn, escolhiveis.map((c) => ({
+      const escolhiveis = contas.filter((c: any) => (!c.oculta || c.id === d.contaId) && (!ehDebito(d) || c.tipo !== "cartao"));   // débito: cartão não
+      btn.addEventListener("click", () => ZoZo.menu.abrir(btn, escolhiveis.map((c: any) => ({
         label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), check: c.id === d.contaId,
         onClick: () => {
           if (c.id === d.contaId) return;
@@ -244,8 +244,8 @@
         conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa })) : null);
     }
     /** Cria a conta e já a escolhe nesta transação */
-    function novaConta(tipo) {
-      ZoZo.modais.novaConta(ctx, tipo, { aoCriar: (c) => {
+    function novaConta(tipo: any) {
+      ZoZo.modais.novaConta(ctx, tipo, { aoCriar: (c: any) => {
         const antes = d.contaId; d.contaId = c.id;
         ctx.loadData("contas", A.getContas, null, { force: true }).catch(() => null).then(() => {
           if (novo) desenhar(); else salvar(() => { d.contaId = antes; }).then(reabrir);
@@ -254,13 +254,13 @@
     }
 
     /** Menu de categorias (pesquisa, seta → painel da categoria, + Nova categoria) */
-    function menuCategorias(anchor) {
+    function menuCategorias(anchor: any) {
       ZoZo.menu.abrir(anchor, { largura: 280, render(el, api) {
         let termo = "";
         const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar categoria" });
         const lista = h("div", { class: ZoZo.estrutura.menuListaRolagem });
-        const escolher = (id) => { api.fechar(); const antes = d.categoriaId; d.categoriaId = id; if (novo) desenhar(); else salvar(() => { d.categoriaId = antes; }).then(() => reabrir()); };
-        const desenharLista = () => mount(lista, cats.filter((c) => !termo || norm(c.nome).includes(termo)).map((c) => h("div", { class: [ZoZo.estrutura.menuItemDividido, c.id === d.categoriaId && "is-checked"] },
+        const escolher = (id: any) => { api.fechar(); const antes = d.categoriaId; d.categoriaId = id; if (novo) desenhar(); else salvar(() => { d.categoriaId = antes; }).then(() => reabrir()); };
+        const desenharLista = () => mount(lista, cats.filter((c: any) => !termo || norm(c.nome).includes(termo)).map((c: any) => h("div", { class: [ZoZo.estrutura.menuItemDividido, c.id === d.categoriaId && "is-checked"] },
           h("button", { type: "button", class: ZoZo.estrutura.menuDivididoPrincipal, onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true })),
           novo ? null : h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Ver categoria " + c.nome, title: "Ver categoria",
             onClick: () => { api.fechar(); ZoZo.categoriasShared.abrirDetalhe(c, ctx, { voltar: voltarParaCa }); } }, icon("chevron-right", { size: 14 })))));
@@ -269,7 +269,7 @@
           d.categoriaId ? h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => escolher(null) }, h("span", { class: ZoZo.estrutura.menuRotulo }, "Sem categoria")) : null,
           h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "",
             // recarrega as categorias antes de escolher: a nova já aparece selecionada no painel
-            aoCriar: (c) => ctx.loadData("categorias", A.getCategorias, null, { force: true }).catch(() => null).then(() => escolher(c.id)) }); } },
+            aoCriar: (c: any) => ctx.loadData("categorias", A.getCategorias, null, { force: true }).catch(() => null).then(() => escolher(c.id)) }); } },
             icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria")));
         desenharLista();
         requestAnimationFrame(() => busca.focus());
@@ -278,14 +278,14 @@
 
     /** Menu de recorrências — o mesmo ao criar e ao editar: as recorrências (a atual marcada, seta → painel
         dela), "Sem recorrência" logo abaixo da última quando há uma, e "+ Nova recorrência". */
-    function menuRecorrencia(anchor) {
+    function menuRecorrencia(anchor: any) {
       const recorrente = !novo && d.tipo === "recorrente";
       const ehOrig = recorrente && (!d.serieId || d.serieId === original.id);
       const atualId = recorrente ? (ehOrig ? original.id : d.serieId) : (pendenteRec && pendenteRec.vincular ? pendenteRec.vincular.id : null);
       const temRecorrencia = recorrente || !!pendenteRec;
       // a origem de uma série não pode entrar em outra série (os membros dela ficariam órfãos)
-      const lista = origens().filter((o) => !ehOrig || o.id === original.id);
-      const itens = lista.map((o) => ({ render: (api) => h("div", { class: [ZoZo.estrutura.menuItemDividido, o.id === atualId && "is-checked"] },
+      const lista = origens().filter((o: any) => !ehOrig || o.id === original.id);
+      const itens = lista.map((o: any) => ({ render: (api: any) => h("div", { class: [ZoZo.estrutura.menuItemDividido, o.id === atualId && "is-checked"] },
         h("button", { type: "button", class: ZoZo.estrutura.menuDivididoPrincipal, onClick: () => { api.fechar(); if (o.id !== atualId) vincular(o); } },
           h("span", { class: ZoZo.pecas.letra }, o.recorrencia === "parcelada" ? "P" : "R"), h("span", { class: ZoZo.estrutura.menuRotulo }, o.descricao), h("small", { class: ZoZo.estrutura.menuDica }, rotuloRecorrencia(o))),
         novo ? null : h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Ver recorrência " + o.descricao, onClick: () => { api.fechar(); abrirRecorrencia(o.id); } }, icon("chevron-right", { size: 14 }))) }));
@@ -295,7 +295,7 @@
         if (itens.length) itens.push({ separador: true });
         // parcelado: o valor da transação é o TOTAL da compra (o ZoZo divide pelas parcelas)
         itens.push({ icone: "mais", label: "Nova recorrência", onClick: () => ZoZo.modais.frequencia(ctx, novo ? null : original.id,
-          novo ? { valor: d.valor, aoEscolher: (dados) => { pendenteRec = { nova: dados }; desenhar(); } } : { valor: d.valor, aoTerminar: reabrir }) });
+          novo ? { valor: d.valor, aoEscolher: (dados: any) => { pendenteRec = { nova: dados }; desenhar(); } } : { valor: d.valor, aoTerminar: reabrir }) });
       }
       ZoZo.menu.abrir(anchor, itens, { posicao: "esquerda", largura: 290, label: "Recorrência" });
 
@@ -303,39 +303,39 @@
         if (novo) { pendenteRec = null; desenhar(); return; }
         const desfazer = () => ctx.bridge.request(A.desvincularRecorrencia, { id: original.id })
           .then(() => { ctx.toast("Recorrência removida desta transação."); return ctx.recarregarTudo().then(reabrir); })
-          .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+          .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
         if (!ehOrig) return desfazer();
         // origem: as parcelas futuras somem e as já lançadas deixam de fazer parte da série
         ZoZo.feedback.confirmarExclusao("Remover recorrência?", "As parcelas e ocorrências futuras desta série serão excluídas. As transações já lançadas continuam, sem recorrência. Essa ação não pode ser desfeita.",
-          { confirmar: "Remover" }).then((ok) => ok && desfazer());
+          { confirmar: "Remover" }).then((ok) => { if (ok) desfazer(); });
       }
     }
-    function vincular(o) {
+    function vincular(o: any) {
       if (novo) { pendenteRec = { vincular: o }; desenhar(); return; }
       ctx.bridge.request(A.vincularRecorrencia, { id: original.id, serieId: o.id })
         .then(() => { ctx.toast("Transação ligada à recorrência."); return ctx.recarregarTudo().then(reabrir); })
-        .catch((e) => ctx.toast(e.friendly, { tone: "error" }));
+        .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
     }
-    function abrirRecorrencia(serieId) {
-      ctx.loadData("recorrencias", A.getRecorrencias, null, { force: true }).then((r) => {
-        const oc = (r.recorrencias || []).concat(r.proximas || [], r.arquivadas || []).find((x) => x.serieId === serieId);
+    function abrirRecorrencia(serieId: any) {
+      ctx.loadData("recorrencias", A.getRecorrencias, null, { force: true }).then((r: any) => {
+        const oc = (r.recorrencias || []).concat(r.proximas || [], r.arquivadas || []).find((x: any) => x.serieId === serieId);
         if (oc) ZoZo.recorrenciasShared.abrirDetalhe(oc, ctx, { voltar: voltarParaCa });
         else ctx.toast("Esta recorrência não tem ocorrência neste mês.", { tone: "aviso" });
       });
     }
 
-    const perfilAtual = () => perfis.find((x) => x.id === d.perfilId) || null;
+    const perfilAtual = () => perfis.find((x: any) => x.id === d.perfilId) || null;
     function campoPerfil() {
       const p = perfilAtual();
       const btn = p ? h("button", { type: "button", class: ZoZo.pecas.lpPilulaBotao, "aria-haspopup": "menu" }, UI.Tag(p.nome, p.cor, { class: "tag--upper" }))
         : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar perfil", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
-      btn.addEventListener("click", () => ZoZo.menu.abrir(btn, perfis.filter((x) => !x.arquivado || x.id === d.perfilId).map((x) => ({
-        render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, x.id === d.perfilId && "is-checked"], onClick: () => {
+      btn.addEventListener("click", () => ZoZo.menu.abrir(btn, perfis.filter((x: any) => !x.arquivado || x.id === d.perfilId).map((x: any) => ({
+        render: (api: any) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, x.id === d.perfilId && "is-checked"], onClick: () => {
           api.fechar(); const antes = d.perfilId; d.perfilId = x.id; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
         } }, UI.Tag(x.nome, x.cor, { class: "tag--upper" })),
       })).concat([
         // sem "Sem perfil": nas contas com Perfis toda transação tem perfil (regra do serviço)
-        { separador: true }, { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => {
+        { separador: true }, { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np: any) => {
           const antes = d.perfilId; d.perfilId = np.id;
           ctx.loadData("perfis", A.getPerfis, null, { force: true }).catch(() => null).then(() => {
             if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
@@ -364,7 +364,7 @@
     function historico() {
       if (novo) return null;
       const todos = (store.get().data.lancamentos && store.get().data.lancamentos.lancamentos) || [];
-      const itens = todos.filter((x) => x.id !== original.id && norm(x.descricao) === norm(original.descricao)).slice(0, 40);
+      const itens = todos.filter((x: any) => x.id !== original.id && norm(x.descricao) === norm(original.descricao)).slice(0, 40);
       if (!itens.length) return null;
       return h("section", { class: ZoZo.pecas.lpHistorico }, L.ListaPainel(itens, { onClick: (x) => abrir(x, ctx, { voltar: voltarParaCa }) }));
     }
@@ -373,7 +373,7 @@
     function desenhar() {
       ({ contas, cats, perfis } = listas());
       tituloTxt.textContent = NOMES[d.tipo] || "Transação";               // o título acompanha o tipo escolhido
-      const recAtual = !novo && d.tipo === "recorrente" ? origens().find((o) => o.id === (d.serieId && !String(d.serieId).startsWith("removida:") ? d.serieId : original.id)) || d : null;
+      const recAtual = !novo && d.tipo === "recorrente" ? origens().find((o: any) => o.id === (d.serieId && !String(d.serieId).startsWith("removida:") ? d.serieId : original.id)) || d : null;
       const chipRec = recAtual
         ? h("button", { type: "button", class: ZoZo.pecas.lpRec, "aria-haspopup": "menu" }, h("span", { class: ZoZo.pecas.letraPequena }, recAtual.recorrencia === "parcelada" ? "P" : "R"), rotuloRecorrencia(recAtual))
         : pendenteRec
@@ -382,7 +382,7 @@
           : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar recorrência", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
       chipRec.addEventListener("click", () => menuRecorrencia(chipRec));
 
-      const cat = cats.find((c) => c.id === d.categoriaId);
+      const cat = cats.find((c: any) => c.id === d.categoriaId);
       const chipCat = cat ? h("button", { type: "button", class: ZoZo.pecas.lpPilulaBotao, "aria-haspopup": "menu" }, UI.CategoryLabel(cat, { pill: true }))
         : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar categoria", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
       chipCat.addEventListener("click", () => menuCategorias(chipCat));
@@ -410,26 +410,26 @@
     }
 
     /* ---------- criar ---------- */
-    function criar(btn) {
-      const nomeAtual = corpo.querySelector(".lp-name");
+    function criar(btn: any) {
+      const nomeAtual = corpo.querySelector<HTMLInputElement>(".lp-name");
       if (nomeAtual) d.descricao = nomeAtual.value.trim();
-      const valorEl = corpo.querySelector(".lp-value");
+      const valorEl = corpo.querySelector<HTMLInputElement>(".lp-value");
       if (valorEl && document.activeElement === valorEl) valorEl.blur();
       if (!d.descricao) { statusEl.textContent = "Informe o nome."; statusEl.className = ZoZo.pecas.lpSituacaoErro; if (nomeAtual) nomeAtual.focus(); return; }
-      if (!(d.valor > 0)) { statusEl.textContent = "Informe um valor maior que zero."; statusEl.className = ZoZo.pecas.lpSituacaoErro; corpo.querySelector(".lp-value").focus(); return; }
+      if (!(d.valor > 0)) { statusEl.textContent = "Informe um valor maior que zero."; statusEl.className = ZoZo.pecas.lpSituacaoErro; if (valorEl) valorEl.focus(); return; }
       if (temCategoria(d) && !d.categoriaId) { statusEl.textContent = "Escolha uma categoria."; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
       if (comPerfis && !d.perfilId) { statusEl.textContent = "Escolha um perfil."; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
-      if (d.tipo === "debito" && !contas.some((c) => c.id === d.contaId && c.tipo !== "cartao")) { statusEl.textContent = ZoZo.messages.FRIENDLY.DEBIT_ACCOUNT; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
+      if (d.tipo === "debito" && !contas.some((c: any) => c.id === d.contaId && c.tipo !== "cartao")) { statusEl.textContent = ZoZo.messages.FRIENDLY.DEBIT_ACCOUNT; statusEl.className = ZoZo.pecas.lpSituacaoErro; return; }
       btn.disabled = true;
-      ctx.bridge.request(A.createLancamento, { lancamento: payload() }).then((r) => {
+      ctx.bridge.request(A.createLancamento, { lancamento: payload() }).then((r: any) => {
         const id = r.lancamento.id;
         if (pendenteRec && pendenteRec.vincular) return ctx.bridge.request(A.vincularRecorrencia, { id, serieId: pendenteRec.vincular.id }).then(() => id);
         if (pendenteRec && pendenteRec.nova) return ctx.bridge.request(A.tornarRecorrente, Object.assign({ id }, pendenteRec.nova)).then(() => id);
         return id;
-      }).then((id) => {
+      }).then((id: any) => {
         ctx.toast("Transação criada.");
         return ctx.recarregarTudo().then(() => abrir({ id }, ctx, { recemCriada: true }));
-      }).catch((e) => { btn.disabled = false; statusEl.textContent = e.friendly; statusEl.className = ZoZo.pecas.lpSituacaoErro; });
+      }).catch((e: any) => { btn.disabled = false; statusEl.textContent = e.friendly; statusEl.className = ZoZo.pecas.lpSituacaoErro; });
     }
 
     const excluir = () => {
@@ -438,7 +438,7 @@
         (origemParcelada ? " As parcelas futuras desta compra também serão excluídas; as já pagas continuam." : ""))
         .then((ok) => ok && ctx.bridge.request(A.deleteLancamento, { id: original.id }).then(() => {
           ctx.detail.close({ silencioso: true }); ctx.toast("Transação excluída."); return ctx.recarregarTudo();
-        }).catch((e) => ctx.toast(e.friendly, { tone: "error" })));
+        }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" })));
     };
 
     const abrirDivisao = () => ZoZo.dividir.abrir(original, ctx, (id) => abrir({ id }, ctx, opts));
@@ -451,10 +451,10 @@
       title: NOMES[d.tipo],
       selected: novo ? null : { tipo: "lancamento", id: original.id },
       voltar: opts.voltar || null,
-      botoes: novo ? [{ label: "Criar", icone: "check", primario: true, onClick: (e) => criar(e.currentTarget) }]
+      botoes: novo ? [{ label: "Criar", icone: "check", primario: true, onClick: (e: any) => criar(e.currentTarget) }]
         : podeDividir && d.divisao ? [{ label: "Editar divisão", icone: "dividir", onClick: abrirDivisao }] : [],
-      menu: novo ? null : [{ label: "Excluir transação", perigo: true, onClick: excluir }],
-      render(body) { desenhar(); mount(body, corpo); },
+      menu: novo ? undefined : [{ label: "Excluir transação", perigo: true, onClick: excluir }],
+      render(body: any) { desenhar(); mount(body, corpo); },
     });
   }
 

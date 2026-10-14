@@ -4,7 +4,7 @@
    arredondamentos · resumo · pré-visualização A4 · impressão
    (os nomes internos ZoZo.boleto / getBoletoData continuam)
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const LOGO_FATURA = "assets/img/zozo-fatura.svg";
   const { h, mount, clear } = ZoZo.dom;
@@ -13,53 +13,53 @@
   const A = ZoZo.messages.ACTIONS;
   const R = () => ZoZo.regras.boleto;
 
-  let atual = null; // instância aberta
+  let atual: { close(): void; carregar(): void } | null = null; // instância aberta
 
   /* ---------------- Cálculo (regras configuráveis em js/config/regras.js) ---------------- */
-  function sinalDoTipo(tipo) {
+  function sinalDoTipo(tipo: any) {
     const s = R().sinalPorTipo[tipo];
     return s === undefined ? 1 : s;
   }
-  const r2 = (n) => Math.round(n * 100) / 100;
-  function calcular(st) {
+  const r2 = (n: any) => Math.round(n * 100) / 100;
+  function calcular(st: any) {
     // Soma em CENTAVOS inteiros: cada linha é arredondada antes de somar (o total confere com as linhas exibidas)
-    const c = (v) => Math.round(F.numero(v) * 100);
-    const lanc = (st.lancamentos || []).reduce((s, l) => s + c(l.valor) * sinalDoTipo(l.tipo), 0);
-    const contrib = (st.contribuicoes || []).reduce((s, d) => s + Math.abs(c(d.valor)), 0) * R().sinalContribuicao;
-    const desc = st.descontos.reduce((s, d) => s + Math.abs(c(d.valor)), 0) * R().sinalDesconto;
-    const arr = st.arredondamentos.reduce((s, d) => s + c(d.valor), 0) * R().sinalArredondamento;
+    const c = (v: any) => Math.round(F.numero(v) * 100);
+    const lanc = (st.lancamentos || []).reduce((s: any, l: any) => s + c(l.valor) * sinalDoTipo(l.tipo), 0);
+    const contrib = (st.contribuicoes || []).reduce((s: any, d: any) => s + Math.abs(c(d.valor)), 0) * R().sinalContribuicao;
+    const desc = st.descontos.reduce((s: any, d: any) => s + Math.abs(c(d.valor)), 0) * R().sinalDesconto;
+    const arr = st.arredondamentos.reduce((s: any, d: any) => s + c(d.valor), 0) * R().sinalArredondamento;
     return { lancamentos: lanc / 100, contribuicoes: contrib / 100, descontos: desc / 100, arredondamentos: arr / 100, total: (lanc + contrib + desc + arr) / 100 };
   }
 
   /** Valor com sinal explícito para o resumo e o documento */
-  function comSinal(n) {
+  function comSinal(n: any) {
     const v = F.numero(n);
     return (v < 0 ? "− " : "") + F.moeda(v);
   }
 
   /* ---------------- Formatos da fatura ---------------- */
-  const maiusculas = (t) => String(t || "").toLocaleUpperCase("pt-BR");
+  const maiusculas = (t: any) => String(t || "").toLocaleUpperCase("pt-BR");
   /** 13 OUT */
-  const diaMes = (iso) => maiusculas(F.dataCurta(iso));
+  const diaMes = (iso: any) => maiusculas(F.dataCurta(iso));
   /** 13 OUT 2026 */
-  function diaMesAno(iso) {
+  function diaMesAno(iso: any) {
     const d = F.parseData(iso);
     return d ? maiusculas(F.dataCurta(iso) + " " + d.getFullYear()) : "";
   }
-  const parcela = (l) => (l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : "");
+  const parcela = (l: any) => (l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : "");
 
   /** Os dados na tela correspondem exatamente ao perfil e ao período escolhidos? (pode imprimir/copiar Pix) */
-  const invalido = (st) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x) => x.invalido));
-  const pronto = (st) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
-  const chaveFiltro = (st) => st.perfilId + "|" + st.ano + "-" + st.mes;
+  const invalido = (st: any) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x: any) => x.invalido));
+  const pronto = (st: any) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
+  const chaveFiltro = (st: any) => st.perfilId + "|" + st.ano + "-" + st.mes;
 
   /* ---------------- Lista de transações (editor) ---------------- */
-  function ListaTransacoes(st) {
+  function ListaTransacoes(st: any) {
     if (st.carregando) return UI.Skeleton(4, { short: true });
-    if (st.erro) return UI.ErrorState(st.erro, () => atual.carregar());
+    if (st.erro) return UI.ErrorState(st.erro, () => { if (atual) atual.carregar(); });
     if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil", class: "tw:min-h-[90px]! tw:p-4!" });
     if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito ou empréstimo deste perfil no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
-    return h("ul", { class: "boleto-list" }, st.lancamentos.map((l) => h("li", { class: "boleto-list__item" },
+    return h("ul", { class: "boleto-list" }, st.lancamentos.map((l: any) => h("li", { class: "boleto-list__item" },
       h("span", { class: "boleto-list__date" }, diaMes(l.data)),
       h("span", { class: "boleto-list__desc" },
         l.ultimos4Digitos ? h("span", { class: "boleto-list__digits" }, l.ultimos4Digitos) : null,
@@ -69,11 +69,11 @@
   }
 
   /* ---------------- Contribuições / descontos / arredondamentos ---------------- */
-  function Ajustes(lista, cfg) {
+  function Ajustes(lista: any, cfg: any) {
     const wrap = h("div", { class: "adjustments" });
     const desenhar = () => {
       mount(wrap,
-        lista.length ? h("div", { class: "adjustments__list" }, lista.map((item, i) => {
+        lista.length ? h("div", { class: "adjustments__list" }, lista.map((item: any, i: any) => {
           const desc = UI.Input({ value: item.descricao, placeholder: "Nome", class: "adjustments__desc", maxlength: String(ZoZo.regras.limiteNome) });
           desc.setAttribute("aria-label", cfg.rotulo + " " + (i + 1) + ": nome");
           desc.dataset.fk = cfg.chave + ":d:" + item.id;
@@ -98,7 +98,7 @@
         UI.Button(cfg.adicionar, { variant: "text", size: "sm", icon: "mais", onClick: () => {
           const novo = { id: crypto.randomUUID(), descricao: "", valor: 0, valorTexto: "" };
           lista.push(novo); desenhar(); cfg.onChange();
-          requestAnimationFrame(() => { const el = wrap.querySelector('[data-fk="' + cfg.chave + ":d:" + novo.id + '"]'); if (el) el.focus(); });
+          requestAnimationFrame(() => { const el = wrap.querySelector<HTMLElement>('[data-fk="' + cfg.chave + ":d:" + novo.id + '"]'); if (el) el.focus(); });
         } }));
     };
     desenhar();
@@ -106,10 +106,10 @@
   }
 
   /* ---------------- Resumo (editor e documento) ---------------- */
-  function Resumo(st, opts) {
+  function Resumo(st: any, opts?: any) {
     const t = calcular(st);
     const o = opts || {};
-    const linha = (rotulo, valor) => h("div", { class: "boleto-summary__line" }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
+    const linha = (rotulo: any, valor: any) => h("div", { class: "boleto-summary__line" }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
     return h("div", { class: ["boleto-summary", o.doc && "boleto-summary--doc"] },
       linha("Total das transações", t.lancamentos),
       linha("Contribuições", t.contribuicoes),
@@ -122,7 +122,7 @@
      Cada desenho gera um código NOVO (TxID aleatório): muda ao trocar perfil, mês, ano,
      valor, ou ao fechar e abrir de novo. O texto do QR fica em st.pixCodigo (botão "copiar").
      Só existe com os dados prontos: nunca há Pix de um total antigo com um perfil/período novo. */
-  function FaturaPix(st) {
+  function FaturaPix(st: any) {
     st.pixCodigo = null;
     const t = calcular(st);
     if (!pronto(st) || !st.pix || !(t.total > 0)) return null;
@@ -135,21 +135,21 @@
   }
 
   /* ---------------- Pré-visualização (documento A4) ---------------- */
-  function Documento(st) {
+  function Documento(st: any) {
     const ok = pronto(st);
     // valor(x): como o item entra no total (contribuição/desconto sempre pelo valor absoluto)
-    const ajustes = (titulo, lista, valor) => {
-      const validos = lista.filter((x) => x.descricao.trim() || F.numero(x.valor));
+    const ajustes = (titulo: any, lista: any, valor: any) => {
+      const validos = lista.filter((x: any) => x.descricao.trim() || F.numero(x.valor));
       if (!validos.length) return null;
       return h("section", { class: "doc__block" },
         h("h3", { class: "doc__block-title" }, titulo),
-        h("table", { class: "doc__table doc__table--adjust" }, h("tbody", null, validos.map((x) => h("tr", null,
+        h("table", { class: "doc__table doc__table--adjust" }, h("tbody", null, validos.map((x: any) => h("tr", null,
           h("td", null, x.descricao.trim() || titulo.replace(/ões$/, "ão").replace(/s$/, "")),
           h("td", { class: "doc__num" }, comSinal(valor(x))))))));
     };
     const transacoes = ok && st.lancamentos.length
       ? h("table", { class: "doc__table doc__table--transacoes" },
-        h("tbody", null, st.lancamentos.map((l) => h("tr", null,
+        h("tbody", null, st.lancamentos.map((l: any) => h("tr", null,
           h("td", { class: "doc__date" }, diaMes(l.data)),
           h("td", { class: "doc__desc" },
             l.ultimos4Digitos ? h("span", { class: "doc__digits" }, l.ultimos4Digitos) : null,
@@ -165,9 +165,9 @@
           h("p", { class: "doc__perfil" }, maiusculas(st.perfil ? st.perfil.nome : "—")),
           h("p", { class: "doc__fatura" }, h("span", { class: "doc__fatura-rotulo" }, "FATURA"), " ", h("span", { class: "doc__fatura-data" }, diaMesAno(st.dataFatura))))),
       h("section", { class: "doc__block" }, h("h3", { class: "doc__block-title" }, "Transações"), transacoes),
-      ajustes("Contribuições", st.contribuicoes, (x) => Math.abs(F.numero(x.valor)) * R().sinalContribuicao),
-      ajustes("Descontos", st.descontos, (x) => Math.abs(F.numero(x.valor)) * R().sinalDesconto),
-      ajustes("Arredondamentos", st.arredondamentos, (x) => F.numero(x.valor) * R().sinalArredondamento),
+      ajustes("Contribuições", st.contribuicoes, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalContribuicao),
+      ajustes("Descontos", st.descontos, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalDesconto),
+      ajustes("Arredondamentos", st.arredondamentos, (x: any) => F.numero(x.valor) * R().sinalArredondamento),
       h("div", { class: "doc__rodape" }, FaturaPix(st), Resumo(st, { doc: true })));
   }
 
@@ -178,7 +178,7 @@
      não correspondem ao perfil/período escolhidos, o documento não é impresso
      (nem pelo Ctrl+P: veja print.css, .doc[aria-busy="true"]).
      O título da página vira o nome sugerido do arquivo (sem caracteres inválidos). */
-  function imprimirDocumento(st) {
+  function imprimirDocumento(st: any) {
     const titulo = ("Fatura " + (st.perfil ? st.perfil.nome : "") + " " + F.mesNome(st.mes - 1) + " " + st.ano)
       .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
     const tituloAnterior = document.title;
@@ -194,20 +194,20 @@
   }
 
   /* ---------------- Editor (janela em tela cheia) ---------------- */
-  function open(ctx, opts) {
+  function open(ctx: ContextoApp, opts: any) {
     if (atual) return;
     // Fatura: só contas com o recurso (o serviço de dados também recusa os dados da fatura)
     if (!ZoZo.recursos.boleto() || !ZoZo.recursos.perfis()) { ctx.toast(ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE, { tone: "error" }); return; }
     const o = opts || {};
     const hoje = new Date();
-    const st = {
+    const st: any = {
       perfilId: o.perfilId || "", perfil: null, mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), dataFatura: F.iso(hoje),
       lancamentos: null, carregadoPara: null, carregando: false, erro: null,
       contribuicoes: [], descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
     };
-    const root = document.getElementById("boleto-root");
+    const root = document.getElementById("boleto-root") || document.body;
     const shell = document.getElementById("shell");
-    const anterior = document.activeElement;
+    const anterior = document.activeElement as HTMLElement | null;
     let token = 0;
 
     const listaEl = h("div", { class: "boleto-editor__list" });
@@ -217,7 +217,7 @@
 
     const avisoPix = h("p", { class: "boleto-editor__pix" });
     const copiarPix = UI.Button("Copiar Pix copia e cola", { size: "sm", variant: "secondary", icon: "copiar", class: "btn--block",
-      onClick: (e) => { const b = e.currentTarget; if (pronto(st) && st.pixCodigo) navigator.clipboard.writeText(st.pixCodigo).then(() => UI.confirmarNoBotao(b, "Código Pix copiado"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } });
+      onClick: (e) => { const b = e.currentTarget as HTMLElement; if (pronto(st) && st.pixCodigo) navigator.clipboard.writeText(st.pixCodigo).then(() => UI.confirmarNoBotao(b, "Código Pix copiado"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } });
     const imprimirBtn = UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
 
     function atualizarResumo() {
@@ -240,12 +240,12 @@
       if (!st.perfilId) { st.perfil = null; st.erro = null; st.carregando = false; atualizarLista(); return; }
       const chave = chaveFiltro(st);
       st.carregando = true; st.erro = null; atualizarLista();
-      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, mes: st.mes, ano: st.ano }).then((d) => {
+      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, mes: st.mes, ano: st.ano }).then((d: any) => {
         if (meu !== token || chave !== chaveFiltro(st)) return;
         st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || st.perfil; st.pix = d.pix || null;
         st.carregadoPara = chave;
         atualizarLista();
-      }).catch((e) => {
+      }).catch((e: any) => {
         if (meu !== token) return;
         st.carregando = false; st.erro = e.friendly; st.lancamentos = null; atualizarLista();
       });
@@ -254,17 +254,17 @@
     // Campos Perfil, Período e Data da fatura
     const perfisData = ZoZo.store.get().data.perfis;
     const perfilSel = UI.Select([], { name: "perfil" });
-    const preencherPerfis = (lista) => {
+    const preencherPerfis = (lista: any) => {
       clear(perfilSel);
       perfilSel.appendChild(h("option", { value: "" }, "Selecione o perfil"));
-      lista.forEach((p) => perfilSel.appendChild(h("option", { value: p.id }, p.nome)));
+      lista.forEach((p: any) => perfilSel.appendChild(h("option", { value: p.id }, p.nome)));
       perfilSel.value = st.perfilId;
-      st.perfil = lista.find((p) => p.id === st.perfilId) || null;
+      st.perfil = lista.find((p: any) => p.id === st.perfilId) || null;
     };
     let perfis = (perfisData && perfisData.perfis) || [];
     preencherPerfis(perfis);
-    if (!perfisData) ctx.loadData("perfis", A.getPerfis).then((d) => { perfis = d.perfis || []; preencherPerfis(perfis); carregar(); }).catch(() => null);
-    perfilSel.addEventListener("change", () => { st.perfilId = perfilSel.value; st.perfil = perfis.find((p) => p.id === st.perfilId) || null; carregar(); });
+    if (!perfisData) ctx.loadData("perfis", A.getPerfis).then((d: any) => { perfis = d.perfis || []; preencherPerfis(perfis); carregar(); }).catch(() => null);
+    perfilSel.addEventListener("change", () => { st.perfilId = perfilSel.value; st.perfil = perfis.find((p: any) => p.id === st.perfilId) || null; carregar(); });
 
     const mesSel = UI.Select(F.MESES.map((m, i) => ({ value: String(i + 1), label: m })), { value: String(st.mes), ariaLabel: "Mês" });
     const anos = [];
@@ -284,7 +284,7 @@
       imprimirDocumento(st);
     }
 
-    const secaoAjuste = (titulo, lista, cfg) => h("section", { class: "boleto-editor__section" },
+    const secaoAjuste = (titulo: any, lista: any, cfg: any) => h("section", { class: "boleto-editor__section" },
       h("h3", { class: "boleto-editor__title" }, titulo), Ajustes(lista, Object.assign({ onChange: atualizarResumo }, cfg)));
 
     const editor = h("div", { class: "boleto__editor" },
@@ -316,15 +316,15 @@
     requestAnimationFrame(() => { el.classList.add("is-open"); perfilSel.focus(); });
 
     // Ajuste de escala do papel A4 à área disponível
-    const scaler = preview.firstChild;
+    const scaler = preview.firstElementChild as HTMLElement | null;
     const ro = new ResizeObserver(() => {
       // a folha A4 inteira sempre cabe na área (telas pequenas: até 25%)
       const largura = preview.clientWidth - (preview.clientWidth < 600 ? 32 : 64);
-      scaler.style.zoom = String(Math.min(1, Math.max(0.25, largura / 794)));
+      if (scaler) scaler.style.zoom = String(Math.min(1, Math.max(0.25, largura / 794)));
     });
     ro.observe(preview);
 
-    const tecla = (e) => {
+    const tecla = (e: any) => {
       if (e.key === "Escape" && !document.querySelector(".modal-overlay, .menu, .emoji-pop.is-aberto")) { e.preventDefault(); close(); }
     };
     document.addEventListener("keydown", tecla);
@@ -341,7 +341,7 @@
         el.inert = true;
         setTimeout(() => el.remove(), 280);
         atual = null;
-        if (anterior && anterior.isConnected && anterior.focus) anterior.focus();
+        if (anterior && anterior.isConnected) anterior.focus();
       },
     };
     carregar();
@@ -351,7 +351,7 @@
 
   /* O logo da fatura é baixado assim que a sessão de uma conta com faturas abre (fica no cache):
      ao gerar a fatura ele já aparece na hora, em vez de surgir depois do resto. */
-  let logoPronto = null;
+  let logoPronto: HTMLImageElement | null = null;
   ZoZo.store.subscribe((st) => {
     if (logoPronto || !st.session.authenticated || !ZoZo.recursos.boleto()) return;
     logoPronto = new Image();
