@@ -4,15 +4,15 @@
    "Selecione para ver detalhes". O cabeçalho (título, ações e
    fechar) pertence ao próprio painel, o que permite que ele vire
    uma gaveta sobreposta em telas estreitas (tela dividida).
-   Visual em Tailwind (components/estrutura.ts).
+   Visual em Tailwind (components/estrutura.ts). TypeScript: tipos em src/globais.d.ts (ZoZoDetailPanel).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h, mount } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const UI = ZoZo.ui;
 
-  function create(workspaceEl, panelEl) {
+  function create(workspaceEl: HTMLElement, panelEl: HTMLElement): PainelInformacoes {
     const E = ZoZo.estrutura;
     const voltarEl = h("span", { class: E.painelVoltar });
     const tituloEl = h("h2", { class: E.painelTitulo, id: "detail-title" });
@@ -21,8 +21,8 @@
     const corpo = h("div", { class: E.painelConteudo });
     mount(panelEl, header, corpo);
 
-    let atual = null;
-    let chaveAtual = null;   // item exibido (para não repetir a animação ao reabrir o mesmo)
+    let atual: { onClose?: () => void } | null = null;
+    let chaveAtual: string | null = null;   // item exibido (para não repetir a animação ao reabrir o mesmo)
 
     function vazio() {
       chaveAtual = null;
@@ -36,7 +36,7 @@
     }
 
     /** Limpa o conteúdo (o painel continua aberto, com o texto de orientação) */
-    function close(opts) {
+    function close(opts?: { silencioso?: boolean }) {
       const anterior = atual;
       atual = null;
       vazio();
@@ -49,7 +49,7 @@
      *   menu   → botão "⋯" que abre o menu suspenso (com submenus)
      *   botoes → botões de texto ao lado do "⋯" (ex.: "Editar orçamento")
      */
-    function open(cfg) {
+    function open(cfg: ConfigPainel): ApiPainel {
       atual = { onClose: cfg.onClose };
       workspaceEl.dataset.conteudo = "sim";
       // Título: texto ou elemento (ex.: seletor do tipo de lançamento)
@@ -69,19 +69,19 @@
       botoes.push(UI.IconButton("fechar", "Fechar painel", { onClick: () => close() }));
       mount(acoesEl, botoes);
 
-      const rolagemAnterior = (corpo.querySelector(".detail__body") || {}).scrollTop || 0;
+      const rolagemAnterior = corpo.querySelector<HTMLElement>(".detail__body")?.scrollTop || 0;
       const chave = cfg.selected ? cfg.selected.tipo + ":" + cfg.selected.id : null;
       const mesmo = chave && chave === chaveAtual;
       chaveAtual = chave;
       // reabrir o mesmo item (salvar no lugar) não repete a animação de entrada
       const body = h("div", { class: mesmo ? E.painelCorpoEstatico : E.painelCorpo, role: "region", "aria-labelledby": "detail-title" });
       mount(corpo, body);
-      const api = { close, setTitle: (t) => { tituloEl.textContent = t; } };
+      const api: ApiPainel = { close, setTitle: (t: string) => { tituloEl.textContent = t; } };
       cfg.render(body, api);
       if (mesmo) body.scrollTop = rolagemAnterior;   // salvar no lugar não leva o painel de volta ao topo
       ZoZo.store.set({ detailPanelOpen: true, selectedItem: cfg.selected || null });
       requestAnimationFrame(() => {
-        const alvo = body.querySelector("[data-autofocus]");
+        const alvo = body.querySelector<HTMLElement>("[data-autofocus]");
         if (alvo && cfg.focus !== false) alvo.focus();
       });
       return api;
@@ -91,5 +91,6 @@
     return { open, close, isOpen: () => workspaceEl.dataset.conteudo === "sim" };
   }
 
-  ZoZo.detailPanel = { create };
+  const api: ZoZoDetailPanel = { create };
+  ZoZo.detailPanel = api;
 })(window.ZoZo);

@@ -223,6 +223,12 @@
               editandoCiclo ? ciclo.el : ZoZo.inline.dinheiro({ valor: conta.valor, rotulo: "Saldo da conta", permitirNegativo: true, classe: ZoZo.pecas.phValor,
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, saldo: v }).then(() => { ctx.toast("Saldo atualizado."); return ctx.recarregarTudo(); }) })),
             conta.limite && !editandoCiclo ? h("div", { class: ZoZo.pecas.phExtra }, F.moeda(conta.limite) + " de limite") : null,
+            // empréstimo: o contrato (parcelas, valor contratado e 1º vencimento)
+            conta.emprestimo ? h("div", { class: ZoZo.pecas.phExtra }, [
+              conta.emprestimo.parcelas ? conta.emprestimo.parcelas + (conta.emprestimo.parcelas === 1 ? " parcela" : " parcelas") + (conta.emprestimo.valorParcela ? " de " + F.moeda(conta.emprestimo.valorParcela) : "") : null,
+              conta.emprestimo.valorContratado ? F.moeda(conta.emprestimo.valorContratado) + " contratados" : null,
+              conta.emprestimo.primeiroVencimento ? "1º vencimento " + F.dataCurta(conta.emprestimo.primeiroVencimento) : null,
+            ].filter(Boolean).join(" · ")) : null,
             // cartão: fechamento e vencimento do mês atual (de todos os meses ou definidos só para este mês)
             !editandoCiclo && conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: ZoZo.pecas.phExtra },
               "Fecha dia " + conta.cicloAtual.fechamento + " · vence dia " + conta.cicloAtual.vencimento + (conta.cicloAtual.soEsteMes ? " (só neste mês)" : "")) : null),

@@ -112,7 +112,7 @@
     /* ---------- título: tipo com menu ---------- */
     const permitidos = tiposPermitidos(original || d, novo);
     const tituloTxt = h("span", null, NOMES[d.tipo] || "Transação");
-    const tituloBtn = h("button", { type: "button", class: ["tipo-select", !permitidos.length && "tipo-select--fixo"], "aria-haspopup": permitidos.length ? "menu" : undefined },
+    const tituloBtn = h("button", { type: "button", class: permitidos.length ? ZoZo.pecas.tipoSelecao : ZoZo.pecas.tipoSelecaoFixo, "aria-haspopup": permitidos.length ? "menu" : undefined },
       tituloTxt, permitidos.length ? icon("chevron-down", { size: 14, stroke: 2.25 }) : null);
     if (permitidos.length) {
       tituloBtn.addEventListener("click", () => ZoZo.menu.abrir(tituloBtn, permitidos.map((t) => ({
@@ -171,12 +171,13 @@
       // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo)
       const input = h("input", { type: "text", inputmode: "decimal", class: ["lp-value", ZoZo.pecas.lpValor, "money", ehVerde(d) && "money--income"], "aria-label": "Valor",
         value: F.moeda(d.valor || 0), "data-com-simbolo": "" });
-      input.addEventListener("focus", () => { input.value = d.valor ? F.valorParaEditar(input, d.valor) : ""; F.cursorNoFim(input); });   // sem selecionar tudo
+      // sem selecionar tudo; transação nova (sem valor): o símbolo da moeda já aparece ("R$ "), pronto para digitar
+      input.addEventListener("focus", () => { input.value = d.valor ? F.valorParaEditar(input, d.valor) : F.simbolo() + " "; F.cursorNoFim(input); });
       input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
       input.addEventListener("blur", () => {
         const v = F.parseMoeda(input.value);
         const valido = v > 0 && v < 1e12;
-        if (!valido && input.value.trim()) { statusEl.textContent = "Valor inválido: use só números, como 1.234,56."; statusEl.className = ZoZo.pecas.lpSituacaoErro; }
+        if (!valido && /\d/.test(input.value)) { statusEl.textContent = "Valor inválido: use só números, como 1.234,56."; statusEl.className = ZoZo.pecas.lpSituacaoErro; }
         if (valido && Math.round(v * 100) !== Math.round((d.valor || 0) * 100)) {
           const antes = d.valor; d.valor = Math.round(v * 100) / 100;
           salvar(() => { d.valor = antes; input.value = F.moeda(antes); });
@@ -233,7 +234,10 @@
           ? { icone: "mais", label: "Nova conta", onClick: () => novaConta("corrente") }
           : { icone: "mais", label: "Nova conta", submenu: [
             { icone: "banco", label: "Conta corrente ou poupança", onClick: () => novaConta("corrente") },
-            { icone: "cartao", label: "Cartão de crédito", onClick: () => novaConta("cartao") }] }]),
+            { icone: "cartao", label: "Cartão de crédito", onClick: () => novaConta("cartao") },
+            { icone: "investimentos", label: "Investimentos", onClick: () => novaConta("investimento") },
+            { icone: "emprestimo", label: "Empréstimos", onClick: () => novaConta("emprestimo") },
+            { icone: "carteira", label: "Outros", onClick: () => novaConta("outros") }] }]),
       { posicao: "esquerda", label: "Conta", largura: 260 }));
       const origem = conta && conta.tipo === "investimento" ? "investimentos" : "contas";
       return h("div", { class: ZoZo.pecas.lpContaLinha }, btn,

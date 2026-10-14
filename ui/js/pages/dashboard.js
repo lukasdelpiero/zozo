@@ -70,7 +70,7 @@
     topGasto: "money tw:justify-self-end tw:font-[620]",
     topReservado: "money tw:text-right tw:pl-4 tw:text-zz-secondary tw:font-[620] tw:area340:hidden",
     // Próximas transações (linha de recorrência compacta)
-    recorrencia: "recurrence-row--compact tw:grid-cols-[52px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:px-2 tw:gap-3 "
+    recorrencia: "tw:grid-cols-[52px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:px-2 tw:gap-3 "
       + "tw:area460:grid-cols-[48px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:area340:grid-cols-[48px_minmax(0,1fr)_auto]",
     recorrenciaPartes: {
       data: "tw:text-[15px] tw:font-[450]",
@@ -220,7 +220,7 @@
       const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
       const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"), false,
         recs.length
-          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r) => L.RecurrenceRow(r, { class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r) => L.RecurrenceRow(r, { compacta: true, class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
           : UI.EmptyState("Nenhuma transação prevista para este mês.", { icon: "recorrencias", class: T.vazio }));
 
       const ultimos = d.ultimosLancamentos || [];

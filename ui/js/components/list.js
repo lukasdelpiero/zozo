@@ -12,18 +12,6 @@
 
   const SUBTITULO_CONTA = { corrente: "Corrente", poupanca: "Poupança", investimento: "Investimento", emprestimo: "Empréstimo" };
 
-  function rowBase(cls, opts, ...children) {
-    const o = opts || {};
-    const tag = o.onClick ? "button" : "div";
-    return h(tag, {
-      type: o.onClick ? "button" : undefined,
-      class: ["row", cls, o.selected && "is-selected", o.onClick && "row--interactive", o.class],
-      onClick: o.onClick,
-      "aria-current": o.selected ? "true" : undefined,
-      "data-id": o.id,
-    }, ...children);
-  }
-
   /** Nome + 4 últimos dígitos (mais claro) */
   function nomeComDigitos(nome, digitos, cls) {
     const P = ZoZo.pecas;
@@ -243,21 +231,53 @@
       o.excluida ? null : h("span", { class: ["money", CR.reservado, "tw:text-zz-text"] }, F.moeda(grupo.reservado)));
   }
 
-  /* ---------- Recorrência (seção 42) ---------- */
+  /* ---------- Recorrência (seção 42) ----------
+     Visual em Tailwind (Recorrências e, compacta, Próximas transações do Dashboard). recurrence-row é gancho.
+     [data | ícone] Nome  frequência ........ [CATEGORIA]  R$ 0,00 ✓ — a base tem especificidade zero (tw:base:):
+     o Dashboard troca colunas, respiros e tamanhos pelas classes que passa (opts.class / opts.partes).
+     Área estreita: a categoria sai em ≤ 620 px (página) e a frequência em ≤ 420 px. */
+  const RR = {
+    linha: "recurrence-row tw:base:grid tw:base:items-center tw:base:gap-3 tw:base:w-full tw:base:min-h-(--row-height) tw:base:px-4 tw:base:py-0 tw:[border:0] "
+      + "tw:base:rounded-lg tw:text-inherit tw:text-left tw:text-[15px] tw:focus-visible:outline-offset-[-2px]",
+    // página: a categoria não reserva largura mínima (o nome nunca some); com o ícone no lugar da data (arquivadas), 22 px
+    colunas: "tw:grid-cols-[52px_minmax(0,1fr)_minmax(0,max-content)_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
+    colunasIcone: "tw:grid-cols-[22px_minmax(0,1fr)_minmax(0,max-content)_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
+    interativa: "tw:cursor-pointer tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
+    normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
+    selecionada: "tw:bg-zz-primary-soft",
+    data: "tw:base:text-zz-secondary tw:base:whitespace-nowrap " + NUMEROS,
+    icone: "tw:text-[15px]",
+    desc: "tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
+    titulo: "tw:base:overflow-hidden tw:base:text-ellipsis tw:base:text-[15px] tw:base:font-[450]",
+    tipo: "tw:flex-none tw:text-zz-muted tw:text-[15px] tw:font-[450] tw:area420:hidden",
+    categoria: "tw:base:min-w-0 tw:base:flex tw:base:max-w-[180px] tw:*:min-w-0 tw:*:max-w-full",
+    categoriaPagina: "tw:area620:hidden",
+    valor: "money tw:[justify-self:end] tw:inline-flex tw:items-center tw:gap-1.5 tw:base:text-[15px] tw:base:font-[620]",
+    // check de pago na cor da categoria; vazio com a mesma largura (os valores ficam alinhados)
+    pago: "tw:inline-grid tw:place-items-center tw:w-3.5 tw:h-[18px] tw:flex-none tw:rounded-[50%] tw:text-[color-mix(in_srgb,var(--tag-color)_75%,black)]",
+  };
   function RecurrenceRow(r, opts) {
-    const p = (opts && opts.partes) || {};     // classes extras por parte: { data, titulo, categoria, valor }
-    return rowBase("recurrence-row", Object.assign({ id: r.id }, opts),
-      h("span", { class: ["recurrence-row__date", p.data] }, (opts || {}).semData ? h("span", { class: "recurrence-row__icon", "aria-hidden": "true" }, (r.categoria && r.categoria.icone) || "•")
+    const o = opts || {};
+    const p = o.partes || {};     // classes extras por parte: { data, titulo, categoria, valor }
+    const colunas = o.compacta ? null : o.semData ? RR.colunasIcone : RR.colunas;
+    return h(o.onClick ? "button" : "div", {
+      type: o.onClick ? "button" : undefined,
+      class: [RR.linha, colunas, o.selected ? RR.selecionada : RR.normal, o.onClick && RR.interativa, o.class],
+      onClick: o.onClick,
+      "aria-current": o.selected ? "true" : undefined,
+      "data-id": r.id,
+    },
+      h("span", { class: [RR.data, p.data] }, o.semData ? h("span", { class: RR.icone, "aria-hidden": "true" }, (r.categoria && r.categoria.icone) || "•")
         : F.dataCurta(r.data) + (r.data.slice(0, 4) !== String(new Date().getFullYear()) ? " " + r.data.slice(2, 4) : "")),
-      h("span", { class: "recurrence-row__desc" },
-        h("span", { class: ["recurrence-row__title", p.titulo] }, r.descricao),
-        h("span", { class: "recurrence-row__type" }, r.tipoRecorrencia)),
-      h("span", { class: ["recurrence-row__category", ZoZo.pecas.ctxPilulaLinha, p.categoria] }, UI.CategoryLabel(r.categoria, { pill: true })),
-      h("span", { class: ["recurrence-row__value money", p.valor] },
+      h("span", { class: RR.desc },
+        h("span", { class: [RR.titulo, p.titulo] }, r.descricao),
+        h("span", { class: RR.tipo }, r.tipoRecorrencia)),
+      h("span", { class: [RR.categoria, o.compacta ? null : RR.categoriaPagina, ZoZo.pecas.ctxPilulaLinha, p.categoria] }, UI.CategoryLabel(r.categoria, { pill: true })),
+      h("span", { class: [RR.valor, p.valor] },
         F.moeda(r.valor),
-        r.pago ? h("span", { class: "recurrence-row__paid", title: "Pago", "aria-label": "Pago",
+        r.pago ? h("span", { class: RR.pago, title: "Pago", "aria-label": "Pago",
           style: { "--tag-color": F.cor(r.categoria && r.categoria.cor, "var(--color-progress-ok)") } }, icon("check", { size: 13, stroke: 2.5 }))
-          : h("span", { class: "recurrence-row__paid recurrence-row__paid--vazio", "aria-hidden": "true" })));
+          : h("span", { class: RR.pago, "aria-hidden": "true" })));
   }
 
   /* ---------- Alocação (seção 25) ---------- */
@@ -327,14 +347,14 @@
           if (v) atual.add(l.id); else atual.delete(l.id);
           ZoZo.store.set({ ui: { selecionados: Array.from(atual) } });
         }, { label: "Selecionar " + l.descricao, class: ZoZo.pecas.plCaixa }),
+        marca ? h("span", { class: [ZoZo.pecas.letra, ZoZo.pecas.plLetra], title: { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] }, marca) : null,
         h("span", { class: ZoZo.pecas.plNome },
-          marca ? h("span", { class: ZoZo.pecas.letra, title: { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" }[marca] }, marca) : null,
           h("span", { class: ZoZo.pecas.plTitulo }, l.descricao),
           l.parcelaTotal ? h("span", { class: "launch-row__parcel" }, l.parcelaAtual + "/" + l.parcelaTotal) : null),
-        l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, l.categoria.icone || "•") : h("span"),
+        l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, l.categoria.icone || "•") : null,
         h("span", { class: [ZoZo.pecas.plValor, verde && "money--income"] }, F.moeda(l.valor))));
     });
-    return h("div", { class: "pl" }, blocos);
+    return h("div", { class: ZoZo.pecas.pl }, blocos);
   }
 
   ZoZo.list = {

@@ -35,7 +35,14 @@
     // pílulas das categorias + "+N" no topo dos painéis de grupo e de "todas"
     leadPilha: "tw:flex-col tw:items-start tw:gap-1.5",
     // pílulas e "+N" sempre lado a lado: as pílulas encolhem (com "…") antes de quebrar a linha
-    pilulas: "tw:flex tw:flex-nowrap tw:items-center tw:gap-1.5 tw:min-w-0 tw:max-w-full tw:*:min-w-0",
+    // (flex-row: o topo do painel põe os seus blocos em coluna, e as pílulas ficavam empilhadas e centralizadas)
+    pilulas: "tw:flex tw:flex-row tw:flex-nowrap tw:items-center tw:gap-1.5 tw:min-w-0 tw:max-w-full tw:*:min-w-0",
+    /* Topo dos painéis em linhas: [ícones | pílulas] ↔ rótulo, [nome] ↔ valor, [grupo] ↔ dica — cada par na mesma
+       linha (as duas colunas viram uma grade só; "contents" deixa os filhos de cada lado irem direto para ela) */
+    topoLinhas: "tw:grid-flow-row-dense tw:items-center tw:gap-y-1",
+    colEsq: "tw:contents tw:*:col-start-1",
+    colDir: "tw:contents tw:*:col-start-2 tw:*:justify-self-end tw:*:text-right",
+    colDirEditando: "tw:col-start-2 tw:row-start-1 tw:row-span-3 tw:self-start",
     mais: "tw:flex-none tw:inline-grid tw:place-items-center tw:h-[22px] tw:px-2 tw:py-0 tw:[border:0] tw:rounded-(--radius-pill) tw:bg-(--color-neutral-soft) "
       + "tw:text-(--color-neutral) tw:text-[11px] tw:font-semibold tw:cursor-pointer tw:hover:bg-zz-primary-soft tw:hover:text-zz-primary "
       + "tw:[&.is-open]:bg-zz-primary-soft tw:[&.is-open]:text-zz-primary",
@@ -46,8 +53,9 @@
     orcValor: "tw:w-[170px]",
     orcInput: ORCAMENTO_INPUT,
     // painel do grupo
-    grupoHero: "tw:items-start tw:area420:flex-col",
-    grupoOrc: "tw:grid tw:justify-items-end tw:gap-2.5 tw:area420:justify-items-start",
+    // [pílulas] ↔ botão do modo, [nome] ↔ valores (no painel, área estreita: o lado direito alinhado à esquerda)
+    grupoOrc: "tw:contents tw:*:col-start-2 tw:*:justify-self-end tw:area420:*:justify-self-start",
+    grupoNome: "tw:self-end",
     grupoValores: "tw:grid tw:grid-flow-col tw:gap-5",
     grupoItem: "tw:grid tw:justify-items-end tw:gap-0.5 tw:area420:justify-items-start",
     grupoRotulo: "tw:text-[12px] tw:text-zz-secondary",
@@ -202,7 +210,7 @@
     ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
     pintarModo();
     valorOrc.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvarOrcamento(); } });
-    const areaOrcamento = h("div", { class: [ZoZo.pecas.painelTopoNumero, T.orcArea] }, modoBtn, rotuloMes,
+    const areaOrcamento = h("div", { class: [ZoZo.pecas.painelTopoNumero, T.orcArea, T.colDirEditando] }, modoBtn, rotuloMes,
       h("div", { class: [ZoZo.pecas.afixo, T.orcValor] }, h("span", { class: ZoZo.pecas.prefixo }, F.simbolo()), valorOrc));
     if (editando) requestAnimationFrame(() => { valorOrc.focus(); F.cursorNoFim(valorOrc); });
     function salvarOrcamento() {
@@ -248,15 +256,15 @@
         const grafico = h("div", { class: ZoZo.pecas.painelGrafico });
         const acima = F.numero(cat.gasto) > F.numero(cat.reservado);
         mount(body,
-          h("div", { class: ZoZo.pecas.painelTopo },
+          h("div", { class: [ZoZo.pecas.painelTopo, T.topoLinhas] },
             // Cor (bolinha), ícone e nome editáveis no lugar
-            h("div", { class: ZoZo.pecas.edicaoTopo },
+            h("div", { class: [ZoZo.pecas.edicaoTopo, T.colEsq] },
               h("div", { class: ZoZo.pecas.edicaoTopoLinha },
                 ZoZo.inline.corDot(cat.cor, (c) => alterar({ cor: c }, "Cor alterada.")),
                 ZoZo.modais.seletorIcone(cat.icone, (e) => alterar({ icone: e }, "Ícone alterado."))),
               ZoZo.inline.texto({ valor: cat.nome, rotulo: "Nome da categoria", max: ZoZo.regras.limiteNome, aoSalvar: (v) => alterar({ nome: v }, "Nome alterado.") }),
               cat.grupo ? h("span", { class: T.subtitulo }, cat.grupo) : null),
-            editando ? areaOrcamento : h("div", { class: ZoZo.pecas.painelTopoNumero },
+            editando ? areaOrcamento : h("div", { class: [ZoZo.pecas.painelTopoNumero, T.colDir] },
               h("span", { class: ZoZo.pecas.painelTopoRotulo }, "Gasto em " + mesNomeDe(mes)),
               h("span", { class: [ZoZo.pecas.painelTopoValor, "money"] }, F.moeda(cat.gasto)),
               cat.status === "excluida" || !orcamentoAtivo() ? null : resumoGasto(cat.gasto, cat.reservado))),
@@ -343,11 +351,11 @@
       render(body) {
         const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         mount(body,
-          h("div", { class: [ZoZo.pecas.painelTopo, T.grupoHero] },
-            h("div", { class: [ZoZo.pecas.painelTopoInicio, T.leadPilha] },
+          h("div", { class: [ZoZo.pecas.painelTopo, T.topoLinhas] },
+            h("div", { class: [ZoZo.pecas.painelTopoInicio, T.leadPilha, T.colEsq] },
               h("div", { class: T.pilulas }, ordenadas.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
                 maisCategorias(ordenadas, 2)),
-              h("span", { class: ZoZo.pecas.painelTopoNome }, nome)),
+              h("span", { class: [ZoZo.pecas.painelTopoNome, T.grupoNome] }, nome)),
             orcamentoAtivo() ? h("div", { class: T.grupoOrc },
               modoBtn,
               h("div", { class: T.grupoValores },
@@ -396,12 +404,12 @@
         const grafico = h("div", { class: ZoZo.pecas.painelGrafico });
         const tags = regulares.slice().sort((a, b) => b.gasto - a.gasto);
         mount(body,
-          h("div", { class: ZoZo.pecas.painelTopo },
-            h("div", { class: [ZoZo.pecas.painelTopoInicio, T.leadPilha] },
+          h("div", { class: [ZoZo.pecas.painelTopo, T.topoLinhas] },
+            h("div", { class: [ZoZo.pecas.painelTopoInicio, T.leadPilha, T.colEsq] },
               h("div", { class: T.pilulas }, tags.slice(0, 2).map((c) => UI.CategoryLabel(c, { pill: true })),
                 maisCategorias(tags, 2)),
               h("span", { class: ZoZo.pecas.painelTopoNome }, "Todas as categorias regulares")),
-            h("div", { class: ZoZo.pecas.painelTopoNumero },
+            h("div", { class: [ZoZo.pecas.painelTopoNumero, T.colDir] },
               h("span", { class: ZoZo.pecas.painelTopoRotulo }, "Gasto em " + mesNomeDe(d.mes)),
               h("span", { class: [ZoZo.pecas.painelTopoValor, "money"] }, F.moeda(d.resumo.gasto)),
               resumoGasto(d.resumo.gasto, d.resumo.reservado))),

@@ -15,26 +15,15 @@
   --t-24: 1.5rem;      /* 24px — Gasto mensal */
 }
 
-/* ================= Recorrências ================= */
-.recurrence-row { grid-template-columns: 52px minmax(0, 1fr) minmax(140px, 220px) 120px; gap: var(--space-3); }
-.recurrence-row:has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(140px, 220px) 120px; }
-.recurrence-row__title, .recurrence-row__type { font-size: var(--t-15); font-weight: 450; }
-.recurrence-row__value { font-size: var(--t-15); font-weight: 620; }
-
 /* ================= Perfis ================= */
 .profile-row__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 6px 0; }
 .profile-row__name { font-size: var(--t-15); font-weight: 450; }
 .profile-row__count { font-size: var(--t-13); font-weight: 450; color: var(--color-text-secondary); }
 .profile-row { min-height: 52px; }
 
-/* ================= Painel de informações ================= */
-.tipo-select { font-size: var(--t-15); font-weight: 620; }
-
 /* ================= Janelas modais ================= */
 .modal .cfg-row__sub { font-size: var(--t-13); font-weight: 620; }
 /* listas de ponta a ponta */
-.freq-list__item { border-radius: 0; margin: 0 calc(-1 * var(--space-6)); padding-left: var(--space-6); padding-right: var(--space-6); }
-.freq-list__item { font-size: var(--t-15); }
 
 /* =============================================================
    Espaçamento das listas de lançamentos
@@ -51,7 +40,7 @@
 :root { --radius-small: 8px; --radius-medium: 12px; --radius-large: 20px; }
 /* linhas, botões, selecionados e destaques: 8px
    (exceto lançamentos da página Lançamentos e das listas do painel, que vão de borda a borda) */
-.row, .nav-item, .tipo-select, .cfg-danger-btn { border-radius: 8px; }
+.row, .nav-item, .cfg-danger-btn { border-radius: 8px; }
 .chart-card { border-radius: 20px; }              /* cards da área principal */
 
 /* Botão Excluir nas janelas modais */
@@ -161,23 +150,12 @@
 /* Dividir: toggle centralizado; "+ Add divisão" igual ao botão "Alterar" (contorno sólido) */
 .dv__toggle { align-self: center; }
 
-/* Listas: etiquetas de categoria/perfil têm largura máxima — o nome do lançamento nunca é espremido até sumir */
-.recurrence-row__category { max-width: 180px; }
-.recurrence-row__category > * { min-width: 0; max-width: 100%; }
-
 /* Recorrências: a categoria não reserva largura mínima (antes 140px) — o título não some */
-.recurrence-row:not(.recurrence-row--compact) { grid-template-columns: 52px minmax(0, 1fr) minmax(0, max-content) 120px; }
-.recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 22px minmax(0, 1fr) minmax(0, max-content) 120px; }
 /* Área estreita (≤ 620px). As regras equivalentes em components.css nunca valiam: pages.css e este
    arquivo carregam depois e redefiniam as grades com a mesma especificidade. Por isso ficam aqui, no fim. */
-@container (max-width: 620px) {
-  .recurrence-row:not(.recurrence-row--compact), .recurrence-row:not(.recurrence-row--compact):has(.recurrence-row__icon) { grid-template-columns: 52px minmax(0, 1fr) 110px; }
-  .recurrence-row:not(.recurrence-row--compact) .recurrence-row__category { display: none; }
-}
 
 @container (max-width: 420px) {
-  .recurrence-row__desc > .recurrence-row__type { display: none; }
-  .allocation-row { grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) 56px; }
+    .allocation-row { grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) 56px; }
 }
 /* Resumos no topo das páginas (Contas, Categorias, Recorrências) em área estreita: valores menores e empilhados */
 @container (max-width: 460px) {
@@ -366,9 +344,6 @@
    ZoZo 2.6 — Débito, Câmbio, grupos de categorias e seleção
    ============================================================= */
 
-/* Parcelamento: prévia das parcelas */
-.parcelas__previa { margin-top: 6px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
-
 /* Câmbio (menu lateral, acima da foto e da engrenagem) */
 .cambio { display: grid; gap: 6px; }
 /* "Câmbio" igual aos títulos das divisões do menu (ex.: Conta bancária) */
@@ -393,9 +368,6 @@
 /* Fatura: QR maior e texto do Pix com peso 620 */
 .doc__pix .qr { width: 132px; height: 132px; }
 .doc__pix-texto { font-weight: 620; }
-
-/* Recorrências: check de pago sem o fundo circular */
-.recurrence-row__paid { background: transparent !important; width: 14px; flex: none; }   /* mesma largura com e sem o check: valores alinhados */
 
 /* Calendário do ZoZo (substitui o do navegador) */
 .cal { display: grid; gap: 8px; }
@@ -448,7 +420,7 @@
 
 /* Aviso laranja (mesmo estilo do aviso de demonstração do menu) */
 .aviso-laranja { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 var(--space-3); padding: 8px 12px; border-radius: 8px;
-  background: #fff1e3; color: #e8730c; font-size: var(--t-13); font-weight: 550; line-height: 1.4; }
+  background: var(--color-alerta-soft); color: var(--color-alerta); font-size: var(--t-13); font-weight: 550; line-height: 1.4; }
 .aviso-laranja .icon { flex: none; margin-top: 1px; }
 
 /* Transferir entre moedas: Enviar | Importar e a moeda no canto inferior esquerdo */

@@ -42,6 +42,9 @@
   --color-income: #15903f;
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
+  --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */
+  --color-alerta-soft: #fff1e3;
+  --color-progress-near: var(--color-alerta);   /* orçamento perto do limite */
   --color-progress-track: #eceef2;
   --color-donut-fundo: #F1F2F5;    /* fundo dos gráficos de rosca (cinza-claro) */
   --color-allocation: #3b78e7;

@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.5.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.6.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,18 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.6.0
+
+- **Empréstimo novo:** nome, instituição (opcional), valor contratado, 1º vencimento, parcelas (inteiro, a partir de 1), valor da parcela e valor devido — um puxa o outro (parcela × parcelas) — com o resumo "Valor devido de R$ X (inclui R$ Y de juros da operação)" atualizado enquanto digita, e a cor. O contrato aparece no painel da conta.
+- **Orçamento perto do limite:** a barra fica laranja (a mesma cor dos avisos) a partir de 80% do orçamento; acima do orçamento continua vermelha.
+- **Divisão personalizada:** editar o valor ou o percentual de uma parte reajusta as outras na mesma proporção — a soma é sempre o valor da transação (100%); remover ou adicionar uma parte também redistribui.
+- **Filtros de Transações:** só aparecem contas, categorias, perfis, recorrências e tipos que existem nas transações (o que já estava marcado continua, para desmarcar). Estorno entrou nos tipos.
+- **Nova conta pelo painel da transação:** além de banco e cartão, Investimentos, Empréstimos e Outros.
+- **Valor da transação nova:** o símbolo da moeda ("R$") aparece ao clicar e continua no campo mesmo apagando tudo.
+- **Alinhamentos:** cabeçalho dos painéis de categoria, grupo e "todas" em linhas (ícones ↔ "Gasto em…", nome ↔ valor); pílulas do grupo lado a lado (estavam empilhadas e desencontradas); lista de transações dos painéis numa grade única (título, letra, ícone da categoria e valor na mesma coluna em todas as linhas); a seta dos links no topo dos cards do Dashboard termina na linha dos valores; janela Nova recorrência sem barra de rolagem horizontal.
+- **Recorrências em Tailwind CSS:** página, linhas (também as do Dashboard), título com o menu de frequência e a janela de frequência/parcelas. ~80 linhas de CSS antigo a menos.
+- **TypeScript:** mais 13 módulos convertidos (ícones, regras, mensagens da ponte, transporte, barra superior, painel de informações, avisos/janelas, calendário, edição no lugar, divisão, roteador e peças das páginas).
 
 ## Novidades da versão 3.5.0
 

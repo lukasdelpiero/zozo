@@ -4,14 +4,15 @@
    A especificação deixa algumas regras em aberto. Elas ficam
    isoladas aqui para serem definidas pela camada de negócio
    sem alterar componentes visuais.
+   TypeScript: tipos em src/globais.d.ts (ZoZoRegras, ZoZoSobre).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
 
   /** Identificação do programa */
-  ZoZo.sobre = Object.freeze({ versao: "3.5.0", autor: "Lukas Del Piero Barros" });
+  ZoZo.sobre = Object.freeze({ versao: "3.6.0", autor: "Lukas Del Piero Barros" });
 
-  ZoZo.regras = {
+  const regras: ZoZoRegras = {
     /** Máximo de caracteres do nome de lançamentos, contas, categorias e perfis (nomes longos aparecem cortados com "…") */
     limiteNome: 50,
 
@@ -20,6 +21,9 @@
       const n = new Uint8Array(1); crypto.getRandomValues(n);
       return this.paleta[n[0] % this.paleta.length];
     },
+
+    /** Orçamento "perto do limite": a barra fica laranja a partir desta fração do orçamento (até estourar, quando fica vermelha) */
+    orcamentoPerto: 0.8,
 
     /** Tipos de lançamento cujo valor é exibido em verde (seção 14.5) */
     tiposValorVerde: ["receita", "estorno"],
@@ -113,4 +117,5 @@
       "#00b2b2", "#2d8cff", "#5a4cfc", "#aa33ff", "#d81aff", "#ff1ad9", "#ff0f5f", "#6078a9",
     ],
   };
+  ZoZo.regras = regras;
 })(window.ZoZo);

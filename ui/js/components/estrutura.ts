@@ -68,9 +68,9 @@
       + "tw:gaveta:static tw:gaveta:w-auto tw:gaveta:h-auto tw:gaveta:overflow-visible tw:gaveta:[clip:auto]",
     contas: "tw:flex-auto tw:min-h-0 tw:overflow-y-auto tw:pt-3 tw:px-3 tw:pb-4 tw:estreito:hidden tw:gaveta:block",
     nota: "tw:text-(--sidebar-fg-muted) tw:text-[13px] tw:py-2 tw:px-2.5",
-    demo: "tw:flex tw:gap-1.5 tw:items-start tw:mt-0 tw:mx-3 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-[#fff1e3] tw:text-[#e8730c] "
+    demo: "tw:flex tw:gap-1.5 tw:items-start tw:mt-0 tw:mx-3 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-(--color-alerta-soft) tw:text-(--color-alerta) "
       + "tw:text-[11.5px] tw:font-[550] tw:leading-[1.4] tw:estreito:hidden tw:gaveta:flex",
-    demoIcone: "tw:mt-px tw:text-[#e8730c]",
+    demoIcone: "tw:mt-px tw:text-(--color-alerta)",
     cambio: "tw:empty:hidden tw:py-2 tw:px-3 tw:border-t tw:border-t-(--sidebar-divider) tw:estreito:p-2",
     rodape: "tw:flex-none tw:flex tw:items-center tw:justify-between tw:gap-1.5 tw:p-3 tw:border-t tw:border-t-(--sidebar-divider) "
       + "tw:estreito:p-2 tw:estreito:flex-col tw:estreito:gap-1 tw:gaveta:flex-row tw:gaveta:p-3",
@@ -248,10 +248,12 @@
     janelaEscolha: "tw:flex tw:flex-col tw:gap-3 tw:pb-4",
     janelaPesquisa: "tw:flex tw:items-center tw:gap-2 tw:h-[38px] tw:px-3 tw:py-0 tw:rounded-lg tw:bg-(--color-background) tw:text-zz-muted",
     janelaPesquisaCampo: "tw:flex-1 tw:min-w-0 tw:[border:0] tw:outline-none tw:bg-transparent tw:text-[15px] tw:text-zz-text",
-    janelaLista: "tw:max-h-[360px] tw:overflow-y-auto tw:flex tw:flex-col",
+    // a lista vai de borda a borda da janela (-mx-6) e as linhas devolvem o respiro por dentro: com a margem
+    // negativa nas linhas, elas passavam da área de rolagem e apareciam uma barra de rolagem horizontal
+    janelaLista: "tw:max-h-[360px] tw:overflow-y-auto tw:overflow-x-hidden tw:-mx-6 tw:flex tw:flex-col",
     janelaListaSemRolagemLateral: "tw:max-h-[360px] tw:overflow-y-auto tw:overflow-x-hidden tw:flex tw:flex-col",
     // transação na lista (de borda a borda da janela)
-    janelaLanc: LANC + " tw:grid-cols-[56px_minmax(0,1fr)_30px_auto] tw:py-0 tw:px-6 tw:-mx-6 tw:my-0",
+    janelaLanc: LANC + " tw:grid-cols-[56px_minmax(0,1fr)_30px_auto] tw:py-0 tw:px-6 tw:m-0",
     janelaLancMarcavel: LANC + " tw:grid-cols-[18px_52px_minmax(0,1fr)_auto] tw:py-0 tw:px-2 tw:m-0 tw:cursor-pointer",
     janelaLancData: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     janelaLancNome: "tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden tw:text-[15px] tw:font-[450] "

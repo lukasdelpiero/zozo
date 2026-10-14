@@ -54,22 +54,6 @@
 }
 .nav-item.is-active .icon { color: var(--color-primary); }
 
-/* Carregando */
-
-   /* esqueleto das contas no menu roxo */
-
-/* Caixa "selecionar todas" ao lado do título da barra superior (Transações) */
-
-/* Seletor de tipo no título do painel (transação, recorrência): o fundo do botão não é cortado */
-.tipo-select {
-  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; margin-left: -10px;
-  border: 0; border-radius: var(--radius-small); background: transparent; color: var(--color-text-primary);
-  font-size: var(--font-size-md); font-weight: var(--font-weight-semibold);
-}
-.tipo-select:hover, .tipo-select.is-open { background: var(--color-surface-hover); }
-.tipo-select--fixo { cursor: default; }
-.tipo-select--fixo:hover { background: transparent; }
-
 /* Cabeçalho da fatura (boleto) */
 .boleto__header {
   background: var(--color-surface);

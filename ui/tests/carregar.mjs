@@ -6,7 +6,7 @@ import vm from "node:vm";
 import { webcrypto } from "node:crypto";
 
 const RAIZ = new URL("../js/", import.meta.url);
-const MODULOS = ["core/format.ts", "core/busca.ts", "core/state.ts", "config/regras.js", "bridge/messages.js", "data/pix.ts", "data/servico.js"];
+const MODULOS = ["core/format.ts", "core/busca.ts", "core/state.ts", "config/regras.ts", "bridge/messages.ts", "data/pix.ts", "data/servico.js"];
 // Módulos já em TypeScript: só os tipos são removidos (o código que roda é o mesmo do navegador)
 const codigo = (m) => { const t = readFileSync(new URL(m, RAIZ), "utf8"); return m.endsWith(".ts") ? stripTypeScriptTypes(t) : t; };
 

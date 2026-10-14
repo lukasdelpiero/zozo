@@ -155,6 +155,165 @@ declare global {
     nomeValido(nome: unknown): boolean;
   }
 
+  /** js/core/icons.ts — ícones de traço (24×24) */
+  interface OpcoesIcone { size?: number; stroke?: number; class?: string }
+  interface ZoZoIcons {
+    icon(name: string, opts?: OpcoesIcone): SVGElement;
+    names: string[];
+  }
+
+  /** js/config/regras.ts — pontos de configuração das regras */
+  interface ModeloCategoria { nome: string; icone: string; cor: string; grupo?: string | null; reservado?: number; status?: "regular" | "excluida" }
+  interface ZoZoRegras {
+    limiteNome: number;
+    corSugerida(): string;
+    orcamentoPerto: number;
+    tiposValorVerde: string[];
+    boleto: { sinalPorTipo: Record<string, number>; sinalContribuicao: number; sinalDesconto: number; sinalArredondamento: number; arredondamentoAceitaNegativo: boolean };
+    categorias: { sinalGastoPorTipo: Record<string, number> };
+    totais: { gasto: Record<string, number>; recebido: Record<string, number> };
+    recorrencias: { pagoSomenteComLancamento: boolean };
+    tiposInvestimento: string[];
+    iconesInvestimento: Record<string, string>;
+    modelosCategoria: ModeloCategoria[];
+    categoriasSugeridas: ModeloCategoria[];
+    paleta: string[];
+  }
+  interface ZoZoSobre { readonly versao: string; readonly autor: string }
+
+  /** js/bridge/messages.ts — contrato de mensagens interface ↔ host */
+  interface PedidoPonte { type: "request"; action: string; requestId: string; data: unknown }
+  interface RespostaPonte {
+    type: "response"; action: string; requestId: string; success: boolean;
+    data?: unknown; error?: { code: string; message?: string; espera?: number; captcha?: boolean };
+  }
+  interface ErroPonte extends Error { code: string; friendly: string; espera?: number; captcha?: boolean }
+  interface ZoZoMessages {
+    ACTIONS: Readonly<Record<string, string>>;
+    SENSITIVE: ReadonlySet<string>;
+    FRIENDLY: Readonly<Record<string, string>>;
+    createRequest(action: string, data?: unknown): PedidoPonte;
+    okResponse(req: PedidoPonte, data?: unknown): RespostaPonte;
+    errorResponse(req: PedidoPonte, code?: string, message?: string): RespostaPonte;
+    BridgeError: new (code?: string, friendly?: string) => ErroPonte;
+  }
+
+  /** js/bridge/transporte.ts — única saída da interface: tudo vira mensagem JSON (web, mock ou nenhum host) */
+  type ModoPonte = "web" | "mock" | "none";
+  interface HostPonte { handle(req: PedidoPonte): Promise<RespostaPonte> | RespostaPonte }
+  interface OpcoesPedido { timeout?: number }
+  interface ZoZoBridge {
+    /** Promise com os dados da resposta; rejeita sempre com ErroPonte (texto amigável) */
+    request(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any>;
+    requestHost(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any>;
+    mode: ModoPonte;
+    isDemo: boolean;
+    ACTIONS: Readonly<Record<string, string>>;
+  }
+
+  /** js/components/topbar.ts */
+  interface BarraSuperior { setPage(titulo: string, acoes?: FilhoDom, prefixo?: FilhoDom): void }
+  interface ZoZoTopbar { create(el: HTMLElement): BarraSuperior }
+
+  /** js/components/inline.ts — edição no lugar (salva ao sair do campo; erro → volta ao valor anterior) */
+  interface CampoTextoNoLugar { valor?: string; rotulo?: string; placeholder?: string; max?: number; classe?: string; aoSalvar(v: string): unknown }
+  interface CampoValorNoLugar { valor?: unknown; rotulo?: string; classe?: string; permitirNegativo?: boolean; permitirZero?: boolean; aoSalvar(v: number): unknown }
+  interface ZoZoInline {
+    texto(cfg: CampoTextoNoLugar): HTMLInputElement;
+    dinheiro(cfg: CampoValorNoLugar): HTMLInputElement;
+    corDot(cor: unknown, aoMudar: (cor: string) => void): HTMLElement;
+  }
+
+  /** js/pages/comum.ts — peças compartilhadas entre páginas */
+  interface SegmentoRosca { label: string; cor?: string; valor: number }
+  interface CardResumo {
+    ariaLabel: string;
+    segmentos?: SegmentoRosca[];
+    esquerda: { valor: unknown; label: string };
+    direita: { valor?: unknown; texto?: string; label: string };
+    onClick?: () => void;
+    progresso?: number;
+    corProgresso?: string;
+    tituloProgresso?: string;
+  }
+  interface ZoZoPagesComum {
+    estadoCarregamento(state: EstadoZoZo, keys: string[], onRetry: () => void, opts?: { skeleton?: HTMLElement }): HTMLElement | null;
+    pagina(cls: string, ...children: FilhoDom[]): HTMLElement;
+    valorResumo(valor: unknown, subtitulo: string, align: "left" | "right"): HTMLElement;
+    cardResumoDonut(cfg: CardResumo): HTMLElement;
+    segmentosPorCategoria(itens: any[], campoValor: string): SegmentoRosca[];
+    detalheLinha(rotulo: string, valor: FilhoDom, cls?: string): HTMLElement;
+    detalheSecao(titulo: string | null, ...children: FilhoDom[]): HTMLElement;
+  }
+
+  /** js/components/calendario.ts */
+  interface OpcoesCalendario { posicao?: "esquerda" | "direita" | "acima"; rotulo?: string }
+  interface CampoData { valor?: string | null; rotulo?: string; classe?: string; aoMudar(iso: string): void }
+  interface ZoZoCalendario {
+    abrir(anchor: HTMLElement, valor: string | null | undefined, aoEscolher: (iso: string) => void, opts?: OpcoesCalendario): void;
+    Campo(cfg: CampoData): HTMLElement;
+  }
+
+  /** js/router.ts — cada página registrada em ZoZo.pages */
+  interface PaginaZoZo {
+    titulo: string;
+    recurso?: keyof ZoZoRecursos;
+    carregar(ctx: any, force: boolean): unknown;
+    deps(state: EstadoZoZo): unknown[];
+    render(state: EstadoZoZo, ctx: any): HTMLElement;
+    topbar?(ctx: any): FilhoDom;
+    prefixo?(ctx: any): FilhoDom;
+    selecionar?(sel: unknown, ctx: any): void;
+  }
+  interface Roteador {
+    navigate(id: string, opts?: { force?: boolean; select?: unknown }): void;
+    refreshTopbar(): void;
+    current(): PaginaZoZo | null;
+  }
+  interface ZoZoRouter { create(ctx: any, topbar: BarraSuperior, mainEl: HTMLElement): Roteador }
+
+  /** js/components/feedback.ts — aviso (toast), janela modal e confirmação */
+  interface OpcoesAviso { tone?: "default" | "success" | "aviso" | "error"; duration?: number }
+  interface OpcoesModal {
+    title?: string;
+    body?: FilhoDom;
+    class?: string;
+    alert?: boolean;
+    actions?: (fechar: (resultado?: unknown) => void) => FilhoDom;
+    onClose?: (resultado: unknown) => void;
+  }
+  interface JanelaModal { fechar(resultado?: unknown): void }
+  interface OpcoesConfirmacao { confirmar?: string; cancelar?: string; variante?: string }
+  interface ZoZoFeedback {
+    toast(mensagem: string, opts?: OpcoesAviso): void;
+    modal(opts: OpcoesModal): JanelaModal;
+    confirmarExclusao(titulo: string, mensagem: string, opts?: OpcoesConfirmacao): Promise<boolean>;
+  }
+
+  /** js/components/detail-panel.ts — painel de informações à direita */
+  interface ApiPainel { close(opts?: { silencioso?: boolean }): void; setTitle(t: string): void }
+  interface ConfigPainel {
+    title?: string;
+    tituloNode?: FilhoDom;
+    voltar?: () => void;
+    botoes?: Array<{ label: string; onClick?: () => void; primario?: boolean; desabilitado?: boolean; icone?: string }>;
+    acoes?: Array<{ icone: string; rotulo: string; perigo?: boolean; onClick?: () => void }>;
+    menu?: unknown[];
+    selected?: { tipo: string; id: string } | null;
+    render(body: HTMLElement, api: ApiPainel): void;
+    onClose?: () => void;
+    focus?: boolean;
+  }
+  interface PainelInformacoes {
+    open(cfg: ConfigPainel): ApiPainel;
+    close(opts?: { silencioso?: boolean }): void;
+    isOpen(): boolean;
+  }
+  interface ZoZoDetailPanel { create(workspaceEl: HTMLElement, panelEl: HTMLElement): PainelInformacoes }
+
+  /** js/components/dividir.ts — dividir uma transação entre perfis */
+  interface ZoZoDividir { abrir(original: any, ctx: any, aoTerminar?: (id: string) => void): void }
+
   interface ZoZoGlobal {
     dom: ZoZoDom;
     store: ZoZoStore;
@@ -167,6 +326,20 @@ declare global {
     /** js/components/pecas.ts — classes Tailwind das peças compartilhadas (ui.js e afins) */
     pecas: Readonly<Record<string, string>>;
     pix: ZoZoPix;
+    icons: ZoZoIcons;
+    regras: ZoZoRegras;
+    sobre: ZoZoSobre;
+    messages: ZoZoMessages;
+    bridge: ZoZoBridge;
+    topbar: ZoZoTopbar;
+    inline: ZoZoInline;
+    pagesComum: ZoZoPagesComum;
+    calendario: ZoZoCalendario;
+    router: ZoZoRouter;
+    pages: Record<string, PaginaZoZo>;
+    feedback: ZoZoFeedback;
+    detailPanel: ZoZoDetailPanel;
+    dividir: ZoZoDividir;
     // módulos ainda em JavaScript
     [modulo: string]: any;
   }

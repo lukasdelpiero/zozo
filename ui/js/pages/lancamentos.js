@@ -104,6 +104,7 @@
     { value: "interno", label: "Transferência" },
     { value: "debito", label: "Débito" },
     { value: "regular", label: "Regular" },
+    { value: "estorno", label: "Estorno" },
     { value: "recorrente", label: "Recorrente" },
   ];
 
@@ -192,12 +193,47 @@
   }
 
   /* ---------------- Menu de filtros (submenus ao passar o mouse) ---------------- */
+  /**
+   * O que aparece nos filtros: só contas, categorias, perfis, recorrências e tipos presentes nas transações
+   * da página (até hoje — as mesmas que Transações lista sem pesquisa). Os já marcados ficam, para poder desmarcar.
+   */
+  function opcoesFiltro(st) {
+    const hoje = F.iso(new Date());
+    const base = ((st.data.lancamentos && st.data.lancamentos.lancamentos) || []).filter((l) => l.data <= hoje);
+    const f = filtros();
+    const usados = (campo, marcados) => new Set(base.map((l) => l[campo]).filter(Boolean).concat(marcados));
+    const contasUsadas = usados("contaId", f.contas), catsUsadas = usados("categoriaId", f.categorias), perfisUsados = usados("perfilId", f.perfis);
+    const tiposUsados = new Set(base.map((l) => l.tipo).concat(f.tipos));
+    // recorrência = série: a transação de origem (recorrente com frequência) e as ocorrências (serieId)
+    const serieDe = (l) => (l.serieId && !String(l.serieId).startsWith("removida:") ? l.serieId : (l.tipo === "recorrente" && l.recorrencia ? l.id : null));
+    const series = new Map();
+    base.forEach((l) => {
+      const sid = serieDe(l); if (!sid) return;
+      const origem = base.find((x) => x.id === sid) || l;
+      if (!series.has(sid) || origem.id === sid) series.set(sid, origem);
+    });
+    const recs = (st.data.recorrencias && st.data.recorrencias.recorrencias) || [];
+    const FREQ = (ZoZo.servico && ZoZo.servico.FREQUENCIAS) || {};
+    const rotuloSerie = (sid, l) => {
+      const r = recs.find((x) => x.serieId === sid);
+      if (r) return r.descricao + " · " + r.tipoRecorrencia;
+      const freq = l.recorrencia === "parcelada" ? "Parcelado" : (FREQ[l.recorrencia] || {}).rotulo;
+      return l.descricao + (freq ? " · " + freq : "");
+    };
+    f.recorrencias.forEach((sid) => { if (!series.has(sid)) { const r = recs.find((x) => x.serieId === sid); if (r) series.set(sid, r); } });
+    const icone = (l) => (l.categoria && l.categoria.icone) || ((st.data.categorias && st.data.categorias.categorias) || []).find((c) => c.id === l.categoriaId)?.icone;
+    return {
+      contas: ((st.data.contas && st.data.contas.contas) || []).filter((c) => contasUsadas.has(c.id)),
+      cats: ((st.data.categorias && st.data.categorias.categorias) || []).filter((c) => catsUsadas.has(c.id)),
+      perfis: ((st.data.perfis && st.data.perfis.perfis) || []).filter((p) => perfisUsados.has(p.id)),
+      recorrencias: Array.from(series, ([sid, l]) => ({ value: sid, label: rotuloSerie(sid, l), icone: icone(l) })).sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
+      tipos: TIPOS_FILTRO.filter((t) => tiposUsados.has(t.value)),
+    };
+  }
+
   function abrirMenuFiltros(anchor, ctx, posicao) {
     const st = store.get();
-    const contas = (st.data.contas && st.data.contas.contas) || [];
-    const cats = (st.data.categorias && st.data.categorias.categorias) || [];
-    const perfis = (st.data.perfis && st.data.perfis.perfis) || [];
-    const recs = (st.data.recorrencias && st.data.recorrencias.recorrencias) || [];
+    const { contas, cats, perfis, recorrencias, tipos } = opcoesFiltro(st);
     const LM = ZoZo.menu.listaMarcavel;
 
     const alternar = (chave) => (valor) => {
@@ -228,17 +264,16 @@
     ZoZo.menu.abrir(anchor, () => [
       { secao: "Filtrar por" },
       { icone: "contas", label: "Conta", valor: qtd(filtros().contas.length),
-        submenu: LM({ itens: contas.map((c) => ({ value: c.id, label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), cor: c.cor })), marcados: marcados("contas"), alternar: alternar("contas"), vazio: "Nenhuma conta." }) },
+        submenu: LM({ itens: contas.map((c) => ({ value: c.id, label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), cor: c.cor })), marcados: marcados("contas"), alternar: alternar("contas"), vazio: "Nenhuma conta nas transações." }) },
       { icone: "categorias", label: "Categoria", valor: qtd(filtros().categorias.length + (filtros().statusCategoria !== "ambos" ? 1 : 0)),
-        submenu: LM({ itens: cats.map((c) => ({ value: c.id, label: c.nome, icone: c.icone })), marcados: marcados("categorias"), alternar: alternar("categorias"), topo: statusCategoria, vazio: "Nenhuma categoria." }) },
+        submenu: LM({ itens: cats.map((c) => ({ value: c.id, label: c.nome, icone: c.icone })), marcados: marcados("categorias"), alternar: alternar("categorias"), topo: statusCategoria, vazio: "Nenhuma categoria nas transações." }) },
       ...(ZoZo.recursos.perfis() ? [{ icone: "perfil", label: "Perfil", valor: qtd(filtros().perfis.length),
-        submenu: LM({ itens: perfis.map((p) => ({ value: p.id, label: p.nome + (p.arquivado ? " (arquivado)" : ""), cor: p.cor })), marcados: marcados("perfis"), alternar: alternar("perfis"), vazio: "Nenhum perfil." }) }] : []),
+        submenu: LM({ itens: perfis.map((p) => ({ value: p.id, label: p.nome + (p.arquivado ? " (arquivado)" : ""), cor: p.cor })), marcados: marcados("perfis"), alternar: alternar("perfis"), vazio: "Nenhum perfil nas transações." }) }] : []),
       { icone: "calendario", label: "Data", valor: filtros().periodo ? "1" : "", submenu: unico("periodo", PERIODOS) },
       { icone: "recorrencias", label: "Recorrência", valor: qtd(filtros().recorrencias.length),
-        submenu: LM({ itens: recs.filter((r, i, arr) => arr.findIndex((x) => x.serieId === r.serieId) === i).map((r) => ({ value: r.serieId, label: r.descricao + " · " + r.tipoRecorrencia, icone: r.categoria && r.categoria.icone })),
-          marcados: marcados("recorrencias"), alternar: alternar("recorrencias"), vazio: "Nenhuma recorrência neste mês." }) },
+        submenu: LM({ itens: recorrencias, marcados: marcados("recorrencias"), alternar: alternar("recorrencias"), vazio: "Nenhuma recorrência nas transações." }) },
       { icone: "interno", label: "Tipo", valor: qtd(filtros().tipos.length),
-        submenu: LM({ itens: TIPOS_FILTRO, marcados: marcados("tipos"), alternar: alternar("tipos"), largura: 240 }) },
+        submenu: LM({ itens: tipos, marcados: marcados("tipos"), alternar: alternar("tipos"), largura: 240, vazio: "Nenhum tipo." }) },
       { separador: true },
       { secao: "Ordenar por" },
       { icone: "calendario", label: "Data", submenu: unico("ordem", ORDENS.filter((o) => o.grupo === "Data")) },

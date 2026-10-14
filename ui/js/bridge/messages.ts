@@ -3,11 +3,12 @@
    ------------------------------------------------------------
    Requisição:  { type:"request",  action, requestId, data }
    Resposta:    { type:"response", action, requestId, success, data | error:{code,message} }
+   TypeScript: tipos em src/globais.d.ts (ZoZoMessages).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
 
-  const ACTIONS = Object.freeze({
+  const ACTIONS: Readonly<Record<string, string>> = Object.freeze({
     // Sessão / armazenamento
     getSession: "getSession",
     registerUser: "registerUser",
@@ -87,10 +88,10 @@
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData]);
+  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
-  const FRIENDLY = Object.freeze({
+  const FRIENDLY: Readonly<Record<string, string>> = Object.freeze({
     LOAD_FAILED: "Não foi possível carregar os dados.",
     SESSION_EXPIRED: "Sua sessão terminou. Entre novamente.",
     ACCESS_DENIED: "O servidor recusou o pedido. Abra o ZoZo pelo endereço oficial (usezozo.com.br) e tente de novo.",
@@ -129,6 +130,7 @@
     TOKEN_INVALID: "Este link de confirmação é inválido ou já venceu. Entre com seu e-mail e senha para receber um novo.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
+    LOAN_INVALID: "Confira o empréstimo: valores de 0 a 1 trilhão, 1º vencimento numa data válida e de 1 a 600 parcelas.",
     DEBIT_ACCOUNT: "Débito precisa de uma conta (corrente, poupança…). Cartão de crédito não pode.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
   });
@@ -139,26 +141,31 @@
     return Date.now().toString(36) + "-" + seq;
   }
 
-  function createRequest(action, data) {
+  function createRequest(action: string, data?: unknown): PedidoPonte {
     return { type: "request", action, requestId: newRequestId(), data: data === undefined ? null : data };
   }
 
-  function okResponse(req, data) {
+  function okResponse(req: PedidoPonte, data?: unknown): RespostaPonte {
     return { type: "response", action: req.action, requestId: req.requestId, success: true, data: data === undefined ? null : data };
   }
 
-  function errorResponse(req, code, message) {
+  function errorResponse(req: PedidoPonte, code?: string, message?: string): RespostaPonte {
     return { type: "response", action: req.action, requestId: req.requestId, success: false, error: { code: code || "UNKNOWN_ERROR", message: message || FRIENDLY.OPERATION_FAILED } };
   }
 
-  /** Erro amigável usado pela interface */
+  /** Erro amigável usado pela interface (o texto nunca traz detalhe técnico) */
   class BridgeError extends Error {
-    constructor(code, friendly) {
+    code: string;
+    friendly: string;
+    espera?: number;      // segundos de espera do bloqueio (transporte)
+    captcha?: boolean;    // a próxima tentativa pede CAPTCHA (transporte)
+    constructor(code?: string, friendly?: string) {
       super(friendly || FRIENDLY.OPERATION_FAILED);
       this.code = code || "UNKNOWN_ERROR";
       this.friendly = friendly || FRIENDLY.OPERATION_FAILED;
     }
   }
 
-  ZoZo.messages = { ACTIONS, SENSITIVE, FRIENDLY, createRequest, okResponse, errorResponse, BridgeError };
+  const api: ZoZoMessages = { ACTIONS, SENSITIVE, FRIENDLY, createRequest, okResponse, errorResponse, BridgeError };
+  ZoZo.messages = api;
 })(window.ZoZo);

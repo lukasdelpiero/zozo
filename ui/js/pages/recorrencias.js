@@ -31,7 +31,7 @@
 
     // Título: frequência com menu (parcelada fica fixa)
     const FREQ = ZoZo.servico.FREQUENCIAS;
-    const freqBtn = h("button", { type: "button", class: ["tipo-select", r.recorrencia === "parcelada" && "tipo-select--fixo"], "aria-haspopup": r.recorrencia === "parcelada" ? undefined : "menu" },
+    const freqBtn = h("button", { type: "button", class: r.recorrencia === "parcelada" ? ZoZo.pecas.tipoSelecaoFixo : ZoZo.pecas.tipoSelecao, "aria-haspopup": r.recorrencia === "parcelada" ? undefined : "menu" },
       h("span", null, r.recorrencia === "parcelada" ? "Recorrência parcelada" : "Recorrência " + ((FREQ[r.recorrencia] || FREQ.mensal).rotulo || "").toLowerCase()),
       r.recorrencia === "parcelada" ? null : ZoZo.icons.icon("chevron-down", { size: 14, stroke: 2.25 }));
     if (r.recorrencia !== "parcelada") {
@@ -155,13 +155,13 @@
         }),
         UI.Section({ key: "rec:mes", title: "Este mês" },
           itens.length
-            ? h("div", { class: "list" }, itens.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))
+            ? h("div", { class: ZoZo.pecas.listaLinhas }, itens.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))
             : UI.EmptyState("Nenhuma recorrência neste mês.",
               { icon: "recorrencias", action: { label: "Nova recorrência", icon: "mais", onClick: () => novaRecorrencia(ctx) } })),
         (d.proximas || []).length ? UI.Section({ key: "rec:proximas", title: "Próximos meses" },
-          h("div", { class: "list" }, d.proximas.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))) : null,
+          h("div", { class: ZoZo.pecas.listaLinhas }, d.proximas.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))) : null,
         (d.arquivadas || []).length ? UI.Section({ key: "rec:arquivadas", title: "Arquivadas" },
-          h("div", { class: "list" }, d.arquivadas.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, semData: true, onClick: () => abrirDetalhe(r, ctx) })))) : null);
+          h("div", { class: ZoZo.pecas.listaLinhas }, d.arquivadas.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, semData: true, onClick: () => abrirDetalhe(r, ctx) })))) : null);
     },
   };
 

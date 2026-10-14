@@ -119,6 +119,7 @@
     barraGrande: "progress tw:w-full tw:h-2 tw:mt-2 tw:rounded-(--radius-pill) tw:bg-(--color-progress-track) tw:overflow-hidden",
     barraOk: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-ok) tw:[transition:width_var(--duration-medium)_var(--easing)]",
     barraAcima: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-over) tw:[transition:width_var(--duration-medium)_var(--easing)]",
+    barraPerto: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-near) tw:[transition:width_var(--duration-medium)_var(--easing)]",
     barraAlocacao: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-allocation) tw:[transition:width_var(--duration-medium)_var(--easing)]",
 
     /* Abas de período 1S · 1M · 3M · AA · 1A · TOTAL */
@@ -167,8 +168,9 @@
     card: "card tw:bg-zz-surface tw:border tw:border-zz-border tw:rounded-[20px] tw:[box-shadow:var(--shadow-card)]",
     cardTopo: "tw:flex tw:items-center tw:justify-between tw:mb-3",
     cardTitulo: "tw:text-[15px] tw:font-[550]",
-    cardLink: "card__link tw:inline-flex tw:items-center tw:gap-0.5 tw:[border:0] tw:bg-transparent tw:py-1 tw:px-1.5 tw:rounded-md tw:text-zz-secondary "
-      + "tw:text-[15px] tw:font-[550] tw:hover:text-zz-primary tw:hover:bg-zz-primary-softer",
+    // a ponta da seta fica na mesma linha dos valores do card (-6 px do respiro do botão, -4 px do respiro do desenho da seta)
+    cardLink: "card__link tw:inline-flex tw:items-center tw:gap-0.5 tw:[border:0] tw:bg-transparent tw:py-1 tw:px-1.5 tw:-mr-1.5 tw:rounded-md tw:text-zz-secondary "
+      + "tw:text-[15px] tw:font-[550] tw:hover:text-zz-primary tw:hover:bg-zz-primary-softer tw:[&>svg]:-mr-1",
 
     /* Seção recolhível (UI.Section) */
     secao: "section tw:mt-6",
@@ -321,7 +323,7 @@
     painelTopoDica: "tw:text-zz-muted tw:text-[11.5px]",
     painelTopoDicaAcima: "tw:text-(--color-negative) tw:text-[11.5px] tw:font-medium",
     // nome editável com a cor e o ícone ao lado (Categorias, Perfis)
-    edicaoTopo: "tw:flex tw:flex-col tw:gap-1.5 tw:min-w-0 tw:[&_.icon-pick]:inline-grid tw:[&_.icon-pick]:place-items-center tw:[&_.icon-pick]:size-[30px] "
+    edicaoTopo: "tw:base:flex tw:base:flex-col tw:base:gap-1.5 tw:base:min-w-0 tw:[&_.icon-pick]:inline-grid tw:[&_.icon-pick]:place-items-center tw:[&_.icon-pick]:size-[30px] "
       + "tw:[&_.icon-pick]:text-[18px] tw:[&_.icon-pick]:[border:0] tw:[&_.icon-pick]:bg-transparent tw:[&_.icon-pick]:rounded-lg tw:[&_.icon-pick:hover]:bg-zz-surface-hover "
       + "tw:[&_.inline-input]:text-[20px] tw:[&_.inline-input]:font-[550]",
     edicaoTopoLinha: "tw:flex tw:items-center tw:gap-2.5 tw:min-w-0",
@@ -390,23 +392,43 @@
     lpSituacaoErro: "tw:min-h-[18px] tw:pt-1.5 tw:text-[11.5px] tw:text-(--color-negative)",
     lpHistorico: "tw:pt-2",
 
-    /* ---------- Lista de transações nos painéis (components/list.js: ListaPainel) — "pl" fica como gancho ---------- */
-    plMes: "tw:[&+&]:mt-4",
-    plMesTopo: "tw:flex tw:items-baseline tw:justify-between tw:gap-3 tw:pt-2",
+    /* ---------- Lista de transações nos painéis (components/list.js: ListaPainel) — "pl" fica como gancho ----------
+       Uma grade só para a lista inteira (meses, dias e linhas em subgrid): título, letra (P/R/T…), ícone da categoria
+       e valor ficam na mesma coluna em todas as linhas. Colunas: respiro | caixa | letra | título | categoria | valor | respiro */
+    pl: "pl tw:grid tw:grid-cols-[var(--page-gutter)_18px_auto_minmax(0,1fr)_auto_auto_var(--page-gutter)] tw:-mx-(--page-gutter)",
+    plMes: "tw:grid tw:grid-cols-subgrid tw:col-span-full tw:[&+&]:mt-4",
+    plMesTopo: "tw:col-[2/-2] tw:flex tw:items-baseline tw:justify-between tw:gap-3 tw:pt-2",
     plMesTitulo: "tw:text-[20px] tw:font-[620]",
     plMesTotal: "tw:inline-flex tw:gap-1.5 tw:text-[20px] tw:font-[620] tw:[&_.money]:font-[620]",
     plMesParenteses: "money tw:text-zz-muted",
-    plDia: "tw:pt-3 tw:mt-0 tw:mb-4 tw:leading-[1.2] tw:text-zz-secondary tw:text-[13px] tw:font-[620]",
-    plLista: "tw:flex tw:flex-col",
-    plLinha: "tw:group/pl tw:grid tw:grid-cols-[18px_minmax(0,1fr)_auto_auto] tw:gap-2.5 tw:items-center tw:min-h-(--row-height) tw:px-(--page-gutter) "
-      + "tw:-mx-(--page-gutter) tw:cursor-pointer tw:[transition:background_var(--duration-fast)_var(--easing)] tw:hover:bg-zz-surface-hover "
+    plDia: "tw:col-[2/-2] tw:pt-3 tw:mt-0 tw:mb-4 tw:leading-[1.2] tw:text-zz-secondary tw:text-[13px] tw:font-[620]",
+    plLista: "tw:grid tw:grid-cols-subgrid tw:col-span-full",
+    plLinha: "tw:group/pl tw:grid tw:grid-cols-subgrid tw:col-span-full tw:items-center tw:min-h-(--row-height) "
+      + "tw:cursor-pointer tw:[transition:background_var(--duration-fast)_var(--easing)] tw:hover:bg-zz-surface-hover "
       + "tw:[&.is-checked]:bg-zz-primary-soft tw:focus-visible:outline-2 tw:focus-visible:outline-[var(--color-focus)] tw:focus-visible:-outline-offset-2",
-    plCaixa: "tw:opacity-55 tw:group-hover/pl:opacity-100 tw:group-[.is-checked]/pl:opacity-100",
-    plNome: "tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
+    plCaixa: "tw:col-start-2 tw:mr-2.5 tw:opacity-55 tw:group-hover/pl:opacity-100 tw:group-[.is-checked]/pl:opacity-100",
+    plLetra: "tw:col-start-3 tw:mr-2",
+    plNome: "tw:col-start-4 tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     plTitulo: "tw:overflow-hidden tw:text-ellipsis tw:text-[15px] tw:font-[450]",
-    plCategoria: "tw:min-w-7 tw:h-[22px] tw:px-1.5 tw:grid tw:place-items-center tw:rounded-(--radius-pill) tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] "
-      + "tw:text-[12px] tw:leading-none tw:mr-0.5",
-    plValor: "money tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[15px] tw:font-[620] tw:whitespace-nowrap",
+    plCategoria: "tw:col-start-5 tw:ml-2.5 tw:min-w-7 tw:h-[22px] tw:px-1.5 tw:grid tw:place-items-center tw:rounded-(--radius-pill) "
+      + "tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] tw:text-[12px] tw:leading-none tw:mr-0.5",
+    plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[15px] tw:font-[620] tw:whitespace-nowrap",
+
+    /* ---------- Listas, título com menu e formulários das janelas ---------- */
+    listaLinhas: "tw:flex tw:flex-col",
+    // título do painel com o menu do tipo (transação, recorrência); "tipo-select" fica como gancho
+    tipoSelecao: "tipo-select tw:inline-flex tw:items-center tw:gap-1.5 tw:h-8 tw:px-2.5 tw:py-0 tw:-ml-2.5 tw:[border:0] tw:rounded-lg tw:bg-transparent "
+      + "tw:text-zz-text tw:text-[15px] tw:font-[620] tw:cursor-pointer tw:hover:bg-zz-surface-hover tw:[&.is-open]:bg-zz-surface-hover",
+    tipoSelecaoFixo: "tipo-select tw:inline-flex tw:items-center tw:gap-1.5 tw:h-8 tw:px-2.5 tw:py-0 tw:-ml-2.5 tw:[border:0] tw:rounded-lg tw:bg-transparent "
+      + "tw:text-zz-text tw:text-[15px] tw:font-[620] tw:cursor-default",
+    linhaForm2: "tw:grid tw:gap-3 tw:grid-cols-[1fr_1fr]",
+    linhaForm3: "tw:grid tw:gap-3 tw:grid-cols-[repeat(3,minmax(0,1fr))]",
+    // Nova recorrência › frequência: opções de borda a borda da janela; freq-list__item fica como gancho (marcar a escolhida)
+    freqLista: "tw:flex tw:flex-col tw:gap-0.5 tw:pb-2",
+    freqItem: "freq-list__item tw:flex tw:items-center tw:gap-2.5 tw:min-h-9 tw:px-6 tw:-mx-6 tw:rounded-none tw:cursor-pointer tw:text-[15px] "
+      + "tw:hover:bg-zz-surface-hover tw:[&.is-active]:bg-zz-primary-soft tw:[&.is-active]:text-zz-primary tw:[&.is-active]:font-medium",
+    freqRadio: "tw:[accent-color:var(--color-primary)] tw:size-4 tw:m-0",
+    parcelasPrevia: "tw:mt-1.5 tw:[font-variant-numeric:tabular-nums]",
 
     /* Ajustes das pílulas por contexto (telas e painéis que ainda montam as linhas com classes próprias) */
     ctxPilulasPainel: "tw:[&_.cat-pill]:font-[620] tw:[&_.cat-pill]:h-6 tw:[&_.tag]:text-[11px] tw:[&_.tag]:font-[620] tw:[&_.tag]:h-6",

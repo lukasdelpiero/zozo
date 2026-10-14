@@ -4,24 +4,27 @@
    permanecem. Cada página expõe:
      titulo, carregar(ctx, force), deps(state), render(state, ctx),
      topbar?(ctx), selecionar?(sel, ctx)
+   TypeScript: tipos em src/globais.d.ts (PaginaZoZo, ZoZoRouter).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { mount } = ZoZo.dom;
 
-  function create(ctx, topbar, mainEl) {
-    let page = null;
-    let assinatura = null;
+  function create(ctx: any, topbar: BarraSuperior, mainEl: HTMLElement): Roteador {
+    let page: PaginaZoZo | null = null;
+    let assinatura: unknown[] | null = null;
     let entrada = false;
     let entradaEm = 0;     // quando a navegação começou
 
-    function render(state) {
+    function render(state: EstadoZoZo) {
       if (!page || !state.session.authenticated) return;
       const deps = page.deps(state);
-      if (assinatura && deps.length === assinatura.length && deps.every((d, i) => d === assinatura[i])) return;
+      const antes = assinatura;
+      if (antes && deps.length === antes.length && deps.every((d, i) => d === antes[i])) return;
       assinatura = deps;
       const scroll = mainEl.scrollTop;
-      const foco = document.activeElement && mainEl.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
+      const ativo = document.activeElement as HTMLElement | null;
+      const foco = ativo && mainEl.contains(ativo) ? ativo.dataset.fk : null;
       // Anima ao entrar na página; um redesenho logo em seguida (dados novos) continua a mesma animação
       const desdeEntrada = Date.now() - entradaEm;
       const animar = entrada || desdeEntrada < 800 || !!mainEl.querySelector('[aria-busy="true"]');
@@ -38,7 +41,7 @@
       const conteudo = page.render(state, ctx);
       ZoZo.charts.permitirAnimacao = true;
       ZoZo.charts.continuarDe = null;
-      if (animar && conteudo.classList) {
+      if (animar) {
         conteudo.classList.add("page--entrar");
         if (!entradaAgora && desdeEntrada < 800) {
           conteudo.style.animationDelay = -desdeEntrada + "ms";                                   // continua de onde parou
@@ -47,7 +50,7 @@
       }
       mount(mainEl, conteudo);
       mainEl.scrollTop = scroll;
-      if (foco) { const el = mainEl.querySelector('[data-fk="' + CSS.escape(foco) + '"]'); if (el) el.focus(); }
+      if (foco) { const el = mainEl.querySelector<HTMLElement>('[data-fk="' + CSS.escape(foco) + '"]'); if (el) el.focus(); }
     }
 
     function refreshTopbar() {
@@ -55,7 +58,7 @@
       topbar.setPage(page.titulo, page.topbar ? page.topbar(ctx) : [], page.prefixo ? page.prefixo(ctx) : null);
     }
 
-    function navigate(id, opts) {
+    function navigate(id: string, opts?: { force?: boolean; select?: unknown }) {
       const o = opts || {};
       const alvo = ZoZo.pages[id];
       if (!alvo) return;
@@ -69,12 +72,12 @@
       entrada = true;
       entradaEm = Date.now();
       ZoZo.store.set({ currentPage: id });
-      document.getElementById("app").dataset.pagina = id;   // ex.: Dashboard não tem painel de informações
+      document.getElementById("app")!.dataset.pagina = id;   // ex.: Dashboard não tem painel de informações
       refreshTopbar();
       if (mudou) mainEl.scrollTop = 0;
       render(ZoZo.store.get());
-      Promise.resolve(page.carregar(ctx, !!o.force)).then(() => {
-        if (o.select && page === alvo && page.selecionar) page.selecionar(o.select, ctx);
+      Promise.resolve(alvo.carregar(ctx, !!o.force)).then(() => {
+        if (o.select && page === alvo && alvo.selecionar) alvo.selecionar(o.select, ctx);
       }).catch(() => { /* erro já refletido no estado */ });
     }
 
@@ -83,6 +86,7 @@
     return { navigate, refreshTopbar, current: () => page };
   }
 
-  ZoZo.router = { create };
+  const api: ZoZoRouter = { create };
+  ZoZo.router = api;
   ZoZo.pages = ZoZo.pages || {};
 })(window.ZoZo);

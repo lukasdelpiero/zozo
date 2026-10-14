@@ -121,7 +121,8 @@
       const digitos = v.replace(/\D/g, "").replace(/^0+/, "").slice(0, 15);   // até R$ 9.999.999.999.999,99
       centavos = digitos ? Number(digitos) : 0;
     }
-    const novo = !centavos && !/\d/.test(v) ? (negativo ? "-" : "") : (negativo ? "-" : "") + prefixoMoeda(input) + moedaEditavel(centavos / 100);
+    // sem dígitos: o símbolo da moeda continua no campo (data-com-simbolo), pronto para digitar
+    const novo = !centavos && !/\d/.test(v) ? (negativo ? "-" : "") + prefixoMoeda(input) : (negativo ? "-" : "") + prefixoMoeda(input) + moedaEditavel(centavos / 100);
     if (novo !== v) input.value = novo;
     try { input.setSelectionRange(novo.length, novo.length); } catch (e) { /* campo sem seleção */ }
   }

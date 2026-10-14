@@ -384,3 +384,30 @@ test("4 últimos dígitos: só 4 algarismos ou vazio", async () => {
   await t.req(t.A.updateConta, { id: conta.id, ultimos4Digitos: "" });
   assert.equal((await t.req(t.A.getContas)).contas[0].ultimos4Digitos, "");
 });
+
+test("empréstimo: guarda o contrato e o saldo é o valor devido; parcelas e valores fora da regra são recusados", async () => {
+  const t = carregar();
+  const emprestimo = { valorContratado: 10000, primeiroVencimento: "2026-11-10", parcelas: 24, valorParcela: 520.5 };
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Financiamento", tipo: "emprestimo", saldo: 12492, emprestimo } });
+  assert.deepEqual(conta.emprestimo, emprestimo);
+  assert.equal(await saldo(t, conta.id), 12492);
+  const ruim = (e) => t.req(t.A.createConta, { conta: { nome: "X", tipo: "emprestimo", saldo: 0, emprestimo: Object.assign({}, emprestimo, e) } });
+  for (const e of [{ parcelas: 0 }, { parcelas: -3 }, { parcelas: "1.5" }, { parcelas: 601 }, { valorParcela: -1 }, { valorContratado: "10abc" }, { primeiroVencimento: "2026-02-31" }, { primeiroVencimento: "amanhã" }]) {
+    await assert.rejects(ruim(e), (x) => x.code === "LOAN_INVALID", JSON.stringify(e));
+  }
+  // outros tipos de conta não guardam dados de empréstimo
+  const { conta: corrente } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 0, emprestimo } });
+  assert.equal(corrente.emprestimo, null);
+});
+
+test("empréstimo: editar a conta sem os dados do contrato não apaga o contrato", async () => {
+  const t = carregar();
+  const emprestimo = { valorContratado: 5000, primeiroVencimento: null, parcelas: 10, valorParcela: 550 };
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Carro", tipo: "emprestimo", saldo: 5500, emprestimo } });
+  await t.req(t.A.updateConta, { id: conta.id, conta: { nome: "Carro novo", tipo: "emprestimo", saldo: 5000 } });
+  const depois = (await t.req(t.A.getContas)).contas.find((c) => c.id === conta.id);
+  assert.equal(depois.nome, "Carro novo");
+  assert.deepEqual(depois.emprestimo, emprestimo);
+  await t.req(t.A.updateConta, { id: conta.id, conta: { nome: "Carro novo", tipo: "corrente", saldo: 0 } });
+  assert.equal((await t.req(t.A.getContas)).contas.find((c) => c.id === conta.id).emprestimo, null);
+});

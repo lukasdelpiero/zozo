@@ -2,14 +2,16 @@
    ZoZo — Ícones
    Uma única família de traço (24×24, stroke 1.75, cantos
    arredondados). Os desenhos são estáticos e locais (offline).
+   TypeScript: tipos da API em src/globais.d.ts (ZoZoIcons).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { s } = ZoZo.dom;
 
   // Cada ícone: lista de [tag, atributos]
-  const P = (d) => ["path", { d }];
-  const ICONS = {
+  type Desenho = [tag: string, atributos: Record<string, string | number>];
+  const P = (d: string): Desenho => ["path", { d }];
+  const ICONS: Record<string, Desenho[]> = {
     // "Z" vazado: contorno na cor do texto (cinza) ou roxo quando selecionado
     dashboard: [["path", { d: "M5 4h14v3.2L10.4 17H19v3H5v-3.2L13.6 7H5z" }]],
     lancamentos: [
@@ -83,7 +85,7 @@
     nota: [P("M12 20h9"), P("M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z")],
   };
 
-  function icon(name, opts) {
+  function icon(name: string, opts?: OpcoesIcone): SVGElement {
     const o = opts || {};
     const size = o.size || 16;
     const def = ICONS[name] || ICONS.alerta;
@@ -104,5 +106,6 @@
     return svg;
   }
 
-  ZoZo.icons = { icon, names: Object.keys(ICONS) };
+  const api: ZoZoIcons = { icon, names: Object.keys(ICONS) };
+  ZoZo.icons = api;
 })(window.ZoZo);

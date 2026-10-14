@@ -182,13 +182,57 @@
         const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor", cheio: true, altura: 36 }));
         desenharCores();
 
-        let linhas;
-        if (d.tipo === "cartao") {
+        let linhas, lerEmprestimo = null;
+        if (d.tipo === "emprestimo") {
+          // Nome · Instituição · Valor contratado · 1º vencimento · Parcelas | Valor da parcela · Valor devido (+ juros)
+          const contratado = campoDinheiro(0); campos.contratado = contratado;
+          let vencimento = null;
+          const vencCampo = ZoZo.calendario.Campo({ valor: null, rotulo: "1º vencimento", aoMudar: (iso) => { vencimento = iso; } });
+          const parcelas = UI.Input({ type: "number", inputmode: "numeric", placeholder: "Ex.: 48" });
+          Object.assign(parcelas, { min: "1", max: "600", step: "1" });
+          contratado.input.setAttribute("aria-label", "Valor contratado");
+          parcelas.addEventListener("keydown", (e) => { if ([",", ".", "-", "+", "e", "E"].includes(e.key)) e.preventDefault(); });   // só inteiros
+          const valorParcela = UI.Input({ inputmode: "decimal", placeholder: "0,00" });
+          const valorDevido = UI.Input({ inputmode: "decimal", placeholder: "0,00" });
+          const resumo = h("p", { class: ZoZo.pecas.campoDica, "aria-live": "polite" });
+          const num = (i) => { const n = F.parseMoeda(i.value); return Number.isFinite(n) && n >= 0 ? n : 0; };
+          const qtd = () => (/^\d+$/.test(parcelas.value.trim()) ? Number(parcelas.value) : 0);
+          // um valor puxa o outro: parcela × parcelas = devido (o último editado manda)
+          let manda = "parcela";
+          const recalcular = () => {
+            const n = qtd();
+            if (n >= 1) {
+              if (manda === "parcela" && valorParcela.value.trim()) valorDevido.value = F.moedaEditavel(Math.round(num(valorParcela) * n * 100) / 100);
+              else if (manda === "devido" && valorDevido.value.trim()) valorParcela.value = F.moedaEditavel(Math.round((num(valorDevido) / n) * 100) / 100);
+            }
+            const devido = num(valorDevido), juros = Math.max(0, Math.round((devido - num(contratado.input)) * 100) / 100);
+            resumo.textContent = "Valor devido de " + F.moeda(devido) + " (inclui " + F.moeda(juros) + " de juros da operação).";
+          };
+          valorParcela.addEventListener("input", () => { manda = "parcela"; recalcular(); });
+          valorDevido.addEventListener("input", () => { manda = "devido"; recalcular(); });
+          [parcelas, contratado.input].forEach((i) => i.addEventListener("input", recalcular));
+          recalcular();
+          lerEmprestimo = () => {
+            const n = parcelas.value.trim();
+            if (!/^\d+$/.test(n) || Number(n) < 1 || Number(n) > 600) { parcelas.setAttribute("aria-invalid", "true"); parcelas.focus(); return "Parcelas: um número inteiro de 1 a 600."; }
+            parcelas.removeAttribute("aria-invalid");
+            return { saldo: num(valorDevido), emprestimo: { valorContratado: num(contratado.input), primeiroVencimento: vencimento, parcelas: Number(n), valorParcela: num(valorParcela) } };
+          };
+          linhas = [
+            add("nome", "Nome", texto("Ex.: Financiamento do carro")),
+            add("instituicao", "Instituição (opcional)", texto("Ex.: Banco do Brasil")),
+            h("div", { class: ZoZo.pecas.linhaForm2 }, UI.Field("Valor contratado", contratado.el), UI.Field("1º vencimento", vencCampo)),
+            UI.Field("Parcelas", parcelas),
+            h("div", { class: "tw:h-px tw:bg-zz-border tw:my-1", role: "separator" }),
+            h("div", { class: ZoZo.pecas.linhaForm2 }, UI.Field("Valor da parcela", valorParcela), UI.Field("Valor devido", valorDevido)),
+            resumo,
+          ];
+        } else if (d.tipo === "cartao") {
           linhas = [
             add("instituicao", "Nome da instituição", texto("Ex.: Nubank")),
             add("nome", "Nome do cartão", texto("Ex.: Ultravioleta")),
-            h("div", { class: "form-row form-row--2" }, add("digitos", "4 últimos dígitos", texto("1234", 4)), UI.Field("Saldo (fatura atual)", saldo.el)),
-            h("div", { class: "form-row form-row--3" },
+            h("div", { class: ZoZo.pecas.linhaForm2 }, add("digitos", "4 últimos dígitos", texto("1234", 4)), UI.Field("Saldo (fatura atual)", saldo.el)),
+            h("div", { class: ZoZo.pecas.linhaForm3 },
               add("limite", "Limite", campoDinheiro(0)),
               add("fechamento", "Fechamento", diaInput()),
               add("vencimento", "Vencimento", diaInput())),
@@ -196,14 +240,14 @@
         } else if (d.tipo === "poupanca" || d.tipo === "corrente") {
           linhas = [
             add("instituicao", "Nome da instituição", texto("Ex.: Itaú")),
-            h("div", { class: "form-row form-row--2" }, add("digitos", "4 últimos dígitos", texto("1234", 4)), UI.Field("Saldo", saldo.el)),
+            h("div", { class: ZoZo.pecas.linhaForm2 }, add("digitos", "4 últimos dígitos", texto("1234", 4)), UI.Field("Saldo", saldo.el)),
           ];
         } else {
           linhas = [
-            add("nome", "Nome", texto(d.tipo === "investimento" ? "Ex.: XP Investimentos" : d.tipo === "emprestimo" ? "Ex.: Financiamento do carro" : "Ex.: Carteira")),
+            add("nome", "Nome", texto(d.tipo === "investimento" ? "Ex.: XP Investimentos" : "Ex.: Carteira")),
             add("instituicao", "Instituição", texto("Opcional")),
             d.tipo === "investimento" ? add("tipoInvestimento", "Tipo de investimento", UI.Select(ZoZo.regras.tiposInvestimento.map((t) => ({ value: t, label: t })), { value: d.tipoInvestimento })) : null,
-            UI.Field(d.tipo === "emprestimo" ? "Valor devido" : "Saldo", saldo.el),
+            UI.Field("Saldo", saldo.el),
           ];
         }
         const enviar = (btn) => {
@@ -211,16 +255,19 @@
           const inst = v("instituicao");
           const nome = d.tipo === "cartao" ? (v("nome") || inst) : (d.tipo === "poupanca" || d.tipo === "corrente") ? inst : v("nome");
           const dig = v("digitos");
-          const s = saldo.ler();
+          const emp = lerEmprestimo ? lerEmprestimo() : null;
+          if (typeof emp === "string") { erro.textContent = emp; return; }
+          const s = emp ? emp.saldo : saldo.ler();
           if (!nome) { erro.textContent = d.tipo === "cartao" ? "Informe a instituição ou o nome do cartão." : (d.tipo === "poupanca" || d.tipo === "corrente") ? "Informe o nome da instituição." : "Informe o nome."; return; }
           if (dig && !/^\d{4}$/.test(dig)) { erro.textContent = "Os 4 últimos dígitos devem ter exatamente 4 números."; return; }
           const dias = ["fechamento", "vencimento"].map(v);
           if (dias.some((x) => x !== "" && !(Number(x) >= 1 && Number(x) <= 31))) { erro.textContent = "Fechamento e vencimento: dias de 1 a 31."; return; }
           btn.disabled = true;
           ctx.bridge.request(A.createConta, { conta: {
-            nome, tipo: d.tipo, ultimos4Digitos: dig, saldo: Number.isFinite(s) ? s : 0, cor: d.cor, instituicao: d.tipo === "cartao" || d.tipo === "poupanca" || d.tipo === "corrente" ? inst : inst,
+            nome, tipo: d.tipo, ultimos4Digitos: dig, saldo: Number.isFinite(s) ? s : 0, cor: d.cor, instituicao: inst,
             limite: campos.limite ? campos.limite.ler() : null, fechamento: v("fechamento") || null, vencimento: v("vencimento") || null,
             tipoInvestimento: campos.tipoInvestimento ? campos.tipoInvestimento.value : null,
+            emprestimo: emp ? emp.emprestimo : null,
           } }).then((r) => { api.fechar(); ctx.toast("Conta criada."); return ctx.recarregarTudo().then(() => { if (o.aoCriar && r && r.conta) o.aoCriar(r.conta); }); })
             .catch((e) => { erro.textContent = e.friendly; btn.disabled = false; });
         };
@@ -246,12 +293,12 @@
   function passoFrequencia(aoConfirmar, voltar, valorInicial) {
     let escolha = "mensal";
     return function passo(api) {
-      const lista = h("div", { class: "freq-list", role: "radiogroup", "aria-label": "Frequência" },
+      const lista = h("div", { class: ZoZo.pecas.freqLista, role: "radiogroup", "aria-label": "Frequência" },
         FREQ_OPCOES.map(([v, t]) => {
-          const input = h("input", { type: "radio", name: "zz-freq", value: v, class: "freq-list__radio" });
+          const input = h("input", { type: "radio", name: "zz-freq", value: v, class: ZoZo.pecas.freqRadio });
           input.checked = v === escolha;
           input.addEventListener("change", () => { escolha = v; atualizar(); });
-          return h("label", { class: ["freq-list__item", v === escolha && "is-active"] }, input, h("span", null, t));
+          return h("label", { class: [ZoZo.pecas.freqItem, v === escolha && "is-active"] }, input, h("span", null, t));
         }));
       let botaoAvancar;
       const atualizar = () => {
@@ -291,7 +338,7 @@
       const fim = UI.Input({ type: "number", inputmode: "numeric", placeholder: "10" });
       [ini, fim].forEach((i) => { i.min = "1"; i.step = "1"; i.addEventListener("keydown", (e) => { if ([".", ",", "e", "-", "+"].includes(e.key)) e.preventDefault(); }); });
       ini.dataset.autofocus = "";
-      const previa = h("p", { class: [ZoZo.pecas.campoDica, "parcelas__previa"], "aria-live": "polite" });
+      const previa = h("p", { class: [ZoZo.pecas.campoDica, ZoZo.pecas.parcelasPrevia], "aria-live": "polite" });
       const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
       const ler = () => ({ v: F.parseMoeda(total.value), a: Number(ini.value), b: Number(fim.value) });
       const atualizar = () => {
@@ -303,7 +350,7 @@
         titulo: "Parcelas",
         corpo: h("div", { class: ZoZo.estrutura.janelaForm },
           UI.Field("Valor total da compra", h("div", { class: ZoZo.pecas.afixo }, h("span", { class: ZoZo.pecas.prefixo }, F.simbolo()), total)),
-          h("div", { class: "form-row form-row--2" }, UI.Field("Parcela atual", ini), UI.Field("Total de parcelas", fim)),
+          h("div", { class: ZoZo.pecas.linhaForm2 }, UI.Field("Parcela atual", ini), UI.Field("Total de parcelas", fim)),
           previa,
           erro),
         botoes: [

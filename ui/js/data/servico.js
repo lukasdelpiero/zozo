@@ -304,6 +304,7 @@
       id: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", tipo: c.tipo, tipoInvestimento: c.tipoInvestimento || "", oculta: !!c.oculta,
       cor: c.cor, instituicao: c.instituicao || "", limite: c.limite || null, fechamento: c.fechamento || null, vencimento: c.vencimento || null,
       ciclos: c.tipo === "cartao" && c.ciclos ? Object.assign({}, c.ciclos) : {}, cicloAtual: c.tipo === "cartao" ? cicloDoCartao(c, mesAtual()) : null,
+      emprestimo: c.tipo === "emprestimo" && c.emprestimo ? Object.assign({}, c.emprestimo) : null,
       valor: saldoAtual(c), variacaoPercentual: variacao(saldoAtual(c), saldoEm(c, fimMesAnterior())),
     };
   }
@@ -756,7 +757,26 @@
     return {
       nome, tipo, saldo: r2(saldo), ultimos4Digitos: dig, cor: cor(e.cor), tipoInvestimento: tipo === "investimento" ? texto(e.tipoInvestimento, 40) || "Outros" : "",
       instituicao: texto(e.instituicao, NOME()), limite: limite > 0 ? r2(limite) : null, fechamento: dia(e.fechamento), vencimento: dia(e.vencimento),
+      emprestimo: tipo === "emprestimo" ? lerEmprestimo(e.emprestimo) : null,
     };
+  }
+  /**
+   * Dados do contrato de um empréstimo: valor contratado, 1º vencimento, parcelas (inteiro de 1 a 600) e valor da
+   * parcela. O valor devido é o saldo da conta. Sem nada preenchido: null (empréstimo cadastrado só pelo saldo).
+   */
+  function lerEmprestimo(e) {
+    if (!e || typeof e !== "object") return null;
+    const valor = (v) => { if (v === undefined || v === null || v === "") return null; const n = numero(v); if (!Number.isFinite(n) || n < 0 || n > 1e12) throw erro("LOAN_INVALID"); return r2(n); };
+    const contratado = valor(e.valorContratado), parcela = valor(e.valorParcela);
+    let parcelas = null;
+    if (e.parcelas !== undefined && e.parcelas !== null && e.parcelas !== "") {
+      parcelas = /^\d{1,4}$/.test(String(e.parcelas).trim()) ? Number(e.parcelas) : NaN;
+      if (!(parcelas >= 1 && parcelas <= 600)) throw erro("LOAN_INVALID");
+    }
+    let venc = null;
+    if (e.primeiroVencimento) { venc = dataValida(e.primeiroVencimento); if (!venc) throw erro("LOAN_INVALID"); }
+    if (contratado === null && parcela === null && parcelas === null && venc === null) return null;
+    return { valorContratado: contratado, primeiroVencimento: venc, parcelas, valorParcela: parcela };
   }
   function registrarSaldo(c, saldo) {
     const hoje = hojeIso();
@@ -1071,6 +1091,7 @@
       conferirLimiteDemo(tipoDemo);
       const c = { id: novoId("c"), nome: e.nome, tipo: e.tipo, ultimos4Digitos: e.ultimos4Digitos, cor: e.cor, tipoInvestimento: e.tipoInvestimento,
         instituicao: e.instituicao, limite: e.limite, fechamento: e.fechamento, vencimento: e.vencimento, historico: [], moeda: moedaAtual() };
+      if (e.emprestimo) c.emprestimo = e.emprestimo;
       registrarSaldo(c, e.saldo);
       doc.contas.push(c);
       contarDemo(tipoDemo);
@@ -1102,6 +1123,8 @@
         const e = lerConta(d.conta);
         Object.assign(c, { nome: e.nome, tipo: e.tipo, ultimos4Digitos: e.ultimos4Digitos, cor: e.cor, tipoInvestimento: e.tipoInvestimento,
           instituicao: e.instituicao, limite: e.limite, fechamento: e.fechamento, vencimento: e.vencimento });
+        // contrato do empréstimo: troca só quando vem preenchido (edição sem esses campos não apaga); outro tipo de conta não guarda
+        if (e.emprestimo) c.emprestimo = e.emprestimo; else if (e.tipo !== "emprestimo") delete c.emprestimo;
         registrarSaldo(c, e.saldo);
       } else if (d.cor) c.cor = cor(d.cor, c.cor);
       if (typeof d.oculta === "boolean") c.oculta = d.oculta;

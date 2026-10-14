@@ -11,14 +11,14 @@ import "./estilos.css";
 
 // Núcleo
 import "../js/core/dom.ts";
-import "../js/core/icons.js";
+import "../js/core/icons.ts";
 import "../js/core/format.ts";
 import "../js/core/busca.ts";
 import "../js/core/state.ts";
-import "../js/config/regras.js";
+import "../js/config/regras.ts";
 
 // Bridge: contrato de mensagens
-import "../js/bridge/messages.js";
+import "../js/bridge/messages.ts";
 
 // Modo de demonstração (?mock=1): só no servidor de desenvolvimento; o build troca por um módulo vazio
 import "virtual:zozo-mock";
@@ -32,33 +32,33 @@ import "../js/data/demo.js";
 import "../js/data/servico.js";
 
 // Bridge: transporte
-import "../js/bridge/transporte.js";
+import "../js/bridge/transporte.ts";
 
 // Componentes
 import "../js/components/estrutura.ts";
-import "../js/components/pecas.ts";               // classes Tailwind das peças compartilhadas          // classes Tailwind da estrutura (menu, barra, painel)
+import "../js/components/pecas.ts";               // classes Tailwind das peças compartilhadas
 import "../js/components/ui.js";
-import "../js/components/feedback.js";
+import "../js/components/feedback.ts";
 import "../js/components/menu.js";
-import "../js/components/calendario.js";
+import "../js/components/calendario.ts";
 import "./emoji-picker.ts";                  // emoji-mart (carrega sob demanda)
 import "../js/components/modais.js";
-import "../js/components/inline.js";
-import "../js/components/dividir.js";
+import "../js/components/inline.ts";
+import "../js/components/dividir.ts";
 import "../js/components/forms.js";
 import "../js/components/charts.js";
 import "../js/components/list.js";
 import "../js/components/sidebar.js";
-import "../js/components/topbar.js";
+import "../js/components/topbar.ts";
 import "../js/components/cambio.js";
-import "../js/components/detail-panel.js";
+import "../js/components/detail-panel.ts";
 import "./qrcode-global.ts";                 // window.qrcode (QR code do 2FA)
 import "../js/components/verificacao.js";
 import "../js/components/auth.js";
 
 // Páginas
-import "../js/router.js";
-import "../js/pages/comum.js";
+import "../js/router.ts";
+import "../js/pages/comum.ts";
 import "../js/pages/contas.js";
 import "../js/pages/investimentos.js";
 import "../js/pages/categorias.js";

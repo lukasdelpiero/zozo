@@ -159,13 +159,17 @@
   /* ---------- Barra de progresso ---------- */
   function ProgressBar(ratio, opts) {
     const o = opts || {};
-    const pct = Math.max(0, Math.min(1, F.numero(ratio))) * 100;
+    const r = F.numero(ratio);
+    const pct = Math.max(0, Math.min(1, r)) * 100;
+    // orçamento: dentro, mas perto do limite → laranja
+    const perto = o.tone === "ok" && r >= ZoZo.regras.orcamentoPerto && r <= 1;
+    const tom = o.tone === "over" ? P.barraAcima : o.tone === "allocation" ? P.barraAlocacao : perto ? P.barraPerto : P.barraOk;
     return h("div", {
       class: [o.grande ? P.barraGrande : P.barra, o.class],
       role: "progressbar",
       "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(pct)),
-      "aria-label": o.label,
-    }, h("div", { class: o.tone === "over" ? P.barraAcima : o.tone === "allocation" ? P.barraAlocacao : P.barraOk, style: { width: pct + "%" } }));
+      "aria-label": perto && o.label ? o.label + " (perto do limite)" : o.label,
+    }, h("div", { class: tom, style: { width: pct + "%" } }));
   }
 
   /* ---------- Filtros 1S | 1M | 3M | ONT | 1A | TOTAL ---------- */

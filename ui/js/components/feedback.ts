@@ -1,14 +1,15 @@
 /* =============================================================
    ZoZo — Toast · Modal · Confirmação de exclusão (seção 57)
+   TypeScript: tipos em src/globais.d.ts (ZoZoFeedback).
    ============================================================= */
-(function (ZoZo) {
+(function (ZoZo: ZoZoGlobal) {
   "use strict";
   const { h } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const { Button } = ZoZo.ui;
 
   /* ---------- Toast ---------- */
-  function toast(mensagem, opts) {
+  function toast(mensagem: string, opts?: OpcoesAviso): void {
     const o = opts || {};
     const root = document.getElementById("toast-root");
     if (!root) return;
@@ -31,25 +32,26 @@
   /* ---------- Modal ----------
      Enquanto houver janela aberta, o resto da tela fica "inert" (sem foco, cliques nem leitor de tela),
      como na fatura. Janelas empilhadas: o estado anterior volta quando a última fecha. */
-  let abertas = 0, inertAntes = null;
+  let abertas = 0, inertAntes: boolean[] | null = null;
   const FUNDO = ["auth-root", "shell", "boleto-root"];
-  function isolarFundo(abrir) {
+  function isolarFundo(abrir: boolean) {
     if (abrir && abertas++ === 0) {
       inertAntes = FUNDO.map((id) => { const el = document.getElementById(id); return el ? el.inert : false; });
       FUNDO.forEach((id) => { const el = document.getElementById(id); if (el) el.inert = true; });
     } else if (!abrir && abertas > 0 && --abertas === 0 && inertAntes) {
-      FUNDO.forEach((id, i) => { const el = document.getElementById(id); if (el) el.inert = inertAntes[i]; });
+      const antes = inertAntes;
+      FUNDO.forEach((id, i) => { const el = document.getElementById(id); if (el) el.inert = antes[i]; });
       inertAntes = null;
     }
   }
-  function modal(opts) {
+  function modal(opts: OpcoesModal): JanelaModal {
     const o = opts || {};
-    const root = document.getElementById("modal-root");
-    const anterior = document.activeElement;
+    const root = document.getElementById("modal-root") || document.body;
+    const anterior = document.activeElement as HTMLElement | null;
     const tituloId = ZoZo.dom.id("modal-titulo");
     let fechado = false;
 
-    const fechar = (resultado) => {
+    const fechar = (resultado?: unknown) => {
       if (fechado) return;
       fechado = true;
       isolarFundo(false);
@@ -62,10 +64,10 @@
 
     // Visual em Tailwind (components/estrutura.ts). O tipo vem das classes modal--x (que ficam como ganchos)
     const E = ZoZo.estrutura;
-    const tem = (c) => String(o.class || "").split(/\s+/).includes(c);
+    const tem = (c: string) => String(o.class || "").split(/\s+/).includes(c);
     const tipo = tem("modal--confirm") ? "Confirmacao" : tem("modal--settings") ? "Config" : tem("modal--dividir") ? "Dividir" : tem("modal--zm") ? "Janela" : "";
     // ex.: modalTopoConfirmacao, senão modalTopo; a divisão é uma janela de criação (corpo igual ao das janelas)
-    const parte = (nome) => E[nome + tipo] || (tipo === "Dividir" && E[nome + "Janela"]) || E[nome];
+    const parte = (nome: string) => E[nome + tipo] || (tipo === "Dividir" && E[nome + "Janela"]) || E[nome];
     const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", "aria-modal": "true", "aria-labelledby": tituloId },
       h("header", { class: parte("modalTopo") },
         h("h2", { class: parte("modalTitulo"), id: tituloId }, o.title || ""),
@@ -73,9 +75,9 @@
       h("div", { class: parte("modalCorpo") }, o.body || null),
       o.actions ? h("footer", { class: tipo === "Confirmacao" ? E.modalRodapeConfirmacao : E.modalRodape }, o.actions(fechar)) : null);
 
-    const overlay = h("div", { class: E.modalFundo, onMousedown: (e) => { if (e.target === overlay) fechar(false); } }, dialog);
+    const overlay: HTMLElement = h("div", { class: E.modalFundo, onMousedown: (e: MouseEvent) => { if (e.target === overlay) fechar(false); } }, dialog);
 
-    const tecla = (e) => {
+    const tecla = (e: KeyboardEvent) => {
       // Só a janela do topo responde (janelas empilhadas)
       if (overlay.parentNode && overlay !== overlay.parentNode.lastElementChild) return;
       // Com um menu suspenso aberto, o Esc fecha só o menu (não a janela e o que estava sendo editado)
@@ -84,8 +86,8 @@
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(false); }
       if (e.key === "Tab") {
         // só o que dá para focar de verdade (visível e habilitado)
-        const foc = Array.from(dialog.querySelectorAll("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"))
-          .filter((x) => !x.disabled && !x.hidden && x.getClientRects().length > 0 && x.getAttribute("tabindex") !== "-1");
+        const foc = Array.from(dialog.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+          .filter((x) => !(x as HTMLButtonElement).disabled && !x.hidden && x.getClientRects().length > 0 && x.getAttribute("tabindex") !== "-1");
         if (!foc.length) return;
         const first = foc[0], last = foc[foc.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -97,23 +99,23 @@
     isolarFundo(true);
     requestAnimationFrame(() => {
       overlay.classList.add("is-visible");
-      const alvo = dialog.querySelector("[data-autofocus]") || dialog.querySelector("footer button");
+      const alvo = dialog.querySelector<HTMLElement>("[data-autofocus]") || dialog.querySelector<HTMLElement>("footer button");
       if (alvo) alvo.focus();
     });
     return { fechar };
   }
 
   /** Confirmação (exclusão por padrão) → Promise<boolean>. opts: { confirmar, cancelar, variante } */
-  function confirmarExclusao(titulo, mensagem, opts) {
+  function confirmarExclusao(titulo: string, mensagem: string, opts?: OpcoesConfirmacao): Promise<boolean> {
     const o = opts || {};
-    return new Promise((resolve) => {
+    return new Promise<boolean>((resolve) => {
       modal({
         title: titulo,
         alert: true,
         class: "modal--confirm",
         body: h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, mensagem),
         onClose: (r) => resolve(!!r),
-        actions: (fechar) => [
+        actions: (fechar: (r?: unknown) => void) => [
           Button(o.cancelar || "Cancelar", { variant: "secondary", onClick: () => fechar(false) }),
           Button(o.confirmar || "Excluir", { variant: o.variante || "danger", onClick: () => fechar(true) }),
         ],
@@ -121,5 +123,6 @@
     });
   }
 
-  ZoZo.feedback = { toast, modal, confirmarExclusao };
+  const api: ZoZoFeedback = { toast, modal, confirmarExclusao };
+  ZoZo.feedback = api;
 })(window.ZoZo);
