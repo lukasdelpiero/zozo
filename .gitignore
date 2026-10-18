@@ -12,6 +12,10 @@ api/dev/.segredo-local
 ui/mock/credenciais.local.js
 .dev.vars
 api/restauracao.log
+# backups do banco (e-mails em texto + documentos cifrados): nunca no git
+api/backup-*.sql
+api/*.sql.gz
+api/conferencia.db
 
 # interface (Vite/TypeScript)
 node_modules/
