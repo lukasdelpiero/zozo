@@ -29,7 +29,7 @@ import "../js/bridge/host-web.ts";
 // Serviço de dados
 import "../js/data/pix.ts";
 import "../js/data/demo.ts";
-import "../js/data/servico.js";
+import "../js/data/servico.ts";
 
 // Bridge: transporte
 import "../js/bridge/transporte.ts";

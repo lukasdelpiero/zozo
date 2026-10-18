@@ -285,6 +285,65 @@
     });
   }
 
+  /* ---------------- Pagar fatura do cartão (botão no painel do cartão) ----------------
+     Nome e 4 dígitos só para conferir; o valor começa com a fatura inteira (pode pagar uma parte); perfil e conta a
+     debitar (corrente, poupança ou outros, com saldo). O serviço cria o Débito na conta e a Receita no cartão juntos
+     e confere tudo de novo (js/data/servico.ts → pagarFatura). */
+  const CONTAS_PAGAMENTO = ["corrente", "poupanca", "outros"];
+  function pagarFatura(ctx: ContextoApp, cartao: any, aoPagar?: () => void) {
+    const comPerfis = ZoZo.recursos.perfis();
+    Promise.all([ctx.loadData("contas", A.getContas), comPerfis ? ctx.loadData("perfis", A.getPerfis) : null]).then(([dc, dp]: any[]) => {
+      const fatura = Math.max(0, F.numero(cartao.valor));
+      const contas = ((dc && dc.contas) || []).filter((c: any) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
+      const perfis = ((dp && dp.perfis) || []).filter((p: any) => !p.arquivado);
+      const centavos = (v: number) => Math.round(v * 100);
+      janela({
+        titulo: "Fatura",
+        classe: "modal--nova-conta",
+        passo: (api) => {
+          const leitura = (valor: string) => { const i = UI.Input({ value: valor, class: "input--leitura" }); i.readOnly = true; return i; };
+          const valor = campoDinheiro(fatura);
+          const perfilSel = perfis.length ? UI.Select([{ value: "", label: "Selecione o perfil" }].concat(perfis.map((p: any) => ({ value: p.id, label: p.nome })))) : null;
+          const contaSel = UI.Select([{ value: "", label: contas.length ? "Selecione a conta" : "Nenhuma conta corrente, poupança ou outros" }]
+            .concat(contas.map((c: any) => ({ value: c.id, label: c.nome + " · " + F.moeda(c.valor) }))));
+          const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
+          const FR = ZoZo.messages.FRIENDLY;
+          const enviar = (btn: HTMLButtonElement) => {
+            const v = valor.ler();
+            const conta = contas.find((c: any) => c.id === contaSel.value);
+            // conferência na tela (mensagem na hora); o serviço confere de novo
+            const problema = !(Number.isFinite(v) && centavos(v) > 0) ? FR.PAYMENT_INVALID
+              : centavos(v) > centavos(fatura) ? FR.PAYMENT_ABOVE_INVOICE
+              : perfilSel && !perfilSel.value ? FR.PROFILE_REQUIRED
+              : !conta ? FR.PAYMENT_ACCOUNT
+              : centavos(v) > centavos(F.numero(conta.valor)) ? FR.INSUFFICIENT_FUNDS : "";
+            if (problema) { erro.textContent = problema; return; }
+            erro.textContent = "";
+            btn.disabled = true;
+            ctx.bridge.request(A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: v, perfilId: perfilSel ? perfilSel.value : null })
+              .then(() => { api.fechar(); ctx.toast("Pagamento realizado com sucesso."); return ctx.recarregarTudo().then(() => { if (aoPagar) aoPagar(); }); })
+              .catch((e: ErroPonte) => { erro.textContent = e.friendly; btn.disabled = false; });
+          };
+          const semFatura = !(fatura > 0);
+          return {
+            corpo: h("div", { class: ZoZo.estrutura.janelaForm },
+              semFatura ? h("p", { class: ZoZo.estrutura.modalTexto }, FR.NO_INVOICE) : null,
+              UI.Field("Nome", leitura(cartao.nome)),
+              UI.Field("4 últimos dígitos", leitura(cartao.ultimos4Digitos || "—")),
+              UI.Field("Saldo (fatura atual)", valor.el),
+              perfilSel ? UI.Field("Perfil", perfilSel) : null,
+              UI.Field("Conta a debitar", contaSel),
+              erro),
+            botoes: [
+              { label: "Cancelar", onClick: () => api.fechar() },
+              { label: "Pagar", primario: true, desabilitado: semFatura || !contas.length, onClick: enviar },
+            ],
+          };
+        },
+      });
+    }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+  }
+
   /* ---------------- Nova recorrência ---------------- */
   const FREQ_OPCOES = [
     ["semanal", "A cada semana"], ["quinzenal", "A cada 2 semanas"], ["mensal", "A cada mês"], ["bimestral", "A cada 2 meses"],
@@ -446,5 +505,5 @@
     });
   }
 
-  ZoZo.modais = { janela, novoPerfil, novaCategoria, criarGrupo, novaConta, novaRecorrencia, frequencia, confirmarComSenha, seletorIcone, Interruptor };
+  ZoZo.modais = { janela, novoPerfil, novaCategoria, criarGrupo, novaConta, novaRecorrencia, frequencia, confirmarComSenha, seletorIcone, Interruptor, pagarFatura };
 })(window.ZoZo);

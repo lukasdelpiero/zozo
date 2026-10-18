@@ -77,8 +77,9 @@
     desvincularRecorrencia: "desvincularRecorrencia",
     dividirLancamento: "dividirLancamento",
 
-    // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador)
+    // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador) e pagamento da fatura do cartão
     getBoletoData: "getBoletoData",
+    pagarFatura: "pagarFatura",
 
     // Grupos de categorias e multicâmbio
     updateGrupo: "updateGrupo",
@@ -132,6 +133,12 @@
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     LOAN_INVALID: "Confira o empréstimo: valores de 0 a 1 trilhão, 1º vencimento numa data válida e de 1 a 600 parcelas.",
     DEBIT_ACCOUNT: "Débito precisa de uma conta (corrente, poupança…). Cartão de crédito não pode.",
+    PAYMENT_INVALID: "Informe um valor de pagamento maior que zero.",
+    PAYMENT_ABOVE_INVOICE: "O valor é maior que a fatura em aberto.",
+    PAYMENT_ACCOUNT: "Escolha uma conta corrente, poupança ou outros para debitar o pagamento.",
+    INSUFFICIENT_FUNDS: "A conta escolhida não tem saldo suficiente para este pagamento.",
+    PROFILE_REQUIRED: "Escolha o perfil do pagamento.",
+    NO_INVOICE: "Este cartão não tem fatura em aberto.",
     CF_CHALLENGE: "A proteção do Cloudflare pediu uma nova verificação e bloqueou o pedido. Recarregue a página e tente de novo.",
   });
 

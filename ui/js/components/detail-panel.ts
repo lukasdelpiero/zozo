@@ -56,8 +56,10 @@
       if (cfg.tituloNode) mount(tituloEl, cfg.tituloNode); else tituloEl.textContent = cfg.title || "";
       // Seta "voltar": retorna ao conteúdo anterior sem trocar de página
       mount(voltarEl, cfg.voltar ? [UI.IconButton("seta-voltar", "Voltar", { onClick: cfg.voltar }), h("span", { class: E.divisorVoltar, "aria-hidden": "true" })] : null);
-      const botoes: HTMLElement[] = (cfg.botoes || []).map((b) => h("button", { type: "button", class: b.primario ? E.botaoTextoPrimario : E.botaoTexto, onClick: b.onClick, disabled: b.desabilitado },
-        b.icone ? icon(b.icone, { size: 14, stroke: 2.25 }) : null, b.label));
+      const botoes: HTMLElement[] = (cfg.botoes || []).map((b) => h("button", { type: "button", class: b.primario ? E.botaoTextoPrimario : E.botaoTexto, onClick: b.onClick, disabled: b.desabilitado,
+        "aria-label": b.rotuloCurto ? b.label : undefined },
+        b.icone ? icon(b.icone, { size: 14, stroke: 2.25 }) : null,
+        b.rotuloCurto ? [h("span", { class: "tw:celular:hidden" }, b.label), h("span", { class: "tw:hidden tw:celular:inline", "aria-hidden": "true" }, b.rotuloCurto)] : b.label));
       (cfg.acoes || []).forEach((a) => botoes.push(UI.IconButton(a.icone, a.rotulo, { class: a.perigo ? "icon-btn--danger" : null, onClick: a.onClick })));
       const itensMenu = (cfg.menu || []).filter((x): x is ItemMenu => !!x);
       if (itensMenu && itensMenu.length) {

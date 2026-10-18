@@ -303,7 +303,8 @@ declare global {
     title?: string;
     tituloNode?: FilhoDom;
     voltar?: () => void;
-    botoes?: Array<{ label: string; onClick?: (e: MouseEvent) => void; primario?: boolean; desabilitado?: boolean; icone?: string }>;
+    /** rotuloCurto: texto no celular (≤ 640 px), quando os botões não cabem ao lado do "⋯"; o nome completo continua para leitores de tela */
+    botoes?: Array<{ label: string; rotuloCurto?: string; onClick?: (e: MouseEvent) => void; primario?: boolean; desabilitado?: boolean; icone?: string }>;
     acoes?: Array<{ icone: string; rotulo: string; perigo?: boolean; onClick?: () => void }>;
     menu?: Array<ItemMenu | null | false>;     // itens nulos (condicionais) são ignorados
     selected?: { tipo: string; id: string } | null;
@@ -499,6 +500,8 @@ declare global {
     janela(cfg: ConfigJanela): ApiJanela;
     seletorIcone(valor: string | null | undefined, aoMudar: (emoji: string) => void): HTMLElement;
     Interruptor(rotulo: string, ligado: boolean, aoMudar: (ligado: boolean) => void, nomeAcessivel?: string): HTMLElement;
+    /** Pagar a fatura do cartão (débito na conta escolhida + receita no cartão) */
+    pagarFatura(ctx: ContextoApp, cartao: any, aoPagar?: () => void): void;
     /** criar perfil, categoria, grupo, conta e recorrência; confirmar com senha */
     [acao: string]: any;
   }

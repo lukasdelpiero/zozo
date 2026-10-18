@@ -365,3 +365,95 @@ test("documento sumido do servidor (host abre só para leitura): nenhuma altera�
   await assert.rejects(t.req(t.A.createConta, { conta: { nome: "X", tipo: "corrente", saldo: 0 } }), codigo("DOCUMENT_MISSING_LOCKED"));
   assert.ok(t.eventos.some((e) => e.type === "zozo:aviso-dados" && e.detail.codigo === "DOCUMENT_MISSING"));
 });
+
+/* ---------------- Pagar fatura do cartão ---------------- */
+async function cenarioFatura(t, { fatura = 500, saldo = 1000, digitos = "0123" } = {}) {
+  const { conta: cartao } = await t.req(t.A.createConta, { conta: { nome: "Ultravioleta", tipo: "cartao", saldo: fatura, ultimos4Digitos: digitos } });
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo } });
+  const { perfil } = await t.req(t.A.createPerfil, { perfil: { nome: "Ana" } });
+  return { cartao, conta, perfil };
+}
+const valorDe = async (t, id) => (await t.req(t.A.getContas)).contas.find((c) => c.id === id).valor;
+
+test("pagar fatura: débito na conta + receita no cartão, com nome, data, perfil, categoria Fatura e observação", async () => {
+  const t = carregar();
+  const { cartao, conta, perfil } = await cenarioFatura(t);
+  const r = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 500, perfilId: perfil.id });
+  const nota = "Pagamento da fatura do cartão de crédito Ultravioleta com 4 últimos dígitos 0123.";
+  assert.equal(r.debito.tipo, "debito");
+  assert.equal(r.debito.contaId, conta.id);
+  assert.equal(r.debito.categoria.nome, "Fatura");
+  assert.equal(r.receita.tipo, "receita");
+  assert.equal(r.receita.contaId, cartao.id);
+  for (const l of [r.debito, r.receita]) {
+    assert.equal(l.descricao, "Pagamento fatura");
+    assert.equal(l.valor, 500);
+    assert.equal(l.data, hoje());
+    assert.equal(l.perfilId, perfil.id);
+    assert.equal(l.notas, nota);
+  }
+  assert.equal(await valorDe(t, conta.id), 500);                                 // saiu da conta
+  assert.equal(await valorDe(t, cartao.id), 0);                                  // fatura quitada
+  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 2);
+});
+
+test("pagar fatura: parcial; a categoria Fatura existente é reaproveitada (não duplica)", async () => {
+  const t = carregar();
+  const { cartao, conta, perfil } = await cenarioFatura(t);
+  const { categoria } = await t.req(t.A.createCategoria, { categoria: { nome: "Fatura", icone: "🧾" } });
+  const r1 = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: "120.50", perfilId: perfil.id });
+  const r2 = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 79.5, perfilId: perfil.id });
+  assert.equal(r1.debito.categoriaId, categoria.id);
+  assert.equal(r2.debito.categoriaId, categoria.id);
+  assert.equal(await valorDe(t, cartao.id), 300);
+  assert.equal(await valorDe(t, conta.id), 800);
+  assert.equal((await t.req(t.A.getCategorias)).categorias.filter((c) => c.nome === "Fatura").length, 1);
+});
+
+test("pagar fatura: valor inválido, acima da fatura ou do saldo, conta errada e sem perfil são recusados sem criar nada", async () => {
+  const t = carregar();
+  const { cartao, conta, perfil } = await cenarioFatura(t, { fatura: 500, saldo: 200 });
+  const conta2 = async (tipo) => (await t.req(t.A.createConta, { conta: { nome: "C-" + tipo, tipo, saldo: 5000 } })).conta.id;
+  const investimento = await conta2("investimento"), emprestimo = await conta2("emprestimo"), outroCartao = await conta2("cartao");
+  const pedido = (extra) => Object.assign({ cartaoId: cartao.id, contaId: conta.id, valor: 100, perfilId: perfil.id }, extra);
+  const casos = [
+    [{ valor: 0 }, "PAYMENT_INVALID"], [{ valor: -10 }, "PAYMENT_INVALID"], [{ valor: "10abc" }, "PAYMENT_INVALID"], [{ valor: 0.001 }, "PAYMENT_INVALID"],
+    [{ valor: 500.01, contaId: investimento }, "PAYMENT_ACCOUNT"],
+    [{ valor: 200.01 }, "INSUFFICIENT_FUNDS"],
+    [{ contaId: emprestimo }, "PAYMENT_ACCOUNT"], [{ contaId: outroCartao }, "PAYMENT_ACCOUNT"], [{ contaId: "c-inexistente" }, "PAYMENT_ACCOUNT"],
+    [{ cartaoId: conta.id }, "OPERATION_FAILED"], [{ cartaoId: "c-inexistente" }, "OPERATION_FAILED"],
+    [{ perfilId: null }, "PROFILE_REQUIRED"], [{ perfilId: "p-de-outra-conta" }, "PROFILE_REQUIRED"],
+  ];
+  for (const [extra, cod] of casos) await assert.rejects(t.req(t.A.pagarFatura, pedido(extra)), codigo(cod), JSON.stringify(extra));
+  const { conta: rica } = await t.req(t.A.createConta, { conta: { nome: "Poupança", tipo: "poupanca", saldo: 9000 } });
+  await assert.rejects(t.req(t.A.pagarFatura, pedido({ contaId: rica.id, valor: 500.01 })), codigo("PAYMENT_ABOVE_INVOICE"));
+  await t.req(t.A.arquivarPerfil, { id: perfil.id, arquivar: true });
+  const { perfil: outro } = await t.req(t.A.createPerfil, { perfil: { nome: "Bia" } });
+  await assert.rejects(t.req(t.A.pagarFatura, pedido({})), codigo("PROFILE_ARCHIVED"));
+  // nada foi criado nem mudou de saldo
+  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 0);
+  assert.equal(await valorDe(t, cartao.id), 500);
+  assert.equal(await valorDe(t, conta.id), 200);
+  assert.ok(!(await t.req(t.A.getCategorias)).categorias.some((c) => c.nome === "Fatura"));
+  await t.req(t.A.pagarFatura, pedido({ perfilId: outro.id }));                   // com perfil válido, passa
+});
+
+test("pagar fatura: cartão sem fatura em aberto é recusado; sem o recurso Perfis, o perfil não é pedido", async () => {
+  const t = carregar({ recursos: { perfis: false, boleto: false, pix: false, cambio: false } });
+  const { conta: cartao } = await t.req(t.A.createConta, { conta: { nome: "Visa", tipo: "cartao", saldo: 0 } });
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 100 } });
+  await assert.rejects(t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 10 }), codigo("NO_INVOICE"));
+  const { conta: cartao2 } = await t.req(t.A.createConta, { conta: { nome: "Master", tipo: "cartao", saldo: 50 } });
+  const r = await t.req(t.A.pagarFatura, { cartaoId: cartao2.id, contaId: conta.id, valor: 50 });
+  assert.equal(r.debito.perfilId, null);
+  assert.equal(r.debito.notas, "Pagamento da fatura do cartão de crédito Master.");    // sem dígitos cadastrados
+});
+
+test("frequência só da tabela: nomes herdados de Object viram mensal", async () => {
+  const t = carregar();
+  const { lancamento } = await t.req(t.A.createLancamento, lanc({}));
+  for (const recorrencia of ["constructor", "toString", "__proto__"]) {
+    await t.req(t.A.tornarRecorrente, { id: lancamento.id, recorrencia });
+    assert.equal((await t.req(t.A.getLancamentos)).lancamentos[0].recorrencia, "mensal", recorrencia);
+  }
+});

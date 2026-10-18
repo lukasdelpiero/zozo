@@ -167,6 +167,7 @@
   function abrirDetalheConta(conta: any, ctx: ContextoApp, origem: any, opts?: any) {
     let intervalo = conta.tipo === "investimento" ? "1M" : "3M";
     const editandoCiclo = !!(opts && opts.editandoCiclo) && conta.tipo === "cartao";
+    const contaAtual = () => (((ZoZo.store.get().data.contas || {}).contas) || []).find((x: any) => x.id === conta.id) || conta;
     const reabrir = (extra: any, atual?: any) => abrirDetalheConta(atual || conta, ctx, origem, Object.assign({}, opts, extra));
     const ciclo = editandoCiclo ? areaCiclo(conta, ctx, (c: any) => reabrir({ editandoCiclo: false }, Object.assign({}, conta, c))) : null;
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir conta?", "Tem certeza de que deseja excluir esta conta?")
@@ -184,7 +185,11 @@
       voltar: opts && opts.voltar,
       botoes: editandoCiclo
         ? [{ label: "Cancelar", onClick: () => reabrir({ editandoCiclo: false }) }, { label: "Salvar fechamento", primario: true, onClick: (e: MouseEvent) => { if (ciclo) ciclo.salvar(e.currentTarget as HTMLButtonElement); } }]
-        : conta.tipo === "cartao" ? [{ label: "Editar fechamento", onClick: () => reabrir({ editandoCiclo: true }) }] : [],
+        : conta.tipo === "cartao" ? [
+          { label: "Editar fechamento", rotuloCurto: "Fechamento", onClick: () => reabrir({ editandoCiclo: true }) },
+          // depois de pagar, o painel reabre com a fatura e o saldo novos
+          { label: "Pagar fatura", rotuloCurto: "Pagar", primario: true, onClick: () => ZoZo.modais.pagarFatura(ctx, conta, () => reabrir({}, contaAtual())) },
+        ] : [],
       menu: [
         { label: conta.oculta ? "Mostrar conta" : "Ocultar conta", onClick: ocultar },
         { separador: true },
@@ -238,7 +243,7 @@
           const dif = r.diferenca;
           mount(difEl, h("span", { class: dif > 0 ? ZoZo.pecas.pctSobe : dif < 0 ? ZoZo.pecas.pctDesce : ZoZo.pecas.pctIgual }, (dif > 0 ? "+ " : dif < 0 ? "− " : "") + F.moeda(dif)));
           desenhar();
-        }).catch(() => mount(graficoEl, h("p", { class: "muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
+        }).catch(() => mount(graficoEl, h("p", { class: "tw:text-zz-muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
 
         ctx.loadData("lancamentos", A.getLancamentos).then((d: any) => {
           const itens = d.lancamentos.filter((l: any) => l.contaId === conta.id).slice(0, 8);

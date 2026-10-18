@@ -174,7 +174,7 @@
   const orcamentoAtivo = () => !(ZoZo.store.get().data.config && ZoZo.store.get().data.config.orcamentoAtivo === false);
 
   function abrirDetalhe(cat: any, ctx: ContextoApp, opts?: any) {
-    const mes = ZoZo.store.get().data.categorias.mes;
+    const mes = (ZoZo.store.get().data.categorias || {}).mes || F.iso(new Date()).slice(0, 7);   // aberto de outro painel antes de carregar Categorias
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir categoria?",
       "A categoria “" + cat.nome + "” e o histórico de orçamentos dela serão apagados. Essa ação não pode ser desfeita. As transações dessa categoria serão movidas para “Outros”.")
       .then((ok) => ok && ctx.bridge.request(A.deleteCategoria, { id: cat.id }).then(() => { ctx.detail.close({ silencioso: true }); ctx.toast("Categoria excluída."); return ctx.recarregarTudo(); })

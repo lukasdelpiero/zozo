@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.10.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.11.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,12 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.11.0
+
+- **Pagar fatura do cartão:** botão "Pagar fatura" no painel do cartão de crédito. A janela "Fatura" mostra o nome e os 4 últimos dígitos (só leitura), o valor da fatura em aberto (pode pagar uma parte), o perfil e a conta a debitar (corrente, poupança ou outros, com saldo). Ao pagar, entram juntas — numa única gravação, ou nenhuma — uma transação Débito na conta (categoria "Fatura", criada se não existir) e uma Receita no cartão, as duas com o nome "Pagamento fatura", a data do dia, o perfil e a observação "Pagamento da fatura do cartão de crédito [nome] com 4 últimos dígitos [dígitos]." O serviço confere tudo de novo: valor maior que zero e até a fatura, saldo da conta, tipo e moeda da conta, perfil (inclusive arquivado).
+- **Serviço de dados em TypeScript** (`data/servico.ts`): o documento cifrado tem tipos (transações, contas, categorias, perfis, recorrências); a interface inteira agora é TypeScript. Os 59 testes do serviço passam antes e depois; 6 novos (pagamento da fatura e frequências).
+- **Correções:** a frequência de uma recorrência aceitava nomes herdados de `Object` (ex.: "constructor") — agora só as da lista; no celular, o "⋯" do painel do cartão saía da tela com dois botões — os botões do painel ganharam rótulo curto no celular ("Fechamento", "Pagar"), com o nome completo para leitores de tela; um texto de erro do gráfico da conta usava uma classe que não existe mais.
 
 ## Novidades da versão 3.10.0
 

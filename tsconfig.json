@@ -1,6 +1,5 @@
 {
-  // Transição para TypeScript: os módulos convertidos (.ts) são verificados com "strict";
-  // os que ainda são .js entram no pacote pelo Vite, mas ainda não são verificados (checkJs: false).
+  // Toda a interface é TypeScript verificado com "strict". Só ui/mock (demonstração local, fora do build) é JS.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -10,8 +9,7 @@
     "types": ["vite/client"],
     "strict": true,
     "noEmit": true,
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     "isolatedModules": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
