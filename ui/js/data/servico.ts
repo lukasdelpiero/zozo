@@ -200,6 +200,8 @@
     (Object.keys(prefixo) as Array<keyof typeof prefixo>).forEach((k) => {
       const vistos = new Set<string>();
       out[k].forEach((x: any) => {
+        // ID ausente/vazio/não-texto: as referências do original não batem com um ID novo → só leitura (nada é regravado)
+        if (typeof x.id !== "string" || !x.id) problemas.push("ID_INVALIDO:" + k);
         if (typeof x.id === "string" && x.id && vistos.has(x.id)) problemas.push("ID_DUPLICADO:" + k);
         if (typeof x.id !== "string" || !x.id || vistos.has(x.id)) x.id = novoId(prefixo[k]);    // só para a tela (não é gravado)
         vistos.add(x.id);

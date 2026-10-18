@@ -1114,6 +1114,14 @@ class TesteKdf(Base):
 
 
 class TestePedidoInvalido(Base):
+    def test_origem_malformada_ou_com_esquema_diferente_recusada(self):
+        for origem in ("https://[", "http://zozo.exemplo.com", "null", "https://zozo.exemplo.com/caminho"):
+            with self.subTest(origem=origem):
+                st, r = self.api("DELETE", "/api/sessao", cab={"Origin": origem})
+                self.assertEqual((st, r["erro"]), (403, "FORBIDDEN"))
+                self.assertEqual(self.api("GET", "/api/sessao")[0], 200)
+        self.assertEqual(self.api("DELETE", "/api/sessao", cab={"Origin": "https://zozo.exemplo.com"})[0], 204)
+
     def test_query_com_campos_demais_e_url_quebrada(self):
         # auditoria F05: parse_qs(max_num_fields=20) lança ValueError — vira 400, nunca 500
         q = "&".join(f"c{i}=1" for i in range(21))

@@ -321,6 +321,8 @@
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      // fora do ZoZo os dados ficam legíveis: avisa toda vez (inclusive pelo botão de Transações)
+      ctx.toast("Arquivo baixado. Ele não é cifrado: guarde-o em local seguro.");
     }).catch((e: any) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
       .then(() => minimo)
       .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); });
@@ -644,7 +646,7 @@
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
           h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda] || "Real") : "Exportar todas as transações",
-            "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : ""), UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
+            "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : "") + ". O arquivo não é cifrado: guarde-o em local seguro.", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),
         ];

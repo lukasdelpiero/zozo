@@ -221,14 +221,36 @@
   }
 
   /* ---------------- documento ---------------- */
-  async function transformar(bytes: Bytes, fluxo: CompressionStream | DecompressionStream): Promise<Bytes> {
+  async function transformar(bytes: Bytes, fluxo: CompressionStream | DecompressionStream, limite?: number): Promise<Bytes> {
     const s = new Blob([bytes]).stream().pipeThrough(fluxo);
-    return new Uint8Array(await new Response(s).arrayBuffer());
+    if (limite === undefined) return new Uint8Array(await new Response(s).arrayBuffer());
+    const leitor = s.getReader();
+    const partes: Uint8Array[] = [];
+    let tamanho = 0;
+    try {
+      while (true) {
+        const { done, value } = await leitor.read();
+        if (done) break;
+        tamanho += value.byteLength;
+        if (tamanho > limite) {
+          await leitor.cancel();
+          throw erro("LOAD_FAILED");
+        }
+        partes.push(value);
+      }
+    } finally { leitor.releaseLock(); }
+    const resultado = new Uint8Array(tamanho);
+    let posicao = 0;
+    for (const parte of partes) { resultado.set(parte, posicao); posicao += parte.byteLength; }
+    return resultado;
   }
   const aad = (email: string, versao: number) => enc.encode("zozo|v2|" + email + "|" + versao);
 
   async function cifrar(chave: CryptoKey, email: string, versao: number, objeto: unknown): Promise<string> {
-    const claro = await transformar(enc.encode(JSON.stringify(objeto === undefined ? null : objeto)), new CompressionStream("gzip"));
+    const json = enc.encode(JSON.stringify(objeto === undefined ? null : objeto));
+    // Não grave um documento que este mesmo cliente recusaria abrir depois.
+    if (json.byteLength > LIMITE_EXPANDIDO) throw erro("DOCUMENT_TOO_LARGE");
+    const claro = await transformar(json, new CompressionStream("gzip"));
     const iv = aleatorio(12);
     const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad(email, versao) }, chave, claro));
     const tudo = new Uint8Array(13 + ct.length);
@@ -239,11 +261,11 @@
   }
 
   async function decifrar(chave: CryptoKey, email: string, versao: number, texto: string): Promise<unknown> {
+    if (typeof texto !== "string" || texto.length > LIMITE_CONTEUDO) throw erro("LOAD_FAILED");
     const tudo = deB64(texto);
     if (tudo.length < 30 || tudo[0] !== FORMATO) throw erro("LOAD_FAILED");
     const claro = await crypto.subtle.decrypt({ name: "AES-GCM", iv: tudo.subarray(1, 13), additionalData: aad(email, versao) }, chave, tudo.subarray(13));
-    const expandido = await transformar(new Uint8Array(claro), new DecompressionStream("gzip"));
-    if (expandido.length > LIMITE_EXPANDIDO) throw erro("LOAD_FAILED");      // documento expandido grande demais
+    const expandido = await transformar(new Uint8Array(claro), new DecompressionStream("gzip"), LIMITE_EXPANDIDO);
     return JSON.parse(dec.decode(expandido));
   }
 

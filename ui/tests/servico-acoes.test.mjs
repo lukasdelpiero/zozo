@@ -355,6 +355,16 @@ test("documento gravado por uma versão mais nova do ZoZo não abre nem é regra
   assert.equal(t.salvos.length, 0);
 });
 
+test("ID ausente, vazio ou que não é texto: abre só para leitura e nunca é regravado com identidade inventada (auditoria C03)", async () => {
+  for (const id of [undefined, "", 123]) {
+    const documento = { versao: 1, perfis: [{ id, nome: "Original" }], contas: [], categorias: [], lancamentos: [] };
+    const t = carregar({ documento });
+    await assert.rejects(t.req(t.A.createPerfil, { perfil: { nome: "Novo" } }), codigo("DOCUMENT_INVALID_LOCKED"), String(id));
+    assert.equal(t.salvos.length, 0);
+    assert.deepEqual(t.documento(), documento);
+  }
+});
+
 test("documento sumido do servidor (host abre só para leitura): nenhuma alteração é aceita", async () => {
   const t = carregar();
   t.Z.bridge.requestHost = async (acao) => {

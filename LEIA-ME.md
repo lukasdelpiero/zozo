@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.11.2** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.11.3** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,14 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.11.3 (correções da revisão externa do Codex, conferidas e reproduzidas)
+
+- **Documento grande demais não é mais gravado:** antes, um documento acima de 40 MiB (descomprimido) era aceito na gravação e recusado na leitura seguinte; agora a gravação é recusada (`DOCUMENT_TOO_LARGE`) e a cópia anterior fica intacta. A descompressão para ao passar do limite, sem montar tudo na memória antes.
+- **ID ausente, vazio ou que não é texto:** o documento abre só para leitura (como já acontecia com ID repetido), em vez de ganhar IDs inventados e ser regravado.
+- **Origem dos pedidos:** a API exige o mesmo esquema (https) e o mesmo host, sem caminho nem credenciais; `Origin` malformado agora dá 403 em vez de erro 500.
+- **Janelas empilhadas:** a janela de baixo fica inativa enquanto outra está por cima; o foco sempre entra na janela (também nas sem rodapé de botões) e, ao fechar a de cima, volta para onde estava na de baixo.
+- **CSV:** aviso visível de que o arquivo baixado não é cifrado.
 
 ## Novidades da versão 3.11.2
 

@@ -33,6 +33,10 @@
      Enquanto houver janela aberta, o resto da tela fica "inert" (sem foco, cliques nem leitor de tela),
      como na fatura. Janelas empilhadas: o estado anterior volta quando a última fecha. */
   let abertas = 0, inertAntes: boolean[] | null = null;
+  const camadas: HTMLElement[] = [];
+  // último elemento focado em cada janela: ao fechar a de cima, a de baixo recebe o foco de volta
+  const ultimoFoco = new WeakMap<HTMLElement, HTMLElement>();
+  const isolarJanelas = () => camadas.forEach((el, i) => { el.inert = i !== camadas.length - 1; });
   const FUNDO = ["auth-root", "shell", "boleto-root"];
   function isolarFundo(abrir: boolean) {
     if (abrir && abertas++ === 0) {
@@ -54,11 +58,18 @@
     const fechar = (resultado?: unknown) => {
       if (fechado) return;
       fechado = true;
+      camadas.splice(camadas.indexOf(overlay), 1);
+      overlay.inert = true;
+      isolarJanelas();
       isolarFundo(false);
       overlay.classList.remove("is-visible");
       document.removeEventListener("keydown", tecla, true);
       setTimeout(() => overlay.remove(), 180);
-      if (anterior && anterior.focus) anterior.focus();
+      // devolve o foco a quem abriu; se ele sumiu (ex.: item de menu) ou ficou atrás de outra janela,
+      // volta para onde estava na janela que ficou por cima
+      const topo = camadas[camadas.length - 1];
+      if (anterior && anterior.isConnected && anterior.focus && (!topo || topo.contains(anterior))) anterior.focus();
+      else if (topo) { const f = ultimoFoco.get(topo); (f && f.isConnected ? f : topo.querySelector<HTMLElement>("[role=dialog], [role=alertdialog]"))?.focus(); }
       if (o.onClose) o.onClose(resultado);
     };
 
@@ -70,7 +81,7 @@
     const parte = (nome: string) => E[nome + tipo] || (tipo === "Dividir" && E[nome + "Janela"]) || E[nome];
     // título centralizado em CAIXA ALTA (o da divisão), também em janelas comuns que pedirem (modal--titulo-central)
     const tituloCentral = tem("modal--titulo-central");
-    const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", "aria-modal": "true", "aria-labelledby": tituloId },
+    const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", tabindex: "-1", "aria-modal": "true", "aria-labelledby": tituloId },
       h("header", { class: tituloCentral ? E.modalTopoDividir : parte("modalTopo") },
         h("h2", { class: tituloCentral ? E.modalTituloDividir : parte("modalTitulo"), id: tituloId }, o.title || ""),
         h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
@@ -81,28 +92,33 @@
 
     const tecla = (e: KeyboardEvent) => {
       // Só a janela do topo responde (janelas empilhadas)
-      if (overlay.parentNode && overlay !== overlay.parentNode.lastElementChild) return;
+      if (camadas.at(-1) !== overlay) return;
       // Com um menu suspenso aberto, o Esc fecha só o menu (não a janela e o que estava sendo editado)
       // Camada por cima aberta (menu ou seletor de emoji): o Esc fecha só ela, não a janela de trás
-      if (e.key === "Escape" && document.querySelector(".menu, .emoji-pop.is-aberto")) return;
+      if ((e.key === "Escape" || e.key === "Tab") && document.querySelector(".menu, .emoji-pop.is-aberto")) return;
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(false); }
       if (e.key === "Tab") {
         // só o que dá para focar de verdade (visível e habilitado)
         const foc = Array.from(dialog.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"))
           .filter((x) => !(x as HTMLButtonElement).disabled && !x.hidden && x.getClientRects().length > 0 && x.getAttribute("tabindex") !== "-1");
-        if (!foc.length) return;
+        if (!foc.length) { e.preventDefault(); dialog.focus(); return; }
         const first = foc[0], last = foc[foc.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        if (!dialog.contains(document.activeElement) || document.activeElement === dialog) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+        else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
       }
     };
     document.addEventListener("keydown", tecla, true);
+    overlay.addEventListener("focusin", (e) => { ultimoFoco.set(overlay, e.target as HTMLElement); });
     root.appendChild(overlay);
+    camadas.push(overlay);
+    isolarJanelas();
     isolarFundo(true);
     requestAnimationFrame(() => {
+      if (fechado || camadas.at(-1) !== overlay) return;
       overlay.classList.add("is-visible");
-      const alvo = dialog.querySelector<HTMLElement>("[data-autofocus]") || dialog.querySelector<HTMLElement>("footer button");
-      if (alvo) alvo.focus();
+      const alvo = dialog.querySelector<HTMLElement>("[data-autofocus]:not(:disabled)") || dialog.querySelector<HTMLElement>("footer button:not(:disabled)") || dialog.querySelector<HTMLElement>("button:not(:disabled)") || dialog;
+      alvo.focus();
     });
     return { fechar };
   }

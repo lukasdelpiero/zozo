@@ -1,20 +1,18 @@
 /* =============================================================
-   ZoZo — estilos (CSS atual + Tailwind CSS, uma tela por vez)
+   ZoZo — estilos (Tailwind CSS + o pouco CSS que sobrou de propósito)
    ------------------------------------------------------------
-   • O CSS atual (pasta css/) entra na camada "legado", a de MENOR
-     prioridade: as telas antigas ficam iguais e, numa tela migrada,
-     as classes do Tailwind sempre vencem as regras antigas.
+   • O CSS da pasta css/ (tokens, base, movimento, impressão) entra na
+     camada "legado", a de MENOR prioridade: uma classe do Tailwind vence
+     uma regra comum dali. Exceções: regras com !important da camada
+     legado (ex.: impressão) vencem as classes, e estilo inline vence
+     as duas.
    • Prefixo "tw:" em todas as classes (ex.: tw:flex, tw:text-sm):
      nunca colide com as classes atuais (.row, .btn, .page…).
    • Sem o "preflight" (reset do Tailwind): o base.css continua valendo.
    • Cores e medidas vêm dos tokens do ZoZo (css/tokens.css), não da
      paleta padrão do Tailwind: tw:bg-zz-primary, tw:text-zz-secondary…
-   • Telas já migradas: Configurações › Sobre; Login/Cadastro/2FA/
-     confirmação de e-mail (components/auth.js); Transações
-     (pages/lancamentos.js) e a linha de transação (components/list.js);
-     Categorias (pages/categorias.js, CategoryRow/CategoryGroupRow);
-     Contas (pages/contas.js, AccountRow); Dashboard (pages/dashboard.js);
-     a estrutura: menu lateral, barra superior e painel (components/estrutura.js).
+   • Todas as telas estão em Tailwind; classes compartilhadas em
+     components/estrutura.ts e components/pecas.ts.
    • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
      "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
    • Cuidado ao migrar: utilitário vence o legado também em :focus,

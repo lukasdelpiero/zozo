@@ -137,11 +137,13 @@ class Pedido:
         try:
             partes = urlsplit(url)
             self.caminho = partes.path
+            self.esquema = partes.scheme.lower()
             self.host = (partes.netloc or "").lower()
             self.query = {k: v[0] for k, v in parse_qs(partes.query, max_num_fields=20).items()}
         except ValueError:
             self.invalido = True
             self.caminho, self.host, self.query = "/api/invalido", "", {}
+            self.esquema = ""
         self.cabecalhos = {str(k).lower(): str(v) for k, v in (cabecalhos or {}).items()}
         self.corpo = corpo or ""
         self.ip = (self.cab("cf-connecting-ip") or "").strip()[:64] or "desconhecido"
@@ -280,8 +282,16 @@ def _mesma_origem(pedido):
     if site and site not in ("same-origin", "none"):
         raise Falha(403, "FORBIDDEN")
     origem = pedido.cab("origin")
-    if origem is not None and urlsplit(origem).netloc.lower() != pedido.host:
-        raise Falha(403, "FORBIDDEN")
+    if origem is not None:
+        try:
+            partes = urlsplit(origem)
+            valida = (partes.scheme.lower() == pedido.esquema and partes.scheme.lower() in ("http", "https")
+                      and partes.netloc.lower() == pedido.host and not partes.path and not partes.query
+                      and not partes.fragment and partes.username is None and partes.password is None)
+        except ValueError:
+            valida = False
+        if not valida:
+            raise Falha(403, "FORBIDDEN")
 
 
 mesma_origem = _mesma_origem       # pública para o app FastAPI (app_fastapi.py), que confere CSRF antes de validar o corpo
@@ -525,7 +535,9 @@ async def _parametros(ctx):
     conta = await ctx.banco.primeiro("SELECT sal, iteracoes, kdf FROM contas WHERE email = ?", email)
     if conta:
         return Resposta(200, {"sal": conta["sal"], "iteracoes": conta["iteracoes"], "kdf": conta["kdf"] or KDF_PBKDF2})
-    # e-mail sem conta: parâmetros iguais aos de uma conta nova (Argon2id) — não revela quem tem conta
+    # e-mail sem conta: parâmetros iguais aos de uma conta nova (Argon2id). Contas Argon2id ficam indistinguíveis
+    # de e-mails sem conta; contas ANTIGAS ainda em PBKDF2 respondem "pbkdf2" e, por isso, revelam que existem
+    # (até trocarem a senha, que as leva ao Argon2id). Mitigação atual: limite de consultas por IP acima.
     falso = hmac.new(ctx.segredo.encode(), ("sal-simulado|" + email).encode("utf-8"), hashlib.sha256).digest()[:16]
     return Resposta(200, {"sal": base64.b64encode(falso).decode("ascii"), "iteracoes": ITERACOES_MIN, "kdf": KDF_ARGON2})
 

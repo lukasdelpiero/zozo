@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { webcrypto, createHash, randomUUID } from "node:crypto";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { argon2id } from "hash-wasm";
 import { carregarHost } from "./carregar.mjs";
 
@@ -16,6 +16,30 @@ const b64 = (u8) => Buffer.from(u8).toString("base64");
 const sha256 = (t) => createHash("sha256").update(t).digest("hex");
 const novaSenha = () => "Teste-" + randomUUID();                 // senha descartável de cada teste
 const codigo = (c) => (e) => { assert.equal(e.code, c); return true; };
+
+test("documento acima do limite expandido não substitui a cópia legível", async () => {
+  const srv = servidorFalso();
+  const h = await cadastrar(srv, "limite@exemplo.test", novaSenha());
+  await h.chamar("saveUserData", { documento: { intacto: true } });
+  const anterior = structuredClone(srv.contas.get("limite@exemplo.test").doc);
+  const documento = { texto: "a".repeat(40 * 1024 * 1024) };
+  await assert.rejects(h.chamar("saveUserData", { documento }), codigo("DOCUMENT_TOO_LARGE"));
+  assert.deepEqual(srv.contas.get("limite@exemplo.test").doc, anterior);
+  assert.deepEqual((await h.chamar("loadUserData")).documento, { intacto: true });
+});
+
+test("documento autenticado que excede o limite expandido é recusado", async () => {
+  const srv = servidorFalso(), email = "expandido@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  const c = srv.contas.get(email);
+  const ref = await derivarRef(senha, Buffer.from(c.sal, "base64"), c.kdf, c.iteracoes);
+  const chave = await subtle.importKey("raw", ref.dados, "AES-GCM", false, ["encrypt"]);
+  const iv = webcrypto.getRandomValues(new Uint8Array(12));
+  const zip = gzipSync(JSON.stringify({ texto: "a".repeat(40 * 1024 * 1024) }));
+  const ct = await subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode("zozo|v2|" + email + "|1") }, chave, zip);
+  c.doc = { versao: 1, conteudo: Buffer.concat([Buffer.from([2]), iv, Buffer.from(ct)]).toString("base64") };
+  await assert.rejects(h.chamar("loadUserData"), codigo("LOAD_FAILED"));
+});
 
 /* ---------------- implementação de referência (independente do host) ---------------- */
 async function derivarRef(senha, sal, kdf, iteracoes) {
