@@ -24,7 +24,7 @@ import "../js/bridge/messages.ts";
 import "virtual:zozo-mock";
 
 // Host web: criptografia no navegador + API Python no Cloudflare
-import "../js/bridge/host-web.js";
+import "../js/bridge/host-web.ts";
 
 // Serviço de dados
 import "../js/data/pix.ts";

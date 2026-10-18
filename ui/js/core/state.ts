@@ -25,7 +25,7 @@
       errors: {},                  // { [chave]: "mensagem amigável" }
       stale: {},                   // { [chave]: true } → recarregar na próxima visita
       ui: {
-        filtros: null,             // filtros de Lançamentos (ver pages/lancamentos.js)
+        filtros: null,             // filtros de Lançamentos (ver pages/lancamentos.ts)
         selecionados: [],          // ids marcados em Lançamentos
         invExcluidas: [],          // contas fora do gráfico de Investimentos
         busca: "",

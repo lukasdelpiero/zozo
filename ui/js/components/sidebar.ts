@@ -1,6 +1,6 @@
 /* =============================================================
    ZoZo — Painel lateral (seções 5, 7, 8)
-   Topo: logo (esquerda) e o botão de recolher/mostrar o menu (direita, criado em app.js)
+   Topo: logo (esquerda) e o botão de recolher/mostrar o menu (direita, criado em app.ts)
    Superior: navegação · Central: resumo de contas · Inferior: foto + nome (esquerda) e Configurações (ícone, direita)
    Visual em Tailwind (components/estrutura.ts). TypeScript: tipos em src/globais.d.ts (ZoZoSidebar).
    ============================================================= */
@@ -81,7 +81,7 @@
           : h("p", { class: E.nota }, "Nenhuma conta cadastrada."));
       }
 
-      const avatar = ZoZo.usuario.Avatar(foto, usuario.nomeUsuario, 28);
+      const avatar = ZoZo.usuario.Avatar(foto, usuario.nomeUsuario || "", 28);
       avatar.classList.add("tw:flex-none", "tw:bg-[rgba(255,255,255,0.92)]", "tw:text-zz-primary");   // foto/inicial clara sobre o roxo
       mount(footerEl,
         h("button", { type: "button", class: E.usuario, title: "Minha conta", "aria-haspopup": "dialog", onClick: () => ctx.abrirConfiguracoes("conta") },

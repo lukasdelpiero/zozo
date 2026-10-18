@@ -114,7 +114,13 @@ function preparar(): Promise<void> {
   if (preparando) return preparando;
   preparando = carregar().then(({ Picker }) => {
     camada = document.createElement("div");
-    camada.className = "emoji-pop";             // sem a classe "menu": senão o Esc das janelas acharia um menu aberto
+    // sem a classe "menu": senão o Esc das janelas acharia um menu aberto; emoji-pop e is-aberto ficam como ganchos.
+    // Fechada: some sem esperar (visibility no fim da transição); aberta: aparece na hora
+    camada.className = "emoji-pop tw:fixed tw:z-400 tw:border tw:border-zz-border tw:rounded-xl tw:bg-zz-surface tw:[box-shadow:var(--shadow-popover)] "
+      + "tw:overflow-hidden tw:invisible tw:opacity-0 tw:pointer-events-none tw:[transform:translateY(-4px)] "
+      + "tw:[transition:opacity_120ms_var(--easing),transform_120ms_var(--easing),visibility_0s_linear_120ms] "
+      + "tw:[&.is-aberto]:visible tw:[&.is-aberto]:opacity-100 tw:[&.is-aberto]:pointer-events-auto tw:[&.is-aberto]:[transform:none] "
+      + "tw:[&.is-aberto]:[transition:opacity_120ms_var(--easing),transform_120ms_var(--easing)] tw:[&_em-emoji-picker]:flex";
     camada.setAttribute("role", "dialog");
     camada.setAttribute("aria-label", "Escolher emoji");
     camada.setAttribute("aria-hidden", "true");

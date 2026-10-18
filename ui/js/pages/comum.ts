@@ -21,7 +21,7 @@
   }
 
   function pagina(cls: string, ...children: FilhoDom[]): HTMLElement {
-    return h("div", { class: ["page", ZoZo.estrutura.pagina, cls] }, ...children);
+    return h("div", { class: [ZoZo.estrutura.pagina, cls] }, ...children);
   }
 
   /** Bloco "valor / subtítulo" usado nos cards de resumo */

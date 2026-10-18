@@ -53,12 +53,21 @@
   }
 
   /* ---------- Campos ---------- */
+  const CAMPOS = "input:not([type=hidden]), select, textarea";
   function Field(label: FilhoDom, control: HTMLElement, opts?: { class?: string; prefix?: string; hint?: FilhoDom }): HTMLElement {
     const o = opts || {};
-    const controlId = control.id || uid("campo");
-    control.id = controlId;
+    // O rótulo precisa apontar para o CAMPO: quando vem um invólucro (ex.: prefixo "R$" + input), usa o campo de dentro.
+    // (o botão de mostrar a senha ao lado não conta); um botão sozinho (ex.: data) também serve.
+    // Invólucro com vários campos vira um grupo nomeado pelo rótulo.
+    const campos = control.matches(CAMPOS + ", button") ? [control] : Array.from(control.querySelectorAll<HTMLElement>(CAMPOS));
+    const botoes = campos.length ? [] : Array.from(control.querySelectorAll<HTMLElement>("button"));
+    const alvo = campos.length === 1 ? campos[0] : botoes.length === 1 ? botoes[0] : null;
+    const rotuloId = uid("rotulo");
+    let controlId: string | undefined;
+    if (alvo) { controlId = alvo.id || uid("campo"); alvo.id = controlId; }
+    else { control.setAttribute("role", "group"); control.setAttribute("aria-labelledby", rotuloId); }
     return h("div", { class: [P.campo, o.class] },
-      h("label", { class: P.campoRotulo, for: controlId }, label),
+      h("label", { class: P.campoRotulo, for: controlId, id: rotuloId }, label),
       o.prefix ? h("div", { class: P.afixo }, h("span", { class: P.prefixo, "aria-hidden": "true" }, o.prefix), control) : control,
       o.hint ? h("p", { class: P.campoDica }, o.hint) : null);
   }

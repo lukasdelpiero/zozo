@@ -170,9 +170,8 @@
   }
 
   /* ---------- Categoria (seções 35–39) ----------
-     Visual em Tailwind (tw:). category-row* são ganchos; a bolinha, a seta e o contador
-     (category-row__dot / __caret / __count) continuam no CSS antigo porque o Dashboard (Top categorias)
-     também os usa. Colunas por largura da área: a barra sai em ≤ 620 px e o reservado em ≤ 420 px. */
+     Visual em Tailwind (tw:). category-row* são ganchos; a bolinha, a seta e o contador vêm de pecas.cat*
+     (o Dashboard › Top categorias também os usa). Colunas por largura da área: a barra sai em ≤ 620 px e o reservado em ≤ 420 px. */
   const CR = {
     linha: "tw:grid tw:items-center tw:gap-4 tw:w-full tw:min-h-(--row-height) tw:px-4 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-inherit tw:text-left "
       + "tw:text-[15px] tw:focus-visible:outline-offset-[-2px] tw:grid-cols-[minmax(8em,1.4fr)_112px_minmax(80px,2fr)_104px] "
@@ -209,7 +208,7 @@
       "data-id": cat.id,
     },
       h("span", { class: [CR.lead, o.filho && CR.leadFilho] },
-        o.pill ? null : h("span", { class: "category-row__dot", style: { background: F.cor(cat.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
+        o.pill ? null : h("span", { class: ZoZo.pecas.catPonto, style: { background: F.cor(cat.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
         UI.CategoryLabel(cat, { pill: !!o.pill })),
       h("span", { class: ["money", CR.gasto] }, F.moeda(cat.gasto)),
       o.excluida ? null : h("span", { class: CR.barra }, barraCategoria(cat.gasto, cat.reservado)),
@@ -228,10 +227,10 @@
       : h("span", { class: ["category-row__group-name", CR.nomeGrupo] }, grupo.nome);
     return h("div", { class: ["category-row", CR.linha, CR.grupo, o.selected ? CR.grupoSelecionado : CR.normal, o.onClick && CR.interativa], onClick: abrir },
       h("span", { class: CR.lead },
-        h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(!o.fechado), "aria-label": (o.fechado ? "Mostrar" : "Ocultar") + " categorias de " + grupo.nome,
+        h("button", { type: "button", class: ZoZo.pecas.catSeta, "aria-expanded": String(!o.fechado), "aria-label": (o.fechado ? "Mostrar" : "Ocultar") + " categorias de " + grupo.nome,
           onClick: (e: MouseEvent) => { e.stopPropagation(); if (o.onToggle) o.onToggle(); } },
           icon(o.fechado ? "chevron-right" : "chevron-down", { size: 14, stroke: 2.25 })),
-        h("span", { class: ["category-row__count", o.excluida && CR.contadorExcluido] }, String(grupo.quantidade)),
+        h("span", { class: [ZoZo.pecas.catContador, o.excluida && CR.contadorExcluido] }, String(grupo.quantidade)),
         nome),
       h("span", { class: ["money", CR.gasto] }, F.moeda(grupo.gasto)),
       o.excluida ? null : h("span", { class: CR.barra }, barraCategoria(grupo.gasto, grupo.reservado)),

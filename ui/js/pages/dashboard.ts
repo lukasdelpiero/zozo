@@ -61,10 +61,10 @@
       + "tw:area460:grid-cols-[16px_26px_minmax(0,1fr)_auto_auto] tw:area340:grid-cols-[16px_26px_minmax(0,1fr)_auto]",
     topItem: "tw:cursor-pointer tw:hover:bg-zz-surface-hover",
     topLead: "tw:grid tw:place-items-center",
-    topPonto: "category-row__dot tw:w-2 tw:h-2",
+    topPonto: ZoZo.pecas.catPonto + " tw:w-2 tw:h-2",
     topIcone: "tw:grid tw:place-items-center tw:text-[15px]",
     topIconeFilho: "tw:grid tw:place-items-center tw:text-[15px] tw:ml-[18px]",
-    topQtd: "category-row__count tw:text-[11px]",
+    topQtd: ZoZo.pecas.catContador + " tw:text-[11px]",
     topNome: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
     topNomeFilho: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:pl-[18px]",
     topGasto: "money tw:justify-self-end tw:font-[620]",
@@ -103,11 +103,11 @@
       if (b.tipo === "categoria") { out.push(filho(b.cat, false)); return; }
       const aberto = !!abertos[b.nome];
       const chave = "dash:grp:" + b.nome;
-      out.push(linha(h("button", { type: "button", class: "category-row__caret", "aria-expanded": String(aberto), "aria-label": (aberto ? "Ocultar" : "Mostrar") + " categorias de " + b.nome,
+      out.push(linha(h("button", { type: "button", class: ZoZo.pecas.catSeta, "aria-expanded": String(aberto), "aria-label": (aberto ? "Ocultar" : "Mostrar") + " categorias de " + b.nome,
         onClick: () => UI.alternarArvore(chave, () => ZoZo.store.set({ ui: { dashGruposAbertos: Object.assign({}, ZoZo.store.get().ui.dashGruposAbertos || {}, { [b.nome]: !aberto }) } })) },
         icon(aberto ? "chevron-down" : "chevron-right", { size: 14, stroke: 2.25 })),
         h("span", { class: T.topQtd }, String(b.quantidade)), b.nome, b.gasto, b.reservado, {}));
-      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: "arvore-grupo" }, b.itens.map((c: any) => filho(c, true)))));
+      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: ZoZo.pecas.arvoreGrupo }, b.itens.map((c: any) => filho(c, true)))));
     });
     return h("div", { class: T.tops, "data-dash-lista": "" }, out);
   }

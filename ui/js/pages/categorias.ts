@@ -1,6 +1,6 @@
 /* =============================================================
    ZoZo — Categorias (seções 34–40)
-   Visual em Tailwind (tabela T abaixo; as linhas estão em components/list.js).
+   Visual em Tailwind (tabela T abaixo; as linhas estão em components/list.ts).
    Continuam no CSS antigo só as peças compartilhadas com outras telas: seção,
    cartão de resumo com a rosca, cabeçalho do painel, pílula da
    categoria, barra de progresso e a árvore do grupo (também no Dashboard).
@@ -22,7 +22,7 @@
   const T = {
     lista: "tw:flex tw:flex-col tw:mb-2",
     // GASTO (à direita) e RESERVADO (à esquerda) alinhados com as colunas das linhas: a MESMA grade de
-    // CategoryRow (components/list.js) em todas as larguras — antes, com a área estreita (painel aberto),
+    // CategoryRow (components/list.ts) em todas as larguras — antes, com a área estreita (painel aberto),
     // as linhas passavam a 3 colunas e o cabeçalho não: o título quebrava e "Gasto" saía do lugar
     cabecalho: "tw:grid tw:grid-cols-[minmax(8em,1.4fr)_112px_minmax(80px,2fr)_104px] tw:gap-4 tw:px-4 "
       + "tw:area620:grid-cols-[minmax(0,1fr)_112px_104px] tw:area420:grid-cols-[minmax(0,1fr)_112px]",
@@ -118,7 +118,7 @@
       const fechado = !!fechados[key];
       out.push(L.CategoryGroupRow(b, { excluida, fechado, onToggle: () => UI.alternarGrupo(key), selected: grupoSel === b.nome,
         onClick: () => abrirGrupo(b.nome, ctx) }));
-      if (!fechado) out.push(UI.corpoArvore(key, h("div", { class: "arvore-grupo" }, b.itens.map((c: any) => linha(c, true)))));
+      if (!fechado) out.push(UI.corpoArvore(key, h("div", { class: ZoZo.pecas.arvoreGrupo }, b.itens.map((c: any) => linha(c, true)))));
     });
     return out;
   }
@@ -162,7 +162,7 @@
         return { rotuloMes: F.mesAbrev(dt.getMonth()), rotuloAno: dt.getMonth() === 0 || i === 0 || i === r.meses.length - 1 ? String(dt.getFullYear()) : "",
           titulo: F.mesNome(dt.getMonth()) + " " + dt.getFullYear(), valor: m.gasto, destaque: i === r.meses.length - 1 };
       }), { limite: r.reservado, nomeValor: "Gasto", ariaLabel: "Gasto nos últimos 12 meses" });
-    }).catch(() => mount(alvo, h("p", { class: "muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
+    }).catch(() => mount(alvo, h("p", { class: "tw:text-zz-muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
   }
 
   function resumoGasto(gasto: any, reservado: any) {
@@ -422,7 +422,7 @@
               regulares.map((c: any) => {
                 const resto = F.numero(c.reservado) - F.numero(c.gasto);
                 return h("button", { type: "button", class: [T.tabelaLinha, T.tabelaLinhaBotao], role: "row", onClick: () => abrirDetalhe(c, ctx) },
-                  h("span", { class: T.tabelaNome, role: "cell" }, h("span", { class: "category-row__dot", style: { background: F.cor(c.cor, "var(--palette-16)") } }), h("span", null, (c.icone || "") + " " + c.nome)),
+                  h("span", { class: T.tabelaNome, role: "cell" }, h("span", { class: ZoZo.pecas.catPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }), h("span", null, (c.icone || "") + " " + c.nome)),
                   h("span", { class: "money", role: "cell" }, F.moeda(c.gasto)),
                   h("span", { class: "money", role: "cell" }, F.moeda(c.reservado)),
                   h("span", { class: ["money", resto < 0 && "money--negative"], role: "cell" }, (resto < 0 ? "−" : "") + F.moeda(resto)));

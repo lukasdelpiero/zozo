@@ -4,7 +4,7 @@
    Única porta de saída da interface: tudo vira mensagem JSON.
 
    Modos:
-   • web   → versão publicada (bridge/host-web.js + API Python no Cloudflare)
+   • web   → versão publicada (bridge/host-web.ts + API Python no Cloudflare)
    • mock  → modo demonstração (pasta mock: só existe no desenvolvimento;
              usado ao abrir o index.html direto do disco ou com ?mock=1)
    • none  → sem host: toda requisição falha com mensagem amigável

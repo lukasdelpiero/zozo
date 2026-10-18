@@ -6,21 +6,15 @@
 :root {
   /* Identidade */
   --color-primary: #6948D8;          /* roxo da marca: textos, barras e destaques */
-  --color-primary-strong: #5A3BC4;
   --color-primary-soft: #EFEBFC;
   --color-primary-softer: #F7F5FE;
   --color-on-primary: #ffffff;
-  --color-on-primary-muted: rgba(255, 255, 255, 0.74);
   --color-on-primary-hover: rgba(255, 255, 255, 0.14);
-  --color-on-primary-active: rgba(255, 255, 255, 0.22);
-  --color-on-primary-divider: rgba(255, 255, 255, 0.2);
 
   /* Superfícies */
   --color-background: #f8f8fa;
   --color-surface: #ffffff;
   --color-surface-hover: #f4f4f7;
-  --color-surface-selected: #edf2fb;
-  --color-row-checked: #EFEBFC;   /* roxo claro: mesmo fundo do item ativo do menu */
   --color-border: #e5e5e8;
   --color-border-strong: #d4d4da;
   --color-overlay: rgba(22, 33, 58, 0.38);
@@ -125,7 +119,20 @@
   --duration-chart: 900ms;
   --page-gutter: 24px;
 
-  /* Ícones */
-  --icon-size: 16px;
-  --icon-stroke: 1.75;
+  /* Menu lateral roxo (usado também pelo câmbio e pela fatura) */
+  --sidebar-bg: #6948D8;
+  --sidebar-fg: rgba(255, 255, 255, 0.86);
+  --sidebar-fg-muted: rgba(255, 255, 255, 0.62);
+  --sidebar-hover: rgba(255, 255, 255, 0.10);
+  --sidebar-active: rgba(255, 255, 255, 0.18);
+  --sidebar-divider: rgba(255, 255, 255, 0.14);
+
+  /* Botões roxos com o gradiente da marca (de cima para baixo) */
+  --botao-roxo: linear-gradient(180deg, #8063EE 0%, #6948D8 100%);
+  --botao-roxo-hover: linear-gradient(180deg, #7458EA 0%, #5F3FCF 100%);
+}
+
+/* Menu só com ícones (≤ 900 px): coluna estreita e respiro menor nas páginas */
+@media (max-width: 900px) {
+  :root { --sidebar-width: 64px; --page-gutter: 16px; }
 }

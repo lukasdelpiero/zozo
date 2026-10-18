@@ -58,7 +58,7 @@ export function carregarHost({ fetch, armazenamento = new Map() } = {}) {
   ctx.window = ctx;
   ctx.ZoZo = {};
   vm.createContext(ctx);
-  const m = "bridge/host-web.js";
+  const m = "bridge/host-web.ts";
   vm.runInContext(codigo(m), ctx, { filename: fileURLToPath(new URL(m, RAIZ)), importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER });
   const host = ctx.ZoZo.webHost;
   /** Chama uma ação; erro do host vira exceção com o código */

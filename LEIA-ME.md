@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.9.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.10.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,13 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.10.0
+
+- **Host web em TypeScript** (`bridge/host-web.ts`): a criptografia de ponta a ponta e a conversa com a API agora têm tipos (sessão, chaves, respostas da API, pedidos da interface). Mesma lógica, mesmas derivações e mesmo formato do documento — os 19 testes do host (com a derivação conferida por uma implementação independente) passam antes e depois, e o login, a gravação e a leitura foram testados no navegador. Ações herdadas de `Object` também são recusadas aqui.
+- **Fim da migração para Tailwind:** CAPTCHA, espaçamento das páginas, bolinha/seta/contador das categorias, grupos que abrem e fecham e a camada do seletor de emoji. Visual conferido elemento a elemento em 1280 e 375 px. O CSS antigo ficou em 4 arquivos com papel claro: `tokens.css` (variáveis, sem as que não eram usadas), `base.css` (fontes, reset, foco, dinheiro, estados globais, lista aberta do select), `movimento.css` (animações por posição dos filhos) e `print.css` (impressão da fatura). `layout.css`, `pages.css` e `tipografia.css` deixaram de existir.
+- **Tipos de todos os módulos:** `window.ZoZo` não aceita mais "qualquer coisa": cada módulo (serviço, login, fatura, painéis, Configurações, emoji…) tem a sua interface. Isso mostrou uma chamada que não atualizava a barra superior ao abrir as transações de um perfil.
+- **Acessibilidade:** o rótulo de um campo com prefixo (ex.: "Saldo" com R$) apontava para o invólucro, não para o campo — o leitor de tela não anunciava o nome e clicar no rótulo não focava. Corrigido para todos os campos (`UI.Field`). A seta dos grupos de categorias ficou centralizada (estava 2 px para a direita).
 
 ## Novidades da versão 3.9.0
 
@@ -359,7 +366,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 
 ## Do Figma para o ZoZo
 
-O ZoZo não usa framework: o visual vem de `ui/css/tokens.css` (cores, espaços, raios, sombras), `tipografia.css` (fontes e tamanhos) e dos componentes em `ui/js/components/`. Para trazer um projeto do Figma:
+O ZoZo não usa framework: o visual vem de `ui/css/tokens.css` (cores, espaços, raios, sombras), das classes Tailwind dos componentes (`ui/js/components/estrutura.ts` e `pecas.ts`). Para trazer um projeto do Figma:
 
 1. **Conecte o Figma ao Claude Code** (recomendado): no Figma desktop, abra o arquivo › menu **Figma › Preferências › Enable Dev Mode MCP Server**. Depois, num terminal, `claude mcp add --transport http figma-dev-mode http://127.0.0.1:3845/mcp`. Selecione um frame no Figma e peça ao Claude Code: *"atualize o card X do ZoZo conforme o frame selecionado, usando os tokens existentes"*.
 2. **Organize o Figma com Variáveis** (cores, espaçamentos, raios, tipografia) com nomes parecidos com os de `tokens.css` (`color-primary`, `space-4`, `radius-large`…). Exporte (Dev Mode › Variables, ou o plugin *Variables to CSS*) e peça para mapear em `tokens.css` — a interface toda muda de uma vez.

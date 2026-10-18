@@ -531,6 +531,64 @@ declare global {
     redesenharConfig?: () => void;
   }
 
+  /* ---------- Módulos das páginas (o que cada um expõe em window.ZoZo) ---------- */
+  /** js/data/servico.js (ainda em JavaScript): regras financeiras sobre o documento decifrado */
+  interface ZoZoServico {
+    handle(action: string, data?: unknown): Promise<any>;
+    atende(action: string): boolean;
+    reset(): void;
+    FREQUENCIAS: Readonly<Record<string, { dias?: number; meses?: number; rotulo: string; texto: string }>>;
+    aguardarGravacoes(): Promise<unknown>;
+    gravando(): boolean;
+    recarregarDoServidor(): boolean;
+  }
+  /** js/components/auth.ts */
+  interface ZoZoAuth {
+    render(root: HTMLElement, cfg: any): void;
+    reiniciar(): void;
+    prepararGoogle(dados: any): void;
+    carregando(root: HTMLElement, texto: string): void;
+    aguardandoEmail(root: HTMLElement, email: string, cfg: any): void;
+    A: Readonly<Record<string, string>>;
+  }
+  /** js/data/demo.ts — documento fictício da conta de demonstração */
+  interface ZoZoDemo { documento(hoje: Date): any }
+  /** js/pages/boleto.ts — criação de fatura */
+  interface ZoZoBoleto {
+    open(ctx: ContextoApp, opts?: { perfilId?: string | null }): void;
+    close(): void;
+    calcular(st: any): { lancamentos: number; contribuicoes: number; descontos: number; arredondamentos: number; total: number };
+  }
+  interface ZoZoCategoriasShared {
+    abrirFormCategoria(ctx: ContextoApp, cat: any, preset?: any, voltar?: any): void;
+    abrirDetalhe(cat: any, ctx: ContextoApp, opts?: any): void;
+    estruturar(categorias: any, grupos: any): any[];
+    abrirGrupo(nome: string, ctx: ContextoApp, opts?: any): void;
+  }
+  interface ZoZoContasShared {
+    ContasChartCard(state: { data: any; ui: EstadoZoZo["ui"] }, ctx: ContextoApp, opts?: any): HTMLElement;
+    abrirDetalheConta(conta: any, ctx: ContextoApp, origem?: any, opts?: any): void;
+  }
+  interface ZoZoLancamentoPainel { abrir(l: any, ctx: ContextoApp, opts?: any): void }
+  interface ZoZoLancamentosShared {
+    abrirFormulario(l: any, ctx: ContextoApp, preset?: any): void;
+    abrirVisualizacao(l: any, ctx: ContextoApp, opts?: any): void;
+    setFiltros(patch: Partial<FiltrosLancamentos>, ctx?: ContextoApp): void;
+    FILTROS_VAZIOS(): FiltrosLancamentos;
+  }
+  interface ZoZoPerfilShared {
+    abrirFormPerfil(ctx: ContextoApp, p: any, voltar?: any): void;
+    AvatarPerfil(p: any): HTMLElement;
+    abrirDetalhe(p: any, ctx: ContextoApp, opts?: any): void;
+  }
+  interface ZoZoRecorrenciasShared { abrirDetalhe(r: any, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown }
+  /** src/emoji-picker.ts */
+  interface ZoZoEmojiPicker {
+    abrir(anchor: HTMLElement, opts?: { atual?: string; aoEscolher?: (emoji: string) => void; posicao?: string }): void;
+    carregar(): Promise<void>;
+    fechar(): void;
+  }
+
   interface ZoZoGlobal {
     dom: ZoZoDom;
     store: ZoZoStore;
@@ -540,7 +598,7 @@ declare global {
     busca: ZoZoBusca;
     /** js/components/estrutura.ts — classes Tailwind do menu lateral, barra superior e painel */
     estrutura: Readonly<Record<string, string>>;
-    /** js/components/pecas.ts — classes Tailwind das peças compartilhadas (ui.js e afins) */
+    /** js/components/pecas.ts — classes Tailwind das peças compartilhadas (ui.ts e afins) */
     pecas: Readonly<Record<string, string>>;
     pix: ZoZoPix;
     icons: ZoZoIcons;
@@ -567,8 +625,26 @@ declare global {
     charts: ZoZoCharts;
     modais: ZoZoModais;
     cambio: ZoZoCambio;
-    // módulos ainda em JavaScript
-    [modulo: string]: any;
+    /** js/bridge/host-web.ts — criptografia de ponta a ponta + API (só na versão web) */
+    webHost?: HostPonte;
+    servico: ZoZoServico;
+    auth: ZoZoAuth;
+    demo: ZoZoDemo;
+    boleto: ZoZoBoleto;
+    categoriasShared: ZoZoCategoriasShared;
+    contasShared: ZoZoContasShared;
+    lancamentoPainel: ZoZoLancamentoPainel;
+    lancamentosShared: ZoZoLancamentosShared;
+    perfilShared: ZoZoPerfilShared;
+    recorrenciasShared: ZoZoRecorrenciasShared;
+    usuario: { Avatar(foto: string | null, nome: string, tamanho?: number): HTMLElement };
+    exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): void;
+    configuracoes: { abrir(ctx: ContextoApp, aba?: string): void };
+    emojiPicker: ZoZoEmojiPicker;
+    /** contexto da interface (app.ts), para depuração e para os módulos que não o recebem por parâmetro */
+    ctx: ContextoApp;
+    /** só no servidor de desenvolvimento com ?mock=1 (ui/mock, fora do build) */
+    mock?: { host?: HostPonte; [k: string]: unknown };
   }
 
   /** qrcode-generator (npm), exposto em window.qrcode por src/main.ts para o 2FA */

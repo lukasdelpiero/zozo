@@ -1,7 +1,7 @@
 /* =============================================================
    ZoZo — Investimentos (seções 23–25, 29–31)
    Visual em Tailwind (tabela T abaixo; as linhas de conta e de alocação
-   estão em components/list.js). TypeScript: a página segue PaginaZoZo (src/globais.d.ts).
+   estão em components/list.ts). TypeScript: a página segue PaginaZoZo (src/globais.d.ts).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
   "use strict";

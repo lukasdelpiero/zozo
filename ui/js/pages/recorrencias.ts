@@ -1,6 +1,6 @@
 /* =============================================================
    ZoZo — Recorrências (seções 41–43)
-   Visual em Tailwind (linha em components/list.js). TypeScript: a página segue PaginaZoZo.
+   Visual em Tailwind (linha em components/list.ts). TypeScript: a página segue PaginaZoZo.
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
   "use strict";

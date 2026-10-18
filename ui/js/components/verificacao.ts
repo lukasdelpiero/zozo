@@ -32,7 +32,7 @@
   }
 
   function Captcha(sitekey: string): CaptchaWidget {
-    const el = h("div", { class: "captcha", "aria-live": "polite" });
+    const el = h("div", { class: "tw:flex tw:justify-center tw:min-h-[65px]", "aria-live": "polite" });
     let token = "", id: string | null = null;
     carregarTurnstile().then((ts) => {
       requestAnimationFrame(() => {                    // espera o elemento estar na página

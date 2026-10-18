@@ -1,6 +1,6 @@
 /* =============================================================
    ZoZo — Peças compartilhadas em Tailwind CSS
-   Classes dos componentes de components/ui.js (e de quem monta as
+   Classes dos componentes de components/ui.ts (e de quem monta as
    mesmas peças): etiquetas, pílulas, percentuais, chips de status,
    barra de progresso, abas de período, ícone de conta, nome com
    dígitos, carregando, esqueletos, estado vazio, avisos, card e seção.
@@ -185,7 +185,7 @@
 
     /* ---------- Botões ---------- */
     rotuloBotao: "btn__label",
-    // botão "Salvar" dos formulários (forms.js) e o do login (auth.js, com as próprias medidas por cima)
+    // botão "Salvar" dos formulários (forms.ts) e o do login (auth.ts, com as próprias medidas por cima)
     botaoPrimario: botao("primary"),
     botaoPrimarioCheio: botao("primary", false, true),
 
@@ -199,7 +199,7 @@
     entradaPequena: "input--sm tw:h-8 tw:w-[130px] tw:text-[13px] tw:font-[550] tw:placeholder:text-[13px] tw:placeholder:font-[550]",   // Configurações
     entradaLeitura: "input--leitura tw:bg-(--color-background) tw:text-zz-secondary tw:cursor-default tw:hover:bg-(--color-background) "
       + "tw:focus:bg-(--color-background) tw:focus:[box-shadow:none]",
-    // lista (select): seta própria no fundo; com "base-select" a lista aberta continua o campo (o resto em tipografia.css)
+    // lista (select): seta própria no fundo; com "base-select" a lista aberta continua o campo (o resto em css/base.css)
     lista: "select " + CAMPO + " tw:base:h-9 tw:base:py-0 tw:base:appearance-none tw:base:pr-[34px] tw:base:[background-image:var(--seta-select)] "
       + "tw:base:[background-repeat:no-repeat] tw:base:[background-position:right_10px_center] tw:base:disabled:bg-(--color-background) tw:base:disabled:text-zz-muted "
       + "tw:base:supports-[appearance:base-select]:[appearance:base-select] tw:base:supports-[appearance:base-select]:flex tw:base:supports-[appearance:base-select]:items-center "
@@ -277,7 +277,7 @@
     resumoRotulo: "tw:text-zz-secondary tw:text-[15px]",
     resumoRosca: "tw:grid tw:place-items-center",
 
-    /* ---------- Gráficos (components/charts.js) — line-chart, line-chart__svg e donut ficam como ganchos ---------- */
+    /* ---------- Gráficos (components/charts.ts) — line-chart, line-chart__svg e donut ficam como ganchos ---------- */
     graficoLinha: "line-chart tw:relative",
     graficoSuporte: "tw:w-full",
     graficoSvg: "line-chart__svg tw:block tw:overflow-visible",
@@ -340,7 +340,7 @@
     phValor: "tw:text-[20px] tw:font-[550] tw:w-auto tw:max-w-[220px] tw:[field-sizing:content] tw:min-w-[90px]",
     phExtra: "tw:text-right tw:text-[13px] tw:text-zz-secondary",
 
-    /* ---------- Edição no lugar (components/inline.js) e ícone escolhível ----------
+    /* ---------- Edição no lugar (components/inline.ts) e ícone escolhível ----------
        Edição "invisível": sem borda, fundo ou destaque, nem com foco — só o cursor de texto indica */
     noLugar: "inline-input tw:base:min-w-0 tw:base:w-full tw:base:py-0.5 tw:base:px-1.5 tw:base:-ml-[7px] tw:base:border tw:base:border-transparent tw:base:rounded-lg "
       + "tw:base:bg-transparent tw:base:[font:inherit] tw:base:text-inherit tw:base:text-ellipsis tw:base:outline-none tw:base:focus:[box-shadow:none]",
@@ -358,7 +358,7 @@
       + "tw:base:text-[22px] tw:base:p-0 tw:base:leading-none tw:base:[font-family:'Segoe_UI_Emoji','Apple_Color_Emoji','Noto_Color_Emoji',var(--font-family)] "
       + "tw:base:hover:border-zz-border-strong",
 
-    /* ---------- Painel da transação (pages/lancamento-painel.js); lp-props e lp-notes-wrap: ganchos da animação de entrada ---------- */
+    /* ---------- Painel da transação (pages/lancamento-painel.ts); lp-props e lp-notes-wrap: ganchos da animação de entrada ---------- */
     lp: "tw:flex tw:flex-col",
     lpTopo: "tw:grid tw:grid-cols-[minmax(0,1fr)_auto] tw:gap-4 tw:pb-4 tw:border-b tw:border-b-zz-border tw:-mx-(--page-gutter) tw:px-(--page-gutter) "
       + "tw:gaveta:grid-cols-[minmax(0,1fr)] tw:gaveta:gap-2",
@@ -392,7 +392,7 @@
     lpSituacaoErro: "tw:min-h-[18px] tw:pt-1.5 tw:text-[11.5px] tw:text-(--color-negative)",
     lpHistorico: "tw:pt-2",
 
-    /* ---------- Lista de transações nos painéis (components/list.js: ListaPainel) — "pl" fica como gancho ----------
+    /* ---------- Lista de transações nos painéis (components/list.ts: ListaPainel) — "pl" fica como gancho ----------
        Uma grade só para a lista inteira (meses, dias e linhas em subgrid): título, letra (P/R/T…), ícone da categoria
        e valor ficam na mesma coluna em todas as linhas. Colunas: respiro | caixa | letra | título | categoria | valor | respiro */
     pl: "pl tw:grid tw:grid-cols-[var(--page-gutter)_18px_auto_minmax(0,1fr)_auto_auto_var(--page-gutter)] tw:-mx-(--page-gutter)",
@@ -414,7 +414,7 @@
       + "tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] tw:text-[12px] tw:leading-none tw:mr-0.5",
     plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[15px] tw:font-[620] tw:whitespace-nowrap",
 
-    /* ---------- Configurações (pages/perfil.js e a seção do câmbio em components/cambio.js) ----------
+    /* ---------- Configurações (pages/perfil.ts e a seção do câmbio em components/cambio.ts) ----------
        [título / explicação ........ controle]; até 700 px o controle desce para a linha de baixo */
     cfgSecao: "tw:text-[15px] tw:font-[550] tw:pt-4 tw:pb-2 tw:mx-0 tw:mb-2 tw:border-b tw:border-zz-border tw:first:pt-0",
     cfgLinha: "tw:flex tw:items-center tw:justify-between tw:gap-5 tw:py-2.5 tw:ate700:flex-wrap",
@@ -439,6 +439,16 @@
       + "tw:hover:bg-zz-surface-hover tw:[&.is-active]:bg-zz-primary-soft tw:[&.is-active]:text-zz-primary tw:[&.is-active]:font-medium",
     freqRadio: "tw:[accent-color:var(--color-primary)] tw:size-4 tw:m-0",
     parcelasPrevia: "tw:mt-1.5 tw:[font-variant-numeric:tabular-nums]",
+
+    /* ---------- Bolinha, seta e contador da categoria (Categorias e Dashboard › Top categorias) ----------
+       Base com especificidade zero: o tamanho de cada tela vence. category-row__caret fica como gancho (clique na linha do grupo) */
+    catPonto: "tw:base:size-1.5 tw:base:rounded-[50%] tw:base:flex-none",
+    catSeta: "category-row__caret tw:base:size-[22px] tw:base:grid tw:base:place-items-center tw:base:-ml-1.5 tw:base:p-0 tw:base:[border:0] tw:base:rounded-md "
+      + "tw:base:bg-transparent tw:base:text-zz-secondary tw:base:hover:bg-zz-surface-hover tw:base:hover:text-zz-text",
+    catContador: "tw:base:min-w-5 tw:base:h-5 tw:base:py-0 tw:base:px-1.5 tw:base:inline-grid tw:base:place-items-center tw:base:rounded-md "
+      + "tw:base:bg-(--color-positive-soft) tw:base:text-(--color-positive) tw:base:text-[11.5px] tw:base:font-[600]",
+    // categorias dentro de um grupo aberto (a animação de abrir/fechar fica em ui.ts: corpoArvore)
+    arvoreGrupo: "tw:flex tw:flex-col",
 
     /* Ajustes das pílulas por contexto (telas e painéis que ainda montam as linhas com classes próprias) */
     ctxPilulasPainel: "tw:[&_.cat-pill]:font-[620] tw:[&_.cat-pill]:h-6 tw:[&_.tag]:text-[11px] tw:[&_.tag]:font-[620] tw:[&_.tag]:h-6",

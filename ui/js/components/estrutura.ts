@@ -1,8 +1,8 @@
 /* =============================================================
    ZoZo — Estrutura em Tailwind CSS
    Classes do menu lateral, da barra superior, da área principal e
-   do painel de informações (usadas por app.js, sidebar.js, list.js,
-   topbar.js, detail-panel.js e pages/comum.js).
+   do painel de informações (usadas por app.ts, sidebar.ts, list.ts,
+   topbar.ts, detail-panel.ts e pages/comum.ts).
    Estados (no #shell de index.html, que é o group/shell):
      data-menu="recolhido"  menu lateral escondido (computador)
      data-gaveta="aberta"   menu aberto como gaveta (celular)
@@ -82,7 +82,7 @@
     usuarioNome: "tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:estreito:hidden tw:gaveta:block",
     config: "tw:flex-none tw:size-9 tw:grid tw:place-items-center tw:[border:0] tw:rounded-lg tw:bg-transparent tw:text-(--sidebar-fg) tw:cursor-pointer "
       + "tw:hover:bg-(--sidebar-hover) tw:hover:text-white tw:focus-visible:outline-2 tw:focus-visible:outline-[color:#fff] tw:focus-visible:-outline-offset-2",
-    // grupos de contas (components/list.js: SidebarAccountGroup)
+    // grupos de contas (components/list.ts: SidebarAccountGroup)
     grupo: "tw:not-first:mt-3",
     grupoTopo: "side-group__header tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:h-7 tw:px-1.5 tw:py-0 tw:[border:0] tw:bg-transparent "
       + "tw:text-(--sidebar-fg-muted) tw:text-[15px] tw:font-[620] tw:rounded-[6px] tw:hover:text-white",
@@ -127,9 +127,10 @@
     barraAcoes: "tw:flex tw:items-center tw:gap-2 tw:flex-[0_1_auto] tw:min-w-0 tw:ate520:flex-auto",
     principal: "main tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:@container tw:focus:outline-none tw:focus-visible:outline-none "
       + "tw:has-[>.dash--na-tela]:overflow-y-hidden",
-    // página (o espaçamento base continua em .page, também usado por Configurações): com o menu recolhido,
+    // página: respiro do menu e do painel (base: a classe de cada página vence); com o menu recolhido,
     // o conteúdo recua junto com o título da barra (mesma curva: nada desalinha durante a animação)
-    pagina: "tw:largo:[transition:padding-left_var(--duration-medium)_var(--easing)] tw:largo:group-data-[menu=recolhido]/shell:pl-[60px] "
+    pagina: "tw:base:max-w-(--content-max) tw:base:m-0 tw:base:pt-5 tw:base:px-(--page-gutter) tw:base:pb-12 "
+      + "tw:largo:[transition:padding-left_var(--duration-medium)_var(--easing)] tw:largo:group-data-[menu=recolhido]/shell:pl-[60px] "
       + "tw:motion-reduce:transition-none!",
 
     /* ---------- Painel de informações ---------- */
@@ -165,8 +166,8 @@
     painelVazio: "tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:text-zz-muted tw:text-[15px] tw:animate-zz-surge",
     painelVazioIcone: "tw:text-zz-border-strong",
 
-    /* ---------- Menus flutuantes (components/menu.js e o conteúdo montado pelas páginas) ----------
-       "menu" é gancho: menu.js posiciona submenus com closest(".menu") e a impressão esconde os menus.
+    /* ---------- Menus flutuantes (components/menu.ts e o conteúdo montado pelas páginas) ----------
+       "menu" é gancho: menu.ts posiciona submenus com closest(".menu") e a impressão esconde os menus.
        Variações que mudam medidas do menu usam "!" (vencem as classes base, que também são Tailwind). */
     menuFlutuante: "menu tw:fixed tw:z-97 tw:min-w-[200px] tw:max-w-[320px] tw:max-h-[min(460px,calc(100vh_-_24px))] tw:overflow-y-auto tw:p-1.5 "
       + "tw:bg-zz-surface tw:border tw:border-zz-border tw:rounded-xl tw:[box-shadow:var(--shadow-popover)] tw:text-zz-text tw:animate-zz-menu",
@@ -211,7 +212,7 @@
       + "tw:[&_.toggle-label:empty]:hidden",
     menuInterruptorRotulo: "tw:flex-auto tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
 
-    /* ---------- Janelas modais (components/feedback.js: modal; components/modais.js: janela) ----------
+    /* ---------- Janelas modais (components/feedback.ts: modal; components/modais.ts: janela) ----------
        "modal", "modal-overlay" e "modal--x" continuam como ganchos: o JS procura a janela aberta e as peças
        ainda no CSS antigo (campos, botões, paleta de cores, Configurações) se ajustam dentro delas.
        is-visible (no fundo) é posta pelo JS logo depois de a janela entrar: fundo e caixa surgem juntos. */
@@ -239,7 +240,7 @@
     modalRodapeConfirmacao: "tw:flex tw:justify-end tw:gap-2 tw:pt-0 tw:px-6 tw:pb-5 " + RODAPE_CELULAR,
     modalTexto: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     modalTextoConfirmacao: "tw:text-zz-secondary tw:text-[13px] tw:font-[450] tw:max-w-none tw:[text-wrap:pretty]",
-    // conteúdo das janelas de criação (modais.janela) e de transferência (cambio.js)
+    // conteúdo das janelas de criação (modais.janela) e de transferência (cambio.ts)
     janelaRodape: "tw:flex tw:justify-end tw:gap-2 tw:pt-0 tw:px-6 tw:pb-4 tw:mt-4 tw:-mx-6 tw:mb-0 tw:empty:hidden " + RODAPE_CELULAR,
     janelaRodapeEsquerda: "tw:mr-auto",
     janelaForm: "tw:flex tw:flex-col tw:gap-4 tw:[&>.segmented--pilulas]:grid",

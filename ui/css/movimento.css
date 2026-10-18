@@ -1,0 +1,31 @@
+/* =============================================================
+   ZoZo — Movimento (animações de entrada que dependem da posição dos filhos)
+   O resto das animações está nas classes Tailwind (animate-zz-*).
+   Com "reduzir movimento" nada se mexe (aqui e em base.css).
+   ============================================================= */
+
+/* Troca de página: o conteúdo sobe um pouco ao entrar */
+.page--entrar { animation: page-in var(--duration-medium) var(--easing); }
+@keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Painel lateral: entrada suave ao começar uma transação e logo depois de criá-la */
+.lp--entrar { animation: lp-in 260ms var(--easing) both; }
+.lp--entrar .lp-props > *, .lp--entrar .lp-notes-wrap { animation: lp-in 300ms var(--easing) both; }
+.lp--entrar .lp-props > :nth-child(2) { animation-delay: 30ms; }
+.lp--entrar .lp-props > :nth-child(3) { animation-delay: 60ms; }
+.lp--entrar .lp-notes-wrap { animation-delay: 90ms; }
+@keyframes lp-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Troca de página: os blocos entram em sequência (o conteúdo "assenta" de cima para baixo) */
+.page--entrar > * { animation: bloco-in 380ms var(--easing) both; animation-delay: calc(var(--entrada-decorrida, 0ms) + 0ms); }
+.page--entrar > :nth-child(2) { animation-delay: calc(var(--entrada-decorrida, 0ms) + 40ms); }
+.page--entrar > :nth-child(3) { animation-delay: calc(var(--entrada-decorrida, 0ms) + 80ms); }
+.page--entrar > :nth-child(n+4) { animation-delay: calc(var(--entrada-decorrida, 0ms) + 120ms); }
+/* Blocos com gráfico só deslizam (sem esmaecer): o gráfico começa a se desenhar já visível, como antes da 2.8 */
+.page--entrar > :has(.line-chart, .donut) { animation-name: bloco-desliza; }
+@keyframes bloco-desliza { from { transform: translateY(10px); } to { transform: none; } }
+@keyframes bloco-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp--entrar, .lp--entrar *, .page--entrar > * { animation: none !important; }
+}

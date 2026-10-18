@@ -93,7 +93,7 @@
     docPixTexto: "tw:mt-0.5 tw:mx-0 tw:mb-0 tw:max-w-[150px] tw:text-left tw:text-[12px] tw:font-[620] tw:leading-[1.35] tw:text-[#6948D8]",
   };
 
-  /* ---------------- Cálculo (regras configuráveis em js/config/regras.js) ---------------- */
+  /* ---------------- Cálculo (regras configuráveis em js/config/regras.ts) ---------------- */
   function sinalDoTipo(tipo: any) {
     const s = R().sinalPorTipo[tipo];
     return s === undefined ? 1 : s;

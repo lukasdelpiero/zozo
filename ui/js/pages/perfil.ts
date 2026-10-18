@@ -90,7 +90,7 @@
   const mesInteiro = (mesIso?: any) => F.mesNome((F.parseData((mesIso || F.iso(new Date()).slice(0, 7)) + "-01") || new Date()).getMonth());
 
   function verLancamentos(p: any, ctx: ContextoApp) {
-    ZoZo.lancamentosShared.setFiltros(Object.assign(ZoZo.lancamentosShared.FILTROS_VAZIOS(), { perfis: [p.id] }));
+    ZoZo.lancamentosShared.setFiltros(Object.assign(ZoZo.lancamentosShared.FILTROS_VAZIOS(), { perfis: [p.id] }), ctx);
     store.set({ ui: { busca: "" } });
     ctx.navigate("lancamentos");
   }
@@ -204,7 +204,7 @@
 
   ZoZo.pages.perfil = {
     titulo: "Perfis",
-    recurso: "perfis",                 // a página só existe para contas com o recurso (router.js)
+    recurso: "perfis",                 // a página só existe para contas com o recurso (router.ts)
     topbar: (ctx) => [UI.IconButton("mais", "Novo perfil", { onPrimary: true, onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (p: any) => abrirDetalhe(Object.assign({ gasto: 0, quantidade: 0 }, p), ctx) }) })],
     carregar: (ctx, force) => ctx.loadData("perfis", A.getPerfis, null, { force }),
     deps: (s) => [s.data.perfis, s.errors.perfis, s.selectedItem, s.ui.gruposFechados],

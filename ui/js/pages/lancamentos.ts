@@ -4,7 +4,7 @@
    informações · seleção múltipla com ações em lote · painel com
    visualização e edição (Grid Superior / Central / Inferior / Notas)
    Visual em Tailwind (tabela T abaixo; a linha da transação está em
-   components/list.js). Classes sem tw: que sobraram são ganchos
+   components/list.ts). Classes sem tw: que sobraram são ganchos
    (selbar: impressão; page--lancamentos: página atual).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
@@ -80,7 +80,7 @@
   /** Listas de ids dentro dos filtros (conta, categoria, perfil, recorrência, tipo) */
   type ChaveLista = "contas" | "categorias" | "perfis" | "recorrencias" | "tipos";
   const filtros = (): FiltrosLancamentos => Object.assign(FILTROS_VAZIOS(), store.get().ui.filtros || {});
-  const setFiltros = (patch: Partial<FiltrosLancamentos>, ctx: ContextoApp) => {
+  const setFiltros = (patch: Partial<FiltrosLancamentos>, ctx?: ContextoApp) => {
     store.set({ ui: { filtros: Object.assign(filtros(), patch), selecionados: [] } });
     if (ctx) ctx.refreshTopbar();
   };
@@ -329,7 +329,7 @@
   /* ---------------- Recarregamento após alterações (seção 54) ---------------- */
   function aposAlterar(ctx: ContextoApp) { return ctx.recarregarTudo(); }
 
-  /* ---------------- Painel do lançamento (js/pages/lancamento-painel.js) ---------------- */
+  /* ---------------- Painel do lançamento (js/pages/lancamento-painel.ts) ---------------- */
   function abrirVisualizacao(l: any, ctx: ContextoApp, opts?: any) { return ZoZo.lancamentoPainel.abrir(l, ctx, opts); }
   function abrirFormulario(l: any, ctx: ContextoApp, preset?: any) { return ZoZo.lancamentoPainel.abrir(l, ctx, l ? {} : { preset }); }
 
@@ -457,7 +457,7 @@
     return [
       UI.IconButton("mais", "Nova transação", { onPrimary: true, onClick: () => abrirFormulario(null, ctx) }),
       ZoZo.recursos.boleto() ? UI.IconButton("boleto", "Criar fatura", { onPrimary: true, onClick: () => ZoZo.boleto.open(ctx, { perfilId: filtros().perfis[0] || null }) }) : null,
-      UI.IconButton("baixar-circulo", "Exportar transações (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget) }),
+      UI.IconButton("baixar-circulo", "Exportar transações (CSV)", { onPrimary: true, onClick: (e) => ZoZo.exportarCsv(ctx, e.currentTarget as HTMLButtonElement) }),
       // Multicâmbio: trazer transações de outra moeda para a escolhida (a qualquer momento, não só na 1ª vez)
       ZoZo.cambio.disponivelTransferir() ? UI.IconButton("interno", "Trazer transações de outra moeda", { onPrimary: true, onClick: () => ZoZo.cambio.abrirTransferencia(ctx) }) : null,
       h("div", { class: T.pesquisa }, icon("pesquisar", { size: 15, class: "tw:text-zz-muted" }), busca, filtroBtn),

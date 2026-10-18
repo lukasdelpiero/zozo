@@ -1,5 +1,7 @@
 /* =============================================================
-   ZoZo — Base
+   ZoZo — Base (o que vale para a página inteira; os componentes estão em Tailwind)
+   Fontes, reset (o Tailwind roda sem o preflight), foco, dinheiro,
+   estados aplicados em qualquer botão e a lista aberta do campo de seleção.
    ============================================================= */
 /* Fonte Matter (local, funciona offline) */
 @font-face {
@@ -67,6 +69,7 @@ button:disabled { cursor: not-allowed; }
   text-align: right;
 }
 .money--income { color: var(--color-income); }
+.money--negative { color: var(--color-negative) !important; }
 
 /* Foco visível (seção 61) */
 :focus { outline: none; }
@@ -77,6 +80,27 @@ button:disabled { cursor: not-allowed; }
 }
 
 /* Barra de rolagem: a do sistema (Windows 11: polegar cinza arredondado com setas), sem personalização */
+
+/* Confirmação no próprio botão (ex.: "Código Pix copiado") */
+.is-confirmado, .is-confirmado .icon { color: var(--color-positive) !important; }
+
+/* Combobox (select): aberta, a lista continua o campo — mesma borda, sem o arredondamento de baixo no campo,
+   e o arredondamento passa para o fim da lista. Navegadores sem "base-select" mostram a lista nativa. */
+@supports (appearance: base-select) {
+  .select::picker-icon { display: none; }                         /* a seta já vem no fundo do campo */
+  .select::picker(select) {
+    appearance: base-select;
+    margin: 0; padding: 4px; border: 1px solid var(--color-primary); border-top: 0; border-radius: 0 0 8px 8px;
+    background: var(--color-surface); box-shadow: 0 10px 24px rgba(22, 33, 58, 0.12);
+    min-inline-size: anchor-size(self-inline); max-block-size: min(320px, 50vh);
+    position-try-fallbacks: none;
+  }
+  .select option { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 10px; border-radius: 6px;
+    font-size: var(--font-size-md); color: var(--color-text-primary); cursor: pointer; }
+  .select option:hover, .select option:focus-visible { background: var(--color-primary-soft); outline: none; }
+  .select option:checked { color: var(--color-primary); font-weight: 550; }
+  .select option::checkmark { order: 1; margin-left: auto; color: var(--color-primary); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }

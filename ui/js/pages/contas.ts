@@ -1,7 +1,7 @@
 /* =============================================================
    ZoZo — Contas (seções 18–22, 26–28)
    Visual em Tailwind (tabela T abaixo; a linha da conta está em
-   components/list.js; peças compartilhadas em components/pecas.ts).
+   components/list.ts; peças compartilhadas em components/pecas.ts).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
   "use strict";
