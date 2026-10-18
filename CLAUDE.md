@@ -24,5 +24,6 @@ O padrão obrigatório está em @docs/SEGURANCA.md — leia antes de mexer em lo
 - Busca: local, em `ui/js/core/busca.ts` (os dados são cifrados de ponta a ponta — nunca use um servidor de busca como Meilisearch/Algolia, que exigiria os dados legíveis fora do navegador).
 - E-mail no servidor local: `ZOZO_DEV_EMAIL=console` (mostra os e-mails no terminal) e `ZOZO_DEV_BANCO=<arquivo>` (banco descartável).
 - Back-end: transição para FastAPI + Pydantic em `api/src/app_fastapi.py` (desligado no Cloudflare; o núcleo continua dono das regras).
+- Backup e restauração do banco: `docs/RESTAURACAO.md` (export + `api/dev/conferir_backup.py`; nunca ensaiar restauração por cima do banco de usuários)
 - Publicar na **prévia** (testes): `.\api\publicar.ps1 previa`
 - Publicar em **produção**: `.\api\publicar.ps1 producao` (só depois de testar na prévia)
