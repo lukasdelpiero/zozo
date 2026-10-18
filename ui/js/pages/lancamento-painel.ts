@@ -222,23 +222,23 @@
         h("span", null, conta ? conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "") : "Sem conta")];
       const btn = h("button", { type: "button", class: ZoZo.pecas.lpConta, "aria-haspopup": "menu", title: "Trocar conta" }, conteudo);   // clicar na conta abre a lista
       const escolhiveis = contas.filter((c: any) => (!c.oculta || c.id === d.contaId) && (!ehDebito(d) || c.tipo !== "cartao"));   // débito: cartão não
-      btn.addEventListener("click", () => ZoZo.menu.abrir(btn, escolhiveis.map((c: any) => ({
-        label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), check: c.id === d.contaId,
-        onClick: () => {
+      btn.addEventListener("click", () => ZoZo.menu.contas(btn, {
+        contas: escolhiveis, atual: d.contaId,
+        aoEscolher: (c: any) => {
           if (c.id === d.contaId) return;
           const antes = d.contaId; d.contaId = c.id;
           if (novo) desenhar(); else salvar(() => { d.contaId = antes; }).then(reabrir);
         },
-      })).concat(escolhiveis.length ? [] : [{ label: ehDebito(d) ? "Nenhuma conta (cartão não vale para débito)" : "Nenhuma conta cadastrada", desabilitado: true }],
-        [{ separador: true }, ehDebito(d)
+        vazio: ehDebito(d) ? "Nenhuma conta (cartão não vale para débito)" : "Nenhuma conta cadastrada",
+        rodape: [ehDebito(d)
           ? { icone: "mais", label: "Nova conta", onClick: () => novaConta("corrente") }
           : { icone: "mais", label: "Nova conta", submenu: [
             { icone: "banco", label: "Conta corrente ou poupança", onClick: () => novaConta("corrente") },
             { icone: "cartao", label: "Cartão de crédito", onClick: () => novaConta("cartao") },
             { icone: "investimentos", label: "Investimentos", onClick: () => novaConta("investimento") },
             { icone: "emprestimo", label: "Empréstimos", onClick: () => novaConta("emprestimo") },
-            { icone: "carteira", label: "Outros", onClick: () => novaConta("outros") }] }]),
-      { posicao: "esquerda", label: "Conta", largura: 260 }));
+            { icone: "carteira", label: "Outros", onClick: () => novaConta("outros") }] }],
+      }));
       const origem = conta && conta.tipo === "investimento" ? "investimentos" : "contas";
       return h("div", { class: ZoZo.pecas.lpContaLinha }, btn,
         conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa })) : null);
@@ -329,19 +329,17 @@
       const p = perfilAtual();
       const btn = p ? h("button", { type: "button", class: ZoZo.pecas.lpPilulaBotao, "aria-haspopup": "menu" }, UI.Tag(p.nome, p.cor, { class: "tag--upper" }))
         : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar perfil", "aria-haspopup": "menu" }, icon("mais", { size: 14 }));
-      btn.addEventListener("click", () => ZoZo.menu.abrir(btn, perfis.filter((x: any) => !x.arquivado || x.id === d.perfilId).map((x: any) => ({
-        render: (api: any) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, x.id === d.perfilId && "is-checked"], onClick: () => {
-          api.fechar(); const antes = d.perfilId; d.perfilId = x.id; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
-        } }, UI.Tag(x.nome, x.cor, { class: "tag--upper" })),
-      })).concat([
-        // sem "Sem perfil": nas contas com Perfis toda transação tem perfil (regra do serviço)
-        { separador: true }, { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np: any) => {
+      // sem "Sem perfil": nas contas com Perfis toda transação tem perfil (regra do serviço)
+      btn.addEventListener("click", () => ZoZo.menu.perfis(btn, ctx, {
+        perfis: perfis.filter((x: any) => !x.arquivado || x.id === d.perfilId), atual: d.perfilId,
+        aoEscolher: (x: any) => { const antes = d.perfilId; d.perfilId = x.id; if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir); },
+        aoCriar: (np: any) => {
           const antes = d.perfilId; d.perfilId = np.id;
           ctx.loadData("perfis", A.getPerfis, null, { force: true }).catch(() => null).then(() => {
             if (novo) desenhar(); else salvar(() => { d.perfilId = antes; }).then(reabrir);
           });
-        } }) },
-      ].filter(Boolean)), { posicao: "esquerda", label: "Perfil", largura: 240 }));
+        },
+      }));
       return btn;
     }
 

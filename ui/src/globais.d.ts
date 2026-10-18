@@ -24,6 +24,10 @@ declare global {
     mount<T extends Node>(el: T, ...filhos: FilhoDom[]): T;
     append(pai: Node, filho: FilhoDom): void;
     id(prefixo?: string): string;
+    /** Emoji centrado pelo desenho (cada emoji tem a tinta numa posição diferente da caixa) */
+    emoji(texto: unknown, classe?: string): HTMLElement;
+    /** "dx dy" (em) que centraliza o desenho de um emoji numa caixa inline-block de line-height 1 ("" = já centrado) */
+    ajusteEmoji(texto: string, fontes?: string): string;
   }
 
   /** js/core/state.ts — estado central (os dados de cada tela ainda são `any`: vêm de módulos em JS) */
@@ -350,7 +354,13 @@ declare global {
     abrir(anchor: HTMLElement, itens: ItensMenu, opts?: OpcoesMenu): void;
     fechar(devolverFoco?: boolean): void;
     listaMarcavel(cfg: ConfigListaMarcavel): ConteudoMenu;
+    /** Menu de perfis (o mesmo do painel da transação, da divisão e da fatura) */
+    perfis(anchor: HTMLElement, ctx: ContextoApp, o: OpcoesMenuPerfil): void;
+    /** Menu de contas (o mesmo do painel da transação e da fatura) */
+    contas(anchor: HTMLElement, o: OpcoesMenuConta): void;
   }
+  interface OpcoesMenuPerfil { perfis: unknown[]; atual?: string | null; aoEscolher(p: any): void; aoCriar?(p: any): void; posicao?: "direita" | "esquerda" | "acima" }
+  interface OpcoesMenuConta { contas: unknown[]; atual?: string | null; aoEscolher(c: any): void; vazio?: string; rodape?: ItemMenu[]; posicao?: "direita" | "esquerda" | "acima" }
 
   /** js/components/sidebar.ts — menu lateral */
   interface ItemNavegacao { id: string; label: string; icon: string; recurso?: keyof ZoZoRecursos }

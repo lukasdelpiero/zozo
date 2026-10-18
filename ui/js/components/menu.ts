@@ -216,7 +216,7 @@
               onClick: () => { cfg.alternar(it.value); desenhar(); } },
               h("span", { class: marcado ? E.menuCaixaMarcada : E.menuCaixa, "aria-hidden": "true" }, marcado ? icon("check", { size: 11, stroke: 3 }) : null),
               it.cor ? h("span", { class: E.menuPonto, style: { background: ZoZo.format.cor(it.cor, "var(--palette-16)") } }) : null,
-              it.icone ? h("span", { class: E.menuEmoji, "aria-hidden": "true" }, it.icone) : null,
+              it.icone ? h("span", { class: E.menuEmoji, "aria-hidden": "true" }, ZoZo.dom.emoji(it.icone)) : null,
               h("span", { class: E.menuRotulo }, it.label));
           }) : h("p", { class: E.menuVazio }, cfg.vazio || "Nada encontrado."));
         };
@@ -231,6 +231,26 @@
     };
   }
 
-  const apiMenu: ZoZoMenu = { abrir, fechar, listaMarcavel };
+  /* ---------- Menus de perfil e de conta: os MESMOS no painel da transação, na divisão e na fatura ---------- */
+  /** Perfis em pílula (caixa alta) + "Novo perfil" (o novo já vem escolhido) */
+  function perfis(anchor: HTMLElement, ctx: ContextoApp, o: OpcoesMenuPerfil): void {
+    abrir(anchor, (o.perfis as any[]).map((p): ItemMenu => ({
+      render: (api) => h("button", { type: "button", class: [E.menuItem, p.id === o.atual && "is-checked"], onClick: () => { api.fechar(); o.aoEscolher(p); } },
+        ZoZo.ui.Tag(p.nome, p.cor, { class: "tag--upper" })),
+    })).concat([
+      { separador: true },
+      { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np: any) => (o.aoCriar || o.aoEscolher)(np) }) },
+    ]), { posicao: o.posicao || "esquerda", label: "Perfil", largura: 240 });
+  }
+  /** Contas pelo nome + 4 últimos dígitos (marcada a atual); rodapé opcional (ex.: "Nova conta") */
+  function contas(anchor: HTMLElement, o: OpcoesMenuConta): void {
+    const lista = o.contas as any[];
+    abrir(anchor, lista.map((c): ItemMenu => ({
+      label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), check: c.id === o.atual, onClick: () => o.aoEscolher(c),
+    })).concat(lista.length ? [] : [{ label: o.vazio || "Nenhuma conta cadastrada", desabilitado: true }],
+      o.rodape && o.rodape.length ? [{ separador: true } as ItemMenu].concat(o.rodape) : []), { posicao: o.posicao || "esquerda", label: "Conta", largura: 260 });
+  }
+
+  const apiMenu: ZoZoMenu = { abrir, fechar, listaMarcavel, perfis, contas };
   ZoZo.menu = apiMenu;
 })(window.ZoZo);

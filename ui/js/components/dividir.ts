@@ -52,8 +52,8 @@
       + "tw:[&_ul]:m-0 tw:[&_ul]:p-0 tw:[&_ul]:list-none tw:[&_ul]:grid tw:[&_ul]:gap-1 tw:[&_li]:m-0 tw:[&_li]:text-left tw:[&_li]:leading-[1.4] "
       + "tw:[&_p]:m-0 tw:[&_p]:text-left tw:[&_p]:leading-[1.4]",
     rodape: "tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-5",
-    restante: "tw:flex tw:items-center tw:gap-2.5 tw:text-[15px] tw:font-[550]",
-    restanteValor: "money tw:text-(--color-income) tw:font-[550] tw:[&.is-negative]:text-(--color-negative)",
+    restante: ZoZo.pecas.restante,
+    restanteValor: ZoZo.pecas.restanteValor,
     acoes: "tw:flex tw:gap-2",
   };
 
@@ -106,15 +106,11 @@
       } }, { posicao: "direita", largura: 280, label: "Categoria", focar: false });
     }
     function menuPerfil(btn: HTMLElement, parte: Parte) {
-      ZoZo.menu.abrir(btn, { largura: 240, render(el: HTMLElement, api: { fechar(): void }) {
-        const atuais = (): any[] => ((store.get().data.perfis || {}).perfis || []).filter((p: any) => !p.arquivado);
-        mount(el, h("div", { class: ZoZo.estrutura.menuListaRolagem }, atuais().map((p) =>
-          h("button", { type: "button", class: [ZoZo.estrutura.menuItem, p.id === parte.perfilId && "is-checked"], onClick: () => { api.fechar(); parte.perfilId = p.id; desenhar(); } },
-            UI.Tag(p.nome, p.cor, { class: "tag--upper" })))),
-          h("div", { class: ZoZo.estrutura.menuSeparador }),
-          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novoPerfil(ctx, { aoCriar: (np: any) => { perfis.push(np); parte.perfilId = np.id; desenhar(); } }); } },
-            icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Novo perfil")));
-      } }, { posicao: "direita", largura: 240, label: "Perfil" });
+      ZoZo.menu.perfis(btn, ctx, {
+        perfis: ((store.get().data.perfis || {}).perfis || []).filter((p: any) => !p.arquivado), atual: parte.perfilId, posicao: "direita",
+        aoEscolher: (p: any) => { parte.perfilId = p.id; desenhar(); },
+        aoCriar: (np: any) => { perfis.push(np); parte.perfilId = np.id; desenhar(); },
+      });
     }
 
     function linha(parte: Parte, i: number) {

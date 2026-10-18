@@ -422,7 +422,7 @@
               regulares.map((c: any) => {
                 const resto = F.numero(c.reservado) - F.numero(c.gasto);
                 return h("button", { type: "button", class: [T.tabelaLinha, T.tabelaLinhaBotao], role: "row", onClick: () => abrirDetalhe(c, ctx) },
-                  h("span", { class: T.tabelaNome, role: "cell" }, h("span", { class: ZoZo.pecas.catPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }), h("span", null, (c.icone || "") + " " + c.nome)),
+                  h("span", { class: T.tabelaNome, role: "cell" }, h("span", { class: ZoZo.pecas.catPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }), h("span", null, c.icone ? [ZoZo.dom.emoji(c.icone), " "] : null, c.nome)),
                   h("span", { class: "money", role: "cell" }, F.moeda(c.gasto)),
                   h("span", { class: "money", role: "cell" }, F.moeda(c.reservado)),
                   h("span", { class: ["money", resto < 0 && "money--negative"], role: "cell" }, (resto < 0 ? "−" : "") + F.moeda(resto)));
@@ -452,7 +452,7 @@
               ctx.toast("Categoria criada.");
               return ctx.recarregarTudo().then(() => abrirDetalhe(Object.assign({ gasto: 0 }, r.categoria), ctx));
             }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
-          } }, h("span", { class: ZoZo.estrutura.menuEmoji }, m.icone), h("span", { class: ZoZo.estrutura.menuRotulo }, m.nome)))
+          } }, h("span", { class: ZoZo.estrutura.menuEmoji }, ZoZo.dom.emoji(m.icone)), h("span", { class: ZoZo.estrutura.menuRotulo }, m.nome)))
             : h("p", { class: ZoZo.estrutura.menuVazio }, termo ? "Nenhum modelo encontrado." : "Todos os modelos já foram criados."));
       };
       busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });

@@ -347,6 +347,13 @@
     noLugarValor: "tw:base:text-right tw:base:ml-0 tw:base:-mr-[7px]",
     // nome do usuário nas Configurações: 220 px alinhado à direita; até 700 px ocupa a linha toda
     cfgNoLugar: "tw:w-[220px] tw:text-right tw:ml-0 tw:-mr-[7px] tw:text-[13px] tw:font-[550] tw:ate700:w-full tw:ate700:text-left tw:ate700:m-0",
+    // "Restante para dividir" (divisão) e "Restante a pagar" (fatura): rótulo e valor (verde; vermelho se passar do total)
+    restante: "tw:flex tw:items-center tw:gap-2.5 tw:text-[15px] tw:font-[550]",
+    restanteValor: "money tw:text-(--color-income) tw:font-[550] tw:[&.is-negative]:text-(--color-negative)",
+    // campo que abre um menu (perfil, conta): mesma cara de um input, seta à direita
+    campoMenu: "tw:inline-flex tw:items-center tw:justify-between tw:gap-2 tw:cursor-pointer tw:text-left tw:min-w-0 "
+      + "tw:[&>.icon]:text-zz-secondary tw:[&>.icon]:flex-none",
+    campoMenuVazio: "tw:text-zz-muted tw:truncate",
     // divisão entre perfis: nome, valor e percentual de cada parte
     dvNome: "tw:text-[15px] tw:font-[450]",
     dvValor: "tw:text-[15px] tw:font-[550] tw:text-right tw:m-0",

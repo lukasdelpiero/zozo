@@ -273,7 +273,7 @@
       "aria-current": o.selected ? "true" : undefined,
       "data-id": r.id,
     },
-      h("span", { class: [RR.data, p.data] }, o.semData ? h("span", { class: RR.icone, "aria-hidden": "true" }, (r.categoria && r.categoria.icone) || "•")
+      h("span", { class: [RR.data, p.data] }, o.semData ? h("span", { class: RR.icone, "aria-hidden": "true" }, ZoZo.dom.emoji(r.categoria && r.categoria.icone))
         : F.dataCurta(r.data) + (r.data.slice(0, 4) !== String(new Date().getFullYear()) ? " " + r.data.slice(2, 4) : "")),
       h("span", { class: RR.desc },
         h("span", { class: [RR.titulo, p.titulo] }, r.descricao),
@@ -366,7 +366,7 @@
         h("span", { class: ZoZo.pecas.plNome },
           h("span", { class: ZoZo.pecas.plTitulo }, l.descricao),
           l.parcelaTotal ? h("span", { class: "launch-row__parcel" }, l.parcelaAtual + "/" + l.parcelaTotal) : null),
-        l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, l.categoria.icone || "•") : null,
+        l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, ZoZo.dom.emoji(l.categoria.icone)) : null,
         h("span", { class: [ZoZo.pecas.plValor, verde && "money--income"] }, F.moeda(l.valor))));
     });
     return h("div", { class: ZoZo.pecas.pl }, blocos);

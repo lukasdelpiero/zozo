@@ -68,9 +68,11 @@
     const tipo = tem("modal--confirm") ? "Confirmacao" : tem("modal--settings") ? "Config" : tem("modal--dividir") ? "Dividir" : tem("modal--zm") ? "Janela" : "";
     // ex.: modalTopoConfirmacao, senão modalTopo; a divisão é uma janela de criação (corpo igual ao das janelas)
     const parte = (nome: string) => E[nome + tipo] || (tipo === "Dividir" && E[nome + "Janela"]) || E[nome];
+    // título centralizado em CAIXA ALTA (o da divisão), também em janelas comuns que pedirem (modal--titulo-central)
+    const tituloCentral = tem("modal--titulo-central");
     const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", "aria-modal": "true", "aria-labelledby": tituloId },
-      h("header", { class: parte("modalTopo") },
-        h("h2", { class: parte("modalTitulo"), id: tituloId }, o.title || ""),
+      h("header", { class: tituloCentral ? E.modalTopoDividir : parte("modalTopo") },
+        h("h2", { class: tituloCentral ? E.modalTituloDividir : parte("modalTitulo"), id: tituloId }, o.title || ""),
         h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
       h("div", { class: parte("modalCorpo") }, o.body || null),
       o.actions ? h("footer", { class: tipo === "Confirmacao" ? E.modalRodapeConfirmacao : E.modalRodape }, o.actions(fechar)) : null);

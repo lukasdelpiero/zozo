@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.11.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.11.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,11 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.11.1
+
+- **Emojis sempre centralizados:** cada emoji tem o desenho numa posição diferente da caixa da letra (o 💳, por exemplo, é um cartão baixo, encostado na linha de base, e ficava ~4 px abaixo do centro). O desenho de cada emoji é medido uma vez e compensado — nos ícones das categorias (botão de escolher, pílulas, listas, menus, Dashboard) e também na grade do seletor de emoji. Medido: todos a menos de 1 px do centro.
+- **Janela de pagar fatura:** título "PAGAR FATURA" centralizado em caixa alta (o mesmo estilo da janela de dividir); 4 últimos dígitos e saldo na mesma linha; perfil e conta a debitar na mesma linha, com os MESMOS menus dos painéis (agora compartilhados entre o painel da transação, a divisão e a fatura); "Restante a pagar" no canto inferior esquerdo, com o tamanho, o peso e a cor do "Restante para dividir" (vermelho se o valor passar da fatura); saldo da conta escolhida abaixo do campo.
 
 ## Novidades da versão 3.11.0
 

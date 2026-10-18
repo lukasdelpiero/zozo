@@ -47,8 +47,8 @@
   /** Botão de ícone (emoji) que abre o seletor de emojis */
   function seletorIcone(valor: string | null | undefined, aoMudar: (emoji: string) => void): HTMLElement {
     let atual = valor || "📦";
-    const btn = h("button", { type: "button", class: ZoZo.pecas.iconeEscolha, "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, atual);
-    btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e: string) => { atual = e; btn.textContent = e; aoMudar(e); } }));
+    const btn = h("button", { type: "button", class: ZoZo.pecas.iconeEscolha, "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, ZoZo.dom.emoji(atual));
+    btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e: string) => { atual = e; mount(btn, ZoZo.dom.emoji(e)); aoMudar(e); } }));
     return btn;
   }
 
@@ -297,30 +297,75 @@
       const contas = ((dc && dc.contas) || []).filter((c: any) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
       const perfis = ((dp && dp.perfis) || []).filter((p: any) => !p.arquivado);
       const centavos = (v: number) => Math.round(v * 100);
+      const P = ZoZo.pecas;
+      const FR = ZoZo.messages.FRIENDLY;
+      let perfil: any = null, conta: any = null;
       janela({
-        titulo: "Fatura",
-        classe: "modal--nova-conta",
+        titulo: "Pagar fatura",
+        classe: "modal--nova-conta modal--titulo-central",
         passo: (api) => {
           const leitura = (valor: string) => { const i = UI.Input({ value: valor, class: "input--leitura" }); i.readOnly = true; return i; };
           const valor = campoDinheiro(fatura);
-          const perfilSel = perfis.length ? UI.Select([{ value: "", label: "Selecione o perfil" }].concat(perfis.map((p: any) => ({ value: p.id, label: p.nome })))) : null;
-          const contaSel = UI.Select([{ value: "", label: contas.length ? "Selecione a conta" : "Nenhuma conta corrente, poupança ou outros" }]
-            .concat(contas.map((c: any) => ({ value: c.id, label: c.nome + " · " + F.moeda(c.valor) }))));
-          const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
-          const FR = ZoZo.messages.FRIENDLY;
+          const erro = h("p", { class: P.erroForm, role: "alert" });
+          // Restante a pagar: fatura − valor digitado (vermelho se passar da fatura)
+          const restanteEl = h("span", { class: P.restanteValor, "aria-live": "polite" });
+          const atualizarRestante = () => {
+            const v = valor.ler();
+            const resto = centavos(fatura) - (Number.isFinite(v) ? centavos(v) : 0);
+            restanteEl.textContent = (resto < 0 ? "−" : "") + F.moeda(Math.abs(resto) / 100);
+            restanteEl.classList.toggle("is-negative", resto < 0);
+          };
+          valor.input.addEventListener("input", atualizarRestante);
+          atualizarRestante();
+
+          // Perfil e conta: botões com cara de campo que abrem os MESMOS menus dos painéis (ZoZo.menu.perfis / contas)
+          const campoMenu = () => h("button", { type: "button", class: [P.entrada, P.campoMenu], "aria-haspopup": "menu" });
+          const seta = () => ZoZo.icons.icon("chevron-down", { size: 14, stroke: 2.25 });
+          const perfilBtn = comPerfis ? campoMenu() : null;
+          const desenharPerfil = () => {
+            if (!perfilBtn) return;
+            perfilBtn.setAttribute("aria-label", "Perfil: " + (perfil ? perfil.nome : "nenhum escolhido"));
+            mount(perfilBtn, perfil ? UI.Tag(perfil.nome, perfil.cor, { class: "tag--upper" }) : h("span", { class: P.campoMenuVazio }, "Selecione o perfil"), seta());
+          };
+          if (perfilBtn) perfilBtn.addEventListener("click", () => ZoZo.menu.perfis(perfilBtn, ctx, {
+            perfis, atual: perfil && perfil.id,
+            aoEscolher: (p: any) => { perfil = p; desenharPerfil(); },
+            aoCriar: (np: any) => { perfis.push(np); perfil = np; desenharPerfil(); },
+          }));
+          const contaBtn = campoMenu();
+          const saldoConta = h("span");
+          const desenharConta = () => {
+            contaBtn.setAttribute("aria-label", "Conta a debitar: " + (conta ? conta.nome : "nenhuma escolhida"));
+            mount(contaBtn, conta
+              ? h("span", { class: P.lpContaLinha }, h("span", { class: P.lpContaPonto, style: { background: F.cor(conta.cor, "var(--palette-16)") } }),
+                h("span", { class: "tw:truncate" }, conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "")))
+              : h("span", { class: P.campoMenuVazio }, contas.length ? "Selecione a conta" : "Nenhuma conta disponível"), seta());
+            saldoConta.textContent = conta ? "Saldo: " + F.moeda(conta.valor) : "Corrente, poupança ou outros";
+          };
+          contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
+            contas, atual: conta && conta.id, vazio: "Nenhuma conta corrente, poupança ou outros",
+            aoEscolher: (c: any) => { conta = c; desenharConta(); },
+            rodape: [{ icone: "mais", label: "Nova conta", onClick: () => novaConta(ctx, "corrente", { aoCriar: (nc: any) => {
+              ctx.loadData("contas", A.getContas, null, { force: true }).then((r: any) => {
+                const criada = ((r && r.contas) || []).find((x: any) => x.id === nc.id);
+                if (criada && CONTAS_PAGAMENTO.includes(criada.tipo)) { contas.push(criada); conta = criada; desenharConta(); }
+              }).catch(() => null);
+            } }) }],
+          }));
+          desenharPerfil(); desenharConta();
+
           const enviar = (btn: HTMLButtonElement) => {
             const v = valor.ler();
-            const conta = contas.find((c: any) => c.id === contaSel.value);
             // conferência na tela (mensagem na hora); o serviço confere de novo
             const problema = !(Number.isFinite(v) && centavos(v) > 0) ? FR.PAYMENT_INVALID
               : centavos(v) > centavos(fatura) ? FR.PAYMENT_ABOVE_INVOICE
-              : perfilSel && !perfilSel.value ? FR.PROFILE_REQUIRED
+              : perfilBtn && perfis.length && !perfil ? FR.PROFILE_REQUIRED
               : !conta ? FR.PAYMENT_ACCOUNT
               : centavos(v) > centavos(F.numero(conta.valor)) ? FR.INSUFFICIENT_FUNDS : "";
             if (problema) { erro.textContent = problema; return; }
             erro.textContent = "";
             btn.disabled = true;
-            ctx.bridge.request(A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: v, perfilId: perfilSel ? perfilSel.value : null })
+            ctx.bridge.request(A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: v, perfilId: perfil ? perfil.id : null })
               .then(() => { api.fechar(); ctx.toast("Pagamento realizado com sucesso."); return ctx.recarregarTudo().then(() => { if (aoPagar) aoPagar(); }); })
               .catch((e: ErroPonte) => { erro.textContent = e.friendly; btn.disabled = false; });
           };
@@ -329,14 +374,15 @@
             corpo: h("div", { class: ZoZo.estrutura.janelaForm },
               semFatura ? h("p", { class: ZoZo.estrutura.modalTexto }, FR.NO_INVOICE) : null,
               UI.Field("Nome", leitura(cartao.nome)),
-              UI.Field("4 últimos dígitos", leitura(cartao.ultimos4Digitos || "—")),
-              UI.Field("Saldo (fatura atual)", valor.el),
-              perfilSel ? UI.Field("Perfil", perfilSel) : null,
-              UI.Field("Conta a debitar", contaSel),
+              h("div", { class: P.linhaForm2 }, UI.Field("4 últimos dígitos", leitura(cartao.ultimos4Digitos || "—")), UI.Field("Saldo (fatura atual)", valor.el)),
+              h("div", { class: perfilBtn ? P.linhaForm2 : undefined },
+                perfilBtn ? UI.Field("Perfil", perfilBtn) : null,
+                UI.Field("Conta a debitar", contaBtn, { hint: saldoConta })),
               erro),
+            rodapeEsquerda: h("div", { class: P.restante }, h("span", null, "Restante a pagar"), restanteEl),
             botoes: [
               { label: "Cancelar", onClick: () => api.fechar() },
-              { label: "Pagar", primario: true, desabilitado: semFatura || !contas.length, onClick: enviar },
+              { label: "Pagar", primario: true, desabilitado: semFatura, onClick: enviar },
             ],
           };
         },
@@ -466,7 +512,7 @@
             return h("button", { type: "button", class: ZoZo.estrutura.janelaLanc, onClick: () => api.ir(passoFrequencia(tornarRecorrente(ctx, l.id, () => ctx.navigate("recorrencias")), () => api.ir(passoLista), l.valor)) },
               h("span", { class: ZoZo.estrutura.janelaLancData }, F.dataCurta(l.data)),
               h("span", { class: ZoZo.estrutura.janelaLancNome }, marca ? h("span", { class: ZoZo.pecas.letra }, marca) : null, h("span", null, l.descricao)),
-              l.categoria ? h("span", { class: ZoZo.estrutura.janelaLancCat, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") }, title: l.categoria.nome }, l.categoria.icone || "•") : h("span"),
+              l.categoria ? h("span", { class: ZoZo.estrutura.janelaLancCat, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") }, title: l.categoria.nome }, ZoZo.dom.emoji(l.categoria.icone)) : h("span"),
               h("span", { class: [ZoZo.estrutura.janelaLancValor, verde && "money--income"] }, F.moeda(l.valor)));
           }) : h("p", { class: ZoZo.estrutura.menuVazio }, "Nenhuma transação encontrada."));
         };

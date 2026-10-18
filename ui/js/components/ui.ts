@@ -148,11 +148,11 @@
     if (o.pill) {
       // Fundo na cor da categoria e texto mais escuro do mesmo tom, em CAIXA ALTA
       return h("span", { class: [P.pilula, o.class], style: { "--tag-color": F.cor(cat.cor, "var(--palette-16)") }, title: cat.nome },
-        h("span", { class: P.pilulaIcone, "aria-hidden": "true" }, cat.icone || "•"),
+        h("span", { class: P.pilulaIcone, "aria-hidden": "true" }, ZoZo.dom.emoji(cat.icone)),
         h("span", { class: P.pilulaNome }, cat.nome));
     }
     return h("span", { class: [P.rotulo, o.class] },
-      h("span", { class: P.rotuloIcone, "aria-hidden": "true" }, cat.icone || "•"),
+      h("span", { class: P.rotuloIcone, "aria-hidden": "true" }, ZoZo.dom.emoji(cat.icone)),
       h("span", { class: P.rotuloNome }, cat.nome));
   }
 

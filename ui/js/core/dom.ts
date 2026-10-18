@@ -106,6 +106,48 @@
   function id(prefix?: string): string { uid += 1; return (prefix || "zz") + "-" + uid; }
 
   // h é declarado em globais.d.ts com o tipo exato de cada tag (o elemento criado é sempre o da tag pedida)
-  const api: ZoZoDom = { h: h as ZoZoDom["h"], s, clear, mount, append, id };
+  /* ---------- Emoji centrado pela tinta ----------
+     Os emojis são desenhados em posições diferentes dentro da caixa da letra (ex.: 💳 é um cartão largo e
+     baixo, encostado na linha de base): centralizar a caixa não centraliza o desenho. A tinta de cada emoji
+     é medida uma vez (canvas, com cache) e o deslocamento que a leva ao centro vai em "translate", em em
+     (vale para qualquer tamanho). Caixa: inline-block com line-height 1 (altura = 1em, largura = avanço). */
+  const FONTES_EMOJI = "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif";
+  const EMOJI = /\p{Extended_Pictographic}/u;
+  const ajustes = new Map<string, string>();
+  let tela: CanvasRenderingContext2D | null | undefined;
+  /** Deslocamento ("dx dy" em em, ou "" se já está no centro) para um emoji numa caixa inline-block de line-height 1 */
+  function ajusteEmoji(texto: string, fontes?: string): string {
+    const chave = (fontes || "") + "|" + texto;
+    const pronto = ajustes.get(chave);
+    if (pronto !== undefined) return pronto;
+    let valor = "";
+    if (tela === undefined) tela = document.createElement("canvas").getContext("2d");
+    if (tela && EMOJI.test(texto)) {
+      const fs = 100;
+      tela.font = fs + "px " + (fontes || FONTES_EMOJI);
+      const m = tela.measureText(texto);
+      if (m.actualBoundingBoxRight + m.actualBoundingBoxLeft > 0) {
+        // linha de base dentro da caixa de 1em: (1em + subida − descida) / 2 da fonte usada
+        const base = (fs + m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2;
+        const tintaY = base + (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2;
+        const tintaX = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+        const em = (v: number) => (Math.round(Math.max(-0.3, Math.min(0.3, v / fs)) * 1000) / 1000) + "em";
+        const dx = m.width / 2 - tintaX, dy = fs / 2 - tintaY;
+        if (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5) valor = em(dx) + " " + em(dy);
+      }
+    }
+    ajustes.set(chave, valor);
+    return valor;
+  }
+  /** Emoji (ícone de categoria, investimento…) centrado pelo desenho; texto vazio vira "•" */
+  function emoji(texto: unknown, classe?: string): HTMLElement {
+    const t = String(texto || "").trim() || "•";
+    const el = h("span", { class: ["tw:inline-block tw:leading-none tw:not-italic tw:[font-family:'Segoe_UI_Emoji','Apple_Color_Emoji','Noto_Color_Emoji',sans-serif]", classe], "aria-hidden": "true" }, t);
+    const a = ajusteEmoji(t);
+    if (a) el.style.translate = a;
+    return el;
+  }
+
+  const api: ZoZoDom = { h: h as ZoZoDom["h"], s, clear, mount, append, id, emoji, ajusteEmoji };
   ZoZo.dom = api;
 })((window.ZoZo = window.ZoZo || ({} as ZoZoGlobal)));

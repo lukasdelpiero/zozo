@@ -95,7 +95,7 @@
       h("span", { class: o.filho ? T.topNomeFilho : T.topNome }, nome),
       h("span", { class: T.topGasto }, F.moeda(gasto)), h("span", { class: T.topReservado }, F.moeda(reservado)));
     const filho = (c: any, sub: any) => linha(sub ? null : h("span", { class: T.topPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
-      c.icone || "•", c.nome, c.gasto, c.reservado,
+      ZoZo.dom.emoji(c.icone), c.nome, c.gasto, c.reservado,
       { item: true, filho: sub, attrs: { role: "button", tabindex: "0", onClick: () => abrir(c),
         onKeydown: (e: any) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(c); } } } });
     const out: HTMLElement[] = [];

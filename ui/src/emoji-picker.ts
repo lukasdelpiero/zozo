@@ -13,7 +13,7 @@
      para abrir na hora.
    ============================================================= */
 type Picker = HTMLElement;
-type Dados = { emojis: Record<string, { keywords: string[]; name: string }>; [k: string]: unknown };
+type Dados = { emojis: Record<string, { keywords: string[]; name: string; skins?: Array<{ native?: string }> }>; [k: string]: unknown };
 
 /* Palavras em português → termos em inglês da base (pesquisa em PT) */
 const PT: Record<string, string> = {
@@ -64,6 +64,22 @@ const CSS_ZOZO = `
 .search input[type="search"] { border-radius: 8px; }
 `;
 
+/* Emojis centrados pelo desenho também na grade (cada um tem a tinta numa posição diferente da caixa):
+   a caixa de cada emoji vira inline-block com line-height 1 e ganha o deslocamento medido em ZoZo.dom.ajusteEmoji */
+const FONTES_GRADE = "EmojiMart, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Segoe UI', 'Apple Color Emoji', 'Twemoji Mozilla', 'Noto Color Emoji', 'Android Emoji'";
+function cssCentro(dados: Dados): string {
+  const regras = [".emoji-mart-emoji > span { display: inline-block; line-height: 1; }"];
+  const vistos = new Set<string>();
+  Object.values(dados.emojis).forEach((e) => {
+    const n = e.skins && e.skins[0] && e.skins[0].native;
+    if (!n || vistos.has(n)) return;
+    vistos.add(n);
+    const a = window.ZoZo.dom.ajusteEmoji(n, FONTES_GRADE);
+    if (a) regras.push('button[aria-label="' + CSS.escape(n) + '"] .emoji-mart-emoji > span { translate: ' + a + "; }");
+  });
+  return regras.join("\n");
+}
+
 let carregando: Promise<{ Picker: new (props: Record<string, unknown>) => Picker }> | null = null;
 
 /** Carrega o emoji-mart e os dados (uma vez); devolve o construtor já preparado para o CSP */
@@ -87,7 +103,7 @@ function carregar() {
       base.injectStyles = function (this: HTMLElement, estilos: string) {
         if (!estilos || !this.shadowRoot) return;
         const folha = new CSSStyleSheet();
-        folha.replaceSync(estilos + CSS_ZOZO);
+        folha.replaceSync(estilos + CSS_ZOZO + cssCentro(dados));
         this.shadowRoot.adoptedStyleSheets = [folha];
       };
       const comDados = function (props: Record<string, unknown>) {
