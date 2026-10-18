@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.11.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.11.2** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,11 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.11.2
+
+- **Rodapé das janelas:** o conteúdo do canto inferior esquerdo (ex.: "Restante a pagar" e o valor) fica centralizado na vertical com os botões; no celular, vai para uma linha própria acima deles (os botões mantêm a largura).
+- **Pagamento da fatura:** confirmado o formato Débito na conta + Receita no cartão.
 
 ## Novidades da versão 3.11.1
 

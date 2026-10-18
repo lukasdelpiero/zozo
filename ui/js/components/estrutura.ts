@@ -241,8 +241,9 @@
     modalTexto: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     modalTextoConfirmacao: "tw:text-zz-secondary tw:text-[13px] tw:font-[450] tw:max-w-none tw:[text-wrap:pretty]",
     // conteúdo das janelas de criação (modais.janela) e de transferência (cambio.ts)
-    janelaRodape: "tw:flex tw:justify-end tw:gap-2 tw:pt-0 tw:px-6 tw:pb-4 tw:mt-4 tw:-mx-6 tw:mb-0 tw:empty:hidden " + RODAPE_CELULAR,
-    janelaRodapeEsquerda: "tw:mr-auto",
+    janelaRodape: "tw:flex tw:items-center tw:justify-end tw:gap-2 tw:pt-0 tw:px-6 tw:pb-4 tw:mt-4 tw:-mx-6 tw:mb-0 tw:empty:hidden " + RODAPE_CELULAR,
+    // ex.: "Restante a pagar": centrado com os botões; no celular, linha própria acima deles
+    janelaRodapeEsquerda: "tw:mr-auto tw:flex tw:items-center tw:gaveta:basis-full tw:gaveta:mr-0 tw:gaveta:justify-center tw:gaveta:pb-1",
     janelaForm: "tw:flex tw:flex-col tw:gap-4 tw:[&>.segmented--pilulas]:grid",
     janelaLinha: "tw:grid tw:grid-cols-[44px_minmax(0,1fr)] tw:gap-3 tw:items-center",
     janelaNome: "tw:h-11 tw:text-[17px]",   // campo de nome grande (ícone + nome, nome do perfil)

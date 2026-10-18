@@ -426,7 +426,7 @@ wheels = [
 
 [[package]]
 name = "zozo-api"
-version = "3.11.1"
+version = "3.11.2"
 source = { virtual = "." }
 
 [package.dev-dependencies]
