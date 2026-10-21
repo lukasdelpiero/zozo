@@ -4,8 +4,9 @@
    Criptografia de ponta a ponta: os dados são cifrados AQUI, no
    navegador. O servidor (API + banco SQL) só guarda blocos cifrados
    e nunca vê a senha nem os lançamentos.
-     • senha → Argon2id (64 MiB, 3 passagens; contas novas e senhas
-       trocadas) ou PBKDF2-SHA256 (600.000 iterações; contas antigas),
+     • senha → Argon2id (64 MiB, 3 passagens; contas novas, senhas trocadas
+       e contas antigas a partir do primeiro login na 3.12) ou PBKDF2-SHA256
+       (600.000 iterações; contas antigas que ainda não entraram),
        sal de 16 bytes → HKDF → duas chaves independentes:
          - chave dos dados: AES-256-GCM (cifra e autentica)
          - prova da senha: enviada à API no login e em cada acesso
@@ -58,7 +59,9 @@
   };
 
   let sessao: Sessao | null = null;
-  let pendente: { email: string; k: Chaves } | null = null;  // senha certa, falta o código do 2FA
+  /** Chaves novas (Argon2id) de uma conta antiga, preparadas depois que o servidor aceitou a senha */
+  type MigracaoKdf = { sal: Bytes; chaves: Chaves };
+  let pendente: { email: string; k: Chaves; migracao: MigracaoKdf | null } | null = null;  // senha certa, falta o código do 2FA
 
   /* ---------------- utilitários ---------------- */
   function b64(bytes: Uint8Array): string {
@@ -280,6 +283,50 @@
     return undefined;
   }
 
+  /* ---------------- conta antiga (PBKDF2) → Argon2id, com a mesma senha ----------------
+     Logo depois de um login que deu certo (com 2FA, depois do código) e antes de o app ler os dados:
+     o documento E o histórico são recifrados com a chave nova e vão juntos, numa transação, para
+     PUT /conta/kdf (o servidor só aceita PBKDF2 → Argon2id, com a prova atual). As derivações e o
+     formato não mudam (HKDF zozo/dados/v2 e zozo/prova/v2, AAD, AES-GCM): muda só o "mestre".
+     Qualquer falha (conflito, rede) só adia: a conta continua em PBKDF2 e tenta no próximo login. */
+  const LIMITE_PEDIDO = 2000000;           // abaixo do limite de corpo da API (2,1 MB)
+  async function prepararArgon2(senha: unknown): Promise<MigracaoKdf> {
+    const sal = aleatorio(16);
+    return { sal, chaves: await derivar(senha, sal, ITERACOES, KDF_ARGON2) };
+  }
+  async function migrarParaArgon2(m: MigracaoKdf | null): Promise<void> {
+    if (!m) return;
+    const s = sessao;
+    try {
+      if (!s || s.demo) return;
+      const doc = await api("GET", "/documento", undefined, s.prova);
+      const va: number = doc ? doc.versao : 0;
+      const documento = doc ? await decifrar(s.chave, s.email, doc.versao, doc.conteudo) : null;   // não abriu: não migra agora
+      const conteudo = await cifrar(m.chaves.chave, s.email, va + 1, documento);
+      // histórico, do mais recente ao mais antigo, até o limite do pedido; cópia que já não abria fica de fora
+      const h = await api("GET", "/historico", undefined, s.prova);
+      const historico: Array<{ versao: number; conteudo: string }> = [];
+      let tamanho = conteudo.length + 1000;
+      for (const v of (h && Array.isArray(h.versoes) ? h.versoes : [])) {
+        let claro: unknown;
+        try { claro = await decifrar(s.chave, s.email, v.versao, v.conteudo); } catch (e) { continue; }
+        const c = await cifrar(m.chaves.chave, s.email, v.versao, claro);
+        if (tamanho + c.length + 40 > LIMITE_PEDIDO) break;
+        tamanho += c.length + 40;
+        historico.push({ versao: v.versao, conteudo: c });
+      }
+      await api("PUT", "/conta/kdf", { sal: b64(m.sal), kdf: KDF_ARGON2, prova: m.chaves.prova, conteudo, versaoAnterior: va, historico }, s.prova);
+      if (sessao !== s) return;
+      Object.assign(s, { chave: m.chaves.chave, prova: m.chaves.prova, versao: va + 1 });
+      await guardarChaveLocal(s.email, s.envelope, m.chaves.bits, m.chaves.prova);
+      await lembrarVersao(s.email, va + 1);
+    } catch (e) {
+      /* fica para o próximo login (a sessão e a chave atuais continuam valendo) */
+    } finally {
+      m.chaves.bits.fill(0);
+    }
+  }
+
   /* ---------------- última versão vista neste navegador ---------------- */
   const chaveVersao = async (email: string) => "zozo.versao." + hex(await crypto.subtle.digest("SHA-256", enc.encode(email))).slice(0, 24);
   async function versaoConhecida(email: string): Promise<number> {
@@ -346,21 +393,29 @@
     async login(d) {
       sessao = null; pendente = null;
       const email = normalizarEmail(d.email);
-      const k = await derivarConta(d.senha, await parametros(email));
+      const par = await parametros(email);
+      const k = await derivarConta(d.senha, par);
       // confirmacao: token do link do e-mail (#confirmar=…) — a conta pendente é ativada junto com a senha
       const confirmacao = /^[A-Za-z0-9_-]{20,100}$/.test(String(d.confirmacao || "")) ? d.confirmacao : undefined;
       const r = await api("POST", "/sessao", { email, prova: k.prova, turnstile: d.turnstile || undefined, confirmacao });
-      if (r && r.doisFatores && !r.envelope) { pendente = { email, k }; return { doisFatores: true }; }
-      return concluir(r, k);
+      // senha aceita numa conta antiga: as chaves Argon2id são preparadas agora (a senha não fica guardada para o 2FA)
+      const legado = !!par && (par.kdf === undefined || par.kdf === KDF_PBKDF2) && !(r && r.demo === true);
+      const migracao = legado ? await prepararArgon2(d.senha).catch(() => null) : null;   // falhou ao preparar: entra assim mesmo
+      if (r && r.doisFatores && !r.envelope) { pendente = { email, k, migracao }; return { doisFatores: true }; }
+      const dados = await concluir(r, k);
+      await migrarParaArgon2(migracao);
+      return dados;
     },
 
     /** Segunda etapa do login: código do aplicativo autenticador */
     async verificar2FA(d) {
       if (!pendente) throw sessaoExpirada();
       const r = await api("POST", "/sessao/2fa", { codigo: String(d.codigo || "") });
-      const k = pendente.k;
+      const { k, migracao } = pendente;
       pendente = null;
-      return concluir(r, k);
+      const dados = await concluir(r, k);
+      await migrarParaArgon2(migracao);
+      return dados;
     },
 
     async registerUser(d) {

@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.11.3** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.12.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,11 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.12.0
+
+- **Contas antigas passam para Argon2id sozinhas:** no primeiro login de uma conta ainda em PBKDF2 (depois do código, se tiver 2FA), o navegador deriva as chaves novas com a mesma senha e recifra o documento **e o histórico** (as cópias de segurança continuam abrindo — diferente da troca de senha). Tudo vai numa transação para `PUT /api/conta/kdf`, que exige sessão e a prova atual, só aceita PBKDF2 → Argon2id e só aceita versões de histórico que já existem. Se algo falhar (conflito, rede), o login entra assim mesmo e a conversão tenta de novo no próximo. Os outros dispositivos saem e entram de novo com a mesma senha. As derivações HKDF (`zozo/dados/v2`, `zozo/prova/v2`), o AAD e o formato dos documentos não mudaram. Testado com o servidor real: login + conversão em ~0,4 s.
+- **Vite 8.3.3:** corrige falhas do servidor de desenvolvimento (`npm run dev`) publicadas nesta semana; o site publicado não era afetado.
 
 ## Novidades da versão 3.11.3 (correções da revisão externa do Codex, conferidas e reproduzidas)
 

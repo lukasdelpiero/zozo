@@ -537,7 +537,7 @@ async def _parametros(ctx):
         return Resposta(200, {"sal": conta["sal"], "iteracoes": conta["iteracoes"], "kdf": conta["kdf"] or KDF_PBKDF2})
     # e-mail sem conta: parâmetros iguais aos de uma conta nova (Argon2id). Contas Argon2id ficam indistinguíveis
     # de e-mails sem conta; contas ANTIGAS ainda em PBKDF2 respondem "pbkdf2" e, por isso, revelam que existem
-    # (até trocarem a senha, que as leva ao Argon2id). Mitigação atual: limite de consultas por IP acima.
+    # até o próximo login (a 3.12 as converte para Argon2id ali, PUT /api/conta/kdf). Mitigação: limite de consultas por IP.
     falso = hmac.new(ctx.segredo.encode(), ("sal-simulado|" + email).encode("utf-8"), hashlib.sha256).digest()[:16]
     return Resposta(200, {"sal": base64.b64encode(falso).decode("ascii"), "iteracoes": ITERACOES_MIN, "kdf": KDF_ARGON2})
 
@@ -853,7 +853,7 @@ async def _google_identidade(ctx):
 
 # ---------------- rotas ----------------
 _PROTEGIDAS = {
-    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("DELETE", "/api/conta"),
+    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("DELETE", "/api/conta"),
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
 }
@@ -943,6 +943,46 @@ async def _rota(ctx):
         await _limpar_login(ctx, email)
         ctx.evento("senha_alterada", email)
         await _avisar(ctx, email, emails.senha_alterada(conta["nome"], ctx.agora), "email_aviso_senha")
+        return Resposta(200, {"versao": va + 1})
+
+    if c == "/api/conta/kdf":
+        # Conta antiga (PBKDF2) passa para Argon2id com a MESMA senha: o navegador faz logo depois de um login que deu certo.
+        # Numa transação só: novo sal + nova prova + documento E histórico recifrados com a chave nova (as cópias
+        # anteriores continuam abrindo — diferente da troca de senha, que descarta o histórico). Só PBKDF2 → Argon2id.
+        atual = await ctx.banco.primeiro("SELECT kdf FROM contas WHERE email = ?", email)
+        if not atual or (atual["kdf"] or KDF_PBKDF2) != KDF_PBKDF2:
+            raise Falha(409, "KDF_CURRENT")
+        if b.get("kdf") != KDF_ARGON2:
+            raise Falha(400, "INVALID_REQUEST")
+        sal, nova_prova = _sal(b.get("sal")), _prova(b.get("prova"))
+        conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
+        hist = b.get("historico", [])
+        if not isinstance(hist, list) or len(hist) > 10:
+            raise Falha(400, "INVALID_REQUEST")
+        existentes = {int(r["versao"]): r["criado_em"] for r in await ctx.banco.todos(
+            "SELECT versao, criado_em FROM historico WHERE email = ?", email)}
+        novas = []
+        for item in hist:
+            if not isinstance(item, dict) or set(item) != {"versao", "conteudo"}:
+                raise Falha(400, "INVALID_REQUEST")
+            v = _versao(item.get("versao"))
+            # só versões que já existem (recifradas), sem repetir: o navegador não inventa cópias de segurança
+            if v not in existentes or any(v == x[0] for x in novas):
+                raise Falha(400, "INVALID_REQUEST")
+            novas.append((v, _conteudo(item.get("conteudo"))))
+        await _lote_atomico(ctx.banco, [
+            _gravar_documento(email, va, conteudo), _GUARDA,
+            ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ? AND kdf = ?",
+             (sal, ITERACOES_MIN, _verificador(nova_prova), KDF_ARGON2, email, conta["verificador"], KDF_PBKDF2)), _GUARDA,
+            _LIMPA_GUARDA,
+            # o histórico passa a ser o recifrado (as versões que o navegador não conseguiu abrir ficam de fora)
+            ("DELETE FROM historico WHERE email = ?", (email,)),
+            *[("INSERT INTO historico (email, versao, conteudo, criado_em) VALUES (?, ?, ?, ?)", (email, v, cv, existentes[v])) for v, cv in novas],
+            # a chave mudou: as outras sessões (outros dispositivos) terminam e entram de novo com a mesma senha
+            ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
+        ])
+        await _limpar_login(ctx, email)
+        ctx.evento("kdf_atualizado", email)
         return Resposta(200, {"versao": va + 1})
 
     if m == "DELETE" and c == "/api/conta":

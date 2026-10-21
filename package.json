@@ -1,6 +1,6 @@
 {
   "name": "zozo",
-  "version": "3.11.3",
+  "version": "3.12.0",
   "private": true,
   "type": "module",
   "description": "ZoZo — interface (Vite + TypeScript + Tailwind CSS). A API Python fica em api/.",
@@ -20,6 +20,6 @@
     "@tailwindcss/vite": "4.3.3",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
-    "vite": "8.3.1"
+    "vite": "8.3.3"
   }
 }

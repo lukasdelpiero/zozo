@@ -55,6 +55,13 @@ async function derivarRef(senha, sal, kdf, iteracoes) {
   return { dados: await bits("dados"), prova: b64(await bits("prova")) };
 }
 /** Abre um documento gravado: [2][iv 12][AES-256-GCM(gzip(JSON))], AAD "zozo|v2|email|versão" */
+/** Cifra como o host: [2][iv 12][AES-256-GCM(gzip(JSON))], AAD "zozo|v2|email|versão" */
+async function cifrarRef(dados, email, versao, objeto) {
+  const chave = await subtle.importKey("raw", dados, "AES-GCM", false, ["encrypt"]);
+  const iv = webcrypto.getRandomValues(new Uint8Array(12));
+  const ct = await subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode("zozo|v2|" + email + "|" + versao) }, chave, gzipSync(JSON.stringify(objeto)));
+  return Buffer.concat([Buffer.from([2]), iv, Buffer.from(ct)]).toString("base64");
+}
 async function abrirRef(dados, email, versao, conteudo) {
   const tudo = Buffer.from(conteudo, "base64");
   assert.equal(tudo[0], 2, "formato do documento");
@@ -118,6 +125,16 @@ function servidorFalso() {
       c.doc = { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo };
       return json(200, { versao: c.doc.versao });
     }
+    if (metodo === "PUT" && caminho === "/conta/kdf") {
+      if ((c.kdf || "pbkdf2") !== "pbkdf2") return json(409, { erro: "KDF_CURRENT" });
+      if (corpo.kdf !== "argon2id-1" || !Array.isArray(corpo.historico)) return json(400, { erro: "INVALID_REQUEST" });
+      if (corpo.versaoAnterior !== (c.doc ? c.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
+      const existentes = new Set(c.historico.map((x) => x.versao));
+      if (corpo.historico.some((x) => !existentes.has(x.versao))) return json(400, { erro: "INVALID_REQUEST" });
+      Object.assign(c, { sal: corpo.sal, kdf: "argon2id-1", iteracoes: 600000, provaHash: sha256(corpo.prova),
+        doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: corpo.historico.slice().sort((a, b) => a.versao - b.versao) });
+      return json(200, { versao: c.doc.versao });
+    }
     if (metodo === "PUT" && caminho === "/conta/senha") {
       if (corpo.versaoAnterior !== (c.doc ? c.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
       Object.assign(c, { sal: corpo.sal, iteracoes: corpo.iteracoes, kdf: corpo.kdf, provaHash: sha256(corpo.prova), doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: [] });
@@ -172,16 +189,98 @@ test("derivações fixas: Argon2id e PBKDF2 → HKDF (zozo/prova/v2, zozo/dados/
   await h.chamar("saveUserData", { documento: { ok: "argon" } });
   assert.deepEqual(await abrirRef(ref.dados, "nova@exemplo.test", 1, nova.doc.conteudo), { ok: "argon" });
 
-  // conta antiga (PBKDF2-SHA256, 600.000 iterações): continua entrando e abrindo os documentos
+  // conta antiga (PBKDF2-SHA256, 600.000 iterações): a senha entra (prova PBKDF2 → HKDF), o documento gravado com a chave
+  // antiga abre, e a conta passa para Argon2id (o documento novo abre com a derivação Argon2id do sal novo)
   const senhaAntiga = novaSenha();
   const sal = new Uint8Array(16).map((_, i) => i * 7);
   const refAntiga = await derivarRef(senhaAntiga, sal, "pbkdf2", 600000);
-  srv.contas.set("antiga@exemplo.test", { nome: "Antiga", sal: b64(sal), iteracoes: 600000, kdf: "pbkdf2", provaHash: sha256(refAntiga.prova), doc: null, historico: [] });
+  srv.contas.set("antiga@exemplo.test", { nome: "Antiga", sal: b64(sal), iteracoes: 600000, kdf: "pbkdf2", provaHash: sha256(refAntiga.prova),
+    doc: { versao: 1, conteudo: await cifrarRef(refAntiga.dados, "antiga@exemplo.test", 1, { ok: "pbkdf2" }) }, historico: [] });
   const h2 = carregarHost({ fetch: srv.fetch });
   await h2.chamar("login", { email: "antiga@exemplo.test", senha: senhaAntiga });
-  await h2.chamar("saveUserData", { documento: { ok: "pbkdf2" } });
   const antiga = srv.contas.get("antiga@exemplo.test");
-  assert.deepEqual(await abrirRef(refAntiga.dados, "antiga@exemplo.test", 1, antiga.doc.conteudo), { ok: "pbkdf2" });
+  assert.equal(antiga.kdf, "argon2id-1");
+  const refMigrada = await derivarRef(senhaAntiga, Buffer.from(antiga.sal, "base64"), "argon2id-1");
+  assert.equal(sha256(refMigrada.prova), antiga.provaHash);
+  assert.deepEqual(await abrirRef(refMigrada.dados, "antiga@exemplo.test", 2, antiga.doc.conteudo), { ok: "pbkdf2" });
+});
+
+/* ---------------- conta antiga (PBKDF2) → Argon2id no login ---------------- */
+async function contaAntiga(srv, email, senha, { versoes = 3, estragada = null } = {}) {
+  const sal = webcrypto.getRandomValues(new Uint8Array(16));
+  const ref = await derivarRef(senha, sal, "pbkdf2", 600000);
+  const historico = [];
+  for (let v = 1; v < versoes; v++) {
+    let conteudo = await cifrarRef(ref.dados, email, v, { versao: v, texto: "Supermercado-Segredo-" + v });
+    if (v === estragada) { const b = Buffer.from(conteudo, "base64"); b[b.length - 3] ^= 1; conteudo = b.toString("base64"); }
+    historico.push({ versao: v, conteudo });
+  }
+  const doc = { versao: versoes, conteudo: await cifrarRef(ref.dados, email, versoes, { versao: versoes, texto: "Supermercado-Segredo-atual" }) };
+  srv.contas.set(email, { nome: "Antiga", sal: b64(sal), iteracoes: 600000, kdf: "pbkdf2", provaHash: sha256(ref.prova), doc, historico });
+  return ref;
+}
+
+test("conta antiga: o login migra para Argon2id; documento e histórico continuam abrindo; nada sai legível", async () => {
+  const srv = servidorFalso(), email = "legado@exemplo.test", senha = novaSenha();
+  const antiga = await contaAntiga(srv, email, senha, { versoes: 4, estragada: 1 });
+  const h = carregarHost({ fetch: srv.fetch });
+  await h.chamar("login", { email, senha });
+  const c = srv.contas.get(email);
+  assert.equal(c.kdf, "argon2id-1");
+  assert.equal(Buffer.from(c.sal, "base64").length, 16);
+  const nova = await derivarRef(senha, Buffer.from(c.sal, "base64"), "argon2id-1");
+  assert.equal(sha256(nova.prova), c.provaHash);
+  assert.notEqual(sha256(antiga.prova), c.provaHash);                                // a prova antiga não vale mais
+  // documento atual (versão nova) e histórico recifrados com a chave Argon2id; a cópia estragada ficou de fora
+  assert.deepEqual(await abrirRef(nova.dados, email, 5, c.doc.conteudo), { versao: 4, texto: "Supermercado-Segredo-atual" });
+  assert.deepEqual(c.historico.map((x) => x.versao), [2, 3]);
+  for (const v of c.historico) assert.deepEqual(await abrirRef(nova.dados, email, v.versao, v.conteudo), { versao: v.versao, texto: "Supermercado-Segredo-" + v.versao });
+  // a sessão segue com a chave nova: lê e grava sem pedir a senha de novo
+  assert.deepEqual((await h.chamar("loadUserData")).documento, { versao: 4, texto: "Supermercado-Segredo-atual" });
+  await h.chamar("saveUserData", { documento: { depois: true } });
+  assert.deepEqual(await abrirRef(nova.dados, email, 6, c.doc.conteudo), { depois: true });
+  // recarga: a chave guardada neste navegador é a nova
+  const recarga = carregarHost({ fetch: srv.fetch, armazenamento: h.armazenamento });
+  assert.equal((await recarga.chamar("getSession")).authenticated, true);
+  assert.deepEqual((await recarga.chamar("loadUserData")).documento, { depois: true });
+  for (const p of srv.pedidos) {
+    const tudo = p.caminho + p.corpo + p.prova;
+    assert.ok(!tudo.includes(senha) && !tudo.includes("Supermercado-Segredo"), "nada legível sai do navegador (" + p.caminho + ")");
+  }
+  // o próximo login já é Argon2id: não migra de novo
+  const outra = carregarHost({ fetch: srv.fetch });
+  const antes = srv.pedidos.length;
+  await outra.chamar("login", { email, senha });
+  assert.ok(!srv.pedidos.slice(antes).some((p) => p.caminho === "/api/conta/kdf"));
+});
+
+test("conta antiga: se a migração falhar, o login entra assim mesmo e tenta de novo no próximo", async () => {
+  const srv = servidorFalso(), email = "legado2@exemplo.test", senha = novaSenha();
+  await contaAntiga(srv, email, senha);
+  srv.resposta = (metodo, caminho) => (caminho === "/api/conta/kdf" ? new Response(JSON.stringify({ erro: "X" }), { status: 500, headers: { "content-type": "application/json" } }) : null);
+  const h = carregarHost({ fetch: srv.fetch });
+  assert.equal((await h.chamar("login", { email, senha })).authenticated, true);
+  assert.equal(srv.contas.get(email).kdf, "pbkdf2");                                  // nada mudou no servidor
+  assert.deepEqual((await h.chamar("loadUserData")).documento, { versao: 3, texto: "Supermercado-Segredo-atual" });
+  srv.resposta = null;
+  await h.chamar("logout");
+  await carregarHost({ fetch: srv.fetch }).chamar("login", { email, senha });
+  assert.equal(srv.contas.get(email).kdf, "argon2id-1");                              // migrou no login seguinte
+});
+
+test("conta antiga com conflito (outro dispositivo gravou): não migra nem sobrescreve", async () => {
+  const srv = servidorFalso(), email = "legado3@exemplo.test", senha = novaSenha();
+  await contaAntiga(srv, email, senha);
+  const c = srv.contas.get(email);
+  // entre a leitura e a migração, outro dispositivo grava (o servidor responde 409)
+  srv.resposta = (metodo, caminho) => {
+    if (caminho === "/api/conta/kdf") c.doc = { versao: c.doc.versao + 1, conteudo: c.doc.conteudo };
+    return null;
+  };
+  const h = carregarHost({ fetch: srv.fetch });
+  assert.equal((await h.chamar("login", { email, senha })).authenticated, true);
+  assert.equal(c.kdf, "pbkdf2");
+  assert.equal(c.doc.versao, 4);
 });
 
 test("login: senha errada é recusada sem abrir sessão; a certa abre e lê o documento", async () => {

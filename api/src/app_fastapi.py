@@ -84,6 +84,19 @@ class NovaSenha(Documento):
     kdf: Kdf | None = None
 
 
+class VersaoCifrada(Modelo):
+    versao: Versao
+    conteudo: Conteudo
+
+
+class NovoKdf(Documento):
+    """Conta antiga (PBKDF2) → Argon2id com a mesma senha: documento e histórico recifrados."""
+    sal: Sal
+    prova: Prova
+    kdf: Literal["argon2id-1"]
+    historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []
+
+
 class ReenviarEmail(Modelo):
     email: Email
 
@@ -95,6 +108,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/email/reenviar"): ReenviarEmail,
     ("PUT", "/api/conta/nome"): NovoNome,
     ("PUT", "/api/conta/senha"): NovaSenha,
+    ("PUT", "/api/conta/kdf"): NovoKdf,
     ("PUT", "/api/documento"): Documento,
     ("POST", "/api/documento/apagar"): Documento,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,

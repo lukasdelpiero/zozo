@@ -196,6 +196,15 @@ class TesteFastAPI(unittest.TestCase):
             with self.subTest(caminho=caminho):
                 self.assertEqual(self.api("GET", caminho)[0], 404)
 
+    def test_migracao_kdf_pelo_fastapi(self):
+        self.assertEqual(self.api("POST", "/api/conta", self.cadastro())[0], 201)
+        base = {"sal": b64(os.urandom(16)), "kdf": "argon2id-1", "prova": prova(), "conteudo": conteudo(), "versaoAnterior": 0, "historico": []}
+        for ruim in (dict(base, kdf="pbkdf2"), dict(base, admin=True), dict(base, historico=[{"versao": "1", "conteudo": conteudo()}])):
+            with self.subTest(ruim=str(ruim)[:60]):
+                self.assertEqual(self.api("PUT", "/api/conta/kdf", ruim, prova=self.prova)[0], 400)
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", base, prova=self.prova)[0], 200)
+        self.assertEqual(self.api("GET", "/api/conta/parametros?email=" + EMAIL)[1]["kdf"], "argon2id-1")
+
     def test_toda_rota_com_corpo_tem_modelo(self):
         com_corpo = {("POST", "/api/conta"), ("POST", "/api/sessao"), ("POST", "/api/sessao/2fa"),
                      ("POST", "/api/email/reenviar")} | {

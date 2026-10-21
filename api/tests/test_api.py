@@ -1113,6 +1113,85 @@ class TesteKdf(Base):
             self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
 
 
+class TesteMigracaoKdf(Base):
+    """Conta antiga (PBKDF2) → Argon2id com a mesma senha: documento e histórico recifrados numa transação."""
+
+    def preparar_historico(self):
+        # 3 versões no histórico (o gatilho guarda uma cópia a cada 10 minutos)
+        for va in range(0, 4):
+            self.con.execute("UPDATE historico SET criado_em = '2000-01-01T00:00:00.000Z'")
+            self.assertEqual(self.gravar(va)[0], 200)
+        return [r[0] for r in self.con.execute("SELECT versao FROM historico ORDER BY versao")]
+
+    def pedido(self, va, historico=(), **mudar):
+        return dict({"sal": b64(os.urandom(16)), "kdf": "argon2id-1", "prova": prova(), "conteudo": conteudo(),
+                     "versaoAnterior": va, "historico": list(historico)}, **mudar)
+
+    def estado(self):
+        return (tuple(self.con.execute("SELECT sal, verificador, kdf FROM contas WHERE email = ?", (EMAIL,)).fetchone()),
+                [tuple(r) for r in self.con.execute("SELECT versao, conteudo FROM documentos")],
+                [tuple(r) for r in self.con.execute("SELECT versao, conteudo, criado_em FROM historico ORDER BY versao")])
+
+    def test_migra_documento_e_historico_e_encerra_outras_sessoes(self):
+        versoes = self.preparar_historico()
+        self.assertEqual(versoes, [1, 2, 3])
+        criado = {r[0]: r[1] for r in self.con.execute("SELECT versao, criado_em FROM historico")}
+        celular = Cliente(self.banco, ip="198.51.100.31")
+        self.entrar(celular)
+        hist = [{"versao": v, "conteudo": conteudo()} for v in (3, 2)]          # a versão 1 não abriu no navegador: fica de fora
+        corpo = self.pedido(4, hist)
+        st, b = self.api("PUT", "/api/conta/kdf", corpo, prova=self.prova)
+        self.assertEqual((st, b), (200, {"versao": 5}))
+        sal, kdf = self.con.execute("SELECT sal, kdf FROM contas WHERE email = ?", (EMAIL,)).fetchone()
+        self.assertEqual((sal, kdf), (corpo["sal"], "argon2id-1"))
+        self.assertEqual(self.api("GET", "/api/conta/parametros?email=" + EMAIL)[1]["kdf"], "argon2id-1")
+        self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 403)              # prova antiga não vale mais
+        self.assertEqual(self.api("GET", "/api/documento", prova=corpo["prova"])[1], {"versao": 5, "conteudo": corpo["conteudo"]})
+        guardado = [tuple(r) for r in self.con.execute("SELECT versao, conteudo, criado_em FROM historico ORDER BY versao")]
+        self.assertEqual(guardado, [(2, hist[1]["conteudo"], criado[2]), (3, hist[0]["conteudo"], criado[3])])   # data original preservada
+        self.assertEqual(celular("GET", "/api/sessao")[0], 204)                                   # o outro dispositivo saiu
+        self.assertEqual(self.api("GET", "/api/sessao")[0], 200)                                  # este continua
+        self.assertTrue(any("kdf_atualizado" in str(x) for x in self.api.logs))                    # evento registrado
+        self.assertFalse(any(EMAIL in str(x) for x in self.api.logs))                             # sem e-mail no log
+
+    def test_recusas_nao_mudam_nada(self):
+        self.preparar_historico()
+        antes = self.estado()
+        ok = {"versao": 3, "conteudo": conteudo()}
+        casos = [
+            (self.pedido(4, kdf="pbkdf2"), 400),                                   # só PBKDF2 → Argon2id
+            (self.pedido(4, kdf=None), 400),
+            (self.pedido(4, [{"versao": 9, "conteudo": conteudo()}]), 400),        # versão que não existe no histórico
+            (self.pedido(4, [ok, dict(ok)]), 400),                                 # versão repetida
+            (self.pedido(4, [ok] * 11), 400),                                      # mais de 10
+            (self.pedido(4, [dict(ok, extra=1)]), 400),                            # campo desconhecido
+            (self.pedido(4, [{"versao": 3, "conteudo": "não é base64"}]), 400),
+            (self.pedido(4, "não é lista"), 400),
+            (self.pedido(4, sal="curto"), 400),
+            (self.pedido(9), 409),                                                 # outro dispositivo gravou depois
+        ]
+        for corpo, status in casos:
+            with self.subTest(corpo=str(corpo)[:80]):
+                self.assertEqual(self.api("PUT", "/api/conta/kdf", corpo, prova=self.prova)[0], status)
+                self.assertEqual(self.estado(), antes)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM guarda").fetchone()[0], 0)
+
+    def test_exige_sessao_e_prova_atual(self):
+        self.preparar_historico()
+        antes = self.estado()
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", self.pedido(4), prova=prova())[1]["erro"], "WRONG_PASSWORD")
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", self.pedido(4))[0], 403)                 # sem prova
+        anonimo = Cliente(self.banco, ip="198.51.100.32")
+        self.assertEqual(anonimo("PUT", "/api/conta/kdf", self.pedido(4), prova=self.prova)[0], 401)
+        self.assertEqual(self.estado(), antes)
+
+    def test_conta_ja_em_argon2_recusa(self):
+        corpo = self.pedido(0)
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", corpo, prova=self.prova)[0], 200)
+        st, b = self.api("PUT", "/api/conta/kdf", self.pedido(1), prova=corpo["prova"])
+        self.assertEqual((st, b), (409, {"erro": "KDF_CURRENT"}))
+
+
 class TestePedidoInvalido(Base):
     def test_origem_malformada_ou_com_esquema_diferente_recusada(self):
         for origem in ("https://[", "http://zozo.exemplo.com", "null", "https://zozo.exemplo.com/caminho"):

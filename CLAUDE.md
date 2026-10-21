@@ -5,7 +5,7 @@ O padrão obrigatório está em @docs/SEGURANCA.md — leia antes de mexer em lo
 
 ## Regras que mais se aplicam a este código
 
-- **Criptografia de ponta a ponta**: o servidor só vê documentos cifrados (AES-256-GCM no navegador). Nunca envie dados legíveis nem a senha à API. Não mude as derivações em `ui/js/bridge/host-web.ts` (`zozo/dados/v2`, `zozo/prova/v2`, AAD) sem uma migração: documentos já gravados deixariam de abrir.
+- **Criptografia de ponta a ponta**: o servidor só vê documentos cifrados (AES-256-GCM no navegador). Nunca envie dados legíveis nem a senha à API. Não mude as derivações em `ui/js/bridge/host-web.ts` (`zozo/dados/v2`, `zozo/prova/v2`, AAD) sem uma migração: documentos já gravados deixariam de abrir. Contas antigas (PBKDF2) viram Argon2id no primeiro login (`migrarParaArgon2` → `PUT /api/conta/kdf`, documento e histórico recifrados numa transação).
 - **Identidade vem da sessão** (cookie HttpOnly), nunca do corpo do pedido. Rotas de dados exigem sessão **e** a prova da senha (`X-ZoZo-Prova`).
 - **Banco**: só comandos parametrizados. Mudança de tabela = novo arquivo em `api/migracoes/NNNN_nome.sql` (nunca edite uma migração já aplicada).
 - **Segredos** (`SEGREDO`, `TURNSTILE_SECRET`, `RESEND_API_KEY`) só por `npx wrangler secret put`; nunca no `wrangler.toml`, no código ou em logs.
