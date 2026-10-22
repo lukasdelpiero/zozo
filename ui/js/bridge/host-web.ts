@@ -433,9 +433,12 @@
       return concluir(r, k);
     },
 
-    async reenviarConfirmacao(d) {
-      await api("POST", "/email/reenviar", { email: normalizarEmail(d && d.email) });
-      return { enviado: true };
+    /** Link do e-mail (#confirmar=…): o servidor só diz se ainda vale e de qual e-mail é — não ativa nada */
+    async conferirLink(d) {
+      const token = String((d && d.token) || "");
+      if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw erro("TOKEN_INVALID");
+      const r = await api("POST", "/email/link", { token });
+      return { email: normalizarEmail(r && r.email), ativa: !!(r && r.ativa) };
     },
 
     async logout() {

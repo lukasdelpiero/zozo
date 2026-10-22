@@ -478,6 +478,23 @@ test("ação desconhecida ou herdada de Object: NOT_IMPLEMENTED", async () => {
   }
 });
 
+test("link do e-mail: token malformado nem sai do navegador; o válido só é conferido (sem prova nem senha)", async () => {
+  const srv = servidorFalso();
+  const h = carregarHost({ fetch: srv.fetch });
+  for (const token of ["", "curto", "a".repeat(101), "<img src=x>aaaaaaaaaaaaaaaaaaaa", 123, null]) {
+    await assert.rejects(h.chamar("conferirLink", { token }), codigo("TOKEN_INVALID"), String(token));
+  }
+  assert.equal(srv.pedidos.length, 0);
+  const token = "A".repeat(43);
+  srv.resposta = (metodo, caminho) => metodo === "POST" && caminho === "/api/email/link"
+    ? new Response(JSON.stringify({ email: " Ana@Exemplo.test ", ativa: false }), { status: 200, headers: { "content-type": "application/json" } }) : null;
+  assert.deepEqual(await h.chamar("conferirLink", { token }), { email: "ana@exemplo.test", ativa: false });
+  assert.deepEqual(JSON.parse(srv.pedidos[0].corpo), { token });
+  assert.equal(srv.pedidos[0].prova, "");
+  srv.resposta = () => new Response(JSON.stringify({ erro: "TOKEN_INVALID" }), { status: 400, headers: { "content-type": "application/json" } });
+  await assert.rejects(h.chamar("conferirLink", { token }), codigo("TOKEN_INVALID"));
+});
+
 test("proteção na frente da API (redirecionamento ou 403 sem JSON): CF_CHALLENGE, com aviso para a tela", async () => {
   const srv = servidorFalso();
   const h = carregarHost({ fetch: srv.fetch });

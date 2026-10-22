@@ -12,7 +12,7 @@
     // Sessão / armazenamento
     getSession: "getSession",
     registerUser: "registerUser",
-    reenviarConfirmacao: "reenviarConfirmacao",
+    conferirLink: "conferirLink",
     login: "login",
     verificar2FA: "verificar2FA",
     logout: "logout",
@@ -128,7 +128,7 @@
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
     EMAIL_NOT_CONFIRMED: "Confirme seu e-mail antes de entrar: abra o link que enviamos para a sua caixa de entrada.",
-    TOKEN_INVALID: "Este link de confirmação é inválido ou já venceu. Entre com seu e-mail e senha para receber um novo.",
+    TOKEN_INVALID: "O link que clicou expirou ou é inválido.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     LOAN_INVALID: "Confira o empréstimo: valores de 0 a 1 trilhão, 1º vencimento numa data válida e de 1 a 600 parcelas.",

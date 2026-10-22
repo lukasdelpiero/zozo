@@ -101,11 +101,16 @@ class ReenviarEmail(Modelo):
     email: Email
 
 
+class LinkEmail(Modelo):
+    token: TokenEmail
+
+
 MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/conta"): Cadastro,
     ("POST", "/api/sessao"): Entrada,
     ("POST", "/api/sessao/2fa"): CodigoDoisFatores,
     ("POST", "/api/email/reenviar"): ReenviarEmail,
+    ("POST", "/api/email/link"): LinkEmail,
     ("PUT", "/api/conta/nome"): NovoNome,
     ("PUT", "/api/conta/senha"): NovaSenha,
     ("PUT", "/api/conta/kdf"): NovoKdf,

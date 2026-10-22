@@ -79,6 +79,10 @@
   let authErro: string | null = null, authEmail = "";
   let authAviso: string | null = null;           // aviso na tela de entrada (ex.: "entre para confirmar o e-mail")
   let authConfirmacao: string | null = null;     // token do link do e-mail: vai junto no próximo login (link + senha ativam a conta)
+  let esperandoEmail: string | null = null;      // e-mail da tela "Verifique seu e-mail" aberta agora
+  // Link aberto em outra aba deste navegador: a aba que espera vira o login sozinha (o token só circula entre abas do ZoZo)
+  const canalAuth = typeof BroadcastChannel === "function" ? new BroadcastChannel("zozo-auth") : null;
+  const TOKEN_LINK = /^[A-Za-z0-9_-]{20,100}$/;
   let turnstile: string | null = null;          // chave pública do CAPTCHA (null = servidor sem CAPTCHA)
   let googleAtivo = false;       // "Continuar com Google" configurado no servidor
   let captchaLogin = false;      // o servidor pediu CAPTCHA para a próxima tentativa de login
@@ -94,6 +98,7 @@
   }
 
   function renderAuth() {
+    esperandoEmail = null;
     ZoZo.auth.render(authRoot, {
       erro: authErro,
       aviso: authAviso,
@@ -105,14 +110,16 @@
       onLogin: (cred: any) => {
         authEmail = cred.email;
         ZoZo.auth.carregando(authRoot, "Entrando no ZoZo");
+        const ativando = !!authConfirmacao;
         bridge.request(A.login, authConfirmacao ? Object.assign({}, cred, { confirmacao: authConfirmacao }) : cred).then((r) => {
           captchaLogin = false; authConfirmacao = null; authAviso = null;
           salvarCredencial(cred.email, cred.senha);
           if (r && r.doisFatores && !r.authenticated) { authErro = null; errosCodigo = 0; store.set({ session: { status: "2fa" } }); return; }
           entrar(r);
+          if (ativando) ctx.toast("Conta ativada com sucesso.", { tone: "success", importante: true, duration: 6000 });
         }).catch((e) => {
           if (e.code === "EMAIL_NOT_CONFIRMED") { aguardarConfirmacao(cred.email); return; }
-          if (e.code === "TOKEN_INVALID") { authConfirmacao = null; authAviso = null; authErro = FR.TOKEN_INVALID; renderAuth(); return; }
+          if (e.code === "TOKEN_INVALID") { authConfirmacao = null; authAviso = null; mostrarLinkInvalido(); return; }
           if (e.captcha || e.code === "CAPTCHA_REQUIRED") captchaLogin = true;
           // a falha que inicia um bloqueio já informa o tempo de espera
           authErro = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? textoBloqueio(e)
@@ -143,24 +150,60 @@
     });
   }
 
-  /** Tela "Confirme seu e-mail" (depois do cadastro ou ao tentar entrar sem confirmar) */
-  function aguardarConfirmacao(email: any) {
-    ZoZo.auth.aguardandoEmail(authRoot, email, {
-      onReenviar: () => bridge.request(A.reenviarConfirmacao, { email }),
-      onEntrar: () => { authErro = null; ZoZo.auth.reiniciar(); store.set({ session: { status: "login" } }); renderAuth(); },
-    });
+  /** Tela "Verifique seu e-mail" (depois do cadastro ou ao tentar entrar sem confirmar) */
+  function aguardarConfirmacao(email: string) {
+    ZoZo.auth.aguardandoEmail(authRoot, email);
+    esperandoEmail = String(email || "").trim().toLowerCase();
   }
 
+  /** Link vencido, já usado ou adulterado */
+  function mostrarLinkInvalido() {
+    esperandoEmail = null;
+    ZoZo.auth.linkInvalido(authRoot, { onVoltar: () => { authErro = null; authAviso = null; ZoZo.auth.reiniciar(); renderAuth(); } });
+  }
+
+  const AVISO_LINK = "E-mail confirmado! Entre com sua senha para concluir a ativação da conta.";
+
+  // A aba que mostra "Verifique seu e-mail" recebe o link aberto em outra aba e vai para o login (já na senha)
+  if (canalAuth) canalAuth.onmessage = (ev: MessageEvent) => {
+    const d = ev.data;
+    if (!d || d.tipo !== "link" || !esperandoEmail || d.email !== esperandoEmail || !TOKEN_LINK.test(String(d.token))) return;
+    if (store.get().session.authenticated) return;
+    authConfirmacao = d.token; authEmail = d.email; authErro = null; authAviso = null;
+    ZoZo.auth.prepararLogin(d.email);
+    store.set({ session: { status: "login" } });
+    renderAuth();
+    ctx.toast(AVISO_LINK, { tone: "success", importante: true, duration: 8000 });
+  };
+
   /**
-   * Link do e-mail (#confirmar=…): guarda o token só na memória e limpa o endereço (não fica no
-   * histórico). A conta é ativada no próximo login — o link sozinho não basta, é preciso a senha.
+   * Link do e-mail (#confirmar=…): limpa o endereço (o token não fica no histórico) e pergunta ao servidor
+   * se o link ainda vale — sem usá-lo. Valendo, o token fica só na memória e vai junto no login: a conta é
+   * ativada com o link E a senha (o link sozinho não basta). Resolve "invalido" para a tela de link inválido.
    */
-  function retornoConfirmacao() {
-    const m = location.hash.match(/^#confirmar=([A-Za-z0-9_-]{20,100})$/);
-    if (!m) return;
+  function retornoConfirmacao(): Promise<"invalido" | null> {
+    const m = location.hash.match(/^#confirmar=(.*)$/);
+    if (!m) return Promise.resolve(null);
     history.replaceState(null, "", location.pathname + location.search);
-    authConfirmacao = m[1];
-    authAviso = "Quase lá! Entre com seu e-mail e senha para ativar a conta.";
+    const token = m[1];
+    if (!TOKEN_LINK.test(token)) return Promise.resolve("invalido");
+    return bridge.request(A.conferirLink, { token }).then((r) => {
+      authEmail = r.email; ZoZo.auth.prepararLogin(r.email);
+      if (r.ativa) {
+        ctx.toast("Sua conta já está ativa. Entre com sua senha.", { tone: "aviso", duration: 7000 });
+        return null;
+      }
+      authConfirmacao = token;
+      ctx.toast(AVISO_LINK, { tone: "success", importante: true, duration: 8000 });
+      if (canalAuth) canalAuth.postMessage({ tipo: "link", token, email: r.email });
+      return null;
+    }).catch((e) => {
+      if (e && e.code === "TOKEN_INVALID") return "invalido" as const;
+      // não deu para conferir (rede, limite): o link ainda pode valer — vai junto no login, como antes
+      authConfirmacao = token;
+      authAviso = "Entre com seu e-mail e senha para ativar a conta.";
+      return null;
+    });
   }
 
   /** Oferece salvar no gerenciador de senhas do navegador (Chrome/Edge; os demais detectam pelo formulário) */
@@ -190,7 +233,7 @@
 
   function entrar(sessao: any) {
     geracao += 1;
-    authErro = null; authAviso = null;
+    authErro = null; authAviso = null; esperandoEmail = null;
     if (ZoZo.servico) ZoZo.servico.reset();
     store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user } });
   }
@@ -435,8 +478,10 @@
         if (linkConfirmacao) ctx.toast("Você já está conectado. Para ativar a conta nova, saia desta conta e abra o link do e-mail de novo.", { tone: "aviso", duration: 10000 });
         return;
       }
-      retornoConfirmacao();
-      return retornoGoogle().then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
+      return retornoConfirmacao().then((link) => {
+        if (link === "invalido") { store.set({ session: { status: "login" } }); mostrarLinkInvalido(); return; }
+        return retornoGoogle().then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));
+      });
     });
   }
 

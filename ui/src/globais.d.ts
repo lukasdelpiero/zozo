@@ -284,7 +284,8 @@ declare global {
   interface ZoZoRouter { create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador }
 
   /** js/components/feedback.ts — aviso (toast), janela modal e confirmação */
-  interface OpcoesAviso { tone?: "default" | "success" | "aviso" | "error"; duration?: number }
+  /** importante: mostra mesmo uma confirmação (tone "success"), que normalmente não aparece */
+  interface OpcoesAviso { tone?: "default" | "success" | "aviso" | "error"; duration?: number; importante?: boolean }
   interface OpcoesModal {
     title?: string;
     body?: FilhoDom;
@@ -561,7 +562,9 @@ declare global {
     reiniciar(): void;
     prepararGoogle(dados: any): void;
     carregando(root: HTMLElement, texto: string): void;
-    aguardandoEmail(root: HTMLElement, email: string, cfg: any): void;
+    prepararLogin(email: string): void;
+    aguardandoEmail(root: HTMLElement, email: string): void;
+    linkInvalido(root: HTMLElement, cfg: { onVoltar: () => void }): void;
     A: Readonly<Record<string, string>>;
   }
   /** js/data/demo.ts — documento fictício da conta de demonstração */

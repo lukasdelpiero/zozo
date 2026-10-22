@@ -73,8 +73,6 @@
       + "tw:celular:static tw:celular:translate-x-0 tw:celular:w-full tw:celular:mt-4",
     ok: "tw:flex tw:items-center tw:justify-center tw:gap-2 tw:m-0 tw:mb-3.5 tw:text-center tw:text-[13px] tw:font-[520] tw:text-zz-positive",
     texto: TEXTO + " tw:text-[15px] tw:text-zz-text",
-    textoSuave: TEXTO + " tw:text-[13px] tw:text-zz-secondary",
-    situacao: "tw:m-0 tw:min-h-[1.4em] tw:text-center tw:text-[13px] tw:text-zz-secondary tw:empty:min-h-0",
     spinnerEspera: ZoZo.pecas.girando + " tw:size-[30px]! tw:border-[3px]!",
   };
   // Animações do cartão: [logo, título (2º filho), 3º filho, 4º em diante]
@@ -115,7 +113,7 @@
   const botao = (texto: string) => h("button", { type: "submit", class: C.botao }, h("span", { class: "btn__label" }, texto)) as HTMLButtonElement;
   const aviso = (msg: any) => h("p", { class: C.erro, role: "alert" }, msg || "");
   const rodape = (pergunta: any, acao: any, onClick: any) => h("p", { class: C.rodape },
-    h("span", null, pergunta + " "), h("button", { type: "button", class: C.link, onClick }, acao));
+    pergunta ? h("span", null, pergunta + " ") : null, h("button", { type: "button", class: C.link, onClick }, acao));
 
   /** Logo oficial "G" do Google (cores da marca) */
   function logoGoogle(classe?: string) {
@@ -296,6 +294,9 @@
   /** Volta à primeira etapa (ex.: depois de sair da conta) */
   function reiniciar() { estado = { modo: null, etapa: 0, email: "", nome: "", google: false }; }
 
+  /** Link do e-mail conferido: o login abre direto na senha da conta do link */
+  function prepararLogin(email: string) { estado = { modo: "login", etapa: 2, email, nome: "", google: false }; }
+
   /** Depois do Google: pula direto para a senha (conta existente) ou para "Crie sua senha" (cadastro) */
   function prepararGoogle(dados: any) {
     estado = dados.contaExiste
@@ -304,36 +305,31 @@
   }
 
   /**
-   * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar): explica, permite
-   * reenviar o link (com espera de 60 s entre envios) e voltar para entrar.
+   * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar). Sem botões: quando o link
+   * é aberto neste navegador, esta tela vira o login sozinha (app.ts); entrar sem o link manda um novo.
    */
-  function aguardandoEmail(root: any, email: any, cfg: any) {
-    const situacao = h("p", { class: C.situacao, role: "status", "aria-live": "polite" });
-    const reenviar = h("button", { type: "button", class: C.opcaoEmail }, "Reenviar link") as HTMLButtonElement;
-    let espera = 0, timer: ReturnType<typeof setTimeout> | undefined;
-    const contar = () => {
-      reenviar.disabled = espera > 0;
-      reenviar.textContent = espera > 0 ? "Reenviar link (" + espera + " s)" : "Reenviar link";
-      if (espera > 0) { espera -= 1; timer = setTimeout(contar, 1000); }
-    };
-    reenviar.addEventListener("click", () => {
-      reenviar.disabled = true;
-      Promise.resolve(cfg.onReenviar()).then(() => { situacao.textContent = "Se houver um cadastro aguardando confirmação, enviamos um novo link."; })
-        .catch((e) => { situacao.textContent = (e && e.friendly) || "Não foi possível reenviar agora. Tente de novo em instantes."; })
-        .finally(() => { clearTimeout(timer); espera = 60; contar(); });
-    });
+  function aguardandoEmail(root: any, email: any) {
+    const titulo = h("h1", { class: C.titulo, tabindex: "-1" }, "Verifique seu e-mail");
     mount(root, cartao("frente", [
       logo(),
-      h("h1", { class: C.titulo }, "Confirme seu e-mail"),
+      titulo,
       h("div", { class: C.form },
-        h("p", { class: C.texto }, "Enviamos um link para ", h("strong", { class: "tw:font-[620]" }, email),
-          ". Abra o e-mail, toque em “Confirmar e-mail” e entre com a sua senha para ativar a conta."),
-        h("p", { class: C.textoSuave }, "Não chegou? Confira a caixa de spam ou reenvie o link (ele vale por 24 horas)."),
-        reenviar, situacao,
-        rodape("Já confirmou?", "Entrar", cfg.onEntrar)),
+        h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email))),
     ]));
-    requestAnimationFrame(() => reenviar.focus());
+    requestAnimationFrame(() => titulo.focus());      // leitor de tela anuncia a troca de tela
   }
 
-  ZoZo.auth = { render, reiniciar, prepararGoogle, carregando, aguardandoEmail, A };
+  /** Link do e-mail vencido, já usado ou adulterado: só o aviso e, no pé do cartão, a volta para a entrada */
+  function linkInvalido(root: any, cfg: { onVoltar: () => void }) {
+    const voltar = rodape(null, "Voltar para tela de entrada", cfg.onVoltar);
+    mount(root, cartao("entrar", [
+      logo(),
+      h("h1", { class: "tw:sr-only" }, "Link inválido"),
+      h("div", { class: C.form }, h("p", { class: C.texto, role: "alert" }, "O link que clicou expirou ou é inválido.")),
+      h("div", { class: "tw:mt-auto tw:flex tw:justify-center tw:w-full" }, voltar),
+    ]));
+    requestAnimationFrame(() => { const b = voltar.querySelector("button"); if (b) b.focus(); });
+  }
+
+  ZoZo.auth = { render, reiniciar, prepararGoogle, prepararLogin, carregando, aguardandoEmail, linkInvalido, A };
 })(window.ZoZo);

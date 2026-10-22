@@ -1033,6 +1033,50 @@ class TesteEmail(unittest.TestCase):
         self.cli("POST", "/api/email/reenviar", {"email": EMAIL})
         self.assertEqual(self.entrar(confirmacao=self.token())[0], 200)
 
+    def test_conferir_link_nao_ativa_nem_gasta_o_link(self):
+        self.cadastrar()
+        token = self.token()
+        self.assertEqual(self.cli("POST", "/api/email/link", {"token": token}), (200, {"email": EMAIL, "ativa": False}))
+        self.assertNotIn("Set-Cookie", self.cli.ultima.cabecalhos)
+        self.assertEqual(self.pendente(), (1, 0))                                       # o link sozinho não ativa
+        self.assertEqual(self.entrar(pv=prova(), confirmacao=token)[1]["erro"], "INVALID_CREDENTIALS")
+        self.assertEqual(self.entrar(confirmacao=token)[0], 200)                        # e continua valendo com a senha
+        self.assertEqual(self.cli("POST", "/api/email/link", {"token": token}), (200, {"email": EMAIL, "ativa": True}))
+        texto = " ".join(self.cli.logs)
+        self.assertNotIn(EMAIL, texto)
+        self.assertNotIn(token, texto)
+
+    def test_conferir_link_vencido_inventado_ou_de_cadastro_refeito(self):
+        self.cadastrar()
+        primeiro = self.token()
+        self.cadastrar(pv=prova())                                                      # refez o cadastro com outra senha
+        self.assertEqual(self.cli("POST", "/api/email/link", {"token": primeiro}), (400, {"erro": "TOKEN_INVALID"}))
+        self.con.execute("UPDATE tokens_email SET expira = 1")
+        self.assertEqual(self.cli("POST", "/api/email/link", {"token": self.token()}), (400, {"erro": "TOKEN_INVALID"}))
+        for ruim in ("A" * 43, "", "curto", "x" * 200, "<script>alert(1)</script>xxxxxxxxxxxx", 123, ["a" * 30], None):
+            self.assertEqual(self.cli("POST", "/api/email/link", {"token": ruim}), (400, {"erro": "TOKEN_INVALID"}), repr(ruim))
+
+    def test_conferir_link_limitado_por_ip(self):
+        for _ in range(nucleo.LINKS_POR_IP):
+            self.cli("POST", "/api/email/link", {"token": "A" * 43})
+        st, r = self.cli("POST", "/api/email/link", {"token": "A" * 43})
+        self.assertEqual((st, r["erro"]), (429, "TOO_MANY_ATTEMPTS"))
+
+    def test_entrar_sem_confirmar_manda_link_novo_sem_estragar_o_antigo(self):
+        self.cadastrar()
+        antigo = self.token()
+        self.assertEqual(self.entrar()[1]["erro"], "EMAIL_NOT_CONFIRMED")
+        self.assertEqual(len(self.serv.emails), 1)                                      # o link acabou de sair: não repete
+        self.assertEqual(self.entrar(pv=prova())[1]["erro"], "INVALID_CREDENTIALS")
+        self.con.execute("UPDATE tokens_email SET expira = expira - ?", (nucleo.REENVIO_LOGIN_S + 1,))
+        self.assertEqual(self.entrar(pv=prova())[1]["erro"], "INVALID_CREDENTIALS")
+        self.assertEqual(len(self.serv.emails), 1)                                      # senha errada nunca manda e-mail
+        self.assertEqual(self.entrar()[1]["erro"], "EMAIL_NOT_CONFIRMED")
+        self.assertEqual(len(self.serv.emails), 2)                                      # senha certa: link novo
+        self.assertNotEqual(self.token(), antigo)
+        self.assertEqual(self.entrar(confirmacao=antigo)[0], 200)                       # o antigo continua valendo (mesmo cadastro)
+        self.assertEqual(self.con.execute("SELECT COUNT(*) FROM tokens_email WHERE usado = 0").fetchone()[0], 0)
+
     def test_reenviar_sempre_igual_e_limitado(self):
         self.assertEqual(self.cli("POST", "/api/email/reenviar", {"email": "ninguem@exemplo.com"}), (202, {"ok": True}))
         self.assertEqual(self.serv.emails, [])                                          # sem conta pendente: nada enviado

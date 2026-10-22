@@ -16,10 +16,12 @@
     const tone = o.tone || "default"; // default | success | aviso | error
     // Confirmações de ação ("Transação criada.", "Salvo"…) não aparecem: a própria tela já mostra o resultado.
     // Só erros e avisos que explicam por que algo NÃO aconteceu.
-    if (tone !== "error" && tone !== "aviso") return;
+    // Exceção (importante): confirmação que a tela não mostra sozinha, como "Conta ativada com sucesso".
+    const ok = tone === "success" && !!o.importante;
+    if (tone !== "error" && tone !== "aviso" && !ok) return;
     const P = ZoZo.pecas;
     const el = h("div", { class: tone === "error" ? P.avisoErro : P.aviso, role: tone === "error" ? "alert" : "status" },
-      icon("alerta", { size: 16, class: tone === "aviso" ? P.avisoIconeAviso : P.avisoIcone }),
+      ok ? icon("check", { size: 16, class: P.avisoIconeOk }) : icon("alerta", { size: 16, class: tone === "aviso" ? P.avisoIconeAviso : P.avisoIcone }),
       h("span", { class: P.avisoTexto }, mensagem));
     root.appendChild(el);
     requestAnimationFrame(() => el.classList.add("is-visible"));

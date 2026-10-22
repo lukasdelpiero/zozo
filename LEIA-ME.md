@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.12.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.13.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,13 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.13.0
+
+- **Tela "Verifique seu e-mail" mais simples:** só o aviso "Enviamos um link de confirmação para [e-mail]" — sem "Reenviar link" nem "Já confirmou? Entrar". Quando o link é aberto em outra aba do mesmo navegador, esta tela vira o login sozinha.
+- **Abrir o link do e-mail:** leva direto ao login, já na senha da conta, com o aviso "E-mail confirmado!" no rodapé; ao entrar, aparece "Conta ativada com sucesso.". Link vencido, já usado ou adulterado mostra só "O link que clicou expirou ou é inválido." e "Voltar para tela de entrada". Por segurança a ativação continua exigindo o link **e** a senha (quem cadastrou o seu e-mail com outra senha não consegue ativar a conta pelo seu clique).
+- **Link novo sem botão:** entrar com a senha certa numa conta ainda não confirmada manda um link novo (se o último saiu há mais de 10 minutos; no máximo 3 por hora). Os links anteriores do mesmo cadastro continuam valendo até vencer.
+- **Servidor:** rota `POST /api/email/link` confere o link sem usá-lo (limitada por IP); o link só vale para o cadastro (a senha) que o gerou. Testes negativos em `api/tests/test_api.py`.
 
 ## Novidades da versão 3.12.1
 

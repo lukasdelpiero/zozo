@@ -69,6 +69,8 @@ KDFS = (KDF_PBKDF2, KDF_ARGON2)
 CONFIRMACAO_S = 86400                     # o link vale 24 h
 PENDENTE_APAGA_S = 7 * 86400              # cadastro nunca confirmado some depois de 7 dias
 EMAILS_POR_CONTA, EMAIL_JANELA_S = 3, 3600            # e-mails de confirmação/aviso por endereço
+REENVIO_LOGIN_S = 600                     # entrar sem confirmar manda um link novo se o último tem mais de 10 min
+LINKS_POR_IP, LINK_JANELA_S = 30, 3600                # conferências de link (tela "Verifique seu e-mail") por IP
 FORMATO_DOCUMENTO = 2           # primeiro byte do documento cifrado (versão do formato)
 MAX_VERSAO = 2**53 - 1
 
@@ -578,13 +580,18 @@ def _hash_link(token):
 
 
 async def _enviar_confirmacao(ctx, email, verificador):
-    """Novo link (os anteriores deixam de valer) e o e-mail. Limitado por endereço."""
+    """
+    Novo link e o e-mail. Limitado por endereço. Links anteriores do MESMO cadastro (mesma senha) continuam
+    valendo até vencer — um reenvio não estraga o e-mail que a pessoa está para abrir; os de um cadastro
+    refeito (outra senha) e os vencidos deixam de existir.
+    """
     if await _contar(ctx, f"email|{ctx.h(email)}", EMAILS_POR_CONTA, EMAIL_JANELA_S):
         ctx.evento("email_limitado", email)
         return
     token = secrets.token_urlsafe(32)
     await ctx.banco.lote([
-        ("DELETE FROM tokens_email WHERE email = ? AND finalidade = 'confirmar'", (email,)),
+        ("DELETE FROM tokens_email WHERE email = ? AND finalidade = 'confirmar' AND (verificador != ? OR expira < ?)",
+         (email, verificador, int(ctx.agora))),
         ("INSERT INTO tokens_email (hash, email, finalidade, verificador, expira) VALUES (?, ?, 'confirmar', ?, ?)",
          (_hash_link(token), email, verificador, int(ctx.agora) + CONFIRMACAO_S)),
     ])
@@ -627,8 +634,10 @@ async def _confirmar_no_login(ctx, email, token):
     if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", token):
         raise Falha(400, "TOKEN_INVALID")
     hash_ = _hash_link(token)
+    # o link só vale para o cadastro (a senha) que o gerou
     t = await ctx.banco.primeiro(
-        "SELECT expira, usado FROM tokens_email WHERE hash = ? AND email = ? AND finalidade = 'confirmar'", hash_, email)
+        "SELECT t.expira, t.usado FROM tokens_email t JOIN contas c ON c.email = t.email AND c.verificador = t.verificador "
+        "WHERE t.hash = ? AND t.email = ? AND t.finalidade = 'confirmar'", hash_, email)
     if not t or t["usado"] or int(t["expira"]) < int(ctx.agora):
         ctx.evento("confirmacao_recusada", email)
         raise Falha(400, "TOKEN_INVALID")
@@ -639,6 +648,29 @@ async def _confirmar_no_login(ctx, email, token):
         ("DELETE FROM tokens_email WHERE email = ? AND usado = 0", (email,)),
     ])
     ctx.evento("email_confirmado", email)
+
+
+async def _conferir_link(ctx):
+    """
+    Tela aberta pelo link do e-mail: diz se o link ainda serve, SEM usá-lo (a conta só é ativada no login,
+    com o link E a senha). Devolve o e-mail do cadastro para a tela já pedir a senha certa: quem tem o
+    link tem a caixa de entrada. Link já usado com a conta ativa: avisa que a conta está ativa.
+    """
+    if await _contar(ctx, f"link|{ctx.h(ctx.pedido.ip)}", LINKS_POR_IP, LINK_JANELA_S):
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": LINK_JANELA_S})
+    token = _json(ctx.pedido).get("token")
+    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", token):
+        raise Falha(400, "TOKEN_INVALID")
+    t = await ctx.banco.primeiro(
+        "SELECT t.email, t.expira, t.usado, c.confirmacao_pendente FROM tokens_email t "
+        "JOIN contas c ON c.email = t.email AND c.verificador = t.verificador WHERE t.hash = ? AND t.finalidade = 'confirmar'",
+        _hash_link(token))
+    if t and t["usado"] and not t["confirmacao_pendente"]:
+        return Resposta(200, {"email": t["email"], "ativa": True})
+    if not t or t["usado"] or not t["confirmacao_pendente"] or int(t["expira"]) < int(ctx.agora):
+        ctx.evento("link_recusado")
+        raise Falha(400, "TOKEN_INVALID")
+    return Resposta(200, {"email": t["email"], "ativa": False})
 
 
 async def _reenviar_confirmacao(ctx):
@@ -704,6 +736,12 @@ async def _entrar(ctx):
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
         if b.get("confirmacao") is None:
             ctx.evento("login_email_pendente", email)
+            # sem o link: manda um novo, a não ser que o último tenha saído há pouco (a tela diz "enviamos um link")
+            recente = await ctx.banco.primeiro(
+                "SELECT 1 AS x FROM tokens_email WHERE email = ? AND finalidade = 'confirmar' AND usado = 0 AND verificador = ? AND expira > ?",
+                email, conta["verificador"], int(ctx.agora) + CONFIRMACAO_S - REENVIO_LOGIN_S)
+            if not recente and emails.ativo(ctx.config):
+                await _enviar_confirmacao(ctx, email, conta["verificador"])
             raise Falha(403, "EMAIL_NOT_CONFIRMED")
         await _confirmar_no_login(ctx, email, b.get("confirmacao"))     # link + senha: ativa a conta e entra
         verificado = True
@@ -880,6 +918,8 @@ async def _rota(ctx):
         return await _entrar(ctx)
     if m == "POST" and c == "/api/email/reenviar":
         return await _reenviar_confirmacao(ctx)
+    if m == "POST" and c == "/api/email/link":
+        return await _conferir_link(ctx)
     if m == "POST" and c == "/api/sessao/2fa":
         return await _segundo_fator(ctx)
     if m == "GET" and c == "/api/sessao":

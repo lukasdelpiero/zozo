@@ -162,6 +162,7 @@
       + "tw:[&.is-visible]:[transform:none]",
     avisoIcone: "tw:flex-none tw:mt-0.5",
     avisoIconeAviso: "tw:flex-none tw:mt-0.5 tw:text-[#ffb36b]",
+    avisoIconeOk: "tw:flex-none tw:mt-0.5 tw:text-[#6fdca4]",
     avisoTexto: "tw:min-w-0 tw:[overflow-wrap:anywhere]",
 
     /* Card (UI.Card) */
