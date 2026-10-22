@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.12.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.12.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,10 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.12.1
+
+- **Correção no servidor (Cloudflare):** toda operação em lote no banco falhava com o pacote Python mais recente do Cloudflare (erro interno "borrowed proxy was automatically destroyed"), e o app mostrava "Não foi possível falar com o servidor do ZoZo". Afetava o cadastro com confirmação de e-mail, a troca de senha, apagar dados e a migração para Argon2id. Causa em `api/src/entry.py` (`lote`); reproduzido e corrigido no runtime local do Workers (`pywrangler dev`).
 
 ## Novidades da versão 3.12.0
 

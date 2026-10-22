@@ -63,7 +63,12 @@ class BancoD1:
         return int(r["meta"]["changes"])
 
     async def lote(self, comandos):
-        resultados = await self.db.batch(to_js([self._comando(sql, tuple(p)) for sql, p in comandos]))
+        # O SDK do Python Workers (pywrangler recente) devolve os comandos EMBRULHADOS (_BindingWrapper, objeto
+        # Python). Passados ao to_js, viravam proxies "emprestados", destruídos antes de o D1 ler o lote
+        # ("borrowed proxy was automatically destroyed") e TODO lote falhava (cadastro com e-mail, troca de senha,
+        # apagar dados, Argon2id). O batch recebe os objetos JS de verdade; com o SDK antigo já são JS (fica igual).
+        comandos_js = [getattr(st, "_binding", st) for st in (self._comando(sql, tuple(p)) for sql, p in comandos)]
+        resultados = await self.db.batch(to_js(comandos_js))
         return [int(_py(r)["meta"]["changes"]) for r in resultados]
 
 
