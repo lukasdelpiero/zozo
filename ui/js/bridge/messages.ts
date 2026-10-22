@@ -12,6 +12,7 @@
     // Sessão / armazenamento
     getSession: "getSession",
     registerUser: "registerUser",
+    reenviarConfirmacao: "reenviarConfirmacao",
     conferirLink: "conferirLink",
     login: "login",
     verificar2FA: "verificar2FA",

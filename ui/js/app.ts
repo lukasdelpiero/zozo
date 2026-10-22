@@ -152,7 +152,7 @@
 
   /** Tela "Verifique seu e-mail" (depois do cadastro ou ao tentar entrar sem confirmar) */
   function aguardarConfirmacao(email: string) {
-    ZoZo.auth.aguardandoEmail(authRoot, email);
+    ZoZo.auth.aguardandoEmail(authRoot, email, { onReenviar: () => bridge.request(A.reenviarConfirmacao, { email }) });
     esperandoEmail = String(email || "").trim().toLowerCase();
   }
 

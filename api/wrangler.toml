@@ -68,7 +68,7 @@ database_id = "d267ce2a-3920-4c7b-8e91-7b3990dba0ba"
 migrations_dir = "migracoes"
 
 [env.previa.vars]
-EMAIL_REMETENTE = "ZoZo (prévia) <nao-responda@usezozo.com.br>"
+EMAIL_REMETENTE = "ZoZo <nao-responda@usezozo.com.br>"
 URL_PUBLICA = "https://zozo-previa.zozo-finance-app.workers.dev"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"

@@ -74,6 +74,7 @@
     ok: "tw:flex tw:items-center tw:justify-center tw:gap-2 tw:m-0 tw:mb-3.5 tw:text-center tw:text-[13px] tw:font-[520] tw:text-zz-positive",
     texto: TEXTO + " tw:text-[15px] tw:text-zz-text",
     spinnerEspera: ZoZo.pecas.girando + " tw:size-[30px]! tw:border-[3px]!",
+    girandoBotao: "tw:size-[18px] tw:rounded-[50%] tw:border-2 tw:border-white/35 tw:border-t-white tw:animate-zz-gira tw:motion-reduce:animate-none",
   };
   // Animações do cartão: [logo, título (2º filho), 3º filho, 4º em diante]
   const ANIM: Record<string, { cartao: string; filhos: string[] }> = {
@@ -305,16 +306,37 @@
   }
 
   /**
-   * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar). Sem botões: quando o link
-   * é aberto neste navegador, esta tela vira o login sozinha (app.ts); entrar sem o link manda um novo.
+   * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar). "Reenviar link": carregando
+   * enquanto envia, depois 60 s de espera. Quando o link é aberto neste navegador, a tela vira o login (app.ts).
    */
-  function aguardandoEmail(root: any, email: any) {
+  function aguardandoEmail(root: any, email: any, cfg: { onReenviar: () => Promise<unknown> }) {
     const titulo = h("h1", { class: C.titulo, tabindex: "-1" }, "Verifique seu e-mail");
+    const reenviar = h("button", { type: "button", class: C.opcaoEmail }, "Reenviar link") as HTMLButtonElement;
+    const falha = aviso(null);
+    let espera = 0;
+    const contar = () => {
+      if (!reenviar.isConnected) return;              // saiu da tela: para de contar
+      reenviar.disabled = espera > 0;
+      reenviar.removeAttribute("aria-busy");
+      reenviar.textContent = espera > 0 ? "Reenviar link (" + espera + " s)" : "Reenviar link";
+      if (espera > 0) { espera -= 1; setTimeout(contar, 1000); }
+    };
+    reenviar.addEventListener("click", () => {
+      if (reenviar.disabled) return;
+      reenviar.disabled = true;
+      reenviar.setAttribute("aria-busy", "true");
+      reenviar.replaceChildren(h("span", { class: C.girandoBotao, "aria-hidden": "true" }), h("span", { class: "tw:sr-only" }, "Enviando…"));
+      falha.textContent = "";
+      Promise.resolve(cfg.onReenviar())
+        .catch((e: any) => { falha.textContent = (e && e.friendly) || "Não foi possível reenviar agora. Tente de novo em instantes."; })
+        .finally(() => { espera = 60; contar(); });
+    });
     mount(root, cartao("frente", [
       logo(),
       titulo,
       h("div", { class: C.form },
-        h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email))),
+        h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email)),
+        reenviar, falha),
     ]));
     requestAnimationFrame(() => titulo.focus());      // leitor de tela anuncia a troca de tela
   }

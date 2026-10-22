@@ -433,6 +433,11 @@
       return concluir(r, k);
     },
 
+    async reenviarConfirmacao(d) {
+      await api("POST", "/email/reenviar", { email: normalizarEmail(d && d.email) });
+      return { enviado: true };
+    },
+
     /** Link do e-mail (#confirmar=…): o servidor só diz se ainda vale e de qual e-mail é — não ativa nada */
     async conferirLink(d) {
       const token = String((d && d.token) || "");
