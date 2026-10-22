@@ -311,19 +311,22 @@
    */
   function aguardandoEmail(root: any, email: any, cfg: { onReenviar: () => Promise<unknown> }) {
     const titulo = h("h1", { class: C.titulo, tabindex: "-1" }, "Verifique seu e-mail");
-    const reenviar = h("button", { type: "button", class: C.opcaoEmail }, "Reenviar link") as HTMLButtonElement;
+    // Mesmo botão de ação das outras etapas (botao: 44 px, logo abaixo da área de campos)
+    const reenviar = botao("Reenviar link");
+    reenviar.type = "button";
     const falha = aviso(null);
     let espera = 0;
     const contar = () => {
       if (!reenviar.isConnected) return;              // saiu da tela: para de contar
       reenviar.disabled = espera > 0;
+      reenviar.classList.remove("is-busy");
       reenviar.removeAttribute("aria-busy");
-      reenviar.textContent = espera > 0 ? "Reenviar link (" + espera + " s)" : "Reenviar link";
+      reenviar.replaceChildren(h("span", { class: "btn__label" }, espera > 0 ? "Reenviar link (" + espera + " s)" : "Reenviar link"));
       if (espera > 0) { espera -= 1; setTimeout(contar, 1000); }
     };
     reenviar.addEventListener("click", () => {
       if (reenviar.disabled) return;
-      reenviar.disabled = true;
+      reenviar.disabled = true; reenviar.classList.add("is-busy");
       reenviar.setAttribute("aria-busy", "true");
       reenviar.replaceChildren(h("span", { class: C.girandoBotao, "aria-hidden": "true" }), h("span", { class: "tw:sr-only" }, "Enviando…"));
       falha.textContent = "";
@@ -335,7 +338,9 @@
       logo(),
       titulo,
       h("div", { class: C.form },
-        h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email)),
+        // o texto ocupa a área dos campos: o botão fica na mesma altura do "Continuar" das outras etapas
+        h("div", { class: C.campos },
+          h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email))),
         reenviar, falha),
     ]));
     requestAnimationFrame(() => titulo.focus());      // leitor de tela anuncia a troca de tela
