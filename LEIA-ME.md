@@ -313,7 +313,7 @@ ZoZo/
 |---|---|---|---|
 | **Local** | http://127.0.0.1:5173 (Vite) · http://127.0.0.1:8787 (API + interface montada) | `api/dev/zozo-local.db` | só o seu computador |
 | **Prévia** | https://zozo-previa.zozo-finance-app.workers.dev | `zozo-previa` | testes (aberta, banco separado) |
-| **Produção** | https://usezozo.com.br · https://zozo.zozo-finance-app.workers.dev | `zozo` | usuários (cadastro aberto, com CAPTCHA) |
+| **Produção** | https://usezozo.com.br (workers.dev desligado) | `zozo` | usuários (cadastro aberto, com CAPTCHA) |
 
 Fluxo recomendado: **mudar → testar no local → publicar na prévia → testar → publicar em produção**.
 

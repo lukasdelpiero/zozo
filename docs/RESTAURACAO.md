@@ -13,7 +13,19 @@ Procedimento ensaiado em 18/10/2026 (versão 3.11.3). **Nunca restaure por cima 
 
 Os segredos **não** estão no export do banco: guarde um inventário deles (nome e onde obter) fora do Cloudflare.
 
-## 1. Fazer o backup (cópia independente)
+## 0. Backup automático (diário, GitHub Actions)
+
+`.github/workflows/backup-d1.yml` roda todo dia às 03:17 (Brasília), ou à mão em Actions → "Backup do banco (D1)" → Run workflow. Exporta o banco de produção, confere com `conferir_backup.py` (falha se houver problema) e **cifra com age antes de sair do runner**. Guarda o arquivo `.sql.age` como artifact por 30 dias (repositório privado; cabe no espaço gratuito enquanto o banco for pequeno). Falha = e-mail do GitHub.
+
+Preparar uma vez:
+1. Instale o age (`winget install FiloSottile.age`) e gere o par: `age-keygen -o zozo-backup-chave.txt`. A linha `# public key: age1…` é a chave pública. **Guarde `zozo-backup-chave.txt` fora deste computador** (pendrive/cofre de senhas): sem ela nenhum backup abre; com ela, todos abrem.
+2. Cloudflare → Manage account → Account API tokens → Create → Custom: permissão **Account → D1 → Edit**, só esta conta.
+3. GitHub → repositório → Settings → Secrets and variables → Actions: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` e `BACKUP_AGE_RECIPIENT` (a chave pública `age1…`).
+4. Rode o workflow uma vez à mão e confira o artifact.
+
+Abrir um backup: baixe o artifact (Actions → execução → Artifacts), descompacte e `age -d -i zozo-backup-chave.txt -o zozo.sql zozo-AAAA-MM-DD.sql.age`. Daí em diante, siga a seção 2 com esse `zozo.sql`.
+
+## 1. Fazer o backup à mão (cópia independente)
 
 ```powershell
 cd api

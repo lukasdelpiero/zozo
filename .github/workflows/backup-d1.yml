@@ -1,0 +1,71 @@
+# Backup diário do banco de produção (D1 "zozo"), independente do Cloudflare.
+# O export (e-mails legíveis + documentos cifrados) é conferido e cifrado com age ANTES de sair do runner:
+# só a chave PÚBLICA fica no GitHub; a privada fica com o dono, fora do computador de trabalho.
+# Restauração: docs/RESTAURACAO.md ("Backup automático").
+#
+# Segredos do repositório (Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   token com só "Account → D1 → Edit" (o export do D1 exige escrita) nesta conta
+#   CLOUDFLARE_ACCOUNT_ID  id da conta
+#   BACKUP_AGE_RECIPIENT   chave pública do age (age1…)
+name: Backup do banco (D1)
+
+on:
+  schedule:
+    - cron: "17 6 * * *"          # 03:17 em Brasília (pouco uso: o export trava o banco por alguns segundos)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-d1
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Conferir segredos
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CONTA: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DESTINO: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: |
+          [ -n "$TOKEN" ] && [ -n "$CONTA" ] || { echo "::error::Faltam CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          case "$DESTINO" in age1*) ;; *) echo "::error::BACKUP_AGE_RECIPIENT não é uma chave pública do age"; exit 1;; esac
+
+      - name: Instalar age
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+
+      - name: Exportar, conferir e cifrar
+        working-directory: api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          set -euo pipefail
+          umask 077
+          dia=$(date -u +%Y-%m-%d)
+          plano="$RUNNER_TEMP/zozo-$dia.sql"
+          npx --yes wrangler@4.148.0 d1 export zozo --remote --output "$plano"
+          # mesma conferência do procedimento manual (só contagens; não imprime e-mails nem conteúdo)
+          python3 -I dev/conferir_backup.py "$plano" "$RUNNER_TEMP/conferencia.db"
+          mkdir -p "$RUNNER_TEMP/saida"
+          age -r "$BACKUP_AGE_RECIPIENT" -o "$RUNNER_TEMP/saida/zozo-$dia.sql.age" "$plano"
+          shred -u "$plano" "$RUNNER_TEMP/conferencia.db"
+          ls -l "$RUNNER_TEMP/saida"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: zozo-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/saida/*.sql.age
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0     # já cifrado: não comprime

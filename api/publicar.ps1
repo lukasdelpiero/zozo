@@ -1,7 +1,7 @@
 ﻿# ZoZo — publicar no Cloudflare
 #
 #   .\api\publicar.ps1 previa      → https://zozo-previa.zozo-finance-app.workers.dev  (só testes; usuários não veem)
-#   .\api\publicar.ps1 producao    → https://zozo.zozo-finance-app.workers.dev         (usuários)
+#   .\api\publicar.ps1 producao    → https://usezozo.com.br                            (usuários; workers.dev desligado)
 #
 # No VS Code: Terminal › Executar Tarefa… › "ZoZo: publicar na prévia" / "ZoZo: publicar em produção".
 #
@@ -21,7 +21,7 @@ $env:CI = "true"      # sem perguntas interativas do wrangler
 
 $banco = if ($Ambiente -eq "previa") { "zozo-previa" } else { "zozo" }
 $extra = if ($Ambiente -eq "previa") { @("--env", "previa") } else { @() }
-$endereco = if ($Ambiente -eq "previa") { "https://zozo-previa.zozo-finance-app.workers.dev" } else { "https://zozo.zozo-finance-app.workers.dev" }
+$endereco = if ($Ambiente -eq "previa") { "https://zozo-previa.zozo-finance-app.workers.dev" } else { "https://usezozo.com.br" }
 
 function Parar($mensagem) { Write-Host ""; Write-Host $mensagem -ForegroundColor Red; exit 1 }
 

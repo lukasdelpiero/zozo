@@ -4,7 +4,7 @@ O ZoZo tem **dois sites separados**, cada um com o **seu próprio banco de dados
 
 | | Endereço | Quem usa |
 |---|---|---|
-| **Principal (produção)** | https://usezozo.com.br (e https://zozo.zozo-finance-app.workers.dev) | os usuários |
+| **Principal (produção)** | https://usezozo.com.br (o workers.dev da produção fica desligado desde a 3.14) | os usuários |
 | **Testes (prévia)** | https://zozo-previa.zozo-finance-app.workers.dev | só você, para testar antes |
 
 Tudo o que você faz na prévia (criar conta, lançamentos, apagar dados…) **não afeta** o site principal.
@@ -66,7 +66,7 @@ O botão já existe; falta criar a "credencial" do ZoZo no Google (gratuito):
 2. **APIs e serviços** → **Tela de consentimento OAuth** → tipo **Externo** → nome **ZoZo**, seu e-mail de suporte → Salvar. Em *Escopos*, adicione `openid`, `email` e `profile`.
 3. **APIs e serviços** → **Credenciais** → **Criar credenciais** → **ID do cliente OAuth** → tipo **Aplicativo da Web**.
 4. Em **URIs de redirecionamento autorizados**, adicione os dois:
-   - `https://zozo.zozo-finance-app.workers.dev/api/google/retorno`
+   - `https://usezozo.com.br/api/google/retorno` (produção: o workers.dev da produção está desligado)
    - `https://zozo-previa.zozo-finance-app.workers.dev/api/google/retorno`
 5. Clique em **Criar**. Aparecem o **ID do cliente** e a **Chave secreta do cliente**.
 6. No `api/wrangler.toml`, preencha `GOOGLE_CLIENT_ID = "…"` em `[vars]` **e** em `[env.previa.vars]` (é público, pode ficar no arquivo).

@@ -1,7 +1,7 @@
 # ZoZo (web) — configuração do Cloudflare (Python Workers + D1)
 #
 # Dois ambientes, com banco e endereço SEPARADOS:
-#   PRODUÇÃO  (usuários)    uv run pywrangler deploy               → https://zozo.zozo-finance-app.workers.dev
+#   PRODUÇÃO  (usuários)    uv run pywrangler deploy               → https://usezozo.com.br (workers.dev desligado)
 #   PRÉVIA    (só testes)   uv run pywrangler deploy --env previa  → https://zozo-previa.zozo-finance-app.workers.dev
 # Teste na prévia primeiro; só depois publique em produção.
 #
@@ -18,10 +18,12 @@ main = "src/entry.py"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["python_workers"]
 
-# Endereço: workers.dev (e o domínio usezozo.com.br). As URLs de pré-visualização por versão
-# ficam desligadas (a prévia oficial é o ambiente "previa").
-workers_dev = true
+# Endereço: só o domínio usezozo.com.br. O workers.dev fica DESLIGADO: as regras de segurança do domínio
+# (limite de pedidos, robôs) não valem nele, e seria um caminho para contorná-las. As URLs de
+# pré-visualização por versão também ficam desligadas (a prévia oficial é o ambiente "previa").
+workers_dev = false
 preview_urls = false
+routes = [{ pattern = "usezozo.com.br", custom_domain = true }]
 
 # Logs do Worker (eventos de segurança, sem senhas, e-mails ou IPs em texto)
 [observability]
@@ -57,6 +59,7 @@ GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleuse
 name = "zozo-previa"
 workers_dev = true
 preview_urls = false
+routes = []                     # NÃO herda o domínio da produção (a prévia só existe no workers.dev)
 
 [env.previa.observability]
 enabled = true
