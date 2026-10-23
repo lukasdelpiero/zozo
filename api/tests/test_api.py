@@ -1231,6 +1231,77 @@ class TesteMigracaoKdf(Base):
         self.assertEqual(anonimo("PUT", "/api/conta/kdf", self.pedido(4), prova=self.prova)[0], 401)
         self.assertEqual(self.estado(), antes)
 
+    def etapa(self, sal_, v, cliente=None, prova_=None, **mudar):
+        return (cliente or self.api)("PUT", "/api/conta/kdf/historico", dict({"sal": sal_, "versao": v, "conteudo": conteudo()}, **mudar),
+                                     prova=prova_ or self.prova)
+
+    def etapas(self):
+        return [tuple(r) for r in self.con.execute("SELECT versao, sal FROM kdf_etapas ORDER BY versao")]
+
+    def test_em_etapas_preserva_todo_o_historico_com_as_datas(self):
+        self.preparar_historico()
+        criado = {r[0]: r[1] for r in self.con.execute("SELECT versao, criado_em FROM historico")}
+        corpo = self.pedido(4)
+        enviados = {}
+        for v in (1, 2):                                                       # duas cópias em etapas, uma junto
+            st, _ = self.etapa(corpo["sal"], v)
+            self.assertEqual(st, 200)
+            enviados[v] = self.con.execute("SELECT conteudo FROM kdf_etapas WHERE versao = ?", (v,)).fetchone()[0]
+        self.assertEqual(self.estado()[0][2], "pbkdf2")                       # nada muda antes do fechamento
+        ultima = {"versao": 3, "conteudo": conteudo()}
+        st, b = self.api("PUT", "/api/conta/kdf", dict(corpo, historico=[ultima]), prova=self.prova)
+        self.assertEqual((st, b), (200, {"versao": 5}))
+        guardado = [tuple(r) for r in self.con.execute("SELECT versao, conteudo, criado_em FROM historico ORDER BY versao")]
+        self.assertEqual(guardado, [(1, enviados[1], criado[1]), (2, enviados[2], criado[2]), (3, ultima["conteudo"], criado[3])])
+        self.assertEqual(self.etapas(), [])
+        self.assertEqual(self.con.execute("SELECT count(*) FROM guarda").fetchone()[0], 0)
+
+    def test_etapa_faltando_ou_de_outra_tentativa_nao_fecha(self):
+        self.preparar_historico()
+        antes = self.estado()
+        primeira, segunda = self.pedido(4), self.pedido(4)
+        for v in (1, 2, 3):
+            self.etapa(primeira["sal"], v)
+        self.etapa(segunda["sal"], 1)                                          # outra tentativa recomeça: a primeira some
+        self.assertEqual(self.etapas(), [(1, segunda["sal"])])
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", primeira, prova=self.prova)[0], 409)
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", segunda, prova=self.prova)[0], 409)    # faltam 2 e 3
+        repetida = dict(segunda, historico=[{"versao": 1, "conteudo": conteudo()}, {"versao": 2, "conteudo": conteudo()},
+                                            {"versao": 3, "conteudo": conteudo()}])
+        self.assertEqual(self.api("PUT", "/api/conta/kdf", repetida, prova=self.prova)[0], 400)   # versão 1 por dois caminhos
+        self.assertEqual(self.estado(), antes)
+
+    def test_etapa_recusada(self):
+        self.preparar_historico()
+        sal = self.pedido(4)["sal"]
+        casos = [
+            ({"versao": 9}, 400),                                              # versão que não existe no histórico
+            ({"versao": -1}, 400), ({"versao": "1"}, 400), ({"sal": "curto"}, 400),
+            ({"conteudo": "não é base64"}, 400), ({"extra": 1}, 400),
+            ({"conteudo": "A" * (nucleo.LIMITE_CONTEUDO + 4)}, 413),
+        ]
+        for mudar, status in casos:
+            with self.subTest(mudar=str(mudar)[:60]):
+                self.assertEqual(self.etapa(sal, 1, **mudar)[0], status)
+        self.assertEqual(self.etapas(), [])
+        self.assertEqual(self.etapa(sal, 1, prova_=prova())[1]["erro"], "WRONG_PASSWORD")
+        anonimo = Cliente(self.banco, ip="198.51.100.33")
+        self.assertEqual(self.etapa(sal, 1, cliente=anonimo)[0], 401)
+        self.assertEqual(self.etapas(), [])
+
+    def test_troca_de_senha_e_exclusao_apagam_etapas(self):
+        self.preparar_historico()
+        sal = self.pedido(4)["sal"]
+        self.etapa(sal, 1)
+        nova = prova()
+        st, _ = self.api("PUT", "/api/conta/senha", {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova, "kdf": "argon2id-1",
+                                                     "conteudo": conteudo(), "versaoAnterior": 4}, prova=self.prova)
+        self.assertEqual(st, 200)
+        self.assertEqual(self.etapas(), [])
+        self.assertEqual(self.etapa(sal, 1, prova_=nova)[0], 409)               # conta já em Argon2id
+        self.assertEqual(self.api("DELETE", "/api/conta", prova=nova)[0], 204)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM kdf_etapas").fetchone()[0], 0)
+
     def test_conta_ja_em_argon2_recusa(self):
         corpo = self.pedido(0)
         self.assertEqual(self.api("PUT", "/api/conta/kdf", corpo, prova=self.prova)[0], 200)

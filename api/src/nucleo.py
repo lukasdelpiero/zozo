@@ -891,7 +891,7 @@ async def _google_identidade(ctx):
 
 # ---------------- rotas ----------------
 _PROTEGIDAS = {
-    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("DELETE", "/api/conta"),
+    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("PUT", "/api/conta/kdf/historico"), ("DELETE", "/api/conta"),
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
 }
@@ -975,8 +975,9 @@ async def _rota(ctx):
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ?",
              (sal, it, _verificador(nova_prova), kdf, email, conta["verificador"])), _GUARDA,
             _LIMPA_GUARDA,
-            # o histórico estava cifrado com a senha anterior: é descartado
+            # o histórico estava cifrado com a senha anterior: é descartado (e uma migração em etapas pela metade)
             ("DELETE FROM historico WHERE email = ?", (email,)),
+            ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
             # as outras sessões (outros dispositivos) terminam
             ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
         ])
@@ -985,10 +986,30 @@ async def _rota(ctx):
         await _avisar(ctx, email, emails.senha_alterada(conta["nome"], ctx.agora), "email_aviso_senha")
         return Resposta(200, {"versao": va + 1})
 
+    if c == "/api/conta/kdf/historico":
+        # Migração em etapas: UMA cópia do histórico, já recifrada com a chave nova, fica guardada à parte até o
+        # fechamento (PUT /api/conta/kdf). Só versões que existem; outra tentativa (outro sal) recomeça do zero.
+        atual = await ctx.banco.primeiro("SELECT kdf FROM contas WHERE email = ?", email)
+        if not atual or (atual["kdf"] or KDF_PBKDF2) != KDF_PBKDF2:
+            raise Falha(409, "KDF_CURRENT")
+        if set(b) != {"sal", "versao", "conteudo"}:
+            raise Falha(400, "INVALID_REQUEST")
+        sal, v, conteudo = _sal(b.get("sal")), _versao(b.get("versao")), _conteudo(b.get("conteudo"))
+        if not await ctx.banco.primeiro("SELECT 1 AS x FROM historico WHERE email = ? AND versao = ?", email, v):
+            raise Falha(400, "INVALID_REQUEST")
+        await ctx.banco.lote([
+            ("DELETE FROM kdf_etapas WHERE email = ? AND sal != ?", (email, sal)),
+            ("INSERT INTO kdf_etapas (email, sal, versao, conteudo) VALUES (?, ?, ?, ?) "
+             "ON CONFLICT(email, versao) DO UPDATE SET sal = excluded.sal, conteudo = excluded.conteudo, "
+             f"enviado_em = {_AGORA_SQL}", (email, sal, v, conteudo)),
+        ])
+        return Resposta(200, {"ok": True})
+
     if c == "/api/conta/kdf":
         # Conta antiga (PBKDF2) passa para Argon2id com a MESMA senha: o navegador faz logo depois de um login que deu certo.
         # Numa transação só: novo sal + nova prova + documento E histórico recifrados com a chave nova (as cópias
         # anteriores continuam abrindo — diferente da troca de senha, que descarta o histórico). Só PBKDF2 → Argon2id.
+        # Histórico grande: as cópias chegam antes, uma por pedido (kdf/historico), e aqui só fecham a migração.
         atual = await ctx.banco.primeiro("SELECT kdf FROM contas WHERE email = ?", email)
         if not atual or (atual["kdf"] or KDF_PBKDF2) != KDF_PBKDF2:
             raise Falha(409, "KDF_CURRENT")
@@ -1010,10 +1031,27 @@ async def _rota(ctx):
             if v not in existentes or any(v == x[0] for x in novas):
                 raise Falha(400, "INVALID_REQUEST")
             novas.append((v, _conteudo(item.get("conteudo"))))
-        if {v for v, _ in novas} != set(existentes):
-            # Cliente antigo ou pedido truncado não pode apagar backups numa migração automática.
+        etapas = {int(r["versao"]) for r in await ctx.banco.todos(
+            "SELECT versao FROM kdf_etapas WHERE email = ? AND sal = ?", email, sal)}
+        if etapas & {v for v, _ in novas}:
+            raise Falha(400, "INVALID_REQUEST")                # a mesma cópia por dois caminhos
+        if {v for v, _ in novas} | etapas != set(existentes):
+            # Cliente antigo, pedido truncado ou etapa que faltou não podem apagar backups numa migração automática.
             raise Falha(409, "DATA_CHANGED")
+        # cópias das etapas: ganham a data original e entram no histórico; a guarda confere que vieram TODAS
+        # (se outra tentativa trocou as etapas no meio do caminho, a transação inteira é desfeita)
+        das_etapas = [
+            ("UPDATE kdf_etapas SET criado_em = (SELECT h.criado_em FROM historico h WHERE h.email = kdf_etapas.email "
+             "AND h.versao = kdf_etapas.versao ORDER BY h.id DESC LIMIT 1) WHERE email = ? AND sal = ?", (email, sal)),
+            ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA,
+        ] if etapas else []
+        reinserir = [
+            ("INSERT INTO historico (email, versao, conteudo, criado_em) "
+             "SELECT email, versao, conteudo, criado_em FROM kdf_etapas WHERE email = ? AND sal = ?", (email, sal)),
+            ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA,
+        ] if etapas else []
         await _lote_atomico(ctx.banco, [
+            *das_etapas,
             _gravar_documento(email, va, conteudo), _GUARDA,
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ? AND kdf = ?",
              (sal, ITERACOES_MIN, _verificador(nova_prova), KDF_ARGON2, email, conta["verificador"], KDF_PBKDF2)), _GUARDA,
@@ -1021,6 +1059,8 @@ async def _rota(ctx):
             # O histórico completo passa a ser o recifrado, preservando as datas originais.
             ("DELETE FROM historico WHERE email = ?", (email,)),
             *[("INSERT INTO historico (email, versao, conteudo, criado_em) VALUES (?, ?, ?, ?)", (email, v, cv, existentes[v])) for v, cv in novas],
+            *reinserir,
+            ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
             # a chave mudou: as outras sessões (outros dispositivos) terminam e entram de novo com a mesma senha
             ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
         ])
@@ -1031,6 +1071,7 @@ async def _rota(ctx):
     if m == "DELETE" and c == "/api/conta":
         await ctx.banco.lote([
             ("DELETE FROM historico WHERE email = ?", (email,)),
+            ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
             ("DELETE FROM documentos WHERE email = ?", (email,)),
             ("DELETE FROM sessoes WHERE email = ?", (email,)),
             ("DELETE FROM contas WHERE email = ?", (email,)),

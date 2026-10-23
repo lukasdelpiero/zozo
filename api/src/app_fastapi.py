@@ -97,6 +97,13 @@ class NovoKdf(Documento):
     historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []
 
 
+class KdfEtapa(Modelo):
+    """Uma cópia do histórico recifrada (migração Argon2id em etapas)."""
+    sal: Sal
+    versao: Versao
+    conteudo: Conteudo
+
+
 class ReenviarEmail(Modelo):
     email: Email
 
@@ -114,6 +121,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/conta/nome"): NovoNome,
     ("PUT", "/api/conta/senha"): NovaSenha,
     ("PUT", "/api/conta/kdf"): NovoKdf,
+    ("PUT", "/api/conta/kdf/historico"): KdfEtapa,
     ("PUT", "/api/documento"): Documento,
     ("POST", "/api/documento/apagar"): Documento,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,

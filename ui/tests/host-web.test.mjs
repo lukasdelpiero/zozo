@@ -125,14 +125,23 @@ function servidorFalso() {
       c.doc = { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo };
       return json(200, { versao: c.doc.versao });
     }
+    if (metodo === "PUT" && caminho === "/conta/kdf/historico") {          // migração em etapas: uma cópia por pedido
+      if ((c.kdf || "pbkdf2") !== "pbkdf2") return json(409, { erro: "KDF_CURRENT" });
+      if (!c.historico.some((x) => x.versao === corpo.versao)) return json(400, { erro: "INVALID_REQUEST" });
+      c.etapas = (c.etapas || []).filter((x) => x.sal === corpo.sal && x.versao !== corpo.versao).concat([corpo]);
+      return json(200, { ok: true });
+    }
     if (metodo === "PUT" && caminho === "/conta/kdf") {
       if ((c.kdf || "pbkdf2") !== "pbkdf2") return json(409, { erro: "KDF_CURRENT" });
       if (corpo.kdf !== "argon2id-1" || !Array.isArray(corpo.historico)) return json(400, { erro: "INVALID_REQUEST" });
       if (corpo.versaoAnterior !== (c.doc ? c.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
       const existentes = new Set(c.historico.map((x) => x.versao));
       if (corpo.historico.some((x) => !existentes.has(x.versao))) return json(400, { erro: "INVALID_REQUEST" });
+      // como o servidor: as cópias junto + as das etapas (do mesmo sal) precisam cobrir o histórico inteiro
+      const todas = corpo.historico.concat((c.etapas || []).filter((x) => x.sal === corpo.sal).map((x) => ({ versao: x.versao, conteudo: x.conteudo })));
+      if (todas.length !== existentes.size || new Set(todas.map((x) => x.versao)).size !== existentes.size) return json(409, { erro: "DATA_CHANGED" });
       Object.assign(c, { sal: corpo.sal, kdf: "argon2id-1", iteracoes: 600000, provaHash: sha256(corpo.prova),
-        doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: corpo.historico.slice().sort((a, b) => a.versao - b.versao) });
+        doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: todas.sort((a, b) => a.versao - b.versao), etapas: [] });
       return json(200, { versao: c.doc.versao });
     }
     if (metodo === "PUT" && caminho === "/conta/senha") {
@@ -523,18 +532,45 @@ test("pedidos à API: mesma origem, sem cache e sem seguir redirecionamentos", a
     assert.equal(o.redirect, "manual");
   }
 });
-test("migração não descarta histórico que excede o limite do pedido", async () => {
+test("histórico maior que um pedido: migra em etapas, uma cópia por pedido, sem perder nenhuma", async () => {
   const srv = servidorFalso(), email = "grande@exemplo.test", senha = novaSenha();
   const ref = await contaAntiga(srv, email, senha);
   const c = srv.contas.get(email);
   const aleatorio = new Uint8Array(850000);
   for (let i = 0; i < aleatorio.length; i += 65536) webcrypto.getRandomValues(aleatorio.subarray(i, i + 65536));
-  for (const v of c.historico) v.conteudo = await cifrarRef(ref.dados, email, v.versao, { texto: b64(aleatorio) });
-  const antes = structuredClone(c);
+  const textos = {};
+  for (const v of c.historico) { textos[v.versao] = b64(aleatorio) + v.versao; v.conteudo = await cifrarRef(ref.dados, email, v.versao, { texto: textos[v.versao] }); }
   const h = carregarHost({ fetch: srv.fetch });
   await h.chamar("login", { email, senha });
-  assert.deepEqual(c, antes);
-  assert.ok(!srv.pedidos.some(p => p.caminho === "/api/conta/kdf"));
+  const etapas = srv.pedidos.filter((p) => p.caminho === "/api/conta/kdf/historico");
+  assert.deepEqual(etapas.map((p) => JSON.parse(p.corpo).versao).sort(), [1, 2]);
+  for (const p of srv.pedidos.filter((x) => x.metodo === "PUT")) assert.ok(p.corpo.length < 2000000, "cada pedido cabe no limite");
+  const fechamento = JSON.parse(srv.pedidos.find((p) => p.caminho === "/api/conta/kdf").corpo);
+  assert.deepEqual(fechamento.historico, []);
+  assert.equal(c.kdf, "argon2id-1");
+  const nova = await derivarRef(senha, Buffer.from(c.sal, "base64"), "argon2id-1");
+  assert.deepEqual(c.historico.map((x) => x.versao), [1, 2]);
+  for (const v of c.historico) assert.deepEqual(await abrirRef(nova.dados, email, v.versao, v.conteudo), { texto: textos[v.versao] });
+  assert.equal((await h.chamar("loadUserData")).documento.versao, 3);
+});
+
+test("migração em etapas interrompida no meio: nada muda e o login segue com a chave antiga", async () => {
+  const srv = servidorFalso(), email = "metade@exemplo.test", senha = novaSenha();
+  const ref = await contaAntiga(srv, email, senha);
+  const c = srv.contas.get(email);
+  const aleatorio = new Uint8Array(850000);
+  for (let i = 0; i < aleatorio.length; i += 65536) webcrypto.getRandomValues(aleatorio.subarray(i, i + 65536));
+  for (const v of c.historico) v.conteudo = await cifrarRef(ref.dados, email, v.versao, { texto: b64(aleatorio) });
+  let etapas = 0;
+  const fetch = async (url, init) => {
+    if (url === "/api/conta/kdf/historico" && ++etapas === 2) throw new TypeError("conexão interrompida");
+    return srv.fetch(url, init);
+  };
+  const antes = structuredClone(c);
+  const h = carregarHost({ fetch });
+  await h.chamar("login", { email, senha });
+  assert.ok(!srv.pedidos.some((p) => p.caminho === "/api/conta/kdf"));
+  assert.deepEqual(Object.assign({}, c, { etapas: undefined }), Object.assign({}, antes, { etapas: undefined }));
   assert.equal((await h.chamar("loadUserData")).documento.versao, 3);
 });
 

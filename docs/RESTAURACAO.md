@@ -27,7 +27,7 @@ O export bloqueia o banco por alguns segundos (faça fora do horário de uso). G
 
 Se o destino já existir, a conferência recusa sem alterá-lo: escolha outro nome. Problemas de formato, integridade ou referências retornam código de saída diferente de zero. O script confere estrutura, não autentica AES-GCM: o ensaio completo ainda exige abrir dados de teste com a senha correta. Importe somente exports SQL de origem confiável.
 
-Na migração automática para Argon2id, preserve todas as versões do histórico. Se alguma não abrir ou o pedido completo exceder o limite da API, adie a migração sem apagar cópias. Uma migração por etapas exigirá protocolo próprio e testes de interrupção; não amplie os limites sem avaliar memória e D1.
+Na migração automática para Argon2id, todas as versões do histórico são preservadas. Se alguma não abrir, a migração é adiada sem apagar cópias. Se o conjunto não couber num pedido, a migração é feita em etapas: cada cópia recifrada fica na tabela `kdf_etapas` (sem uso até o fechamento) e `PUT /api/conta/kdf` troca documento, chave e histórico numa transação só. Linhas que sobrarem em `kdf_etapas` são de uma tentativa interrompida: não são backups (a próxima tentativa, a troca de senha ou a exclusão da conta as apagam). Não amplie os limites sem avaliar memória e D1.
 
 ## 2. Restaurar
 

@@ -305,19 +305,25 @@
       const va: number = doc.versao;
       const documento = await decifrar(s.chave, s.email, doc.versao, doc.conteudo);
       const conteudo = await cifrar(m.chaves.chave, s.email, va + 1, documento);
-      // Migração automática nunca descarta backups: se qualquer cópia não abrir ou não couber,
-      // adia a migração inteira, mantendo a chave e todos os documentos anteriores.
+      // Migração automática nunca descarta backups: se qualquer cópia não abrir, adia a migração inteira,
+      // mantendo a chave e todos os documentos anteriores.
       const h = await api("GET", "/historico", undefined, s.prova);
       if (!h || !Array.isArray(h.versoes)) return;
-      const historico: Array<{ versao: number; conteudo: string }> = [];
+      const recifradas: Array<{ versao: number; conteudo: string }> = [];
       let tamanho = conteudo.length + 1000;
       for (const v of h.versoes) {
         let claro: unknown;
         try { claro = await decifrar(s.chave, s.email, v.versao, v.conteudo); } catch (e) { return; }
         const c = await cifrar(m.chaves.chave, s.email, v.versao, claro);
-        if (tamanho + c.length + 40 > LIMITE_PEDIDO) return;
         tamanho += c.length + 40;
-        historico.push({ versao: v.versao, conteudo: c });
+        recifradas.push({ versao: v.versao, conteudo: c });
+      }
+      // Cabe num pedido: vai tudo junto. Não cabe: em etapas — cada cópia num pedido (guardada à parte no servidor,
+      // sem uso até o fechamento) e o fechamento troca documento, chave e histórico numa transação só.
+      let historico = recifradas;
+      if (tamanho > LIMITE_PEDIDO) {
+        for (const r of recifradas) await api("PUT", "/conta/kdf/historico", { sal: b64(m.sal), versao: r.versao, conteudo: r.conteudo }, s.prova);
+        historico = [];
       }
       try {
         await api("PUT", "/conta/kdf", { sal: b64(m.sal), kdf: KDF_ARGON2, prova: m.chaves.prova, conteudo, versaoAnterior: va, historico }, s.prova);
