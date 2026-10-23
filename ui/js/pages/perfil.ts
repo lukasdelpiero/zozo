@@ -529,6 +529,30 @@
   /* ---------------- Configurações: Geral | Conta ---------------- */
   let abaConfig = "geral";
 
+  /**
+   * Proteção avançada: sem cópia da chave no servidor — só você abre os dados, mas esqueceu a senha, a conta
+   * recomeça vazia. Desligada (padrão): "Esqueci minha senha" recupera os dados pelo link do e-mail.
+   */
+  function linhaProtecao(ctx: ContextoApp) {
+    const interruptor = ZoZo.modais.Interruptor("", false, (ligar) => {
+      ZoZo.modais.confirmarComSenha(ligar
+        ? { titulo: "Ativar proteção avançada?", botao: "Ativar", mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar." }
+        : { titulo: "Desativar proteção avançada?", botao: "Desativar", mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha para confirmar." })
+        .then((senha: any) => {
+          if (!senha) { entrada.checked = !ligar; return; }
+          entrada.disabled = true;
+          return ctx.bridge.request(A.setProtecao, { avancada: ligar, senha }, { timeout: 120000 })
+            .then((r: any) => { entrada.checked = !!r.avancada; })
+            .catch((e: any) => { entrada.checked = !ligar; ctx.toast(e.friendly, { tone: "error" }); })
+            .finally(() => { entrada.disabled = false; });
+        });
+    }, "Proteção avançada");
+    const entrada = interruptor.querySelector("input") as HTMLInputElement;
+    entrada.disabled = true;                            // até saber o estado atual
+    ctx.bridge.request(A.getProtecao).then((r: any) => { entrada.checked = !!r.avancada; entrada.disabled = false; }).catch(() => null);
+    return linhaConfig("Proteção avançada", "Só você abre seus dados. Se esquecer a senha, a conta recomeça vazia (sem recuperação pelo e-mail).", interruptor);
+  }
+
   function linhaConfig(titulo: any, sub: any, direita: any) {
     const P = ZoZo.pecas;
     return h("div", { class: P.cfgLinha },
@@ -646,6 +670,7 @@
           demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
+          demo ? null : linhaProtecao(ctx),
           h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda] || "Real") : "Exportar todas as transações",
             "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : "") + ". O arquivo não é cifrado: guarde-o em local seguro.", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),

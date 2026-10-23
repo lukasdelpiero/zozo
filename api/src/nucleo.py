@@ -71,6 +71,8 @@ PENDENTE_APAGA_S = 7 * 86400              # cadastro nunca confirmado some depoi
 EMAILS_POR_CONTA, EMAIL_JANELA_S = 3, 3600            # e-mails de confirmação/aviso por endereço
 REENVIO_LOGIN_S = 600                     # entrar sem confirmar manda um link novo se o último tem mais de 10 min
 LINKS_POR_IP, LINK_JANELA_S = 30, 3600                # conferências de link (tela "Verifique seu e-mail") por IP
+RECUPERACAO_S = 3600                      # link de "Esqueci minha senha": 1 hora
+RECUPERACOES_POR_IP, RECUPERACAO_JANELA_S = 5, 3600   # pedidos de recuperação por IP
 FORMATO_DOCUMENTO = 2           # primeiro byte do documento cifrado (versão do formato)
 MAX_VERSAO = 2**53 - 1
 
@@ -483,7 +485,7 @@ def _sessao_publica(ctx, email, nome, envelope, dois_fatores, verificado=False):
 async def _conferir_prova(ctx, email):
     """Confere a prova do cabeçalho X-ZoZo-Prova. Erros contam no mesmo bloqueio do login (e-mail + IP)."""
     conta = await ctx.banco.primeiro(
-        "SELECT nome, verificador, totp_segredo, totp_pendente, totp_ultimo_passo FROM contas WHERE email = ?", email)
+        "SELECT nome, verificador, totp_segredo, totp_pendente, totp_ultimo_passo, protecao_avancada FROM contas WHERE email = ?", email)
     if not conta:
         raise Falha(401, "UNAUTHORIZED")
     chave = f"login|{ctx.h(email)}|{ctx.h(ctx.pedido.ip)}"
@@ -684,6 +686,211 @@ async def _reenviar_confirmacao(ctx):
         if c:
             await _enviar_confirmacao(ctx, email, c["verificador"])
     return Resposta(202, {"ok": True})
+
+
+# ---------------- troca da chave com o histórico recifrado (migração Argon2id e recuperação de senha) ----------------
+async def _guardar_etapa(ctx, email, b, campos):
+    """Uma cópia do histórico já recifrada com a chave nova, guardada à parte (kdf_etapas) até o fechamento."""
+    if set(b) != campos:
+        raise Falha(400, "INVALID_REQUEST")
+    sal, v, conteudo = _sal(b.get("sal")), _versao(b.get("versao")), _conteudo(b.get("conteudo"))
+    if not await ctx.banco.primeiro("SELECT 1 AS x FROM historico WHERE email = ? AND versao = ?", email, v):
+        raise Falha(400, "INVALID_REQUEST")
+    await ctx.banco.lote([
+        ("DELETE FROM kdf_etapas WHERE email = ? AND sal != ?", (email, sal)),
+        ("INSERT INTO kdf_etapas (email, sal, versao, conteudo) VALUES (?, ?, ?, ?) "
+         "ON CONFLICT(email, versao) DO UPDATE SET sal = excluded.sal, conteudo = excluded.conteudo, "
+         f"enviado_em = {_AGORA_SQL}", (email, sal, v, conteudo)),
+    ])
+
+
+async def _historico_recifrado(ctx, email, b, sal, completo):
+    """
+    Confere o histórico recifrado (o que veio junto + o das etapas com este sal) e devolve os comandos da
+    transação: (antes da gravação do documento, depois dela). Só versões que existem, sem repetir.
+    completo=True: tem de cobrir TODAS as versões (migração automática nunca descarta backup).
+    completo=False: recuperação de senha — uma cópia que já não abria fica de fora (as datas das outras ficam).
+    """
+    hist = b.get("historico", [])
+    if not isinstance(hist, list) or len(hist) > 10:
+        raise Falha(400, "INVALID_REQUEST")
+    existentes = {int(r["versao"]): r["criado_em"] for r in await ctx.banco.todos(
+        "SELECT versao, criado_em FROM historico WHERE email = ?", email)}
+    novas = []
+    for item in hist:
+        if not isinstance(item, dict) or set(item) != {"versao", "conteudo"}:
+            raise Falha(400, "INVALID_REQUEST")
+        v = _versao(item.get("versao"))
+        # só versões que já existem (recifradas), sem repetir: o navegador não inventa cópias de segurança
+        if v not in existentes or any(v == x[0] for x in novas):
+            raise Falha(400, "INVALID_REQUEST")
+        novas.append((v, _conteudo(item.get("conteudo"))))
+    etapas = {int(r["versao"]) for r in await ctx.banco.todos(
+        "SELECT versao FROM kdf_etapas WHERE email = ? AND sal = ?", email, sal)}
+    if etapas & {v for v, _ in novas}:
+        raise Falha(400, "INVALID_REQUEST")                # a mesma cópia por dois caminhos
+    if completo and {v for v, _ in novas} | etapas != set(existentes):
+        # Cliente antigo, pedido truncado ou etapa que faltou não podem apagar backups numa migração automática.
+        raise Falha(409, "DATA_CHANGED")
+    # cópias das etapas: ganham a data original e entram no histórico; a guarda confere que vieram TODAS
+    # (se outra tentativa trocou as etapas no meio do caminho, a transação inteira é desfeita)
+    antes = [
+        ("UPDATE kdf_etapas SET criado_em = (SELECT h.criado_em FROM historico h WHERE h.email = kdf_etapas.email "
+         "AND h.versao = kdf_etapas.versao ORDER BY h.id DESC LIMIT 1) WHERE email = ? AND sal = ?", (email, sal)),
+        ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA,
+    ] if etapas else []
+    depois = [
+        # o histórico passa a ser o recifrado, com as datas originais
+        ("DELETE FROM historico WHERE email = ?", (email,)),
+        *[("INSERT INTO historico (email, versao, conteudo, criado_em) VALUES (?, ?, ?, ?)", (email, v, cv, existentes[v])) for v, cv in novas],
+        *([("INSERT INTO historico (email, versao, conteudo, criado_em) "
+            "SELECT email, versao, conteudo, criado_em FROM kdf_etapas WHERE email = ? AND sal = ?", (email, sal)),
+           ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA] if etapas else []),
+        ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
+    ]
+    return antes, depois
+
+
+# ---------------- recuperação de senha ("Esqueci minha senha") ----------------
+def _hash_recuperacao(token):
+    return hashlib.sha256(("zozo/recuperar/v1|" + token).encode("utf-8")).hexdigest()
+
+
+def _chave_custodia(ctx, email, nonce):
+    """Chave que tranca a cópia da chave dos dados. Só o servidor calcula (HMAC do SEGREDO); não fica guardada."""
+    return base64.b64encode(hmac.new(ctx.segredo.encode(), ("zozo/custodia/v1|" + email + "|" + nonce).encode("utf-8"),
+                                     hashlib.sha256).digest()).decode("ascii")
+
+
+async def _pedir_recuperacao(ctx):
+    """Sempre 202 (não revela se o e-mail tem conta). Link de 1 h; no máximo 3 e-mails por hora por endereço."""
+    b = _json(ctx.pedido)
+    email = _email(b.get("email"))
+    if await _contar(ctx, f"recuperar|{ctx.h(ctx.pedido.ip)}", RECUPERACOES_POR_IP, RECUPERACAO_JANELA_S):
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": RECUPERACAO_JANELA_S})
+    if not emails.ativo(ctx.config) or email == DEMO_EMAIL:
+        return Resposta(202, {"ok": True})
+    c = await ctx.banco.primeiro("SELECT nome, verificador FROM contas WHERE email = ? AND confirmacao_pendente = 0", email)
+    if not c:
+        return Resposta(202, {"ok": True})
+    if await _contar(ctx, f"email|{ctx.h(email)}", EMAILS_POR_CONTA, EMAIL_JANELA_S):
+        ctx.evento("email_limitado", email)
+        return Resposta(202, {"ok": True})
+    token = secrets.token_urlsafe(32)
+    await ctx.banco.lote([
+        ("DELETE FROM tokens_recuperacao WHERE email = ? AND (expira < ? OR usado = 1 OR verificador != ?)",
+         (email, int(ctx.agora), c["verificador"])),
+        ("INSERT INTO tokens_recuperacao (hash, email, verificador, expira) VALUES (?, ?, ?, ?)",
+         (_hash_recuperacao(token), email, c["verificador"], int(ctx.agora) + RECUPERACAO_S)),
+    ])
+    ok = await emails.enviar(ctx.servicos, ctx.config, email, emails.recuperacao(ctx.config, token, c["nome"]))
+    ctx.evento("recuperacao_enviada" if ok else "email_falhou", email)
+    return Resposta(202, {"ok": True})
+
+
+async def _token_recuperacao(ctx, token, aberto=False):
+    """Link válido: existe, não usado, no prazo e da senha ATUAL (trocou a senha, os links antigos morrem)."""
+    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", token):
+        raise Falha(400, "TOKEN_INVALID")
+    t = await ctx.banco.primeiro(
+        "SELECT t.hash, t.email, t.expira, t.aberto, c.nome, c.verificador, c.totp_segredo, c.totp_ultimo_passo, c.protecao_avancada "
+        "FROM tokens_recuperacao t JOIN contas c ON c.email = t.email AND c.verificador = t.verificador "
+        "WHERE t.hash = ? AND t.usado = 0 AND c.confirmacao_pendente = 0", _hash_recuperacao(token))
+    if not t or int(t["expira"]) < int(ctx.agora) or (aberto and not t["aberto"]):
+        ctx.evento("recuperacao_recusada")
+        raise Falha(400, "TOKEN_INVALID")
+    return t
+
+
+async def _abrir_recuperacao(ctx):
+    """
+    Link do e-mail aberto (+ código do 2FA, se a conta tiver): devolve a cópia da chave e a chave de custódia,
+    o documento e o histórico (cifrados) — o navegador abre, recifra com a senha nova e conclui.
+    Proteção avançada (ou cópia ainda não guardada): sem cópia; a conta só pode recomeçar vazia.
+    """
+    if await _contar(ctx, f"link|{ctx.h(ctx.pedido.ip)}", LINKS_POR_IP, LINK_JANELA_S):
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": LINK_JANELA_S})
+    b = _json(ctx.pedido)
+    t = await _token_recuperacao(ctx, b.get("token"))
+    email = t["email"]
+    if t["totp_segredo"]:
+        if b.get("codigo") is None:
+            raise Falha(401, "CODE_REQUIRED")
+        chave = f"2fa|{ctx.h(email)}"                        # mesmo bloqueio do código no login
+        r = await _reservar(ctx, chave)
+        if not r:
+            raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
+        segredo = totp.decifrar(t["totp_segredo"], ctx.segredo)
+        passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, t["totp_ultimo_passo"]) if segredo else None
+        if passo is not None:
+            n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?",
+                                         passo, email, passo)
+            passo = passo if n == 1 else None
+        if passo is None:
+            ctx.evento("recuperacao_2fa_falhou", email, tentativa=r["falhas"])
+            raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
+    await ctx.banco.executar("UPDATE tokens_recuperacao SET aberto = 1 WHERE hash = ?", t["hash"])
+    cu = None if t["protecao_avancada"] else await ctx.banco.primeiro(
+        "SELECT nonce, chave FROM custodia WHERE email = ? AND verificador = ?", email, t["verificador"])
+    doc = await ctx.banco.primeiro("SELECT versao, conteudo FROM documentos WHERE email = ?", email)
+    resposta = {"email": email, "versao": int(doc["versao"]) if doc else 0, "custodia": None, "documento": None, "historico": []}
+    if cu:
+        resposta["custodia"] = {"nonce": cu["nonce"], "chave": cu["chave"], "r": _chave_custodia(ctx, email, cu["nonce"])}
+        resposta["documento"] = {"versao": int(doc["versao"]), "conteudo": doc["conteudo"]} if doc else None
+        resposta["historico"] = await ctx.banco.todos(
+            "SELECT versao, conteudo FROM historico WHERE email = ? ORDER BY versao DESC LIMIT 10", email)
+    ctx.evento("recuperacao_aberta", email, copia=bool(cu))
+    return Resposta(200, resposta)
+
+
+async def _etapa_recuperacao(ctx):
+    """Histórico grande na recuperação: uma cópia recifrada por pedido (como na migração em etapas)."""
+    b = _json(ctx.pedido)
+    t = await _token_recuperacao(ctx, b.get("token"), aberto=True)
+    await _guardar_etapa(ctx, t["email"], {k: v for k, v in b.items() if k != "token"}, {"sal", "versao", "conteudo"})
+    return Resposta(200, {"ok": True})
+
+
+async def _concluir_recuperacao(ctx):
+    """
+    Senha nova numa transação: link usado, nova senha (Argon2id), documento recifrado (modo "manter", com a
+    cópia da chave) ou vazio (modo "recomecar": proteção avançada ou sem cópia), histórico, cópia da chave
+    antiga apagada e TODAS as sessões encerradas. Depois, login normal com a senha nova.
+    """
+    b = _json(ctx.pedido)
+    t = await _token_recuperacao(ctx, b.get("token"), aberto=True)
+    email = t["email"]
+    modo = b.get("modo")
+    if modo not in ("manter", "recomecar") or b.get("kdf") != KDF_ARGON2:
+        raise Falha(400, "INVALID_REQUEST")
+    sal, nova_prova = _sal(b.get("sal")), _prova(b.get("prova"))
+    conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
+    if modo == "manter":
+        if t["protecao_avancada"] or not await ctx.banco.primeiro(
+                "SELECT 1 AS x FROM custodia WHERE email = ? AND verificador = ?", email, t["verificador"]):
+            raise Falha(409, "DATA_CHANGED")
+        antes, depois = await _historico_recifrado(ctx, email, b, sal, completo=False)
+    else:
+        if b.get("historico", []) != []:
+            raise Falha(400, "INVALID_REQUEST")
+        antes, depois = [], [("DELETE FROM historico WHERE email = ?", (email,)), ("DELETE FROM kdf_etapas WHERE email = ?", (email,))]
+    await _lote_atomico(ctx.banco, [
+        ("UPDATE tokens_recuperacao SET usado = 1 WHERE hash = ? AND usado = 0 AND aberto = 1", (t["hash"],)), _GUARDA, _LIMPA_GUARDA,
+        *antes,
+        _gravar_documento(email, va, conteudo), _GUARDA,
+        ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ?",
+         (sal, ITERACOES_MIN, _verificador(nova_prova), KDF_ARGON2, email, t["verificador"])), _GUARDA,
+        _LIMPA_GUARDA,
+        *depois,
+        ("DELETE FROM custodia WHERE email = ?", (email,)),
+        ("DELETE FROM tokens_recuperacao WHERE email = ? AND hash != ?", (email, t["hash"])),
+        ("DELETE FROM sessoes WHERE email = ?", (email,)),
+    ])
+    await _limpar_login(ctx, email)
+    ctx.evento("senha_redefinida", email, modo=modo)
+    await _avisar(ctx, email, emails.senha_redefinida(t["nome"], ctx.agora, modo == "recomecar"), "email_aviso_senha")
+    return Resposta(200, {"ok": True})
 
 
 async def _avisar(ctx, email, mensagem, evento):
@@ -894,8 +1101,9 @@ _PROTEGIDAS = {
     ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("PUT", "/api/conta/kdf/historico"), ("DELETE", "/api/conta"),
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
+    ("GET", "/api/custodia"), ("POST", "/api/custodia/chave"), ("PUT", "/api/custodia"), ("PUT", "/api/conta/protecao"),
 }
-_SEM_CORPO = {"/api/2fa/iniciar"}
+_SEM_CORPO = {"/api/2fa/iniciar", "/api/custodia/chave"}
 
 
 async def _rota(ctx):
@@ -920,6 +1128,14 @@ async def _rota(ctx):
         return await _reenviar_confirmacao(ctx)
     if m == "POST" and c == "/api/email/link":
         return await _conferir_link(ctx)
+    if m == "POST" and c == "/api/recuperacao/pedir":
+        return await _pedir_recuperacao(ctx)
+    if m == "POST" and c == "/api/recuperacao/abrir":
+        return await _abrir_recuperacao(ctx)
+    if m == "PUT" and c == "/api/recuperacao/historico":
+        return await _etapa_recuperacao(ctx)
+    if m == "PUT" and c == "/api/recuperacao/concluir":
+        return await _concluir_recuperacao(ctx)
     if m == "POST" and c == "/api/sessao/2fa":
         return await _segundo_fator(ctx)
     if m == "GET" and c == "/api/sessao":
@@ -975,9 +1191,12 @@ async def _rota(ctx):
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ?",
              (sal, it, _verificador(nova_prova), kdf, email, conta["verificador"])), _GUARDA,
             _LIMPA_GUARDA,
-            # o histórico estava cifrado com a senha anterior: é descartado (e uma migração em etapas pela metade)
+            # o histórico estava cifrado com a senha anterior: é descartado (e uma migração em etapas pela metade);
+            # a cópia da chave (recuperação) era da chave antiga: o navegador guarda a nova logo depois
             ("DELETE FROM historico WHERE email = ?", (email,)),
             ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
+            ("DELETE FROM custodia WHERE email = ?", (email,)),
+            ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,)),
             # as outras sessões (outros dispositivos) terminam
             ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
         ])
@@ -992,17 +1211,7 @@ async def _rota(ctx):
         atual = await ctx.banco.primeiro("SELECT kdf FROM contas WHERE email = ?", email)
         if not atual or (atual["kdf"] or KDF_PBKDF2) != KDF_PBKDF2:
             raise Falha(409, "KDF_CURRENT")
-        if set(b) != {"sal", "versao", "conteudo"}:
-            raise Falha(400, "INVALID_REQUEST")
-        sal, v, conteudo = _sal(b.get("sal")), _versao(b.get("versao")), _conteudo(b.get("conteudo"))
-        if not await ctx.banco.primeiro("SELECT 1 AS x FROM historico WHERE email = ? AND versao = ?", email, v):
-            raise Falha(400, "INVALID_REQUEST")
-        await ctx.banco.lote([
-            ("DELETE FROM kdf_etapas WHERE email = ? AND sal != ?", (email, sal)),
-            ("INSERT INTO kdf_etapas (email, sal, versao, conteudo) VALUES (?, ?, ?, ?) "
-             "ON CONFLICT(email, versao) DO UPDATE SET sal = excluded.sal, conteudo = excluded.conteudo, "
-             f"enviado_em = {_AGORA_SQL}", (email, sal, v, conteudo)),
-        ])
+        await _guardar_etapa(ctx, email, b, {"sal", "versao", "conteudo"})
         return Resposta(200, {"ok": True})
 
     if c == "/api/conta/kdf":
@@ -1017,50 +1226,17 @@ async def _rota(ctx):
             raise Falha(400, "INVALID_REQUEST")
         sal, nova_prova = _sal(b.get("sal")), _prova(b.get("prova"))
         conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
-        hist = b.get("historico", [])
-        if not isinstance(hist, list) or len(hist) > 10:
-            raise Falha(400, "INVALID_REQUEST")
-        existentes = {int(r["versao"]): r["criado_em"] for r in await ctx.banco.todos(
-            "SELECT versao, criado_em FROM historico WHERE email = ?", email)}
-        novas = []
-        for item in hist:
-            if not isinstance(item, dict) or set(item) != {"versao", "conteudo"}:
-                raise Falha(400, "INVALID_REQUEST")
-            v = _versao(item.get("versao"))
-            # só versões que já existem (recifradas), sem repetir: o navegador não inventa cópias de segurança
-            if v not in existentes or any(v == x[0] for x in novas):
-                raise Falha(400, "INVALID_REQUEST")
-            novas.append((v, _conteudo(item.get("conteudo"))))
-        etapas = {int(r["versao"]) for r in await ctx.banco.todos(
-            "SELECT versao FROM kdf_etapas WHERE email = ? AND sal = ?", email, sal)}
-        if etapas & {v for v, _ in novas}:
-            raise Falha(400, "INVALID_REQUEST")                # a mesma cópia por dois caminhos
-        if {v for v, _ in novas} | etapas != set(existentes):
-            # Cliente antigo, pedido truncado ou etapa que faltou não podem apagar backups numa migração automática.
-            raise Falha(409, "DATA_CHANGED")
-        # cópias das etapas: ganham a data original e entram no histórico; a guarda confere que vieram TODAS
-        # (se outra tentativa trocou as etapas no meio do caminho, a transação inteira é desfeita)
-        das_etapas = [
-            ("UPDATE kdf_etapas SET criado_em = (SELECT h.criado_em FROM historico h WHERE h.email = kdf_etapas.email "
-             "AND h.versao = kdf_etapas.versao ORDER BY h.id DESC LIMIT 1) WHERE email = ? AND sal = ?", (email, sal)),
-            ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA,
-        ] if etapas else []
-        reinserir = [
-            ("INSERT INTO historico (email, versao, conteudo, criado_em) "
-             "SELECT email, versao, conteudo, criado_em FROM kdf_etapas WHERE email = ? AND sal = ?", (email, sal)),
-            ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA,
-        ] if etapas else []
+        # Migração automática nunca descarta backups: o histórico recifrado tem de cobrir TODAS as versões
+        antes, depois = await _historico_recifrado(ctx, email, b, sal, completo=True)
         await _lote_atomico(ctx.banco, [
-            *das_etapas,
+            *antes,
             _gravar_documento(email, va, conteudo), _GUARDA,
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ? AND kdf = ?",
              (sal, ITERACOES_MIN, _verificador(nova_prova), KDF_ARGON2, email, conta["verificador"], KDF_PBKDF2)), _GUARDA,
             _LIMPA_GUARDA,
-            # O histórico completo passa a ser o recifrado, preservando as datas originais.
-            ("DELETE FROM historico WHERE email = ?", (email,)),
-            *[("INSERT INTO historico (email, versao, conteudo, criado_em) VALUES (?, ?, ?, ?)", (email, v, cv, existentes[v])) for v, cv in novas],
-            *reinserir,
-            ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
+            *depois,
+            # a cópia da chave (recuperação) era da chave antiga: o navegador guarda a nova logo depois
+            ("DELETE FROM custodia WHERE email = ?", (email,)),
             # a chave mudou: as outras sessões (outros dispositivos) terminam e entram de novo com a mesma senha
             ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
         ])
@@ -1072,6 +1248,8 @@ async def _rota(ctx):
         await ctx.banco.lote([
             ("DELETE FROM historico WHERE email = ?", (email,)),
             ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
+            ("DELETE FROM custodia WHERE email = ?", (email,)),
+            ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,)),
             ("DELETE FROM documentos WHERE email = ?", (email,)),
             ("DELETE FROM sessoes WHERE email = ?", (email,)),
             ("DELETE FROM contas WHERE email = ?", (email,)),
@@ -1096,6 +1274,44 @@ async def _rota(ctx):
         sql, params = _gravar_documento(email, va, conteudo)
         n = await ctx.banco.executar(sql, *params)
         return Resposta(200, {"versao": va + 1}) if n else Resposta(409, {"erro": "DATA_CHANGED"})
+
+    if c == "/api/custodia" and m == "GET":
+        cu = await ctx.banco.primeiro("SELECT 1 AS x FROM custodia WHERE email = ? AND verificador = ?", email, conta["verificador"])
+        return Resposta(200, {"avancada": bool(conta["protecao_avancada"]), "ativa": bool(cu)})
+
+    if c == "/api/custodia/chave":
+        # Recuperação pelo e-mail: o navegador tranca a chave dos dados com esta chave de custódia e guarda a cópia
+        # (PUT /api/custodia). Nada a fazer com proteção avançada ou com uma cópia da senha atual já guardada.
+        if conta["protecao_avancada"]:
+            return Resposta(200, {"avancada": True})
+        if await ctx.banco.primeiro("SELECT 1 AS x FROM custodia WHERE email = ? AND verificador = ?", email, conta["verificador"]):
+            return Resposta(200, {"atual": True})
+        nonce = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+        return Resposta(200, {"nonce": nonce, "r": _chave_custodia(ctx, email, nonce)})
+
+    if c == "/api/custodia":
+        if set(b) != {"nonce", "chave"} or len(_b64(b.get("nonce"), 24, 24)) != 16 or len(_b64(b.get("chave"), 80, 80)) != 60:
+            raise Falha(400, "INVALID_REQUEST")                # 12 (IV) + 32 (chave) + 16 (etiqueta GCM)
+        if conta["protecao_avancada"]:
+            raise Falha(409, "DATA_CHANGED")
+        await ctx.banco.executar(
+            "INSERT INTO custodia (email, nonce, chave, verificador) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET "
+            f"nonce = excluded.nonce, chave = excluded.chave, verificador = excluded.verificador, criado_em = {_AGORA_SQL}",
+            email, b["nonce"], b["chave"], conta["verificador"])
+        ctx.evento("custodia_guardada", email)
+        return Resposta(200, {"ok": True})
+
+    if c == "/api/conta/protecao":
+        avancada = b.get("avancada")
+        if set(b) != {"avancada"} or not isinstance(avancada, bool):
+            raise Falha(400, "INVALID_REQUEST")
+        await ctx.banco.lote([
+            ("UPDATE contas SET protecao_avancada = ? WHERE email = ?", (1 if avancada else 0, email)),
+            *([("DELETE FROM custodia WHERE email = ?", (email,)), ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,))]
+              if avancada else []),
+        ])
+        ctx.evento("protecao_avancada_ligada" if avancada else "protecao_avancada_desligada", email)
+        return Resposta(200, {"avancada": avancada})
 
     if c == "/api/documento/apagar":
         # "Apagar todos os dados": grava o documento vazio (a versão continua subindo,

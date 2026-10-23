@@ -5,7 +5,7 @@
 //   node --test ui/tests
 import test from "node:test";
 import assert from "node:assert/strict";
-import { webcrypto, createHash, randomUUID } from "node:crypto";
+import { webcrypto, createHash, createHmac, randomUUID } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { argon2id } from "hash-wasm";
 import { carregarHost } from "./carregar.mjs";
@@ -114,6 +114,39 @@ function servidorFalso() {
     }
     if (metodo === "GET" && caminho === "/sessao") return c ? json(200, sessao(c, s.logado)) : new Response(null, { status: 204 });
     if (metodo === "DELETE" && caminho === "/sessao") { s.logado = null; s.envelope = null; return new Response(null, { status: 204 }); }
+    // "Esqueci minha senha" (sem sessão): o link vale enquanto a senha for a mesma
+    const chaveCustodia = (email, nonce) => createHmac("sha256", "segredo-falso").update("zozo/custodia/v1|" + email + "|" + nonce).digest("base64");
+    if (metodo === "POST" && caminho === "/recuperacao/pedir") {
+      if (contas.has(corpo.email)) { s.ultimoToken = "T" + randomUUID().replace(/-/g, ""); s.tokens = Object.assign(s.tokens || {}, { [s.ultimoToken]: { email: corpo.email, prova: contas.get(corpo.email).provaHash } }); }
+      return json(202, { ok: true });
+    }
+    const tok = corpo && s.tokens && s.tokens[corpo.token];
+    const contaTok = tok && contas.get(tok.email);
+    if (caminho.startsWith("/recuperacao/") && (!contaTok || contaTok.provaHash !== tok.prova || tok.usado)) return json(400, { erro: "TOKEN_INVALID" });
+    if (metodo === "POST" && caminho === "/recuperacao/abrir") {
+      if (contaTok.codigo2fa && corpo.codigo === undefined) return json(401, { erro: "CODE_REQUIRED" });
+      if (contaTok.codigo2fa && corpo.codigo !== contaTok.codigo2fa) return json(401, { erro: "CODE_INVALID" });
+      tok.aberto = true;
+      const cu = !contaTok.avancada && contaTok.custodia && contaTok.custodia.prova === contaTok.provaHash ? contaTok.custodia : null;
+      return json(200, { email: tok.email, versao: contaTok.doc ? contaTok.doc.versao : 0,
+        custodia: cu ? { nonce: cu.nonce, chave: cu.chave, r: chaveCustodia(tok.email, cu.nonce) } : null,
+        documento: cu ? contaTok.doc : null, historico: cu ? contaTok.historico.slice().reverse() : [] });
+    }
+    if (caminho.startsWith("/recuperacao/") && !tok.aberto) return json(400, { erro: "TOKEN_INVALID" });
+    if (metodo === "PUT" && caminho === "/recuperacao/historico") {
+      contaTok.etapas = (contaTok.etapas || []).filter((x) => x.sal === corpo.sal && x.versao !== corpo.versao).concat([corpo]);
+      return json(200, { ok: true });
+    }
+    if (metodo === "PUT" && caminho === "/recuperacao/concluir") {
+      if (corpo.versaoAnterior !== (contaTok.doc ? contaTok.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
+      const todas = corpo.modo === "manter"
+        ? corpo.historico.concat((contaTok.etapas || []).filter((x) => x.sal === corpo.sal).map((x) => ({ versao: x.versao, conteudo: x.conteudo }))) : [];
+      tok.usado = true;
+      Object.assign(contaTok, { sal: corpo.sal, kdf: "argon2id-1", iteracoes: 600000, provaHash: sha256(corpo.prova), custodia: null, etapas: [],
+        doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: todas.sort((a, b) => a.versao - b.versao) });
+      s.logado = null;
+      return json(200, { ok: true });
+    }
     const recusa = comProva();
     if (recusa) return recusa;
     if (metodo === "GET" && caminho === "/documento") return c.doc ? json(200, c.doc) : json(404, { erro: "NOT_FOUND" });
@@ -144,6 +177,23 @@ function servidorFalso() {
         doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: todas.sort((a, b) => a.versao - b.versao), etapas: [] });
       return json(200, { versao: c.doc.versao });
     }
+    if (metodo === "POST" && caminho === "/custodia/chave") {
+      if (c.avancada) return json(200, { avancada: true });
+      if (c.custodia && c.custodia.prova === c.provaHash) return json(200, { atual: true });
+      const nonce = b64(webcrypto.getRandomValues(new Uint8Array(16)));
+      return json(200, { nonce, r: chaveCustodia(s.logado, nonce) });
+    }
+    if (metodo === "PUT" && caminho === "/custodia") {
+      if (c.avancada) return json(409, { erro: "DATA_CHANGED" });
+      c.custodia = { nonce: corpo.nonce, chave: corpo.chave, prova: c.provaHash };
+      return json(200, { ok: true });
+    }
+    if (metodo === "GET" && caminho === "/custodia") return json(200, { avancada: !!c.avancada, ativa: !!(c.custodia && c.custodia.prova === c.provaHash) });
+    if (metodo === "PUT" && caminho === "/conta/protecao") {
+      c.avancada = corpo.avancada === true;
+      if (c.avancada) c.custodia = null;
+      return json(200, { avancada: c.avancada });
+    }
     if (metodo === "PUT" && caminho === "/conta/senha") {
       if (corpo.versaoAnterior !== (c.doc ? c.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
       Object.assign(c, { sal: corpo.sal, iteracoes: corpo.iteracoes, kdf: corpo.kdf, provaHash: sha256(corpo.prova), doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: [] });
@@ -153,6 +203,9 @@ function servidorFalso() {
   };
   return s;
 }
+
+/** Conta sem a cópia da chave (recuperação) nem etapas de migração: o que a migração adiada não pode mudar */
+const semCopia = (c) => { const x = structuredClone(c); delete x.custodia; delete x.etapas; return x; };
 
 /** Cadastra uma conta nova (Argon2id) e devolve o host já com a sessão aberta */
 async function cadastrar(srv, email, senha, armazenamento) {
@@ -504,6 +557,85 @@ test("link do e-mail: token malformado nem sai do navegador; o válido só é co
   await assert.rejects(h.chamar("conferirLink", { token }), codigo("TOKEN_INVALID"));
 });
 
+/* ---------------- recuperação de senha ---------------- */
+async function abrirCopia(srv, email) {
+  const cu = srv.contas.get(email).custodia;
+  const r = createHmac("sha256", "segredo-falso").update("zozo/custodia/v1|" + email + "|" + cu.nonce).digest();
+  const tudo = Buffer.from(cu.chave, "base64");
+  const k = await subtle.importKey("raw", r, "AES-GCM", false, ["decrypt"]);
+  return new Uint8Array(await subtle.decrypt({ name: "AES-GCM", iv: tudo.subarray(0, 12), additionalData: enc.encode("zozo|custodia|v1|" + email + "|" + cu.nonce) }, k, tudo.subarray(12)));
+}
+
+test("cadastro guarda a cópia da chave trancada; o servidor nunca recebe a chave aberta", async () => {
+  const srv = servidorFalso(), email = "copia@exemplo.test", senha = novaSenha();
+  await cadastrar(srv, email, senha);
+  const c = srv.contas.get(email);
+  assert.ok(c.custodia, "cópia guardada");
+  const ref = await derivarRef(senha, Buffer.from(c.sal, "base64"), "argon2id-1");
+  const aberta = await abrirCopia(srv, email);
+  assert.equal(b64(aberta), b64(ref.dados));                                         // é a chave dos dados
+  for (const p of srv.pedidos) assert.ok(!p.corpo.includes(b64(ref.dados)), "a chave aberta não sai do navegador");
+});
+
+test("esqueci a senha: link + senha nova; o login com a senha nova abre os mesmos dados e o histórico", async () => {
+  const srv = servidorFalso(), email = "esqueci@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  for (let i = 1; i <= 3; i++) {
+    await h.chamar("loadUserData");
+    await h.chamar("saveUserData", { documento: { texto: "Mercado-" + i } });
+  }
+  await h.chamar("logout");
+  const outro = carregarHost({ fetch: srv.fetch });
+  await outro.chamar("pedirRecuperacao", { email });
+  await assert.rejects(outro.chamar("abrirRecuperacao", { token: "inventado-123456789012345" }), codigo("TOKEN_INVALID"));
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: true });
+  const nova = novaSenha();
+  assert.deepEqual(await outro.chamar("concluirRecuperacao", { senha: nova }), { email, recomecou: false });
+  await assert.rejects(outro.chamar("concluirRecuperacao", { senha: nova }), codigo("TOKEN_INVALID"));   // não repete
+  await assert.rejects(carregarHost({ fetch: srv.fetch }).chamar("login", { email, senha }), codigo("INVALID_CREDENTIALS"));
+  const depois = carregarHost({ fetch: srv.fetch });
+  await depois.chamar("login", { email, senha: nova });
+  assert.deepEqual((await depois.chamar("loadUserData")).documento, { texto: "Mercado-3" });
+  const c = srv.contas.get(email);
+  const ref = await derivarRef(nova, Buffer.from(c.sal, "base64"), "argon2id-1");
+  assert.deepEqual(c.historico.map((x) => x.versao), [1, 2]);
+  for (const v of c.historico) assert.deepEqual(await abrirRef(ref.dados, email, v.versao, v.conteudo), { texto: "Mercado-" + v.versao });
+  assert.equal(b64(await abrirCopia(srv, email)), b64(ref.dados));                   // a cópia nova foi guardada no login
+});
+
+test("proteção avançada: sem cópia da chave; recomeçar vazia só com confirmação", async () => {
+  const srv = servidorFalso(), email = "avancada@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  await h.chamar("loadUserData");
+  await h.chamar("saveUserData", { documento: { texto: "Segredo" } });
+  await assert.rejects(h.chamar("setProtecao", { avancada: true, senha: novaSenha() }), codigo("WRONG_PASSWORD"));
+  assert.deepEqual(await h.chamar("setProtecao", { avancada: true, senha }), { avancada: true, recuperacao: false });
+  assert.equal(srv.contas.get(email).custodia, null);
+  const outro = carregarHost({ fetch: srv.fetch });
+  await outro.chamar("pedirRecuperacao", { email });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: false });
+  await assert.rejects(outro.chamar("concluirRecuperacao", { senha: novaSenha() }), codigo("OPERATION_FAILED"));    // sem confirmar
+  const nova = novaSenha();
+  assert.deepEqual(await outro.chamar("concluirRecuperacao", { senha: nova, recomecar: true }), { email, recomecou: true });
+  const depois = carregarHost({ fetch: srv.fetch });
+  await depois.chamar("login", { email, senha: nova });
+  assert.equal((await depois.chamar("loadUserData")).documento, null);
+  assert.deepEqual(await depois.chamar("setProtecao", { avancada: false, senha: nova }), { avancada: false, recuperacao: true });
+});
+
+test("recuperação com 2FA pede o código; cópia adulterada não recupera (só recomeçar)", async () => {
+  const srv = servidorFalso(), email = "doisfatores@exemplo.test", senha = novaSenha();
+  await cadastrar(srv, email, senha);
+  const c = srv.contas.get(email);
+  c.codigo2fa = "123456";
+  const outro = carregarHost({ fetch: srv.fetch });
+  await outro.chamar("pedirRecuperacao", { email });
+  await assert.rejects(outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), codigo("CODE_REQUIRED"));
+  await assert.rejects(outro.chamar("abrirRecuperacao", { token: srv.ultimoToken, codigo: "000000" }), codigo("CODE_INVALID"));
+  const b = Buffer.from(c.custodia.chave, "base64"); b[20] ^= 1; c.custodia.chave = b.toString("base64");
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken, codigo: "123456" }), { email, manter: false });
+});
+
 test("proteção na frente da API (redirecionamento ou 403 sem JSON): CF_CHALLENGE, com aviso para a tela", async () => {
   const srv = servidorFalso();
   const h = carregarHost({ fetch: srv.fetch });
@@ -570,7 +702,7 @@ test("migração em etapas interrompida no meio: nada muda e o login segue com a
   const h = carregarHost({ fetch });
   await h.chamar("login", { email, senha });
   assert.ok(!srv.pedidos.some((p) => p.caminho === "/api/conta/kdf"));
-  assert.deepEqual(Object.assign({}, c, { etapas: undefined }), Object.assign({}, antes, { etapas: undefined }));
+  assert.deepEqual(semCopia(c), semCopia(antes));
   assert.equal((await h.chamar("loadUserData")).documento.versao, 3);
 });
 
@@ -579,7 +711,7 @@ test("migração não elimina histórico que não pôde autenticar", async () =>
   await contaAntiga(srv, email, senha, { estragada: 1 });
   const c = srv.contas.get(email), antes = structuredClone(c);
   await carregarHost({ fetch: srv.fetch }).chamar("login", { email, senha });
-  assert.deepEqual(c, antes);
+  assert.deepEqual(semCopia(c), semCopia(antes));
 });
 
 test("migração reconciliada quando a resposta se perde após o commit", async () => {
@@ -609,7 +741,7 @@ test("migração não recria documento ausente nem mascara rollback", async () =
     const armazenamento = new Map([["zozo.versao." + sha256(email).slice(0, 24), "4"]]);
     const h = carregarHost({ fetch: srv.fetch, armazenamento });
     await h.chamar("login", { email, senha });
-    assert.deepEqual(c, antes);
+    assert.deepEqual(semCopia(c), semCopia(antes));
     const lido = await h.chamar("loadUserData");
     assert.equal(lido.aviso, ausente ? "DOCUMENT_MISSING" : "OLDER_VERSION");
   }

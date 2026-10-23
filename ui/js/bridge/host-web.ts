@@ -62,6 +62,10 @@
   /** Chaves novas (Argon2id) de uma conta antiga, preparadas depois que o servidor aceitou a senha */
   type MigracaoKdf = { sal: Bytes; chaves: Chaves };
   let pendente: { email: string; k: Chaves; migracao: MigracaoKdf | null } | null = null;  // senha certa, falta o código do 2FA
+  /** "Esqueci minha senha": link aberto; dados já abertos com a cópia da chave (só na memória desta aba) */
+  type Recuperacao = { token: string; email: string; versao: number; manter: boolean; documento: unknown;
+    historico: Array<{ versao: number; claro: unknown }> };
+  let recuperacao: Recuperacao | null = null;
 
   /* ---------------- utilitários ---------------- */
   function b64(bytes: Uint8Array): string {
@@ -119,7 +123,7 @@
     const codigo = dados && typeof dados.erro === "string" ? dados.erro : "";
     const extra = { espera: dados ? dados.espera : undefined, captcha: dados ? dados.captcha : undefined };
     if (r.status === 401) {
-      if (codigo === "INVALID_CREDENTIALS" || codigo === "CODE_INVALID") throw erro(codigo, extra);
+      if (codigo === "INVALID_CREDENTIALS" || codigo === "CODE_INVALID" || codigo === "CODE_REQUIRED") throw erro(codigo, extra);
       throw sessaoExpirada("SESSION_EXPIRED");
     }
     if (r.status === 404 && metodo === "GET") return null;
@@ -215,11 +219,42 @@
     email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0,
     doisFatores: !!r.doisFatores, demo: r.demo === true, recursos: lerRecursos(r.recursos) });
 
-  async function concluir(r: RespostaApi | null, k: Chaves) {
+  /* ---------------- recuperação de senha: cópia da chave dos dados (custódia) ----------------
+     O servidor entrega uma chave de custódia (HMAC do SEGREDO, não fica guardada); o navegador tranca a chave
+     dos dados com ela e guarda só a cópia trancada. Esqueceu a senha: o link do e-mail devolve a chave de
+     custódia e a cópia. Proteção avançada: não há cópia (o servidor responde "avancada"). */
+  const aadCustodia = (email: string, nonce: string) => enc.encode("zozo|custodia|v1|" + email + "|" + nonce);
+  async function guardarCustodia(s: Sessao | null, bits: Bytes): Promise<void> {
+    if (!s || s.demo) return;
+    try {
+      const r = await api("POST", "/custodia/chave", undefined, s.prova);
+      if (!r || typeof r.nonce !== "string" || typeof r.r !== "string") return;      // já guardada ou proteção avançada
+      const chave = await crypto.subtle.importKey("raw", deB64(r.r), { name: "AES-GCM" }, false, ["encrypt"]);
+      const iv = aleatorio(12);
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aadCustodia(s.email, r.nonce) }, chave, bits));
+      const tudo = new Uint8Array(12 + ct.length);
+      tudo.set(iv); tudo.set(ct, 12);
+      await api("PUT", "/custodia", { nonce: r.nonce, chave: b64(tudo) }, s.prova);
+    } catch (e) { /* fica para o próximo login */ }
+  }
+  /** Abre a cópia da chave dos dados com a chave de custódia que veio com o link do e-mail */
+  async function abrirCustodia(email: string, c: RespostaApi): Promise<CryptoKey> {
+    const tranca = await crypto.subtle.importKey("raw", deB64(String(c.r || "")), { name: "AES-GCM" }, false, ["decrypt"]);
+    const tudo = deB64(String(c.chave || ""));
+    if (tudo.length !== 60) throw erro("LOAD_FAILED");
+    const bits = new Uint8Array(await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: tudo.subarray(0, 12), additionalData: aadCustodia(email, String(c.nonce || "")) }, tranca, tudo.subarray(12)));
+    const chave = await crypto.subtle.importKey("raw", bits, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    bits.fill(0);
+    return chave;
+  }
+
+  /** Sessão aberta. adiarCustodia: conta antiga — a cópia da chave é guardada depois da migração (com a chave nova) */
+  async function concluir(r: RespostaApi | null, k: Chaves, adiarCustodia = false) {
     if (!r) throw erro("STORAGE_UNAVAILABLE");
     await guardarChaveLocal(r.email, r.envelope, k.bits, k.prova);
-    k.bits.fill(0);
     sessao = novaSessao(r, k);
+    if (!adiarCustodia) { await guardarCustodia(sessao, k.bits); k.bits.fill(0); }
     return sessaoData();
   }
 
@@ -294,9 +329,10 @@
     const sal = aleatorio(16);
     return { sal, chaves: await derivar(senha, sal, ITERACOES, KDF_ARGON2) };
   }
-  async function migrarParaArgon2(m: MigracaoKdf | null): Promise<void> {
+  async function migrarParaArgon2(m: MigracaoKdf | null, bitsAntigos: Bytes): Promise<void> {
     if (!m) return;
     const s = sessao;
+    let migrou = false;
     try {
       if (!s || s.demo) return;
       const doc = await api("GET", "/documento", undefined, s.prova);
@@ -341,13 +377,17 @@
       }
       if (sessao !== s) return;
       Object.assign(s, { chave: m.chaves.chave, prova: m.chaves.prova, versao: va + 1 });
+      migrou = true;
       await guardarChaveLocal(s.email, s.envelope, m.chaves.bits, m.chaves.prova);
       await lembrarVersao(s.email, va + 1);
     } catch (e) {
       if (!sessao) throw e;
       /* fica para o próximo login (a sessão e a chave atuais continuam valendo) */
     } finally {
+      // cópia da chave para a recuperação: da chave nova se migrou, senão da atual
+      if (sessao === s) await guardarCustodia(s, migrou ? m.chaves.bits : bitsAntigos);
       m.chaves.bits.fill(0);
+      bitsAntigos.fill(0);
     }
   }
 
@@ -426,8 +466,8 @@
       const legado = !!par && (par.kdf === undefined || par.kdf === KDF_PBKDF2) && !(r && r.demo === true);
       const migracao = legado ? await prepararArgon2(d.senha).catch(() => null) : null;   // falhou ao preparar: entra assim mesmo
       if (r && r.doisFatores && !r.envelope) { pendente = { email, k, migracao }; return { doisFatores: true }; }
-      const dados = await concluir(r, k);
-      await migrarParaArgon2(migracao);
+      const dados = await concluir(r, k, !!migracao);
+      await migrarParaArgon2(migracao, k.bits);
       return dados;
     },
 
@@ -437,8 +477,8 @@
       const r = await api("POST", "/sessao/2fa", { codigo: String(d.codigo || "") });
       const { k, migracao } = pendente;
       pendente = null;
-      const dados = await concluir(r, k);
-      await migrarParaArgon2(migracao);
+      const dados = await concluir(r, k, !!migracao);
+      await migrarParaArgon2(migracao, k.bits);
       return dados;
     },
 
@@ -556,6 +596,7 @@
       if (sessao === s) {
         Object.assign(s, { chave: nova.chave, prova: nova.prova, versao: va + 1 });
         await guardarChaveLocal(s.email, s.envelope, nova.bits, nova.prova);
+        await guardarCustodia(s, nova.bits);                // a cópia antiga (recuperação) foi apagada pelo servidor
       }
       nova.bits.fill(0);
       await lembrarVersao(s.email, va + 1);
@@ -596,6 +637,89 @@
       esquecerChaveLocal();
       sessao = null;
       return { excluido: true };
+    },
+
+    /* ---- "Esqueci minha senha" ---- */
+    async pedirRecuperacao(d) {
+      await api("POST", "/recuperacao/pedir", { email: normalizarEmail(d && d.email) });
+      return { enviado: true };
+    },
+
+    /**
+     * Link do e-mail (+ código do 2FA): abre os dados com a cópia da chave e guarda tudo só na memória.
+     * manter = os dados voltam com a senha nova; senão (proteção avançada, sem cópia ou cópia que não abre)
+     * a conta só pode recomeçar vazia — a tela avisa antes.
+     */
+    async abrirRecuperacao(d) {
+      recuperacao = null;
+      const token = String((d && d.token) || "");
+      if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw erro("TOKEN_INVALID");
+      const codigo = d && d.codigo !== undefined ? String(d.codigo || "") : undefined;
+      const r = await api("POST", "/recuperacao/abrir", { token, codigo });
+      if (!r || typeof r.email !== "string") throw erro("TOKEN_INVALID");
+      const email = r.email, versao = Number.isSafeInteger(r.versao) && r.versao >= 0 ? r.versao : 0;
+      const rec: Recuperacao = { token, email, versao, manter: false, documento: null, historico: [] };
+      if (r.custodia) {
+        try {
+          const chave = await abrirCustodia(email, r.custodia);
+          rec.documento = r.documento ? await decifrar(chave, email, r.documento.versao, r.documento.conteudo) : null;
+          for (const v of (Array.isArray(r.historico) ? r.historico : [])) {
+            try { rec.historico.push({ versao: v.versao, claro: await decifrar(chave, email, v.versao, v.conteudo) }); }
+            catch (e) { /* cópia que já não abria: fica de fora */ }
+          }
+          rec.manter = !r.documento || r.documento.versao === versao;
+        } catch (e) { rec.documento = null; rec.historico = []; rec.manter = false; }
+      }
+      recuperacao = rec;
+      return { email, manter: rec.manter };
+    },
+
+    /** Senha nova: recifra os dados (ou recomeça vazia, se confirmado) e conclui numa transação no servidor */
+    async concluirRecuperacao(d) {
+      const rec = recuperacao;
+      if (!rec) throw erro("TOKEN_INVALID");
+      if (!rec.manter && d.recomecar !== true) throw erro("OPERATION_FAILED");
+      validarSenha(d.senha);
+      if (await senhaVazada(d.senha)) throw erro("PASSWORD_BREACHED");
+      const sal = aleatorio(16);
+      const nova = await derivar(d.senha, sal, ITERACOES, KDF_ARGON2);
+      try {
+        const conteudo = await cifrar(nova.chave, rec.email, rec.versao + 1, rec.manter ? rec.documento : null);
+        let historico: Array<{ versao: number; conteudo: string }> = [];
+        let tamanho = conteudo.length + 1000;
+        if (rec.manter) {
+          for (const v of rec.historico) {
+            const c = await cifrar(nova.chave, rec.email, v.versao, v.claro);
+            tamanho += c.length + 40;
+            historico.push({ versao: v.versao, conteudo: c });
+          }
+          if (tamanho > LIMITE_PEDIDO) {           // não cabe num pedido: uma cópia por pedido, como na migração
+            for (const h of historico) await api("PUT", "/recuperacao/historico", { token: rec.token, sal: b64(sal), versao: h.versao, conteudo: h.conteudo });
+            historico = [];
+          }
+        }
+        await api("PUT", "/recuperacao/concluir", { token: rec.token, modo: rec.manter ? "manter" : "recomecar", sal: b64(sal), kdf: KDF_ARGON2,
+          prova: nova.prova, conteudo, versaoAnterior: rec.versao, historico });
+      } finally { nova.bits.fill(0); }
+      recuperacao = null;
+      esquecerChaveLocal();                       // a chave guardada era da senha antiga
+      return { email: rec.email, recomecou: !rec.manter };
+    },
+
+    /* ---- Proteção avançada (sem cópia da chave: esqueceu a senha, a conta recomeça vazia) ---- */
+    async getProtecao() {
+      const s = exigirContaReal();
+      const r = await comProvaDaSessao(() => api("GET", "/custodia", undefined, s.prova));
+      return { avancada: !!(r && r.avancada === true), recuperacao: !!(r && r.ativa === true) };
+    },
+    async setProtecao(d) {
+      const s = exigirContaReal();
+      const k = await derivarConta(d.senha, await parametros(s.email));
+      try {
+        await api("PUT", "/conta/protecao", { avancada: d.avancada === true }, k.prova);   // senha errada → WRONG_PASSWORD
+        if (d.avancada !== true) await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
+      } finally { k.bits.fill(0); }
+      return ACOES.getProtecao({});
     },
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */

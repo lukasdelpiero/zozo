@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.14.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.15.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -8,10 +8,18 @@ Aplicativo web com design baseado no Copilot Money.
 |---|---|
 | Front-end | **Vite + TypeScript + Tailwind CSS** (pasta `ui`); JavaScript em `ui/mock` somente para desenvolvimento |
 | Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`); transição para **FastAPI + Pydantic** iniciada (`app_fastapi.py`, desligada no Cloudflare) |
-| Dados | **Cloudflare D1** (banco SQL) — documentos financeiros cifrados; nomes e e-mails de cadastro legíveis para a API |
+| Dados | **Cloudflare D1** (banco SQL) — documentos financeiros cifrados; nomes e e-mails de cadastro legíveis para a API; cópia da chave para "Esqueci minha senha" (exceto com a proteção avançada) |
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.15.0
+
+- **Esqueci minha senha:** link na tela da senha → e-mail com um link de 1 hora → (código do 2FA, se a conta tiver) → senha nova → login com a senha nova e **os mesmos dados** (documento e histórico). Todos os dispositivos saem e chega um e-mail avisando da troca.
+- **Como funciona:** ao entrar, o navegador guarda no servidor uma cópia da chave dos dados, trancada com uma chave que só o servidor calcula; o link do e-mail devolve essa chave. Isso é o mesmo nível de confiança dos apps de finanças comuns: quem tiver o banco **e** o segredo do servidor conseguiria abrir os dados dessas contas.
+- **Proteção avançada (opcional):** Configurações › Conta. Sem cópia da chave — só você abre os dados; esquecida a senha, a conta recomeça vazia (a tela avisa e pede confirmação). Ligar e desligar pede a senha.
+- Contas existentes ganham a cópia no próximo login. Quem esquecer a senha **antes** de entrar de novo nesta versão recomeça vazio.
+- **Servidor:** migração `0009` (tabelas `custodia` e `tokens_recuperacao`, coluna `protecao_avancada`); rotas `/api/recuperacao/pedir|abrir|historico|concluir`, `/api/custodia` e `/api/conta/protecao`; resposta igual para e-mail com ou sem conta, limites por IP e por endereço, link de uso único preso à senha da época. Testes negativos em `api/tests/test_api.py`.
 
 ## Novidades da versão 3.14.0
 

@@ -563,7 +563,10 @@ declare global {
     prepararGoogle(dados: any): void;
     carregando(root: HTMLElement, texto: string): void;
     prepararLogin(email: string): void;
-    aguardandoEmail(root: HTMLElement, email: string, cfg: { onReenviar: () => Promise<unknown> }): void;
+    aguardandoEmail(root: HTMLElement, email: string, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }): void;
+    pedirRecuperacao(root: HTMLElement, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }): void;
+    codigoRecuperacao(root: HTMLElement, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }): void;
+    novaSenha(root: HTMLElement, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }): void;
     linkInvalido(root: HTMLElement, cfg: { onVoltar: () => void }): void;
     A: Readonly<Record<string, string>>;
   }

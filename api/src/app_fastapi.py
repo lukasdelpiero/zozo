@@ -104,6 +104,38 @@ class KdfEtapa(Modelo):
     conteudo: Conteudo
 
 
+class Custodia(Modelo):
+    """Cópia da chave dos dados, trancada no navegador com a chave de custódia (recuperação de senha)."""
+    nonce: Annotated[str, StringConstraints(min_length=24, max_length=24, pattern=_B64)]
+    chave: Annotated[str, StringConstraints(min_length=80, max_length=80, pattern=_B64)]
+
+
+class Protecao(Modelo):
+    avancada: bool
+
+
+class PedirRecuperacao(Modelo):
+    email: Email
+
+
+class AbrirRecuperacao(Modelo):
+    token: TokenEmail
+    codigo: Codigo | None = None
+
+
+class EtapaRecuperacao(KdfEtapa):
+    token: TokenEmail
+
+
+class ConcluirRecuperacao(Documento):
+    token: TokenEmail
+    modo: Literal["manter", "recomecar"]
+    sal: Sal
+    prova: Prova
+    kdf: Literal["argon2id-1"]
+    historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []
+
+
 class ReenviarEmail(Modelo):
     email: Email
 
@@ -122,6 +154,12 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/conta/senha"): NovaSenha,
     ("PUT", "/api/conta/kdf"): NovoKdf,
     ("PUT", "/api/conta/kdf/historico"): KdfEtapa,
+    ("PUT", "/api/custodia"): Custodia,
+    ("PUT", "/api/conta/protecao"): Protecao,
+    ("POST", "/api/recuperacao/pedir"): PedirRecuperacao,
+    ("POST", "/api/recuperacao/abrir"): AbrirRecuperacao,
+    ("PUT", "/api/recuperacao/historico"): EtapaRecuperacao,
+    ("PUT", "/api/recuperacao/concluir"): ConcluirRecuperacao,
     ("PUT", "/api/documento"): Documento,
     ("POST", "/api/documento/apagar"): Documento,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,

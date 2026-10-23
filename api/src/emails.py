@@ -86,6 +86,25 @@ def ja_tem_conta(config):
                    rodape="Se não foi você, sua conta continua protegida: nada foi alterado.")
 
 
+def recuperacao(config, token, nome):
+    """Link de "Esqueci minha senha" (a conta já é confirmada: o nome vai escapado)."""
+    link = f"{_url_base(config)}/#recuperar={token}"
+    return _montar("Redefina sua senha do ZoZo", _ola(nome),
+                   ["Recebemos um pedido para redefinir a senha da sua conta no ZoZo.",
+                    "Toque no botão abaixo para criar uma senha nova. O link vale por 1 hora e só pode ser usado uma vez."],
+                   botao=("Redefinir senha", link),
+                   rodape="Não pediu? Ignore este e-mail: sua senha continua a mesma e ninguém entra sem este link.")
+
+
+def senha_redefinida(nome, agora, recomecou):
+    paragrafos = [f"A senha da sua conta no ZoZo foi redefinida pelo link do e-mail em {_quando(agora)} (horário de Brasília).",
+                  "Todos os dispositivos foram desconectados: entre de novo com a senha nova."]
+    if recomecou:
+        paragrafos.append("Como a sua conta usava a proteção avançada, os dados anteriores não puderam ser recuperados e a conta recomeçou vazia.")
+    return _montar("Sua senha do ZoZo foi redefinida", _ola(nome), paragrafos,
+                   rodape="Não foi você? Redefina a senha agora pelo \"Esqueci minha senha\" e ative a verificação em duas etapas.")
+
+
 def senha_alterada(nome, agora):
     return _montar("Sua senha do ZoZo foi alterada", _ola(nome),
                    [f"A senha da sua conta no ZoZo foi alterada em {_quando(agora)} (horário de Brasília).",

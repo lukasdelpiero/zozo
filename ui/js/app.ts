@@ -105,6 +105,7 @@
       emailInicial: authEmail,
       turnstile, captchaLogin, google: googleAtivo,
       onIrCadastro: () => { authErro = null; authAviso = null; store.set({ session: { status: "register" } }); },
+      onEsqueci: (email: string) => mostrarPedirRecuperacao(email),
       onVoltar: () => { authErro = null; authAviso = null; store.set({ session: { status: "login" } }); },
       onErro: (msg: any, email: any) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
       onLogin: (cred: any) => {
@@ -154,6 +155,63 @@
   function aguardarConfirmacao(email: string) {
     ZoZo.auth.aguardandoEmail(authRoot, email, { onReenviar: () => bridge.request(A.reenviarConfirmacao, { email }) });
     esperandoEmail = String(email || "").trim().toLowerCase();
+  }
+
+  /* ---------------- "Esqueci minha senha" ---------------- */
+  const voltarEntrada = () => { authErro = null; authAviso = null; ZoZo.auth.reiniciar(); store.set({ session: { status: "login" } }); renderAuth(); };
+
+  function mostrarPedirRecuperacao(email: string) {
+    esperandoEmail = null;
+    const pedir = (em: string) => bridge.request(A.pedirRecuperacao, { email: em });
+    ZoZo.auth.pedirRecuperacao(authRoot, { email, onVoltar: voltarEntrada, onEnviar: (em) => pedir(em).then(() => {
+      ZoZo.auth.aguardandoEmail(authRoot, em, { recuperacao: true, onReenviar: () => pedir(em), onVoltar: voltarEntrada });
+    }) });
+  }
+
+  /** Senha nova (o host já abriu os dados com a cópia da chave, ou vai recomeçar vazia) */
+  function mostrarNovaSenha(r: { email: string; manter: boolean }, erroTela?: string) {
+    ZoZo.auth.novaSenha(authRoot, { email: r.email, manter: r.manter, erro: erroTela || null, onVoltar: voltarEntrada, onSalvar: (senha) => {
+      ZoZo.auth.carregando(authRoot, "Redefinindo sua senha...");
+      bridge.request(A.concluirRecuperacao, { senha, recomecar: !r.manter }, { timeout: 120000 }).then((x: any) => {
+        authEmail = x.email; authErro = null; authAviso = null;
+        ZoZo.auth.prepararLogin(x.email);
+        store.set({ session: { status: "login" } });
+        renderAuth();
+        ctx.toast(x.recomecou ? "Senha redefinida. A conta recomeçou vazia: entre com a senha nova." : "Senha redefinida. Entre com a senha nova.",
+          { tone: "success", importante: true, duration: 8000 });
+      }).catch((e: any) => {
+        if (e.code === "TOKEN_INVALID") { mostrarLinkInvalido(); return; }
+        mostrarNovaSenha(r, ["PASSWORD_BREACHED", "WEAK_PASSWORD"].includes(e.code) ? FR[e.code] : (e.friendly || FR.OPERATION_FAILED));
+      });
+    } });
+  }
+
+  /**
+   * Link do e-mail (#recuperar=…): limpa o endereço e abre a recuperação (o código do 2FA, se a conta tiver).
+   * Resolve true quando já mostrou uma tela (senha nova, código ou link inválido).
+   */
+  function retornoRecuperacao(): Promise<boolean> {
+    const m = location.hash.match(/^#recuperar=(.*)$/);
+    if (!m) return Promise.resolve(false);
+    history.replaceState(null, "", location.pathname + location.search);
+    const token = m[1];
+    store.set({ session: { status: "login" } });
+    if (!TOKEN_LINK.test(token)) { mostrarLinkInvalido(); return Promise.resolve(true); }
+    ZoZo.auth.carregando(authRoot, "Abrindo sua conta...");
+    return bridge.request(A.abrirRecuperacao, { token }, { timeout: 60000 }).then((r: any) => { mostrarNovaSenha(r); return true; }).catch((e: any) => {
+      if (e.code === "CODE_REQUIRED") {
+        ZoZo.auth.codigoRecuperacao(authRoot, { onVoltar: voltarEntrada, onCodigo: (codigo) =>
+          bridge.request(A.abrirRecuperacao, { token, codigo }, { timeout: 60000 }).then((r: any) => { mostrarNovaSenha(r); return null; }).catch((x: any) => {
+            if (x.code === "TOKEN_INVALID") { mostrarLinkInvalido(); return null; }
+            return x.code === "TOO_MANY_ATTEMPTS" || x.espera ? textoBloqueio(x) : FR.CODE_INVALID;
+          }) });
+        return true;
+      }
+      if (e.code === "TOKEN_INVALID") { mostrarLinkInvalido(); return true; }
+      authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e) : (e.friendly || FR.OPERATION_FAILED);
+      renderAuth();
+      return true;
+    });
   }
 
   /** Link vencido, já usado ou adulterado */
@@ -471,13 +529,15 @@
       if (sessao && sessao.email) authEmail = sessao.email;       // sessão aberta sem a chave neste navegador: só pede a senha
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
       if (sessao && sessao.authenticated) {
-        const linkConfirmacao = /^#confirmar=/.test(location.hash);
+        const linkConfirmacao = /^#confirmar=/.test(location.hash), linkRecuperacao = /^#recuperar=/.test(location.hash);
         history.replaceState(null, "", location.pathname + (location.search.includes("mock=1") ? "?mock=1" : ""));
         entrar(sessao);
         // link de confirmação aberto com outra conta já conectada: o token não é usado nesta sessão
         if (linkConfirmacao) ctx.toast("Você já está conectado. Para ativar a conta nova, saia desta conta e abra o link do e-mail de novo.", { tone: "aviso", duration: 10000 });
+        if (linkRecuperacao) ctx.toast("Você já está conectado. Para trocar a senha, use Configurações › Conta (ou saia e abra o link do e-mail de novo).", { tone: "aviso", duration: 10000 });
         return;
       }
+      if (/^#recuperar=/.test(location.hash)) return retornoRecuperacao().then(() => undefined);
       return retornoConfirmacao().then((link) => {
         if (link === "invalido") { store.set({ session: { status: "login" } }); mostrarLinkInvalido(); return; }
         return retornoGoogle().then((destino) => store.set({ session: { status: destino === "register" ? "register" : "login" } }));

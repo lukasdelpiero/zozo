@@ -75,6 +75,10 @@
     texto: TEXTO + " tw:text-[15px] tw:text-zz-text",
     spinnerEspera: ZoZo.pecas.girando + " tw:size-[30px]! tw:border-[3px]!",
     girandoBotao: "tw:size-[18px] tw:rounded-[50%] tw:border-2 tw:border-white/35 tw:border-t-white tw:animate-zz-gira tw:motion-reduce:animate-none",
+    // "Esqueci minha senha": discreto, embaixo do campo (dentro da área dos campos: o botão não muda de lugar)
+    esqueci: "tw:self-end tw:p-0 tw:[border:0] tw:bg-transparent tw:text-[14px] tw:font-[550] tw:text-zz-secondary tw:cursor-pointer "
+      + "tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2",
+    atencao: "tw:m-0 tw:p-3 tw:rounded-lg tw:text-center tw:text-[13px] tw:leading-[1.4] tw:bg-zz-warning-soft tw:text-zz-warning-text",
   };
   // Animações do cartão: [logo, título (2º filho), 3º filho, 4º em diante]
   const ANIM: Record<string, { cartao: string; filhos: string[] }> = {
@@ -154,7 +158,7 @@
     return h("div", { class: C.form2fa },
       h("p", { class: C.sub2fa }, "Insira o código de 6 dígitos do seu aplicativo 2FA."),
       campoCod.el, erro,
-      rodape("Não é você?", "Entrar com outra conta", cfg.onCancelar2FA));
+      cfg.voltar ? rodape(null, cfg.voltar, cfg.onCancelar2FA) : rodape("Não é você?", "Entrar com outra conta", cfg.onCancelar2FA));
   }
 
   /** Primeira tela: Continuar com e-mail · Continuar com Google · Inscreva-se */
@@ -224,7 +228,9 @@
         if (senha.input.type === "text") senha.wrap.querySelector<HTMLElement>(".input-reveal")?.click();     // volta a ocultar
         enviar.disabled = true; enviar.classList.add("is-busy");
         cfg.onLogin({ email: estado.email, senha: senha.input.value, turnstile: captcha ? captcha.token() : undefined });
-      } }, nota, h("div", { class: C.campos }, emailOculto(), senha.wrap), captcha ? captcha.el : null, enviar, msg,
+      } }, nota, h("div", { class: C.campos }, emailOculto(), senha.wrap,
+        cfg.onEsqueci ? h("button", { type: "button", class: C.esqueci, onClick: () => cfg.onEsqueci(estado.email) }, "Esqueci minha senha") : null),
+      captcha ? captcha.el : null, enviar, msg,
         rodape(estado.email, "Usar outro e-mail", voltar(1)));
     } else if (estado.etapa === 1) {
       titulo = "Vamos começar";
@@ -309,7 +315,7 @@
    * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar). "Reenviar link": carregando
    * enquanto envia, depois 60 s de espera. Quando o link é aberto neste navegador, a tela vira o login (app.ts).
    */
-  function aguardandoEmail(root: any, email: any, cfg: { onReenviar: () => Promise<unknown> }) {
+  function aguardandoEmail(root: any, email: any, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }) {
     const titulo = h("h1", { class: C.titulo, tabindex: "-1" }, "Verifique seu e-mail");
     // Mesmo botão de ação das outras etapas (botao: 44 px, logo abaixo da área de campos)
     const reenviar = botao("Reenviar link");
@@ -339,11 +345,66 @@
       titulo,
       h("div", { class: C.form },
         // o texto ocupa a área dos campos: o botão fica na mesma altura do "Continuar" das outras etapas
-        h("div", { class: C.campos },
-          h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email))),
-        reenviar, falha),
+        h("div", { class: C.campos }, cfg.recuperacao
+          // não revela se o e-mail tem conta
+          ? h("p", { class: C.texto, role: "status" }, "Se houver uma conta com ", h("strong", { class: "tw:font-[620]" }, email),
+            ", enviamos um link para criar uma senha nova. Ele vale por 1 hora.")
+          : h("p", { class: C.texto, role: "status" }, "Enviamos um link de confirmação para ", h("strong", { class: "tw:font-[620]" }, email))),
+        reenviar, falha,
+        cfg.onVoltar ? rodape(null, "Voltar para tela de entrada", cfg.onVoltar) : null),
     ]));
     requestAnimationFrame(() => titulo.focus());      // leitor de tela anuncia a troca de tela
+  }
+
+  /** "Esqueci minha senha": e-mail da conta → link por e-mail */
+  function pedirRecuperacao(root: any, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }) {
+    const email = campo({ type: "email", name: "email", id: "email", autocomplete: "username", inputmode: "email", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: cfg.email || "" });
+    const enviar = botao("Enviar link");
+    const msg = aviso(null);
+    const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+      e.preventDefault();
+      if (!EMAIL_OK.test(email.value.trim())) { msg.textContent = "Insira um e-mail válido."; email.focus(); return; }
+      enviar.disabled = true; enviar.classList.add("is-busy"); msg.textContent = "";
+      Promise.resolve(cfg.onEnviar(email.value.trim())).catch((er: any) => {
+        msg.textContent = (er && er.friendly) || "Não foi possível enviar agora. Tente de novo em instantes.";
+        enviar.disabled = false; enviar.classList.remove("is-busy");
+      });
+    } },
+      h("div", { class: C.campos }, h("p", { class: C.texto }, "Informe o e-mail da sua conta. Enviaremos um link para criar uma senha nova."), email),
+      enviar, msg, rodape(null, "Voltar para tela de entrada", cfg.onVoltar));
+    mount(root, cartao("frente", [logo(), h("h1", { class: C.titulo }, "Redefinir senha"), form]));
+    requestAnimationFrame(() => email.focus());
+  }
+
+  /** Conta com 2FA: o código do aplicativo antes de criar a senha nova */
+  function codigoRecuperacao(root: any, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }) {
+    mount(root, cartao("frente", [logo(), h("h1", { class: C.titulo }, "Autentique sua conta"),
+      corpo2FA({ onCodigo: cfg.onCodigo, onCancelar2FA: cfg.onVoltar, voltar: "Voltar para tela de entrada" })]));
+  }
+
+  /**
+   * Senha nova depois do link. manter = os dados voltam com a senha nova; senão (proteção avançada ou sem
+   * cópia da chave) a tela avisa que a conta recomeça vazia e o botão diz isso.
+   */
+  function novaSenha(root: any, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }) {
+    estado.email = cfg.email;                          // e-mail oculto do formulário (gerenciador de senhas)
+    const senha = campoSenha("new-password");
+    senha.input.setAttribute("minlength", "8");
+    const enviar = botao(cfg.manter ? "Salvar senha nova" : "Recomeçar com senha nova");
+    const msg = aviso(cfg.erro || null);
+    const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+      e.preventDefault();
+      if (senha.input.value.length < 8) { msg.textContent = "Use pelo menos 8 caracteres."; senha.input.focus(); return; }
+      if (senha.input.type === "text") senha.wrap.querySelector<HTMLElement>(".input-reveal")?.click();
+      enviar.disabled = true; enviar.classList.add("is-busy");
+      cfg.onSalvar(senha.input.value);
+    } },
+      cfg.manter ? null : h("p", { class: C.atencao, role: "alert" },
+        "Os dados desta conta não podem ser recuperados sem a senha antiga (proteção avançada). Ao continuar, a conta recomeça vazia."),
+      h("div", { class: C.campos }, emailOculto(), senha.wrap),
+      enviar, msg, rodape(null, "Voltar para tela de entrada", cfg.onVoltar));
+    mount(root, cartao("frente", [logo(), h("h1", { class: C.titulo }, "Crie uma nova senha"), form]));
+    requestAnimationFrame(() => senha.input.focus());
   }
 
   /** Link do e-mail vencido, já usado ou adulterado: só o aviso e, no pé do cartão, a volta para a entrada */
@@ -358,5 +419,5 @@
     requestAnimationFrame(() => { const b = voltar.querySelector("button"); if (b) b.focus(); });
   }
 
-  ZoZo.auth = { render, reiniciar, prepararGoogle, prepararLogin, carregando, aguardandoEmail, linkInvalido, A };
+  ZoZo.auth = { render, reiniciar, prepararGoogle, prepararLogin, carregando, aguardandoEmail, linkInvalido, pedirRecuperacao, codigoRecuperacao, novaSenha, A };
 })(window.ZoZo);

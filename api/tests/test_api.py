@@ -1109,6 +1109,168 @@ class TesteEmail(unittest.TestCase):
         self.assertFalse(emails.ativo(cli.config))
 
 
+class TesteRecuperacao(Base):
+    """Esqueci minha senha: link do e-mail (+ 2FA) devolve a cópia da chave; proteção avançada recomeça vazia."""
+
+    def setUp(self):
+        super().setUp()
+        self.serv = FakeServicos()
+        self.rec = Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="198.51.100.120")      # quem esqueceu a senha
+
+    def historico(self):
+        for va in range(0, 4):                     # 3 versões no histórico (uma cópia a cada 10 min)
+            self.con.execute("UPDATE historico SET criado_em = '2000-01-01T00:00:00.000Z'")
+            self.assertEqual(self.gravar(va)[0], 200)
+
+    def guardar_custodia(self):
+        st, r = self.api("POST", "/api/custodia/chave", prova=self.prova)
+        self.assertEqual(st, 200)
+        chave = b64(os.urandom(60))
+        self.assertEqual(self.api("PUT", "/api/custodia", {"nonce": r["nonce"], "chave": chave}, prova=self.prova)[0], 200)
+        return r, chave
+
+    def token(self, i=-1):
+        return self.serv.emails[i]["text"].split("#recuperar=", 1)[1].split()[0]
+
+    def pedir(self, email=EMAIL, cli=None):
+        return (cli or self.rec)("POST", "/api/recuperacao/pedir", {"email": email})
+
+    def concluir(self, token, modo="manter", va=4, historico=(), **mudar):
+        corpo = dict({"token": token, "modo": modo, "sal": b64(os.urandom(16)), "kdf": "argon2id-1", "prova": prova(),
+                      "conteudo": conteudo(), "versaoAnterior": va, "historico": list(historico)}, **mudar)
+        return self.rec("PUT", "/api/recuperacao/concluir", corpo), corpo
+
+    def codigo(self, delta=0):
+        linha = self.con.execute("SELECT totp_segredo, totp_pendente FROM contas WHERE email = ?", (EMAIL,)).fetchone()
+        seg = totp.decifrar(linha[0] or linha[1], SEGREDO)
+        return totp.codigo(seg, T0 // 30 + delta)
+
+    def test_link_recupera_os_dados_com_a_senha_nova(self):
+        self.historico()
+        criado = {r[0]: r[1] for r in self.con.execute("SELECT versao, criado_em FROM historico")}
+        r, chave = self.guardar_custodia()
+        self.assertEqual(self.api("GET", "/api/custodia", prova=self.prova)[1], {"avancada": False, "ativa": True})
+        self.assertEqual(self.pedir(), (202, {"ok": True}))
+        self.assertEqual(self.serv.emails[-1]["subject"], "Redefina sua senha do ZoZo")
+        self.assertIn("https://usezozo.com.br/#recuperar=", self.serv.emails[-1]["text"])
+        token = self.token()
+        self.assertNotEqual(self.con.execute("SELECT hash FROM tokens_recuperacao").fetchone()[0], token)   # só o hash
+        st, a = self.rec("POST", "/api/recuperacao/abrir", {"token": token})
+        self.assertEqual(st, 200)
+        self.assertEqual(a["custodia"], {"nonce": r["nonce"], "chave": chave, "r": r["r"]})                # mesma chave de custódia
+        self.assertEqual((a["email"], a["versao"], a["documento"]["versao"]), (EMAIL, 4, 4))
+        self.assertEqual([v["versao"] for v in a["historico"]], [3, 2, 1])
+        # histórico grande: a versão 1 vai em etapa; a 3 não abriu no navegador e fica de fora
+        self.assertEqual(self.rec("PUT", "/api/recuperacao/historico", {"token": token, "sal": "", "versao": 1, "conteudo": conteudo()})[0], 400)
+        corpo_sal = b64(os.urandom(16))
+        etapa = {"token": token, "sal": corpo_sal, "versao": 1, "conteudo": conteudo()}
+        self.assertEqual(self.rec("PUT", "/api/recuperacao/historico", etapa)[0], 200)
+        dois = {"versao": 2, "conteudo": conteudo()}
+        (st, b), corpo = self.concluir(token, historico=[dois], sal=corpo_sal)
+        self.assertEqual((st, b), (200, {"ok": True}))
+        self.assertEqual(self.entrar(Cliente(self.banco, ip="198.51.100.121"))[0], 401)         # a senha antiga não entra
+        self.assertEqual(self.entrar(Cliente(self.banco, ip="198.51.100.122"), pv=corpo["prova"])[0], 200)
+        self.assertEqual(self.api("GET", "/api/sessao")[0], 204)                                 # todas as sessões saíram
+        guardado = [tuple(x) for x in self.con.execute("SELECT versao, conteudo, criado_em FROM historico ORDER BY versao")]
+        self.assertEqual(guardado, [(1, etapa["conteudo"], criado[1]), (2, dois["conteudo"], criado[2])])
+        self.assertEqual(tuple(self.con.execute("SELECT versao, conteudo FROM documentos").fetchone()), (5, corpo["conteudo"]))
+        self.assertEqual(self.con.execute("SELECT count(*) FROM custodia").fetchone()[0], 0)   # a cópia antiga não vale mais
+        self.assertEqual(self.con.execute("SELECT count(*) FROM kdf_etapas").fetchone()[0], 0)
+        self.assertEqual(self.serv.emails[-1]["subject"], "Sua senha do ZoZo foi redefinida")
+        self.assertEqual(self.concluir(token)[0][1]["erro"], "TOKEN_INVALID")                     # link usado não vale de novo
+        self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": token})[1]["erro"], "TOKEN_INVALID")
+        texto = " ".join(self.rec.logs)
+        self.assertNotIn(EMAIL, texto)
+        self.assertNotIn(token, texto)
+        self.assertNotIn(r["r"], texto)
+
+    def test_pedido_nao_revela_quem_tem_conta_e_e_limitado(self):
+        for email in ("ninguem@exemplo.com", nucleo.DEMO_EMAIL):
+            self.assertEqual(self.pedir(email), (202, {"ok": True}))
+        self.assertEqual(self.serv.emails, [])
+        for _ in range(3):
+            self.assertEqual(self.pedir(cli=Cliente(self.banco, self.serv, CONFIG_EMAIL, ip=f"198.51.100.{130 + _}"))[0], 202)
+        self.pedir(cli=Cliente(self.banco, self.serv, CONFIG_EMAIL, ip="198.51.100.140"))
+        self.assertEqual(len(self.serv.emails), nucleo.EMAILS_POR_CONTA)                        # no máximo 3 por hora
+        for _ in range(nucleo.RECUPERACOES_POR_IP - 2):
+            self.pedir("outro@exemplo.com")
+        self.assertEqual(self.pedir("outro@exemplo.com")[1]["erro"], "TOO_MANY_ATTEMPTS")       # por IP
+        sem_email = Cliente(self.banco, self.serv, CONFIG, ip="198.51.100.141")
+        self.assertEqual(self.pedir(cli=sem_email), (202, {"ok": True}))                          # e-mail desligado: nada sai
+        self.assertEqual(len(self.serv.emails), nucleo.EMAILS_POR_CONTA)
+
+    def test_link_vencido_inventado_de_senha_antiga_ou_sem_abrir(self):
+        self.guardar_custodia()
+        self.pedir()
+        token = self.token()
+        self.assertEqual(self.concluir(token)[0][1]["erro"], "TOKEN_INVALID")                     # sem passar pelo "abrir"
+        for ruim in ("A" * 43, "", "curto", "x" * 200, 123, None, ["a" * 30]):
+            self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": ruim})[1]["erro"], "TOKEN_INVALID", repr(ruim))
+        self.con.execute("UPDATE tokens_recuperacao SET expira = 1")
+        self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": token})[1]["erro"], "TOKEN_INVALID")
+        self.pedir()
+        novo = self.token()
+        nova = prova()
+        st, _ = self.api("PUT", "/api/conta/senha", {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova, "kdf": "argon2id-1",
+                                                     "conteudo": conteudo(), "versaoAnterior": 0}, prova=self.prova)
+        self.assertEqual(st, 200)
+        self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": novo})[1]["erro"], "TOKEN_INVALID")   # senha trocada
+        self.assertEqual(self.con.execute("SELECT count(*) FROM custodia").fetchone()[0], 0)
+
+    def test_conta_com_2fa_exige_o_codigo(self):
+        self.api("POST", "/api/2fa/iniciar", prova=self.prova)
+        self.assertEqual(self.api("POST", "/api/2fa/confirmar", {"codigo": self.codigo()}, prova=self.prova)[0], 200)
+        self.guardar_custodia()
+        self.pedir()
+        token = self.token()
+        self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": token}), (401, {"erro": "CODE_REQUIRED"}))
+        self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": token, "codigo": "000000"})[1]["erro"], "CODE_INVALID")
+        self.assertEqual(self.concluir(token, va=0)[0][1]["erro"], "TOKEN_INVALID")             # sem o código, não abriu
+        self.rec.agora = T0 + 30
+        st, a = self.rec("POST", "/api/recuperacao/abrir", {"token": token, "codigo": self.codigo(1)})
+        self.assertEqual(st, 200)
+        self.assertIsNotNone(a["custodia"])
+        self.assertEqual(self.rec("POST", "/api/recuperacao/abrir", {"token": token, "codigo": self.codigo(1)})[1]["erro"], "CODE_INVALID")  # sem reuso
+
+    def test_protecao_avancada_recomeca_vazia(self):
+        self.historico()
+        self.guardar_custodia()
+        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova), (200, {"avancada": True}))
+        self.assertEqual(self.api("GET", "/api/custodia", prova=self.prova)[1], {"avancada": True, "ativa": False})
+        self.assertEqual(self.api("POST", "/api/custodia/chave", prova=self.prova)[1], {"avancada": True})
+        self.assertEqual(self.api("PUT", "/api/custodia", {"nonce": b64(os.urandom(16)), "chave": b64(os.urandom(60))}, prova=self.prova)[0], 409)
+        self.pedir()
+        token = self.token()
+        st, a = self.rec("POST", "/api/recuperacao/abrir", {"token": token})
+        self.assertEqual((st, a["custodia"], a["documento"], a["historico"], a["versao"]), (200, None, None, [], 4))   # nada cifrado sai
+        self.assertEqual(self.concluir(token)[0], (409, {"erro": "DATA_CHANGED"}))               # sem cópia não há "manter"
+        self.assertEqual(self.concluir(token, modo="recomecar", historico=[{"versao": 3, "conteudo": conteudo()}])[0][0], 400)
+        self.assertEqual(self.concluir(token, modo="tudo")[0][0], 400)
+        (st, _), corpo = self.concluir(token, modo="recomecar")
+        self.assertEqual(st, 200)
+        self.assertEqual(tuple(self.con.execute("SELECT versao, conteudo FROM documentos").fetchone()), (5, corpo["conteudo"]))
+        self.assertEqual(self.con.execute("SELECT count(*) FROM historico").fetchone()[0], 0)
+        self.assertIn("proteção avançada", self.serv.emails[-1]["text"])
+        nova = Cliente(self.banco, ip="198.51.100.150")
+        self.assertEqual(self.entrar(nova, pv=corpo["prova"])[0], 200)
+        self.assertEqual(nova("PUT", "/api/conta/protecao", {"avancada": False}, prova=corpo["prova"])[0], 200)
+        self.assertIn("nonce", nova("POST", "/api/custodia/chave", prova=corpo["prova"])[1])          # recuperação de volta
+
+    def test_custodia_validada_e_presa_a_sessao_e_prova(self):
+        r, _ = self.guardar_custodia()
+        self.assertEqual(self.api("POST", "/api/custodia/chave", prova=self.prova)[1], {"atual": True})
+        for corpo in ({"nonce": r["nonce"], "chave": b64(os.urandom(59))}, {"nonce": b64(os.urandom(15)), "chave": b64(os.urandom(60))},
+                      {"nonce": r["nonce"], "chave": "!" * 80}, {"nonce": r["nonce"]}, {"nonce": r["nonce"], "chave": b64(os.urandom(60)), "a": 1}):
+            self.assertEqual(self.api("PUT", "/api/custodia", corpo, prova=self.prova)[0], 400, str(corpo)[:40])
+        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": "sim"}, prova=self.prova)[0], 400)
+        self.assertEqual(self.api("POST", "/api/custodia/chave", prova=prova())[1]["erro"], "WRONG_PASSWORD")
+        anonimo = Cliente(self.banco, ip="198.51.100.160")
+        self.assertEqual(anonimo("GET", "/api/custodia", prova=self.prova)[0], 401)
+        self.assertEqual(anonimo("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova)[0], 401)
+        self.assertEqual(self.api("DELETE", "/api/conta", prova=self.prova)[0], 204)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM custodia").fetchone()[0], 0)
+
+
 class TesteVersaoDocumento(Base):
     def test_versao_exige_sessao_e_prova_e_e_so_da_propria_conta(self):
         self.assertEqual(self.api("GET", "/api/documento/versao", prova=self.prova), (200, {"versao": 0}))

@@ -8,7 +8,7 @@ Procedimento ensaiado em 18/10/2026 (versão 3.11.3). **Nunca restaure por cima 
 |---|---|---|
 | Export SQL do D1 (contas, documentos cifrados, histórico, sessões) | arquivo `.sql` gerado pelo `wrangler d1 export` | não há o que restaurar |
 | Senha de cada usuário | só com o usuário (criptografia de ponta a ponta) | o documento continua cifrado — **é assim de propósito** |
-| `SEGREDO` do Worker | segredo do Cloudflare (`wrangler secret`) | 2FA (TOTP) e envelopes de sessão deixam de abrir; documentos **não** dependem dele |
+| `SEGREDO` do Worker | segredo do Cloudflare (`wrangler secret`) | 2FA (TOTP), envelopes de sessão e a recuperação de senha (cópias da chave) deixam de funcionar; documentos **não** dependem dele (abrem com a senha) |
 | `TURNSTILE_SECRET`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `RECURSOS_*` | segredos do Cloudflare | cadastro/login com CAPTCHA, Google, e-mail e recursos liberados param |
 
 Os segredos **não** estão no export do banco: guarde um inventário deles (nome e onde obter) fora do Cloudflare.
