@@ -212,13 +212,13 @@
       if (c.historico !== undefined && !Array.isArray(c.historico)) problemas.push("HISTORICO_INVALIDO");
       const hist = Array.isArray(c.historico) ? c.historico : [];
       hist.forEach((p: any) => { if (objeto(p) && typeof p.saldo === "string" && /^\s*-?\d{1,13}(\.\d{1,2})?\s*$/.test(p.saldo)) p.saldo = Number(p.saldo); });
-      const validos = hist.filter((p: any) => objeto(p) && typeof p.data === "string" && /^\d{4}-\d{2}-\d{2}/.test(p.data) && Number.isFinite(p.saldo));
+      const validos = hist.filter((p: any) => objeto(p) && typeof p.data === "string" && dataValida(p.data) !== null && Number.isFinite(p.saldo));
       if (validos.length !== hist.length) problemas.push("HISTORICO_INVALIDO");
       c.historico = validos;
       if (typeof c.nome !== "string") c.nome = String(c.nome || "Conta");
     });
     out.lancamentos.forEach((l: any) => {
-      if (typeof l.data !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(l.data)) { problemas.push("DATA_INVALIDA"); l.data = typeof l.data === "string" ? l.data : ""; }
+      if (typeof l.data !== "string" || dataValida(l.data) === null) { problemas.push("DATA_INVALIDA"); l.data = typeof l.data === "string" ? l.data : ""; }
       if (typeof l.descricao !== "string") l.descricao = String(l.descricao || "");
       if (typeof l.valor === "string" && /^\s*\d{1,13}(\.\d{1,2})?\s*$/.test(l.valor)) l.valor = Number(l.valor);   // migração conhecida
       if (typeof l.valor !== "number" || !Number.isFinite(l.valor)) { problemas.push("VALOR_INVALIDO"); l.valorInvalido = true; l.valor = 0; }

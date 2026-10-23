@@ -101,7 +101,7 @@
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fechar(false); }
       if (e.key === "Tab") {
         // só o que dá para focar de verdade (visível e habilitado)
-        const foc = Array.from(dialog.querySelectorAll<HTMLElement>("button, input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+        const foc = Array.from(dialog.querySelectorAll<HTMLElement>("button, input, select, textarea, a[href], area[href], [contenteditable='true'], [tabindex]:not([tabindex='-1'])"))
           .filter((x) => !(x as HTMLButtonElement).disabled && !x.hidden && x.getClientRects().length > 0 && x.getAttribute("tabindex") !== "-1");
         if (!foc.length) { e.preventDefault(); dialog.focus(); return; }
         const first = foc[0], last = foc[foc.length - 1];

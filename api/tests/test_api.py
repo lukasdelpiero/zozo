@@ -1182,7 +1182,7 @@ class TesteMigracaoKdf(Base):
         criado = {r[0]: r[1] for r in self.con.execute("SELECT versao, criado_em FROM historico")}
         celular = Cliente(self.banco, ip="198.51.100.31")
         self.entrar(celular)
-        hist = [{"versao": v, "conteudo": conteudo()} for v in (3, 2)]          # a versão 1 não abriu no navegador: fica de fora
+        hist = [{"versao": v, "conteudo": conteudo()} for v in (3, 2, 1)]
         corpo = self.pedido(4, hist)
         st, b = self.api("PUT", "/api/conta/kdf", corpo, prova=self.prova)
         self.assertEqual((st, b), (200, {"versao": 5}))
@@ -1192,7 +1192,7 @@ class TesteMigracaoKdf(Base):
         self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 403)              # prova antiga não vale mais
         self.assertEqual(self.api("GET", "/api/documento", prova=corpo["prova"])[1], {"versao": 5, "conteudo": corpo["conteudo"]})
         guardado = [tuple(r) for r in self.con.execute("SELECT versao, conteudo, criado_em FROM historico ORDER BY versao")]
-        self.assertEqual(guardado, [(2, hist[1]["conteudo"], criado[2]), (3, hist[0]["conteudo"], criado[3])])   # data original preservada
+        self.assertEqual(guardado, [(v, hist[3-v]["conteudo"], criado[v]) for v in (1, 2, 3)])
         self.assertEqual(celular("GET", "/api/sessao")[0], 204)                                   # o outro dispositivo saiu
         self.assertEqual(self.api("GET", "/api/sessao")[0], 200)                                  # este continua
         self.assertTrue(any("kdf_atualizado" in str(x) for x in self.api.logs))                    # evento registrado
@@ -1203,6 +1203,8 @@ class TesteMigracaoKdf(Base):
         antes = self.estado()
         ok = {"versao": 3, "conteudo": conteudo()}
         casos = [
+            (self.pedido(4), 409),                                                # histórico omitido
+            (self.pedido(4, [ok]), 409),                                          # histórico parcial
             (self.pedido(4, kdf="pbkdf2"), 400),                                   # só PBKDF2 → Argon2id
             (self.pedido(4, kdf=None), 400),
             (self.pedido(4, [{"versao": 9, "conteudo": conteudo()}]), 400),        # versão que não existe no histórico

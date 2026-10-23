@@ -1010,12 +1010,15 @@ async def _rota(ctx):
             if v not in existentes or any(v == x[0] for x in novas):
                 raise Falha(400, "INVALID_REQUEST")
             novas.append((v, _conteudo(item.get("conteudo"))))
+        if {v for v, _ in novas} != set(existentes):
+            # Cliente antigo ou pedido truncado não pode apagar backups numa migração automática.
+            raise Falha(409, "DATA_CHANGED")
         await _lote_atomico(ctx.banco, [
             _gravar_documento(email, va, conteudo), _GUARDA,
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ? AND kdf = ?",
              (sal, ITERACOES_MIN, _verificador(nova_prova), KDF_ARGON2, email, conta["verificador"], KDF_PBKDF2)), _GUARDA,
             _LIMPA_GUARDA,
-            # o histórico passa a ser o recifrado (as versões que o navegador não conseguiu abrir ficam de fora)
+            # O histórico completo passa a ser o recifrado, preservando as datas originais.
             ("DELETE FROM historico WHERE email = ?", (email,)),
             *[("INSERT INTO historico (email, versao, conteudo, criado_em) VALUES (?, ?, ?, ?)", (email, v, cv, existentes[v])) for v, cv in novas],
             # a chave mudou: as outras sessões (outros dispositivos) terminam e entram de novo com a mesma senha

@@ -6,9 +6,9 @@ Aplicativo web com design baseado no Copilot Money.
 
 | Camada | Tecnologia |
 |---|---|
-| Front-end | **Vite + TypeScript + Tailwind CSS** (em transição; pasta `ui`) — módulos ainda em JavaScript convivem com os já convertidos |
+| Front-end | **Vite + TypeScript + Tailwind CSS** (pasta `ui`); JavaScript em `ui/mock` somente para desenvolvimento |
 | Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`); transição para **FastAPI + Pydantic** iniciada (`app_fastapi.py`, desligada no Cloudflare) |
-| Dados | **Cloudflare D1** (banco SQL) — só dados cifrados |
+| Dados | **Cloudflare D1** (banco SQL) — documentos financeiros cifrados; nomes e e-mails de cadastro legíveis para a API |
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
@@ -19,6 +19,9 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 - **E-mails da prévia:** o remetente aparece como "ZoZo" (antes "ZoZo (prévia)").
 - **Abrir o link do e-mail:** leva direto ao login, já na senha da conta, com o aviso "E-mail confirmado!" no rodapé; ao entrar, aparece "Conta ativada com sucesso.". Link vencido, já usado ou adulterado mostra só "O link que clicou expirou ou é inválido." e "Voltar para tela de entrada". Por segurança a ativação continua exigindo o link **e** a senha (quem cadastrou o seu e-mail com outra senha não consegue ativar a conta pelo seu clique).
 - **Link novo também ao entrar:** entrar com a senha certa numa conta ainda não confirmada manda um link novo (se o último saiu há mais de 10 minutos; no máximo 3 por hora). Os links anteriores do mesmo cadastro continuam valendo até vencer.
+- **Migração para Argon2id sem perder backups (revisão do Codex):** se alguma cópia do histórico não abrir ou o conjunto não couber num pedido, a migração fica para depois (a conta segue em PBKDF2) em vez de apagar cópias; o servidor recusa histórico incompleto (409). Documento ausente ou versão mais antiga que a já vista não são regravados pela migração (os avisos normais continuam). Resposta perdida depois da gravação: o navegador confere a chave nova antes de usá-la.
+- **Datas:** lançamentos e histórico de saldo com dia inexistente (ex.: 30/02) abrem protegidos contra regravação; o CSV recusa data inválida em vez de trocar pela de hoje. O aviso "o arquivo não é cifrado" do CSV voltou a aparecer.
+- **Teclado:** Tab nas janelas também percorre links. **Backup:** `conferir_backup.py` nunca apaga o destino e sai com erro quando encontra problema.
 - **Servidor:** rota `POST /api/email/link` confere o link sem usá-lo (limitada por IP); o link só vale para o cadastro (a senha) que o gerou. Testes negativos em `api/tests/test_api.py`.
 
 ## Novidades da versão 3.12.1

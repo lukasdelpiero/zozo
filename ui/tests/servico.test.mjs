@@ -303,6 +303,9 @@ test("estrutura inválida no documento não é descartada ao gravar (auditoria A
     historicoTexto: Object.assign({}, base, { contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", historico: [{ data: "2026-10-11", saldo: "abc" }] }] }),
     historicoNaoLista: Object.assign({}, base, { contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", historico: { a: 1 } }] }),
     dataInvalida: Object.assign({}, base, { lancamentos: [{ id: "l1", valor: 1, data: 20261011, tipo: "regular", descricao: "x" }] }),
+    diaInexistente: Object.assign({}, base, { lancamentos: [{ id: "l1", valor: 1, data: "2026-02-30", tipo: "regular", descricao: "x" }] }),
+    sufixoNaData: Object.assign({}, base, { lancamentos: [{ id: "l1", valor: 1, data: "2026-10-23lixo", tipo: "regular", descricao: "x" }] }),
+    historicoDiaInexistente: Object.assign({}, base, { contas: [{ id: "c1", nome: "Conta", tipo: "corrente", historico: [{ data: "2026-02-30", saldo: 125 }] }] }),
   };
   for (const [nome, documento] of Object.entries(casos)) {
     const t = carregar({ documento: JSON.parse(JSON.stringify(documento)) });

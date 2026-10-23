@@ -300,27 +300,45 @@
     try {
       if (!s || s.demo) return;
       const doc = await api("GET", "/documento", undefined, s.prova);
-      const va: number = doc ? doc.versao : 0;
-      const documento = doc ? await decifrar(s.chave, s.email, doc.versao, doc.conteudo) : null;   // não abriu: não migra agora
+      // A leitura normal precisa detectar ausência/rollback antes de qualquer escrita automática.
+      if (!doc || !Number.isSafeInteger(doc.versao) || doc.versao < 1 || doc.versao < await versaoConhecida(s.email)) return;
+      const va: number = doc.versao;
+      const documento = await decifrar(s.chave, s.email, doc.versao, doc.conteudo);
       const conteudo = await cifrar(m.chaves.chave, s.email, va + 1, documento);
-      // histórico, do mais recente ao mais antigo, até o limite do pedido; cópia que já não abria fica de fora
+      // Migração automática nunca descarta backups: se qualquer cópia não abrir ou não couber,
+      // adia a migração inteira, mantendo a chave e todos os documentos anteriores.
       const h = await api("GET", "/historico", undefined, s.prova);
+      if (!h || !Array.isArray(h.versoes)) return;
       const historico: Array<{ versao: number; conteudo: string }> = [];
       let tamanho = conteudo.length + 1000;
-      for (const v of (h && Array.isArray(h.versoes) ? h.versoes : [])) {
+      for (const v of h.versoes) {
         let claro: unknown;
-        try { claro = await decifrar(s.chave, s.email, v.versao, v.conteudo); } catch (e) { continue; }
+        try { claro = await decifrar(s.chave, s.email, v.versao, v.conteudo); } catch (e) { return; }
         const c = await cifrar(m.chaves.chave, s.email, v.versao, claro);
-        if (tamanho + c.length + 40 > LIMITE_PEDIDO) break;
+        if (tamanho + c.length + 40 > LIMITE_PEDIDO) return;
         tamanho += c.length + 40;
         historico.push({ versao: v.versao, conteudo: c });
       }
-      await api("PUT", "/conta/kdf", { sal: b64(m.sal), kdf: KDF_ARGON2, prova: m.chaves.prova, conteudo, versaoAnterior: va, historico }, s.prova);
+      try {
+        await api("PUT", "/conta/kdf", { sal: b64(m.sal), kdf: KDF_ARGON2, prova: m.chaves.prova, conteudo, versaoAnterior: va, historico }, s.prova);
+      } catch (e) {
+        // Uma falha de transporte não prova rollback. Confere o sal e autentica o documento
+        // com a chave nova antes de continuar; jamais repete a escrita às cegas.
+        const par = await parametros(s.email).catch(() => null);
+        if (par && par.kdf === KDF_PBKDF2) throw e;
+        if (!par || par.kdf !== KDF_ARGON2 || par.sal !== b64(m.sal)) throw sessaoExpirada();
+        try {
+          const salvo = await api("GET", "/documento", undefined, m.chaves.prova);
+          if (!salvo || salvo.versao !== va + 1) throw erro("LOAD_FAILED");
+          await decifrar(m.chaves.chave, s.email, salvo.versao, salvo.conteudo);
+        } catch (_) { throw sessaoExpirada(); }
+      }
       if (sessao !== s) return;
       Object.assign(s, { chave: m.chaves.chave, prova: m.chaves.prova, versao: va + 1 });
       await guardarChaveLocal(s.email, s.envelope, m.chaves.bits, m.chaves.prova);
       await lembrarVersao(s.email, va + 1);
     } catch (e) {
+      if (!sessao) throw e;
       /* fica para o próximo login (a sessão e a chave atuais continuam valendo) */
     } finally {
       m.chaves.bits.fill(0);

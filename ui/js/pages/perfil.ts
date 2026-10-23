@@ -292,9 +292,11 @@
     const comPerfil = ZoZo.recursos.perfis();             // coluna Perfil só para contas com o recurso
     const linhas = [["Data", "Nome", "Valor"].concat(moeda ? ["Moeda"] : [], ["Tipo", "Conta", "Categoria"], comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
     lancamentos.slice().sort((a: any, b: any) => a.data.localeCompare(b.data)).forEach((l: any) => {
+      const data = F.parseData(l.data);
+      if (!data || F.iso(data) !== l.data) throw Object.assign(new Error("INVALID_DATE"), { friendly: "Há uma data inválida nos lançamentos. O CSV não foi gerado." });
       const recorrencia = l.tipo !== "recorrente" ? "" : l.recorrencia === "parcelada" ? "Parcelada" : (freq[l.recorrencia] || freq.mensal).rotulo;
       linhas.push([
-        texto((F.parseData(l.data) || new Date()).toLocaleDateString("pt-BR")), texto(l.descricao), numero((entra(l) ? 1 : -1) * F.numero(l.valor)),
+        texto(data.toLocaleDateString("pt-BR")), texto(l.descricao), numero((entra(l) ? 1 : -1) * F.numero(l.valor)),
       ].concat(moeda ? [moeda] : [], [texto(tipos[l.tipo] || l.tipo), texto(l.nomeConta), texto(l.categoria ? l.categoria.nome : "")], comPerfil ? [texto(l.perfil ? l.perfil.nome : "")] : [], [
         texto(recorrencia), texto(l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : ""), texto(l.notas),
       ]).join(";"));
@@ -322,7 +324,7 @@
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       // fora do ZoZo os dados ficam legíveis: avisa toda vez (inclusive pelo botão de Transações)
-      ctx.toast("Arquivo baixado. Ele não é cifrado: guarde-o em local seguro.");
+      ctx.toast("Arquivo baixado. Ele não é cifrado: guarde-o em local seguro.", { tone: "aviso" });
     }).catch((e: any) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
       .then(() => minimo)
       .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); });

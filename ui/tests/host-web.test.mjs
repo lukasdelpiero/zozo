@@ -222,7 +222,7 @@ async function contaAntiga(srv, email, senha, { versoes = 3, estragada = null } 
 
 test("conta antiga: o login migra para Argon2id; documento e histórico continuam abrindo; nada sai legível", async () => {
   const srv = servidorFalso(), email = "legado@exemplo.test", senha = novaSenha();
-  const antiga = await contaAntiga(srv, email, senha, { versoes: 4, estragada: 1 });
+  const antiga = await contaAntiga(srv, email, senha, { versoes: 4 });
   const h = carregarHost({ fetch: srv.fetch });
   await h.chamar("login", { email, senha });
   const c = srv.contas.get(email);
@@ -231,9 +231,9 @@ test("conta antiga: o login migra para Argon2id; documento e histórico continua
   const nova = await derivarRef(senha, Buffer.from(c.sal, "base64"), "argon2id-1");
   assert.equal(sha256(nova.prova), c.provaHash);
   assert.notEqual(sha256(antiga.prova), c.provaHash);                                // a prova antiga não vale mais
-  // documento atual (versão nova) e histórico recifrados com a chave Argon2id; a cópia estragada ficou de fora
+  // documento atual (versão nova) e histórico inteiro recifrados com a chave Argon2id (nenhuma cópia fica de fora)
   assert.deepEqual(await abrirRef(nova.dados, email, 5, c.doc.conteudo), { versao: 4, texto: "Supermercado-Segredo-atual" });
-  assert.deepEqual(c.historico.map((x) => x.versao), [2, 3]);
+  assert.deepEqual(c.historico.map((x) => x.versao), [1, 2, 3]);
   for (const v of c.historico) assert.deepEqual(await abrirRef(nova.dados, email, v.versao, v.conteudo), { versao: v.versao, texto: "Supermercado-Segredo-" + v.versao });
   // a sessão segue com a chave nova: lê e grava sem pedir a senha de novo
   assert.deepEqual((await h.chamar("loadUserData")).documento, { versao: 4, texto: "Supermercado-Segredo-atual" });
@@ -521,5 +521,60 @@ test("pedidos à API: mesma origem, sem cache e sem seguir redirecionamentos", a
     assert.equal(o.credentials, "same-origin");
     assert.equal(o.cache, "no-store");
     assert.equal(o.redirect, "manual");
+  }
+});
+test("migração não descarta histórico que excede o limite do pedido", async () => {
+  const srv = servidorFalso(), email = "grande@exemplo.test", senha = novaSenha();
+  const ref = await contaAntiga(srv, email, senha);
+  const c = srv.contas.get(email);
+  const aleatorio = new Uint8Array(850000);
+  for (let i = 0; i < aleatorio.length; i += 65536) webcrypto.getRandomValues(aleatorio.subarray(i, i + 65536));
+  for (const v of c.historico) v.conteudo = await cifrarRef(ref.dados, email, v.versao, { texto: b64(aleatorio) });
+  const antes = structuredClone(c);
+  const h = carregarHost({ fetch: srv.fetch });
+  await h.chamar("login", { email, senha });
+  assert.deepEqual(c, antes);
+  assert.ok(!srv.pedidos.some(p => p.caminho === "/api/conta/kdf"));
+  assert.equal((await h.chamar("loadUserData")).documento.versao, 3);
+});
+
+test("migração não elimina histórico que não pôde autenticar", async () => {
+  const srv = servidorFalso(), email = "corrompido@exemplo.test", senha = novaSenha();
+  await contaAntiga(srv, email, senha, { estragada: 1 });
+  const c = srv.contas.get(email), antes = structuredClone(c);
+  await carregarHost({ fetch: srv.fetch }).chamar("login", { email, senha });
+  assert.deepEqual(c, antes);
+});
+
+test("migração reconciliada quando a resposta se perde após o commit", async () => {
+  const srv = servidorFalso(), email = "resposta@exemplo.test", senha = novaSenha();
+  await contaAntiga(srv, email, senha);
+  const fetch = async (url, init) => {
+    const r = await srv.fetch(url, init);
+    if (url === "/api/conta/kdf" && r.ok) throw new TypeError("conexão interrompida");
+    return r;
+  };
+  const h = carregarHost({ fetch });
+  await h.chamar("login", { email, senha });
+  assert.equal(srv.contas.get(email).kdf, "argon2id-1");
+  assert.equal((await h.chamar("loadUserData")).documento.versao, 3);
+  const recarga = carregarHost({ fetch: srv.fetch, armazenamento: h.armazenamento });
+  assert.equal((await recarga.chamar("getSession")).authenticated, true);
+  assert.equal((await recarga.chamar("loadUserData")).documento.versao, 3);
+});
+
+test("migração não recria documento ausente nem mascara rollback", async () => {
+  for (const ausente of [true, false]) {
+    const srv = servidorFalso(), email = "rollback@exemplo.test", senha = novaSenha();
+    await contaAntiga(srv, email, senha);
+    const c = srv.contas.get(email);
+    if (ausente) { c.doc = null; c.historico = []; }
+    const antes = structuredClone(c);
+    const armazenamento = new Map([["zozo.versao." + sha256(email).slice(0, 24), "4"]]);
+    const h = carregarHost({ fetch: srv.fetch, armazenamento });
+    await h.chamar("login", { email, senha });
+    assert.deepEqual(c, antes);
+    const lido = await h.chamar("loadUserData");
+    assert.equal(lido.aviso, ausente ? "DOCUMENT_MISSING" : "OLDER_VERSION");
   }
 });

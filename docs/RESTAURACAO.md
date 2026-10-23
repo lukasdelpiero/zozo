@@ -25,6 +25,10 @@ O export bloqueia o banco por alguns segundos (faça fora do horário de uso). G
 
 `conferir_backup.py` restaura o export num SQLite **novo** e mostra: `integrity_check`, linhas por tabela, migrações aplicadas, contas por KDF, formato de cada documento e do histórico, documentos sem conta. Não imprime e-mails nem conteúdo.
 
+Se o destino já existir, a conferência recusa sem alterá-lo: escolha outro nome. Problemas de formato, integridade ou referências retornam código de saída diferente de zero. O script confere estrutura, não autentica AES-GCM: o ensaio completo ainda exige abrir dados de teste com a senha correta. Importe somente exports SQL de origem confiável.
+
+Na migração automática para Argon2id, preserve todas as versões do histórico. Se alguma não abrir ou o pedido completo exceder o limite da API, adie a migração sem apagar cópias. Uma migração por etapas exigirá protocolo próprio e testes de interrupção; não amplie os limites sem avaliar memória e D1.
+
 ## 2. Restaurar
 
 **Voltar no tempo (mesmo banco, últimos 7 dias no plano gratuito / 30 no pago):** o `publicar.ps1 producao` registra um ponto antes de cada publicação em `api/restauracao.log`.
