@@ -15,10 +15,10 @@ Os segredos **não** estão no export do banco: guarde um inventário deles (nom
 
 ## 0. Backup automático (diário, GitHub Actions)
 
-`.github/workflows/backup-d1.yml` roda todo dia às 03:17 (Brasília), ou à mão em Actions → "Backup do banco (D1)" → Run workflow. Exporta o banco de produção, confere com `conferir_backup.py` (falha se houver problema) e **cifra com age antes de sair do runner**. Guarda o arquivo `.sql.age` como artifact por 30 dias (repositório privado; cabe no espaço gratuito enquanto o banco for pequeno). Falha = e-mail do GitHub.
+`.github/workflows/backup-d1.yml` — **desligado por enquanto**: só roda à mão em Actions → "Backup do banco (D1)" → Run workflow. Para rodar todo dia às 03:17 (Brasília), cadastre os segredos abaixo e descomente o `schedule` no arquivo. Exporta o banco de produção, confere com `conferir_backup.py` (falha se houver problema) e **cifra com age antes de sair do runner**. Guarda o arquivo `.sql.age` como artifact por 30 dias (repositório privado; cabe no espaço gratuito enquanto o banco for pequeno). Falha = e-mail do GitHub.
 
 Preparar uma vez:
-1. Instale o age (`winget install FiloSottile.age`) e gere o par: `age-keygen -o zozo-backup-chave.txt`. A linha `# public key: age1…` é a chave pública. **Guarde `zozo-backup-chave.txt` fora deste computador** (pendrive/cofre de senhas): sem ela nenhum backup abre; com ela, todos abrem.
+1. Instale o age (`winget install FiloSottile.age`) e gere o par: `age-keygen -o zozo-backup-chave.txt`. A linha `# public key: age1…` é a chave pública. **Guarde `zozo-backup-chave.txt` fora deste computador** (pendrive/cofre de senhas): sem ela nenhum backup abre; com ela, todos abrem. Perdeu a chave: os backups antigos ficam perdidos (o banco e o Time Travel do D1 não dependem dela); gere um par novo, troque `BACKUP_AGE_RECIPIENT` e siga.
 2. Cloudflare → Manage account → Account API tokens → Create → Custom: permissão **Account → D1 → Edit**, só esta conta.
 3. GitHub → repositório → Settings → Secrets and variables → Actions: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` e `BACKUP_AGE_RECIPIENT` (a chave pública `age1…`).
 4. Rode o workflow uma vez à mão e confira o artifact.

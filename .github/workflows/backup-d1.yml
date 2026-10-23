@@ -9,9 +9,11 @@
 #   BACKUP_AGE_RECIPIENT   chave pública do age (age1…)
 name: Backup do banco (D1)
 
+# DESLIGADO por enquanto: só roda à mão (Actions → Run workflow). Para o backup diário, depois de
+# cadastrar os segredos, descomente as 2 linhas de "schedule" (03:17 em Brasília).
 on:
-  schedule:
-    - cron: "17 6 * * *"          # 03:17 em Brasília (pouco uso: o export trava o banco por alguns segundos)
+  # schedule:
+  #   - cron: "17 6 * * *"
   workflow_dispatch:
 
 permissions:
