@@ -244,6 +244,7 @@ declare global {
   interface ZoZoInline {
     texto(cfg: CampoTextoNoLugar): HTMLInputElement;
     dinheiro(cfg: CampoValorNoLugar): HTMLInputElement;
+    dinheiroCampo(cfg: { valor: unknown; rotulo: string; classe?: string; aoEnter?: () => void }): { el: HTMLInputElement; ler(): number; definir(v: unknown): void };
     corDot(cor: unknown, aoMudar: (cor: string) => void): HTMLElement;
   }
 
@@ -456,7 +457,8 @@ declare global {
     Toggle(label: string, opts?: { checked?: boolean; onChange?: (ligado: boolean) => void }): HTMLElement;
     Tag(nome: string | null | undefined, cor: unknown, opts?: { class?: string; placeholder?: string; onClick?: (e: MouseEvent) => void; title?: string }): HTMLElement | null;
     CategoryLabel(cat: CategoriaRotulo | null | undefined, opts?: { pill?: boolean; class?: string; vazio?: string }): HTMLElement | null;
-    PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string }): HTMLElement;
+    PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string; passivo?: boolean }): HTMLElement;
+    Dinheiro(valor: unknown, opts?: { class?: string | false | null }): HTMLElement;
     ProgressBar(ratio: unknown, opts?: { tone?: "ok" | "over" | "allocation"; grande?: boolean; class?: string; label?: string }): HTMLElement;
     FilterTabs(valor: string, onChange: (v: string, teclado?: boolean) => void, opts?: { itens?: string[]; label?: string }): HTMLElement;
     /** pontos com { data, … } (os demais campos variam: valor, ativos, passivos…) */
@@ -500,6 +502,9 @@ declare global {
   interface OpcoesGraficoLinha {
     height?: number; ariaLabel?: string; animar?: boolean; semEixo?: boolean; independentScale?: boolean;
     formatValue?: (v: number) => string; rotuloX?: (p: PontoGrafico) => string; rotuloTooltip?: (p: PontoGrafico) => string;
+    /** passar o mouse "filtra": data em cima do ponto, o resto esmaecido e quem chama atualiza o topo
+        (pontos = o ponto de cada série no lugar do mouse; null = saiu do gráfico) */
+    aoPassar?: (pontos: Array<PontoGrafico | null> | null) => void;
   }
   interface OpcoesRosca { size?: number; thickness?: number; ariaLabel?: string; onClick?: () => void; progresso?: number; corProgresso?: string; tituloProgresso?: string }
   interface BarraGrafico { valor: unknown; rotulo?: string; rotuloMes?: string; rotuloAno?: string; titulo?: string; destaque?: boolean }

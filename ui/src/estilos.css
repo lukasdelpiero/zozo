@@ -40,6 +40,7 @@
   --color-zz-text: var(--color-text-primary);
   --color-zz-secondary: var(--color-text-secondary);
   --color-zz-muted: var(--color-text-muted);
+  --color-zz-cinza: var(--color-text-cinza);
   --color-zz-positive: var(--color-positive);
   --color-zz-primary-soft: var(--color-primary-soft);
   --color-zz-primary-softer: var(--color-primary-softer);

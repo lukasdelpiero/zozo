@@ -68,6 +68,9 @@
   // Painel da transação: botões de texto pequenos (data, conta, "Despesa ▾") e os campos grandes de nome e valor
   const LP_BOTAO = "tw:inline-flex tw:items-center tw:gap-1.5 tw:px-1.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:bg-transparent tw:text-zz-secondary "
     + "tw:text-[13px] tw:font-[550] tw:hover:bg-zz-surface-hover tw:hover:text-zz-text";
+  // data e conta no topo do painel da transação: mesmo botão, em cinza
+  const LP_BOTAO_CINZA = "tw:inline-flex tw:items-center tw:gap-1.5 tw:px-1.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:bg-transparent tw:text-zz-cinza "
+    + "tw:text-[.8125rem] tw:font-[550] tw:hover:bg-zz-surface-hover tw:hover:text-zz-text";
   const LP_CAMPO = "tw:border tw:border-transparent tw:rounded-lg tw:bg-transparent tw:text-[20px] tw:font-[550] tw:tracking-[-0.01em] tw:text-zz-text tw:py-0.5 tw:px-1.5 "
     + "tw:min-w-0 tw:outline-none tw:focus:[box-shadow:none]";
 
@@ -94,12 +97,12 @@
     rotuloNome: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-[15px] tw:font-[450]",
 
     /* Variação percentual (UI.PercentageChange) */
-    pctSobe: PCT + " tw:text-zz-positive tw:bg-(--color-positive-soft)",
-    pctDesce: PCT + " tw:text-(--color-negative) tw:bg-(--color-negative-soft)",
-    pctIgual: PCT + " tw:text-(--color-neutral) tw:bg-(--color-neutral-soft)",
-    pctSimplesSobe: PCT + " tw:text-zz-positive tw:bg-transparent tw:p-0",
-    pctSimplesDesce: PCT + " tw:text-(--color-negative) tw:bg-transparent tw:p-0",
-    pctSimplesIgual: PCT + " tw:text-(--color-neutral) tw:bg-transparent tw:p-0",
+    pctSobe: PCT + " tw:text-(--color-pilula-sobe) tw:bg-(--color-pilula-sobe-fundo)",
+    pctDesce: PCT + " tw:text-(--color-pilula-desce) tw:bg-(--color-pilula-desce-fundo)",
+    pctIgual: PCT + " tw:text-(--color-pilula-igual) tw:bg-(--color-pilula-igual-fundo)",
+    pctSimplesSobe: PCT + " tw:text-(--color-pilula-sobe) tw:bg-transparent tw:p-0",
+    pctSimplesDesce: PCT + " tw:text-(--color-pilula-desce) tw:bg-transparent tw:p-0",
+    pctSimplesIgual: PCT + " tw:text-(--color-pilula-igual) tw:bg-transparent tw:p-0",
     pctValor: "tw:text-[13px] tw:font-[550]",
 
     /* Letra do tipo (R/P/T/I/D) */
@@ -124,7 +127,7 @@
 
     /* Abas de período 1S · 1M · 3M · AA · 1A · TOTAL */
     abas: "filter-tabs tw:inline-flex tw:items-center tw:gap-1",
-    aba: ABA + " tw:bg-transparent tw:text-zz-secondary tw:hover:text-zz-text tw:hover:bg-zz-surface-hover",
+    aba: ABA + " tw:bg-transparent tw:text-zz-cinza tw:hover:text-zz-text tw:hover:bg-zz-surface-hover",
     abaAtiva: ABA + " tw:bg-zz-primary-soft tw:text-zz-primary",
 
     /* Ícone redondo da conta (UI.AccountIcon) e nome com os 4 últimos dígitos */
@@ -282,8 +285,11 @@
     graficoLinha: "line-chart tw:relative",
     graficoSuporte: "tw:w-full",
     graficoSvg: "line-chart__svg tw:block tw:overflow-visible",
-    graficoRotulo: "tw:fill-zz-muted tw:text-[11.5px] tw:[font-family:var(--font-family)]",
+    graficoRotulo: "tw:fill-zz-cinza tw:text-[11.5px] tw:[font-family:var(--font-family)]",
     graficoCursor: "tw:stroke-zz-border-strong tw:[stroke-width:1]",
+    // modo filtro (passar o mouse): véu sobre o trecho depois do ponto e a data em cima dele
+    graficoVeu: "tw:fill-zz-surface tw:[fill-opacity:0.78] tw:pointer-events-none",
+    graficoDataTopo: "tw:fill-zz-cinza tw:text-[11.5px] tw:font-[550] tw:tracking-[0.02em] tw:[font-family:var(--font-family)]",
     graficoVazio: "tw:grid tw:place-items-center tw:text-zz-muted tw:text-[13px]",
     dica: "tw:absolute tw:-top-1.5 tw:pointer-events-none tw:min-w-40 tw:py-2 tw:px-2.5 tw:rounded-lg tw:bg-zz-text tw:text-white tw:text-[12px] tw:opacity-0 "
       + "tw:[transform:translateY(-100%)] tw:[transition:opacity_var(--duration-fast)] tw:z-2 tw:[&.is-visible]:opacity-100",
@@ -325,7 +331,7 @@
     painelTopoDicaAcima: "tw:text-(--color-negative) tw:text-[11.5px] tw:font-medium",
     // nome editável com a cor e o ícone ao lado (Categorias, Perfis)
     edicaoTopo: "tw:base:flex tw:base:flex-col tw:base:gap-1.5 tw:base:min-w-0 tw:[&_.icon-pick]:inline-grid tw:[&_.icon-pick]:place-items-center tw:[&_.icon-pick]:size-[30px] "
-      + "tw:[&_.icon-pick]:text-[18px] tw:[&_.icon-pick]:[border:0] tw:[&_.icon-pick]:bg-transparent tw:[&_.icon-pick]:rounded-lg tw:[&_.icon-pick:hover]:bg-zz-surface-hover "
+      + "tw:[&_.icon-pick]:text-[18px] tw:[&_.icon-pick]:[border:0] tw:[&_.icon-pick]:bg-transparent tw:[&_.icon-pick]:rounded-[50%] tw:[&_.icon-pick:hover]:bg-zz-surface-hover "
       + "tw:[&_.inline-input]:text-[20px] tw:[&_.inline-input]:font-[550]",
     edicaoTopoLinha: "tw:flex tw:items-center tw:gap-2.5 tw:min-w-0",
     pilulaBotao: "tw:[border:0] tw:bg-transparent tw:p-0 tw:self-start tw:rounded-(--radius-pill) tw:hover:[box-shadow:0_0_0_2px_var(--color-primary-soft)]",
@@ -359,7 +365,7 @@
     dvNome: "tw:text-[15px] tw:font-[450]",
     dvValor: "tw:text-[15px] tw:font-[550] tw:text-right tw:m-0",
     dvPct: "tw:text-[15px] tw:font-[550] tw:text-left tw:w-[72px] tw:m-0",
-    pontoCor: "tw:size-3.5 tw:rounded-[50%] tw:[border:0] tw:p-0 tw:bg-(--dot) tw:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-border)] tw:flex-none tw:cursor-pointer "
+    pontoCor: "ponto-cor tw:size-3.5 tw:rounded-[50%] tw:[border:0] tw:p-0 tw:bg-(--dot) tw:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-border)] tw:flex-none tw:cursor-pointer "
       + "tw:hover:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-primary)]",
     pontoCorMenu: "tw:p-1",
     iconeEscolha: "icon-pick tw:base:size-11 tw:base:grid tw:base:place-items-center tw:base:border tw:base:border-zz-border tw:base:rounded-lg tw:base:bg-(--color-background) "
@@ -372,17 +378,17 @@
       + "tw:gaveta:grid-cols-[minmax(0,1fr)] tw:gaveta:gap-2",
     lpTopoEsquerda: "tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0",
     lpTopoDireita: "tw:flex tw:flex-col tw:items-end tw:gap-1 tw:gaveta:flex-row-reverse tw:gaveta:items-center tw:gaveta:justify-between",
-    lpData: LP_BOTAO + " tw:self-start tw:h-6 tw:-ml-1.5 tw:whitespace-nowrap",
-    lpConta: LP_BOTAO + " tw:self-start tw:h-[26px] tw:-ml-1.5 tw:max-w-full tw:min-w-0 tw:[&>span:not(.lp-account-dot)]:min-w-0 tw:[&>span:not(.lp-account-dot)]:overflow-hidden "
+    lpData: LP_BOTAO_CINZA + " tw:self-start tw:h-6 tw:-ml-1.5 tw:whitespace-nowrap",
+    lpConta: LP_BOTAO_CINZA + " tw:self-start tw:h-[26px] tw:-ml-1.5 tw:max-w-full tw:min-w-0 tw:[&>span:not(.lp-account-dot)]:min-w-0 tw:[&>span:not(.lp-account-dot)]:overflow-hidden "
       + "tw:[&>span:not(.lp-account-dot)]:text-ellipsis tw:[&>span:not(.lp-account-dot)]:whitespace-nowrap tw:[&>svg]:flex-none",
     lpContaPonto: "lp-account-dot tw:size-[9px] tw:rounded-[50%] tw:flex-none",
     lpContaLinha: "tw:inline-flex tw:items-center tw:gap-0.5 tw:min-w-0 tw:max-w-full",
     lpSub: LP_BOTAO + " tw:self-end tw:h-6 tw:-mr-1.5",
-    lpNome: LP_CAMPO + " tw:-ml-[7px] tw:text-ellipsis tw:placeholder:text-zz-muted",
+    lpNome: LP_CAMPO + " tw:-ml-[7px] tw:text-ellipsis tw:placeholder:text-zz-cinza",
     lpValor: LP_CAMPO + " tw:w-[170px] tw:text-right tw:-mr-[7px] tw:[&.money--income]:text-(--color-income) tw:gaveta:text-left",
     lpProps: "lp-props tw:flex tw:flex-col tw:gap-1 tw:py-3 tw:border-b tw:border-b-zz-border tw:-mx-(--page-gutter) tw:px-(--page-gutter)",
     lpProp: "tw:grid tw:grid-cols-[110px_minmax(0,1fr)] tw:items-center tw:min-h-[34px] tw:[&>:last-child]:justify-self-start",
-    lpPropRotulo: "tw:text-zz-secondary tw:text-[15px] tw:font-[550]",
+    lpPropRotulo: "tw:text-zz-cinza tw:text-[15px] tw:font-[550]",
     lpMais: "tw:size-[26px] tw:inline-grid tw:place-items-center tw:p-0 tw:leading-0 tw:border tw:border-zz-border-strong tw:rounded-[50%] tw:bg-zz-surface "
       + "tw:text-zz-secondary tw:hover:border-zz-primary tw:hover:text-zz-primary tw:[&_.icon]:block tw:[&_.icon]:m-0",
     lpPilulaBotao: "lp-chip-btn tw:inline-flex tw:items-center tw:gap-1.5 tw:[border:0] tw:bg-transparent tw:p-0.5 tw:-ml-0.5 tw:rounded-(--radius-pill) tw:max-w-full "
@@ -394,7 +400,7 @@
     lpPilula: "tw:inline-flex tw:items-center tw:gap-0.5 tw:min-w-0 tw:max-w-full",
     lpNotasArea: "lp-notes-wrap tw:py-3 tw:border-b tw:border-b-zz-border tw:-mx-(--page-gutter) tw:px-(--page-gutter)",
     lpNotas: "tw:w-full tw:[border:0] tw:resize-none tw:bg-transparent tw:text-[15px] tw:font-[550] tw:leading-normal tw:py-1 tw:px-1.5 tw:-ml-1.5 tw:rounded-lg "
-      + "tw:overflow-hidden tw:text-zz-text tw:placeholder:text-zz-muted tw:outline-none tw:focus:[box-shadow:none]",
+      + "tw:overflow-hidden tw:text-zz-text tw:placeholder:text-zz-cinza tw:outline-none tw:focus:[box-shadow:none]",
     lpSituacao: "tw:min-h-[18px] tw:pt-1.5 tw:text-[11.5px] tw:text-zz-muted",
     lpSituacaoOk: "tw:min-h-[18px] tw:pt-1.5 tw:text-[11.5px] tw:text-zz-positive",
     lpSituacaoErro: "tw:min-h-[18px] tw:pt-1.5 tw:text-[11.5px] tw:text-(--color-negative)",
@@ -406,10 +412,10 @@
     pl: "pl tw:grid tw:grid-cols-[var(--page-gutter)_18px_auto_minmax(0,1fr)_auto_auto_var(--page-gutter)] tw:-mx-(--page-gutter)",
     plMes: "tw:grid tw:grid-cols-subgrid tw:col-span-full tw:[&+&]:mt-4",
     plMesTopo: "tw:col-[2/-2] tw:flex tw:items-baseline tw:justify-between tw:gap-3 tw:pt-2",
-    plMesTitulo: "tw:text-[20px] tw:font-[620]",
-    plMesTotal: "tw:inline-flex tw:gap-1.5 tw:text-[20px] tw:font-[620] tw:[&_.money]:font-[620]",
+    plMesTitulo: "tw:text-[.9375rem] tw:font-[620]",
+    plMesTotal: "tw:inline-flex tw:items-baseline tw:gap-1.5 tw:text-[.9375rem] tw:font-[620] tw:[&_.money]:font-[620]",
     plMesParenteses: "money tw:text-zz-muted",
-    plDia: "tw:col-[2/-2] tw:pt-3 tw:mt-0 tw:mb-4 tw:leading-[1.2] tw:text-zz-secondary tw:text-[13px] tw:font-[620]",
+    plDia: "tw:col-[2/-2] tw:pt-3 tw:mt-0 tw:mb-4 tw:leading-[1.2] tw:text-zz-cinza tw:text-[.8125rem] tw:font-[620]",
     plLista: "tw:grid tw:grid-cols-subgrid tw:col-span-full",
     plLinha: "tw:group/pl tw:grid tw:grid-cols-subgrid tw:col-span-full tw:items-center tw:min-h-(--row-height) "
       + "tw:cursor-pointer tw:[transition:background_var(--duration-fast)_var(--easing)] tw:hover:bg-zz-surface-hover "
@@ -417,12 +423,14 @@
     plCaixa: "tw:col-start-2 tw:mr-2.5 tw:opacity-55 tw:group-hover/pl:opacity-100 tw:group-[.is-checked]/pl:opacity-100",
     plLetra: "tw:col-start-3 tw:mr-2",
     plNome: "tw:col-start-4 tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
-    plTitulo: "tw:overflow-hidden tw:text-ellipsis tw:text-[15px] tw:font-[450]",
+    plTitulo: "tw:overflow-hidden tw:text-ellipsis tw:text-[.9375rem] tw:font-[450]",
     // o nome é o botão da linha (teclado e leitor de tela): sem aparência de botão
     plTituloBotao: "tw:min-w-0 tw:p-0 tw:[border:0] tw:bg-transparent tw:text-left tw:text-inherit tw:whitespace-nowrap tw:cursor-pointer tw:rounded-sm tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2",
     plCategoria: "tw:col-start-5 tw:ml-2.5 tw:min-w-7 tw:h-[22px] tw:px-1.5 tw:grid tw:place-items-center tw:rounded-(--radius-pill) "
       + "tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] tw:text-[12px] tw:leading-none tw:mr-0.5",
-    plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[15px] tw:font-[620] tw:whitespace-nowrap",
+    plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[.9375rem] tw:font-[620] tw:whitespace-nowrap",
+    // símbolo da moeda menor que o número e alinhado ao topo dele (R$ pequeno, como no Copilot)
+    moedaSimbolo: "tw:inline-block tw:text-[0.7em] tw:leading-none tw:align-top tw:mt-[0.12em] tw:mr-[0.15em]",
 
     /* ---------- Configurações (pages/perfil.ts e a seção do câmbio em components/cambio.ts) ----------
        [título / explicação ........ controle]; até 700 px o controle desce para a linha de baixo */
@@ -476,7 +484,7 @@
     // seta → ao lado das pílulas no painel da transação
     setaVer: "tw:flex-none tw:size-6 tw:text-[var(--color-text-tertiary,var(--color-text-secondary))] tw:opacity-80 tw:hover:opacity-100 tw:hover:text-zz-text "
       + "tw:focus-visible:opacity-100 tw:focus-visible:text-zz-text",
-    ctxIconeContaPequeno: "tw:[&_.account-icon]:size-[22px] tw:[&_.account-icon]:rounded-md tw:[&_.account-icon_.icon]:size-[13px]",
+    ctxIconeContaPequeno: "tw:[&_.account-icon]:size-6 tw:[&_.account-icon]:rounded-[50%] tw:[&_.account-icon_.icon]:size-[14px]",
   } as const;
 
   ZoZo.pecas = P;

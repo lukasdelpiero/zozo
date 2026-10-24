@@ -544,6 +544,7 @@
         let secao: HTMLElement = h("section"), lista: HTMLElement = h("div");
         // transações de cada mês numa única passada (antes: a lista inteira era filtrada de novo a cada mês)
         const porMes = new Map();
+        const mesHoje = F.iso(new Date()).slice(0, 7);
         itens.forEach((x: any) => { const m = x.data.slice(0, 7); if (!porMes.has(m)) porMes.set(m, []); porMes.get(m).push(x); });
         itens.forEach((l: any) => {
           const mes = l.data.slice(0, 7);
@@ -551,10 +552,13 @@
             mesAtual = mes; diaAtual = null;
             // Total gasto do mês (mesma regra da barra de informações) à direita
             const doMes = porMes.get(mes);
+            // "Mês Ano" e o total só nos meses passados; no mês atual, o título fica só para o leitor de tela
+            const passado = mes < mesHoje;
             secao = h("section", { class: [blocos.length && T.mesSeguinte, anim(blocos.length)] },
-              h("header", { class: T.mesCab },
-                h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),
-                h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto))));
+              mes === mesHoje ? h("h2", { class: "tw:sr-only" }, F.mesAno(mes + "-01"))
+                : h("header", { class: T.mesCab },
+                  h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),
+                  passado ? h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto)) : null));
             blocos.push(secao);
           }
           if (l.data !== diaAtual) {

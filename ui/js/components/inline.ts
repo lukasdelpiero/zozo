@@ -45,6 +45,31 @@
     return input;
   }
 
+  /**
+   * Valor que se edita como o da transação (exibido como texto; clicou, apaga e digita), mas que só é
+   * gravado quando a tela pede (ex.: "Salvar orçamento"): ler() devolve o número e definir() troca o valor.
+   */
+  function dinheiroCampo(cfg: { valor: unknown; rotulo: string; classe?: string; aoEnter?: () => void }): { el: HTMLInputElement; ler(): number; definir(v: unknown): void } {
+    let atual = F.numero(cfg.valor);
+    const input = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, ZoZo.pecas.noLugarValor, "money", cfg.classe], value: F.moeda(atual),
+      "data-com-simbolo": "", "aria-label": cfg.rotulo }) as HTMLInputElement;
+    input.addEventListener("focus", () => { input.value = F.valorParaEditar(input, atual); F.cursorNoFim(input); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); input.blur(); if (cfg.aoEnter) cfg.aoEnter(); }
+      if (e.key === "Escape") { input.value = F.valorParaEditar(input, atual); input.blur(); }
+    });
+    input.addEventListener("blur", () => {
+      const v = F.parseMoeda(input.value);
+      if (Number.isFinite(v) && v >= 0 && v < 1e12) { atual = Math.round(v * 100) / 100; input.removeAttribute("aria-invalid"); }
+      input.value = F.moeda(atual);
+    });
+    return {
+      el: input,
+      ler: () => (document.activeElement === input ? F.parseMoeda(input.value) : atual),
+      definir(v: unknown) { atual = F.numero(v); input.value = F.moeda(atual); },
+    };
+  }
+
   /** Bolinha de cor que abre a paleta 4×4 */
   function corDot(cor: unknown, aoMudar: (cor: string) => void): HTMLElement {
     let atual = F.cor(cor, "#6078a9") || "#6078a9";
@@ -57,6 +82,6 @@
     return btn;
   }
 
-  const api: ZoZoInline = { texto, dinheiro, corDot };
+  const api: ZoZoInline = { texto, dinheiro, dinheiroCampo, corDot };
   ZoZo.inline = api;
 })(window.ZoZo);

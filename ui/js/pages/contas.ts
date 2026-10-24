@@ -25,11 +25,12 @@
     cartaoEmbutido: "tw:p-0",
     topo: "tw:grid tw:grid-cols-[1fr_1fr] tw:gap-4 tw:max-w-[520px] tw:mx-auto tw:area460:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tw:area460:gap-2",
     metade: "tw:flex tw:flex-col tw:items-center tw:gap-1 tw:text-center",
-    legenda: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-secondary tw:text-[13px] tw:font-medium",
+    legenda: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-cinza tw:text-[13px] tw:font-medium",
+    legendaEmbutida: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-cinza tw:text-[.9375rem] tw:font-[550]",      // no Dashboard
     pontoAtivos: "tw:size-[7px] tw:rounded-[50%] tw:bg-(--color-assets)",
     pontoPassivos: "tw:size-[7px] tw:rounded-[50%] tw:bg-(--color-liabilities)",
     valor: "money tw:text-[28px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center tw:area460:text-[17px]",
-    valorEmbutido: "money tw:text-[15px] tw:font-[550] tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center",
+    valorEmbutido: "money tw:text-[1.5rem] tw:font-[550] tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center",
     grafico: "tw:relative tw:mt-4 tw:mb-2",
     filtros: "tw:flex tw:justify-center",
     // painel: 4 últimos dígitos editáveis no lugar (sem borda, fundo transparente)
@@ -43,7 +44,7 @@
     cicloDias: "tw:flex tw:items-end tw:gap-2",
     cicloCampo: "tw:flex tw:flex-col tw:items-end tw:gap-0.5",
     cicloRotulo: "tw:text-[12px] tw:text-zz-secondary",
-    cicloInput: "tw:w-[72px] tw:h-9 tw:text-right tw:text-[17px] tw:font-semibold " + ZoZo.ui.CAMPO_PAINEL,
+    cicloData: "tw:w-[150px] tw:h-9",
     cicloErro: "tw:m-0 tw:text-right tw:text-[13px] tw:text-(--color-negative)",
   };
 
@@ -56,11 +57,14 @@
   ];
 
   /* ---------- Card do gráfico de Contas (Ativos × Passivos) ---------- */
-  function metade(ponto: any, titulo: any, dados: any, embutido: any) {
-    return h("div", { class: T.metade },
-      h("span", { class: T.legenda }, h("span", { class: ponto, "aria-hidden": "true" }), titulo),
-      h("span", { class: embutido ? T.valorEmbutido : T.valor }, F.moeda(dados.valor)),
-      UI.PercentageChange(dados.variacaoPercentual));
+  function metade(ponto: any, titulo: any, dados: any, embutido: any, passivo: boolean) {
+    const valorEl = h("span", { class: embutido ? T.valorEmbutido : T.valor }, F.moeda(dados.valor));
+    const pctEl = h("span", { class: "tw:contents" }, UI.PercentageChange(dados.variacaoPercentual, { passivo }));
+    const el = h("div", { class: T.metade },
+      h("span", { class: embutido ? T.legendaEmbutida : T.legenda }, h("span", { class: ponto, "aria-hidden": "true" }), titulo),
+      valorEl, pctEl);
+    // o gráfico "filtra" ao passar o mouse: o topo mostra o valor e a variação até o ponto
+    return { el, mostrar(valor: number, pct: number) { valorEl.textContent = F.moeda(valor); mount(pctEl, UI.PercentageChange(pct, { passivo })); } };
   }
 
   function ContasChartCard(state: any, ctx: ContextoApp, opts?: any) {
@@ -70,16 +74,27 @@
     const serie = UI.recortarSerie(resumo.serie, intervalo);
     const chart = h("div", { class: T.grafico });
     const css = getComputedStyle(document.documentElement);
+    const ativos = metade(T.pontoAtivos, "Ativos", resumo.ativos, o.embedded, false);
+    const passivos = metade(T.pontoPassivos, "Passivos", resumo.passivos, o.embedded, true);
+    const variacaoAte = (v: number, v0: number) => (v0 ? Math.round(((v - v0) / Math.abs(v0)) * 10000) / 100 : 0);
     ZoZo.charts.renderLineChart(chart, [
       // degradê: o de Ativos desce até a linha de Passivos; o de Passivos, até o fim do gráfico
       { name: "Ativos", color: css.getPropertyValue("--color-assets").trim(), points: serie.map((p) => ({ data: p.data, valor: p.ativos })) },
       { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
-    ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos" });
+    ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos",
+      aoPassar: (pts) => {
+        if (!pts || !serie.length) {
+          ativos.mostrar(resumo.ativos.valor, resumo.ativos.variacaoPercentual);
+          passivos.mostrar(resumo.passivos.valor, resumo.passivos.variacaoPercentual);
+          return;
+        }
+        if (pts[0]) ativos.mostrar(pts[0].valor, variacaoAte(pts[0].valor, serie[0].ativos));
+        if (pts[1]) passivos.mostrar(pts[1].valor, variacaoAte(pts[1].valor, serie[0].passivos));
+      } });
 
     return h("section", { class: [!o.embedded && ZoZo.pecas.card, T.cartao, o.embedded ? T.cartaoEmbutido : T.cartaoPadding], "aria-label": "Gráfico de contas" },
       h("div", { class: T.topo },
-        metade(T.pontoAtivos, "Ativos", resumo.ativos, o.embedded),
-        metade(T.pontoPassivos, "Passivos", resumo.passivos, o.embedded)),
+        ativos.el, passivos.el),
       chart,
       o.compact && !o.filtros ? null : h("div", { class: T.filtros },
         UI.FilterTabs(intervalo, (v) => ZoZo.store.set({ ui: { [o.chaveIntervalo || "intervaloContas"]: v } }), { label: o.rotuloFiltro || "Período do gráfico de contas" })));
@@ -103,7 +118,7 @@
   /**
    * Cartão de crédito: editar fechamento no PRÓPRIO painel (sem janela). O canto direito vira:
    *   [Mesmo fechamento para todos os meses ▾ | Diferentes fechamentos por mês ▾] (+ mês, no 2º caso)
-   *   Fechamento (dia)  Vencimento (dia)
+   *   Fechamento [data]  Vencimento [data] — as datas do ciclo atual (ou do mês escolhido); grava o dia de cada uma
    * Os DOIS são obrigatórios (não dá para mudar só um); a mesma regra vale no serviço de dados.
    */
   function areaCiclo(conta: any, ctx: ContextoApp, aoSalvar: any) {
@@ -112,12 +127,25 @@
     const soEsteMes = !!(conta.cicloAtual && conta.cicloAtual.soEsteMes);
     let modo = soEsteMes ? "mes" : "fixo", mes = meses[1];
     const ciclo = () => (modo === "mes" && conta.ciclos && conta.ciclos[mes]) || { fechamento: conta.fechamento, vencimento: conta.vencimento };
-    const dia = (rotulo: any) => { const i = UI.Input({ inputmode: "numeric", placeholder: "1–31", class: T.cicloInput }); i.maxLength = 2; i.setAttribute("aria-label", rotulo); return i; };
-    const fech = dia("Dia do fechamento"), venc = dia("Dia do vencimento");
+    // datas do ciclo no mês de referência (o mês atual, ou o escolhido em "por mês"); dia 31 em mês curto = último dia
+    const dataNoMes = (mesIso: string, dia: unknown) => { const [a, m] = mesIso.split("-").map(Number); return F.iso(new Date(a, m - 1, Math.min(Number(dia) || 1, new Date(a, m, 0).getDate()))); };
+    const mesSeguinte = (mesIso: string) => { const [a, m] = mesIso.split("-").map(Number); return F.iso(new Date(a, m, 1)).slice(0, 7); };
+    let fechIso = "", vencIso = "";
+    const diasEl = h("div", { class: T.cicloDias });
     const erro = h("p", { class: T.cicloErro, role: "alert" });
     const modoBtn = h("button", { type: "button", class: T.cicloModo, "aria-haspopup": "menu" });
     const mesSel = UI.Select(meses.map((m) => ({ value: m, label: F.mesAno(m + "-01") })), { value: mes, ariaLabel: "Mês do fechamento", class: T.cicloMes });
-    const preencher = () => { const c = ciclo(); fech.value = c.fechamento || ""; venc.value = c.vencimento || ""; erro.textContent = ""; };
+    const campo = (rotulo: string, el: HTMLElement) => h("div", { class: T.cicloCampo }, h("span", { class: T.cicloRotulo }, rotulo), el);
+    const preencher = () => {
+      const c = ciclo(), ref = modo === "mes" ? mes : meses[1];
+      fechIso = c.fechamento ? dataNoMes(ref, c.fechamento) : "";
+      // vencimento depois do fechamento: no mesmo mês; antes (ou no mesmo dia): no mês seguinte
+      vencIso = c.vencimento ? dataNoMes(Number(c.vencimento) > Number(c.fechamento) ? ref : mesSeguinte(ref), c.vencimento) : "";
+      erro.textContent = "";
+      mount(diasEl,
+        campo("Fechamento", ZoZo.calendario.Campo({ valor: fechIso, rotulo: "data do fechamento", classe: T.cicloData, aoMudar: (v) => { fechIso = v; erro.textContent = ""; } })),
+        campo("Vencimento", ZoZo.calendario.Campo({ valor: vencIso, rotulo: "data do vencimento", classe: T.cicloData, aoMudar: (v) => { vencIso = v; erro.textContent = ""; } })));
+    };
     const pintar = () => {
       mount(modoBtn, h("span", null, modo === "fixo" ? "Mesmo fechamento para todos os meses" : "Diferentes fechamentos por mês"), ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }));
       mesSel.hidden = modo !== "mes";
@@ -129,17 +157,13 @@
     ], { posicao: "direita", checkEsquerda: true, largura: 300, label: "Tipo de fechamento" }));
     mesSel.addEventListener("change", () => { mes = mesSel.value; preencher(); });
     pintar();
-    const valido = (v: any) => /^\d{1,2}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 31;
-    [fech, venc].forEach((i) => i.addEventListener("input", () => { i.value = i.value.replace(/\D/g, ""); i.removeAttribute("aria-invalid"); erro.textContent = ""; }));
-    const campo = (rotulo: any, input: any) => h("label", { class: T.cicloCampo }, h("span", { class: T.cicloRotulo }, rotulo), input);
-    requestAnimationFrame(() => { fech.focus(); F.cursorNoFim(fech); });
     return {
-      el: h("div", { class: T.cicloArea }, modoBtn, mesSel, h("div", { class: T.cicloDias }, campo("Fechamento (dia)", fech), campo("Vencimento (dia)", venc)), erro),
+      el: h("div", { class: T.cicloArea }, modoBtn, mesSel, diasEl, erro),
       salvar(btn: any) {
-        const ruins = [fech, venc].filter((i) => !valido(i.value));
-        if (ruins.length) { ruins.forEach((i) => i.setAttribute("aria-invalid", "true")); ruins[0].focus(); erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
+        if (!fechIso || !vencIso) { erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
         if (btn) btn.disabled = true;
-        ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: fech.value.trim(), vencimento: venc.value.trim(), modo, mes: modo === "mes" ? mes : undefined })
+        // grava o DIA de cada data (a regra do ciclo continua por dia do mês)
+        ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: String(Number(fechIso.slice(8, 10))), vencimento: String(Number(vencIso.slice(8, 10))), modo, mes: modo === "mes" ? mes : undefined })
           .then((r: any) => ctx.recarregarTudo().then(() => aoSalvar(r.conta)))
           .catch((e: any) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
       },
@@ -165,6 +189,7 @@
   }
 
   function abrirDetalheConta(conta: any, ctx: ContextoApp, origem: any, opts?: any) {
+    const passivo = conta.tipo === "cartao" || conta.tipo === "emprestimo";
     let intervalo = conta.tipo === "investimento" ? "1M" : "3M";
     const editandoCiclo = !!(opts && opts.editandoCiclo) && conta.tipo === "cartao";
     const contaAtual = () => (((ZoZo.store.get().data.contas || {}).contas) || []).find((x: any) => x.id === conta.id) || conta;
@@ -204,8 +229,9 @@
         const desenhar = () => {
           const recorte = UI.recortarSerie(serie, intervalo);
           const subiu = recorte.length > 1 && recorte[recorte.length - 1].valor >= recorte[0].valor;
+          const bom = passivo ? !subiu : subiu;          // cartão/empréstimo: a dívida cair é bom (verde)
           const cs = getComputedStyle(document.documentElement);
-          ZoZo.charts.renderLineChart(graficoEl, [{ name: conta.nome, color: cs.getPropertyValue(subiu ? "--color-chart-up" : "--color-chart-down").trim(), points: recorte.map((p) => ({ data: p.data, valor: p.valor })) }],
+          ZoZo.charts.renderLineChart(graficoEl, [{ name: conta.nome, color: cs.getPropertyValue(bom ? "--color-chart-up" : "--color-chart-down").trim(), points: recorte.map((p) => ({ data: p.data, valor: p.valor })) }],
             { height: 160, ariaLabel: "Evolução do saldo" });
           mount(filtrosEl, UI.FilterTabs(intervalo, (v) => { intervalo = v; desenhar(); }, { label: "Período do gráfico da conta" }));
         };
@@ -218,7 +244,7 @@
                 // 4 últimos dígitos: um clique e já edita (investimento não tem cartão/conta com dígitos)
                 conta.tipo === "investimento" ? null : campoDigitos(conta, ctx),
                 h("span", { class: ZoZo.pecas.phTipo }, conta.oculta ? "Ocultado" : conta.tipo === "investimento" ? conta.tipoInvestimento || "Investimento" : L.SUBTITULO_CONTA[conta.tipo] || (conta.tipo === "cartao" ? "Cartão de crédito" : "Outros"))),
-              h("span", { class: ZoZo.pecas.phChips }, difEl, UI.PercentageChange(conta.variacaoPercentual))),
+              h("span", { class: ZoZo.pecas.phChips }, difEl, UI.PercentageChange(conta.variacaoPercentual, { passivo }))),
             h("div", { class: ZoZo.pecas.phLinha },
               ZoZo.inline.texto({ valor: conta.nome, rotulo: "Nome da conta", max: ZoZo.regras.limiteNome, classe: ZoZo.pecas.phNome,
                 aoSalvar: (v) => ctx.bridge.request(A.updateConta, { id: conta.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) }),
@@ -236,12 +262,14 @@
             !editandoCiclo && conta.tipo === "cartao" && conta.cicloAtual && conta.cicloAtual.fechamento ? h("div", { class: ZoZo.pecas.phExtra },
               "Fecha dia " + conta.cicloAtual.fechamento + " · vence dia " + conta.cicloAtual.vencimento + (conta.cicloAtual.soEsteMes ? " (só neste mês)" : "")) : null),
           graficoEl, filtrosEl,
-          C.detalheSecao("Transações", listaEl));
+          C.detalheSecao(null, listaEl));
 
         ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r: any) => {
           serie = r.serie;
           const dif = r.diferenca;
-          mount(difEl, h("span", { class: dif > 0 ? ZoZo.pecas.pctSobe : dif < 0 ? ZoZo.pecas.pctDesce : ZoZo.pecas.pctIgual }, (dif > 0 ? "+ " : dif < 0 ? "− " : "") + F.moeda(dif)));
+          // passivo (cartão, empréstimo): a dívida subir é ruim (vermelho); cair é bom (verde)
+          const bom = passivo ? dif < 0 : dif > 0, ruim = passivo ? dif > 0 : dif < 0;
+          mount(difEl, h("span", { class: bom ? ZoZo.pecas.pctSobe : ruim ? ZoZo.pecas.pctDesce : ZoZo.pecas.pctIgual }, (dif > 0 ? "+ " : dif < 0 ? "− " : "") + F.moeda(Math.abs(dif))));
           desenhar();
         }).catch(() => mount(graficoEl, h("p", { class: "tw:text-zz-muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
 

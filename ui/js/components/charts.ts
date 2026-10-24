@@ -106,7 +106,7 @@
     function draw() {
       const W = Math.max(160, holder.clientWidth);
       const H = o.height;
-      const m = { t: 14, r: 14, b: o.semEixo ? 8 : 36, l: 6 };
+      const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 6 };      // modo filtro: espaço para a data em cima do ponto
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
       const n = Math.max(...validas.map((sr: any) => sr.points.length));
 
@@ -216,10 +216,17 @@
       });
 
       // interação
+      // modo filtro: o que vem depois do ponto fica esmaecido (véu branco por cima) e a data aparece em cima dele
+      const veu = o.aoPassar ? s("rect", { x: 0, y: 0, width: 0, height: m.t + ih + 2, class: P.graficoVeu, visibility: "hidden" }) : null;
+      const dataTopo = o.aoPassar ? s("text", { x: 0, y: 12, class: P.graficoDataTopo, "text-anchor": "middle", visibility: "hidden" }) : null;
+      if (veu) tela.appendChild(veu);
       const cursor = s("line", { y1: m.t, y2: m.t + ih, class: P.graficoCursor, visibility: "hidden" });
-      const marcadores = validas.map((sr: any) => s("circle", { r: 3.5, fill: sr.colorBySlope ? css("--color-chart-up") : sr.color, visibility: "hidden" }));
+      const marcadores = validas.map((sr: any) => s("circle", o.aoPassar
+        ? { r: 4.5, fill: "#fff", stroke: sr.colorBySlope ? css("--color-chart-up") : sr.color, "stroke-width": 2.5, visibility: "hidden" }
+        : { r: 3.5, fill: sr.colorBySlope ? css("--color-chart-up") : sr.color, visibility: "hidden" }));
       tela.appendChild(cursor);
       marcadores.forEach((c: any) => tela.appendChild(c));
+      if (dataTopo) tela.appendChild(dataTopo);
       const area = s("rect", { x: m.l, y: 0, width: iw, height: H, fill: "transparent" });
       tela.appendChild(area);
 
@@ -240,6 +247,15 @@
             h("span", { class: P.dicaPonto, style: { background: sr.colorBySlope ? "var(--color-text-secondary)" : sr.color } }),
             h("span", null, sr.name), h("strong", null, o.formatValue(p.valor))));
         });
+        if (o.aoPassar && veu && dataTopo) {
+          const xc = x(i, n);
+          veu.setAttribute("x", String(xc)); veu.setAttribute("width", String(Math.max(0, W - xc))); veu.setAttribute("visibility", "visible");
+          const dt = F.parseData(ponto && (ponto as PontoGrafico).data);
+          dataTopo.textContent = dt ? (String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()) + " " + dt.getFullYear()).toUpperCase() : "";
+          dataTopo.setAttribute("x", String(Math.min(Math.max(xc, 44), W - 44))); dataTopo.setAttribute("visibility", "visible");
+          o.aoPassar(validas.map((sr: any) => sr.points[Math.min(i, sr.points.length - 1)] || null));
+          return;                                    // no modo filtro o topo do cartão mostra os valores (sem caixinha)
+        }
         tooltip.insertBefore(h("div", { class: P.dicaData }, ponto && o.rotuloTooltip ? o.rotuloTooltip(ponto) : F.dataExtenso(ponto && ponto.data)), tooltip.firstChild);
         tooltip.classList.add("is-visible");
         tooltip.style.left = Math.min(Math.max(x(i, n) - tooltip.offsetWidth / 2, 0), W - tooltip.offsetWidth) + "px";
@@ -248,6 +264,9 @@
         cursor.setAttribute("visibility", "hidden");
         marcadores.forEach((c: any) => c.setAttribute("visibility", "hidden"));
         tooltip.classList.remove("is-visible");
+        if (veu) veu.setAttribute("visibility", "hidden");
+        if (dataTopo) dataTopo.setAttribute("visibility", "hidden");
+        if (o.aoPassar) o.aoPassar(null);
       };
       area.addEventListener("mousemove", (e) => mostrar(e.clientX));
       area.addEventListener("mouseleave", esconder);

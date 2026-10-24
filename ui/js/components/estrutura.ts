@@ -31,8 +31,8 @@
     + "tw:[transition:transform_var(--duration-medium)_var(--easing)] tw:in-[.is-visible]:[transform:none] tw:gaveta:max-w-full "
     // peças dentro das janelas: rótulos, dicas e botões maiores; "Excluir" vermelho vivo (texto branco ≥ 4,5:1)
     + "tw:[&_.field-label]:text-[15px] tw:[&_.field-label]:font-[620] tw:[&_.field-hint]:text-[13px] tw:[&_.field-hint]:font-[620] "
-    + "tw:[&_.input::placeholder]:text-[15px] tw:[&_.input::placeholder]:font-[450] tw:[&_.btn]:text-[15px] tw:[&_.btn]:font-[620] tw:[&_.btn--danger]:bg-[#e01414] tw:[&_.btn--danger]:border-[#e01414] "
-    + "tw:[&_.btn--danger]:text-white tw:[&_.btn--danger:hover:not(:disabled)]:bg-[#c40f0f] tw:[&_.btn--danger:hover:not(:disabled)]:border-[#c40f0f]";
+    + "tw:[&_.input::placeholder]:text-[15px] tw:[&_.input::placeholder]:font-[450] tw:[&_.btn]:text-[15px] tw:[&_.btn]:font-[620] tw:[&_.btn--danger]:bg-(--color-danger) tw:[&_.btn--danger]:border-(--color-danger) "
+    + "tw:[&_.btn--danger]:text-white tw:[&_.btn--danger:hover:not(:disabled)]:bg-(--color-danger-hover) tw:[&_.btn--danger:hover:not(:disabled)]:border-(--color-danger-hover)";
   const RODAPE_CELULAR = "tw:gaveta:justify-center tw:gaveta:flex-wrap tw:gaveta:[&>.btn]:flex-[1_1_0] tw:gaveta:[&>.btn]:min-w-0 tw:gaveta:[&>.btn]:max-w-[220px]";
   const LANC = "tw:grid tw:gap-3 tw:items-center tw:min-h-9 tw:[border:0] tw:rounded-none tw:bg-transparent tw:text-left "
     + "tw:hover:bg-zz-surface-hover tw:focus-visible:bg-zz-surface-hover";
@@ -174,7 +174,7 @@
     menuCompacto: "tw:min-w-[168px]!",
     menuCalendario: "tw:p-2.5!",
     menuItem: ITEM + " " + ITEM_REALCE,
-    menuItemPerigo: ITEM_BASE + " tw:text-(--color-danger) tw:hover:bg-(--color-danger-soft) tw:focus-visible:bg-(--color-danger-soft) tw:focus-visible:outline-none",
+    menuItemPerigo: ITEM_BASE + " tw:text-(--color-menu-perigo) tw:hover:bg-(--color-menu-perigo-fundo) tw:focus-visible:bg-(--color-menu-perigo-fundo) tw:focus-visible:outline-none",
     menuItemEstatico: ITEM + " tw:cursor-default",
     // linha com o botão principal e uma seta à direita (categoria/recorrência no painel da transação)
     menuItemDividido: "tw:flex tw:items-center tw:gap-0.5 tw:w-full tw:min-h-[34px] tw:pr-1 tw:pl-0 tw:py-0 tw:[border:0] tw:rounded-lg tw:bg-transparent "

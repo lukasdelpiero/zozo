@@ -209,10 +209,10 @@
 
     /** Seta ao lado de uma pílula: mostra no painel de informações a conta, categoria, perfil ou recorrência
         (com "voltar" para esta transação). Não mexe nos filtros da lista de Transações. */
-    function seta(rotulo: any, abrirPainel: any) {
+    function seta(rotulo: any, abrirPainel: any, tamanho = 14) {
       if (novo) return null;
       return h("button", { type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), "lp-ver", ZoZo.pecas.setaVer], "aria-label": "Ver " + rotulo, title: "Ver " + rotulo,
-        onClick: abrirPainel }, icon("chevron-right", { size: 14 }));
+        onClick: abrirPainel }, icon("chevron-right", { size: tamanho }));
     }
 
     /** Conta: escolhida no menu (ao criar e depois, em qualquer tipo); a seta ao lado lista as transações dela */
@@ -241,7 +241,7 @@
       }));
       const origem = conta && conta.tipo === "investimento" ? "investimentos" : "contas";
       return h("div", { class: ZoZo.pecas.lpContaLinha }, btn,
-        conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa })) : null);
+        conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa }), 16) : null);
     }
     /** Cria a conta e já a escolhe nesta transação */
     function novaConta(tipo: any) {

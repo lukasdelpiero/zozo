@@ -49,11 +49,11 @@
     vazio: "tw:na-tela:min-h-0 tw:na-tela:py-3",
     // Gasto mensal
     gastoTopo: "tw:flex tw:flex-col tw:gap-0.5 tw:items-center tw:text-center",
-    gastoValor: "tw:text-left tw:text-[24px] tw:font-[550] tw:tracking-[-0.02em]",
+    gastoValor: "tw:text-left tw:text-[1.5rem] tw:font-[550] tw:tracking-[-0.02em]",
     gastoNumero: "money tw:[font-weight:inherit]",
     gastoNumeroAcima: "money tw:[font-weight:inherit] tw:text-(--color-negative)",
     gastoPalavra: "tw:font-semibold",
-    gastoNota: "tw:text-zz-secondary tw:text-[15px] tw:font-[550]",
+    gastoNota: "tw:text-zz-cinza tw:text-[.9375rem] tw:font-[550]",
     grafico: "tw:relative tw:mt-4 tw:mb-2",
     // Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado
     tops: "tw:flex tw:flex-col tw:-mx-5 tw:na-tela:min-h-0 tw:na-tela:overflow-hidden",
@@ -68,7 +68,7 @@
     topNome: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
     topNomeFilho: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:pl-[18px]",
     topGasto: "money tw:justify-self-end tw:font-[620]",
-    topReservado: "money tw:text-right tw:pl-4 tw:text-zz-secondary tw:font-[620] tw:area340:hidden",
+    topReservado: "money tw:text-right tw:pl-4 tw:text-zz-cinza tw:font-[620] tw:area340:hidden",
     // Próximas transações (linha de recorrência compacta)
     recorrencia: "tw:grid-cols-[52px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:px-2 tw:gap-3 "
       + "tw:area460:grid-cols-[48px_minmax(0,1fr)_minmax(0,max-content)_auto] tw:area340:grid-cols-[48px_minmax(0,1fr)_auto]",
@@ -167,15 +167,27 @@
       series.push({ name: "Orçamento", color: cs.getPropertyValue("--color-text-muted").trim(), tracejado: true,
         points: g.dias.map((d: any) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
     }
-    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês" });
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
+    const numero = h("span"), palavra = h("span", { class: T.gastoPalavra }), nota = h("span", { class: T.gastoNota });
+    const resumo = () => {
+      numero.className = acima ? T.gastoNumeroAcima : T.gastoNumero;
+      numero.textContent = F.moeda(comOrcamento ? diferenca : g.total);
+      palavra.textContent = comOrcamento ? (acima ? " acima" : " restante") : " gastos";
+      nota.textContent = comOrcamento ? F.moeda(g.orcamento) + " reservado" : "neste mês";
+    };
+    resumo();
+    // passar o mouse "filtra": o topo mostra o gasto acumulado até o dia do ponto
+    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês",
+      aoPassar: (pts) => {
+        const p = pts && pts[0];
+        if (!p) { resumo(); return; }
+        numero.className = T.gastoNumero; numero.textContent = F.moeda(p.valor);
+        palavra.textContent = " gastos";
+        nota.textContent = "até " + F.dataCurta(p.data);
+      } });
     return h("div", null,
-      h("div", { class: T.gastoTopo },
-        h("span", { class: T.gastoValor },
-          h("span", { class: acima ? T.gastoNumeroAcima : T.gastoNumero }, F.moeda(comOrcamento ? diferenca : g.total)),
-          h("span", { class: T.gastoPalavra }, comOrcamento ? (acima ? " acima" : " restante") : " gastos")),
-        h("span", { class: T.gastoNota }, comOrcamento ? F.moeda(g.orcamento) + " reservado" : "neste mês")),
+      h("div", { class: T.gastoTopo }, h("span", { class: T.gastoValor }, numero, palavra), nota),
       chart);
   }
 

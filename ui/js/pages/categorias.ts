@@ -18,8 +18,9 @@
   /* ---------------- Visual (Tailwind; classes escritas por inteiro) ---------------- */
   const COLUNA = "tw:text-[13px] tw:font-[620] tw:uppercase tw:tracking-[0.04em] tw:text-zz-muted tw:area420:hidden";
   // campo do painel: edição "invisível" (sem borda nem fundo, também com foco); erro = texto vermelho
-  const ORCAMENTO_INPUT = "tw:h-10 tw:text-[17px] tw:font-semibold " + ZoZo.ui.CAMPO_PAINEL;
   const T = {
+    // painel da categoria: bolinha de cor 8×8 e ícone 32×32
+    edicaoCategoria: "tw:[&_.ponto-cor]:size-2 tw:[&_.icon-pick]:size-8! tw:[&_.icon-pick]:text-[20px]!",
     lista: "tw:flex tw:flex-col tw:mb-2",
     // GASTO (à direita) e RESERVADO (à esquerda) alinhados com as colunas das linhas: a MESMA grade de
     // CategoryRow (components/list.ts) em todas as larguras — antes, com a área estreita (painel aberto),
@@ -50,8 +51,9 @@
     orcArea: "tw:gap-1.5",
     orcModo: "tw:inline-flex tw:items-center tw:gap-1.5 tw:h-7 tw:px-2.5 tw:py-0 tw:border tw:border-zz-border tw:rounded-lg tw:bg-zz-surface "
       + "tw:text-[13px] tw:font-medium tw:hover:border-zz-border-strong",
-    orcValor: "tw:w-[170px]",
-    orcInput: ORCAMENTO_INPUT,
+    // valor do orçamento editável no lugar (mesma cara do valor no topo do painel)
+    orcCampo: "tw:w-[170px] tw:text-right tw:text-[20px] tw:font-[550]",
+    grupoCampoValor: "tw:w-[150px] tw:text-[17px] tw:font-semibold",
     // painel do grupo
     // [pílulas] ↔ botão do modo, [nome] ↔ valores (no painel, área estreita: o lado direito alinhado à esquerda)
     grupoOrc: "tw:contents tw:*:col-start-2 tw:*:justify-self-end tw:area420:*:justify-self-start",
@@ -60,7 +62,6 @@
     grupoItem: "tw:grid tw:justify-items-end tw:gap-0.5 tw:area420:justify-items-start",
     grupoRotulo: "tw:text-[12px] tw:text-zz-secondary",
     grupoValor: "money tw:text-[17px] tw:font-semibold",
-    grupoCampo: "tw:w-[150px]",
     // tabela "Todas as categorias regulares"
     tabela: "tw:flex tw:flex-col",
     tabelaLinha: "tw:grid tw:grid-cols-[minmax(0,1.4fr)_1fr_1fr_1fr] tw:gap-2 tw:items-center tw:min-h-[34px] tw:px-2 tw:py-0 tw:[border:0] "
@@ -195,27 +196,25 @@
     const editando = !!(opts && opts.editandoOrcamento);
     const mesAtualIso = mes || F.iso(new Date()).slice(0, 7);
     let modo = cat.orcamentoPorMes ? "mes" : "fixo";
-    const valorOrc = UI.Input({ inputmode: "decimal", value: F.moedaEditavel(cat.reservado || 0), class: T.orcInput, "aria-label": "Valor do orçamento" });
+    // como o valor da transação: exibido; clicou, apaga e digita (grava no "Salvar orçamento")
+    const valorOrc = ZoZo.inline.dinheiroCampo({ valor: cat.reservado || 0, rotulo: "Valor do orçamento", classe: T.orcCampo, aoEnter: () => salvarOrcamento() });
     const rotuloMes = h("span", { class: ZoZo.pecas.painelTopoRotulo });
     const modoBtn = h("button", { type: "button", class: T.orcModo, "aria-haspopup": "menu" });
     const pintarModo = () => {
       ZoZo.dom.mount(modoBtn, h("span", null, modo === "fixo" ? "Orçamento mensal fixo" : "Orçamentos por mês"), ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }));
       const dt = F.parseData(mesAtualIso + "-01") || new Date();
       rotuloMes.textContent = modo === "mes" ? "Orçamento para " + F.mesNome(dt.getMonth()) + " " + dt.getFullYear() : "";
-      valorOrc.value = F.moedaEditavel(modo === "fixo" ? (cat.reservadoFixo || 0) : (cat.reservado || 0));
+      valorOrc.definir(modo === "fixo" ? (cat.reservadoFixo || 0) : (cat.reservado || 0));
     };
     modoBtn.addEventListener("click", () => ZoZo.menu.abrir(modoBtn, [
       { label: "Mesmo orçamento para todos os meses", check: modo === "fixo", onClick: () => { modo = "fixo"; pintarModo(); } },
       { label: "Diferentes orçamentos por mês", check: modo === "mes", onClick: () => { modo = "mes"; pintarModo(); } },
     ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
     pintarModo();
-    valorOrc.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvarOrcamento(); } });
-    const areaOrcamento = h("div", { class: [ZoZo.pecas.painelTopoNumero, T.orcArea, T.colDirEditando] }, modoBtn, rotuloMes,
-      h("div", { class: [ZoZo.pecas.afixo, T.orcValor] }, h("span", { class: ZoZo.pecas.prefixo }, F.simbolo()), valorOrc));
-    if (editando) requestAnimationFrame(() => { valorOrc.focus(); F.cursorNoFim(valorOrc); });
+    const areaOrcamento = h("div", { class: [ZoZo.pecas.painelTopoNumero, T.orcArea, T.colDirEditando] }, modoBtn, rotuloMes, valorOrc.el);
     function salvarOrcamento() {
-      const v = F.parseMoeda(valorOrc.value);
-      if (!(v >= 0)) { valorOrc.setAttribute("aria-invalid", "true"); valorOrc.focus(); return; }
+      const v = valorOrc.ler();
+      if (!(v >= 0)) { valorOrc.el.setAttribute("aria-invalid", "true"); valorOrc.el.focus(); return; }
       const dados = modo === "fixo" ? { reservado: v, modoOrcamento: "fixo" } : { orcamentoMes: { mes: mesAtualIso, valor: v } };
       ctx.bridge.request(A.updateCategoria, Object.assign({ id: cat.id }, dados)).then(() => {
         ctx.toast("Orçamento salvo.");
@@ -258,7 +257,7 @@
         mount(body,
           h("div", { class: [ZoZo.pecas.painelTopo, T.topoLinhas] },
             // Cor (bolinha), ícone e nome editáveis no lugar
-            h("div", { class: [ZoZo.pecas.edicaoTopo, T.colEsq] },
+            h("div", { class: [ZoZo.pecas.edicaoTopo, T.colEsq, T.edicaoCategoria] },
               h("div", { class: ZoZo.pecas.edicaoTopoLinha },
                 ZoZo.inline.corDot(cat.cor, (c) => alterar({ cor: c }, "Cor alterada.")),
                 ZoZo.modais.seletorIcone(cat.icone, (e) => alterar({ icone: e }, "Ícone alterado."))),
@@ -308,22 +307,20 @@
     const dt = F.parseData(mes + "-01") || new Date();
     const rotuloModo = () => (modo === "fixo" ? "Orçamento para todos os meses" : "Orçamento de " + F.mesNome(dt.getMonth()) + " " + dt.getFullYear());
     const modoBtn = h("button", { type: "button", class: T.orcModo, "aria-haspopup": "menu" });
-    const valorNA = h("input", { type: "text", inputmode: "decimal", autocomplete: "off", class: [ZoZo.pecas.entrada, T.orcInput], "aria-label": "Valor não atribuído" });
+    // como o valor da transação: exibido; clicou, apaga e digita (grava no "Salvar orçamento")
+    const valorNA = ZoZo.inline.dinheiroCampo({ valor: 0, rotulo: "Valor não atribuído", classe: T.grupoCampoValor, aoEnter: () => salvar() });
     const pintarModo = () => {
       mount(modoBtn, h("span", null, rotuloModo()), editando ? ZoZo.icons.icon("chevron-down", { size: 13, stroke: 2.25 }) : null);
-      valorNA.value = F.moedaEditavel(modo === "fixo" ? info.naoAtribuidoFixo : (info.porMes ? info.naoAtribuidoBase : info.naoAtribuidoFixo));
+      valorNA.definir(modo === "fixo" ? info.naoAtribuidoFixo : (info.porMes ? info.naoAtribuidoBase : info.naoAtribuidoFixo));
     };
     if (editando) modoBtn.addEventListener("click", () => ZoZo.menu.abrir(modoBtn, [
       { label: "Mesmo orçamento para todos os meses", check: modo === "fixo", onClick: () => { modo = "fixo"; pintarModo(); } },
       { label: "Orçamento só deste mês", check: modo === "mes", onClick: () => { modo = "mes"; pintarModo(); } },
     ], { posicao: "direita", checkEsquerda: true, largura: 290, label: "Tipo de orçamento" }));
     pintarModo();
-    valorNA.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); salvar(); } });
-    if (editando) requestAnimationFrame(() => { valorNA.focus(); F.cursorNoFim(valorNA); });
-
     function salvar() {
-      const v = F.parseMoeda(valorNA.value);
-      if (!(v >= 0)) { valorNA.setAttribute("aria-invalid", "true"); valorNA.focus(); return; }
+      const v = valorNA.ler();
+      if (!(v >= 0)) { valorNA.el.setAttribute("aria-invalid", "true"); valorNA.el.focus(); return; }
       ctx.bridge.request(A.updateGrupo, { nome, naoAtribuido: v, modo, mes }).then((r: any) => {
         ctx.toast(r.coberto > 0 ? "Orçamento salvo. " + F.moeda(r.coberto) + " cobriram categorias acima do orçamento; " + F.moeda(r.restante) + " ficaram sem atribuir."
           : "Orçamento do grupo salvo.", { duration: r.coberto > 0 ? 7000 : 3200 });
@@ -360,7 +357,7 @@
               modoBtn,
               h("div", { class: T.grupoValores },
                 figura("Subcategorias", h("span", { class: T.grupoValor }, F.moeda(info.subcategorias))),
-                figura("Não atribuído", editando ? h("div", { class: [ZoZo.pecas.afixoPequeno, T.grupoCampo] }, h("span", { class: ZoZo.pecas.prefixo }, F.simbolo()), valorNA)
+                figura("Não atribuído", editando ? valorNA.el
                   : h("span", { class: T.grupoValor }, F.moeda(info.naoAtribuido))))) : null),
           orcamentoAtivo() ? C.detalheSecao(null,
             C.detalheLinha("Orçamento total do grupo", F.moeda(info.total)),

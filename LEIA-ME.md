@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.16.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.17.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,19 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.17.0
+
+- **Gráficos que filtram ao passar o mouse (Dashboard e Contas):** a data aparece em cima do ponto, o trecho depois dele fica esmaecido e o topo do cartão mostra o valor e a variação até aquele dia (gasto acumulado no Gasto mensal; ativos e passivos no Patrimônio).
+- **Pílulas de variação:** verde/vermelha/cinza (com "=" quando não muda). Em passivos (cartão, empréstimo) a dívida subir é seta para baixo vermelha e cair é seta para cima verde — também na lista de contas, no painel e na cor do gráfico do painel.
+- **Fechamento do cartão:** editar mostra as **datas** do fechamento e do vencimento atuais (calendário) em vez de "1–31"; grava o dia de cada uma.
+- **Orçamento de categoria e de grupo:** o valor se edita como o da transação (aparece o valor; clicou, apaga e digita).
+- **Transações:** "Mês Ano" e o total só aparecem nos meses passados (no mês atual, não).
+- **Painel lateral:** mês e total 15 px/620; dias 13 px/620 em cinza; nome 15 px/450; valor 15 px/620 com o "R$" menor e no topo do número; conta e investimento com ícone redondo de 24 px e sem o título "Transações"; perfil sem a pílula/aviso de arquivado e sem "Últimas transações"; categoria com bolinha 8×8 e ícone 32×32 (fundo redondo); transação com data e conta em cinza 13 px/550, rótulos e placeholders em cinza e seta da conta 16×16.
+- **Dashboard:** Ativos/Passivos 15 px/550 cinza; valores do Gasto mensal e do Patrimônio em 1,5 rem; texto abaixo do gasto 15 px/550 cinza; datas das transações recentes e o reservado das Top categorias em cinza; pílulas das transações recentes alinhadas.
+- **Recorrências:** data em cinza e pílulas alinhadas à esquerda. **Perfis:** quantidade de transações em cinza. **Filtros e datas dos gráficos** em cinza.
+- **Vermelho:** item perigoso dos menus com texto vermelho e realce vermelho claro; botão vermelho mais vivo, com hover mais escuro.
+- **Cores acessíveis:** o cinza #7f8ba4, o vermelho #e51300, o verde #008a33 e o vermelho #ff1a1a pedidos ficaram abaixo do contraste mínimo (WCAG AA 4,5:1); foram usados tons quase iguais que passam (#647087, #d01100, #007f2f, #e40c0c/#c70a0a). axe-core: zero violações em todas as páginas e painéis.
 
 ## Novidades da versão 3.16.0
 

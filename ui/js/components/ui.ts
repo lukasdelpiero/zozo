@@ -157,16 +157,31 @@
   }
 
   /* ---------- Variação percentual (seções 19, 63) ---------- */
-  function PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string }): HTMLElement {
+  /**
+   * Pílula de variação. Ativo: subiu = seta para cima, verde; caiu = seta para baixo, vermelha.
+   * Passivo (cartão, empréstimo; passivo: true): a dívida subir é ruim — seta para baixo, vermelha;
+   * a dívida cair é bom — seta para cima, verde. Sem variação: "=" cinza.
+   */
+  function PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string; passivo?: boolean }): HTMLElement {
     const o = opts || {};
     const n = F.numero(valor);
-    const dir = n > 0 ? "up" : n < 0 ? "down" : "flat";
+    const bom = o.passivo ? n < 0 : n > 0, ruim = o.passivo ? n > 0 : n < 0;
+    const dir = bom ? "up" : ruim ? "down" : "flat";
     const nomeIcone = dir === "up" ? "seta-sobe" : dir === "down" ? "seta-desce" : "igual";
-    const descr = dir === "up" ? "Aumento de " : dir === "down" ? "Redução de " : "Sem variação, ";
+    const descr = n > 0 ? (o.passivo ? "Dívida aumentou " : "Aumento de ") : n < 0 ? (o.passivo ? "Dívida diminuiu " : "Redução de ") : "Sem variação, ";
     const cls = o.plain ? { up: P.pctSimplesSobe, down: P.pctSimplesDesce, flat: P.pctSimplesIgual }[dir] : { up: P.pctSobe, down: P.pctDesce, flat: P.pctIgual }[dir];
-    return h("span", { class: [cls, o.class], title: o.title, "aria-label": descr + F.percentual(n) + (o.contexto ? " " + o.contexto : "") },
+    return h("span", { class: [cls, o.class], title: o.title, role: "img", "aria-label": descr + F.percentual(Math.abs(n)) + (o.contexto ? " " + o.contexto : "") },
       icon(nomeIcone, { size: 12, stroke: 2.25 }),
-      h("span", { class: P.pctValor }, F.percentual(n)));
+      h("span", { class: P.pctValor, "aria-hidden": "true" }, F.percentual(n)));
+  }
+
+  /** Valor em dinheiro com o símbolo da moeda menor e alinhado ao topo do número ("R$" pequeno) */
+  function Dinheiro(valor: unknown, opts?: { class?: string | false | null }): HTMLElement {
+    const texto = F.moeda(valor), simbolo = F.simbolo();
+    const i = texto.indexOf(simbolo);
+    if (i < 0) return h("span", { class: ["money", opts && opts.class] }, texto);
+    return h("span", { class: ["money", opts && opts.class] }, texto.slice(0, i),
+      h("span", { class: P.moedaSimbolo }, simbolo), texto.slice(i + simbolo.length).trimStart());
   }
 
   /* ---------- Barra de progresso ---------- */
@@ -431,7 +446,7 @@
 
   const api: ZoZoUI = {
     confirmarNoBotao,
-    Button, IconButton, Field, Input, Select, Textarea, Toggle, Tag, CategoryLabel, PercentageChange, ProgressBar,
+    Button, IconButton, Field, Input, Select, Textarea, Toggle, Tag, CategoryLabel, PercentageChange, ProgressBar, Dinheiro,
     FilterTabs, recortarSerie, Segmented, Card, Section, Skeleton, EmptyState, ErrorState, ColorPicker,
     AccountIcon, INTERVALOS, refocus, Checkbox, alternarArvore, corpoArvore, alternarGrupo, CAMPO_PAINEL,
   };

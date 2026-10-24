@@ -26,7 +26,7 @@
     inicial: "tw:text-[15px] tw:font-[620] tw:leading-none tw:uppercase tw:select-none",
     texto: "tw:flex tw:flex-col tw:gap-px tw:min-w-0",
     nome: "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-[15px] tw:font-[450]",
-    quantidade: "tw:[justify-self:start] tw:whitespace-nowrap tw:text-zz-secondary tw:text-[13px] tw:font-[450]",
+    quantidade: "tw:[justify-self:start] tw:whitespace-nowrap tw:text-zz-cinza tw:text-[13px] tw:font-[450]",
     valor: "money tw:[justify-self:end] tw:whitespace-nowrap",
   };
 
@@ -165,15 +165,13 @@
               h("div", { class: ZoZo.pecas.edicaoTopoLinha },
                 ZoZo.inline.corDot(p.cor, (c) => ctx.bridge.request(A.updatePerfil, { id: p.id, cor: c }).then(() => { ctx.toast("Cor alterada."); return ctx.recarregarTudo(); })),
                 ZoZo.inline.texto({ valor: p.nome, rotulo: "Nome do perfil", max: ZoZo.regras.limiteNome,
-                  aoSalvar: (v) => ctx.bridge.request(A.updatePerfil, { id: p.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) })),
-              p.arquivado ? h("span", { class: ZoZo.pecas.chipPendente }, "Arquivado") : null),
+                  aoSalvar: (v) => ctx.bridge.request(A.updatePerfil, { id: p.id, nome: v }).then(() => { ctx.toast("Nome alterado."); return ctx.recarregarTudo(); }) }))),
             h("div", { class: ZoZo.pecas.painelTopoNumero },
               h("span", { class: ZoZo.pecas.painelTopoRotulo }, "Transações"),
               h("span", { class: ZoZo.pecas.painelTopoValor }, String(p.quantidade || 0)))),
           C.detalheSecao(null,
-            C.detalheLinha("Gasto em " + mesInteiro(), F.moeda(p.gasto || 0)),
-            p.arquivado ? h("p", { class: ZoZo.pecas.campoDica }, "Perfil arquivado: continua nas transações e nos totais, mas não pode ser usado em novas transações.") : null),
-          C.detalheSecao("Últimas transações", listaEl,
+            C.detalheLinha("Gasto em " + mesInteiro(), F.moeda(p.gasto || 0))),
+          C.detalheSecao(null, listaEl,
             h("div", { class: ZoZo.pecas.painelAcoesFim }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
         ctx.loadData("lancamentos", A.getLancamentos).then((d: any) => {
           const itens = d.lancamentos.filter((l: any) => l.perfilId === p.id).slice(0, 10);
