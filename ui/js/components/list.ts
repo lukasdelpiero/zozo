@@ -44,7 +44,9 @@
     interativa: "tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
     pagina: {
       linha: "tw:w-auto tw:-mx-(--page-gutter) tw:px-(--page-gutter) tw:gap-3 tw:rounded-none",
-      grade: "tw:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_minmax(84px,max-content)_112px] "
+      // categoria e perfil do tamanho da pílula, encostados à direita (perfil junto do valor, categoria junto do perfil):
+      // nada de coluna com largura mínima, que abria um vão entre as duas pílulas
+      grade: "tw:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_minmax(0,max-content)_112px] "
         + "tw:area620:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_96px] tw:area420:grid-cols-[12px_minmax(0,1fr)_96px]",
       gradeSemPerfil: "tw:grid-cols-[12px_minmax(0,1fr)_minmax(0,max-content)_112px] tw:area620:grid-cols-[12px_minmax(0,1fr)_96px]",
       data: "tw:min-w-[46px] tw:text-[13px] tw:text-zz-secondary",
