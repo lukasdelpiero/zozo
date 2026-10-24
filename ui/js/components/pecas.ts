@@ -429,8 +429,6 @@
     plCategoria: "tw:col-start-5 tw:ml-2.5 tw:min-w-7 tw:h-[22px] tw:px-1.5 tw:grid tw:place-items-center tw:rounded-(--radius-pill) "
       + "tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] tw:text-[12px] tw:leading-none tw:mr-0.5",
     plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[.9375rem] tw:font-[620] tw:whitespace-nowrap",
-    // símbolo da moeda menor que o número e alinhado ao topo dele (R$ pequeno, como no Copilot)
-    moedaSimbolo: "tw:inline-block tw:text-[0.7em] tw:leading-none tw:align-top tw:mt-[0.12em] tw:mr-[0.15em]",
 
     /* ---------- Configurações (pages/perfil.ts e a seção do câmbio em components/cambio.ts) ----------
        [título / explicação ........ controle]; até 700 px o controle desce para a linha de baixo */

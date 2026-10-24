@@ -243,8 +243,9 @@ declare global {
   interface CampoValorNoLugar { valor?: unknown; rotulo?: string; classe?: string; permitirNegativo?: boolean; permitirZero?: boolean; aoSalvar(v: number): unknown }
   interface ZoZoInline {
     texto(cfg: CampoTextoNoLugar): HTMLInputElement;
-    dinheiro(cfg: CampoValorNoLugar): HTMLInputElement;
-    dinheiroCampo(cfg: { valor: unknown; rotulo: string; classe?: string; aoEnter?: () => void }): { el: HTMLInputElement; ler(): number; definir(v: unknown): void };
+    dinheiro(cfg: CampoValorNoLugar): HTMLElement;
+    dinheiroCampo(cfg: { valor: unknown; rotulo: string; classe?: string; aoEnter?: () => void }): { el: HTMLElement; campo: HTMLInputElement; editar(): void; ler(): number; definir(v: unknown): void };
+    vitrine(input: HTMLInputElement, rotulo: string): { el: HTMLElement; editar(): void };
     corDot(cor: unknown, aoMudar: (cor: string) => void): HTMLElement;
   }
 
@@ -665,6 +666,8 @@ declare global {
     /** js/bridge/host-web.ts — criptografia de ponta a ponta + API (só na versão web) */
     webHost?: HostPonte;
     testeHost?: ZoZoTesteHost;
+    /** js/core/simbolos.ts — "R$" e "%" menores e no alto do número */
+    simbolos?: { realcar(raiz: Node): void };
     /** js/components/teste.ts — painel de testes (só existe com testeHost) */
     teste?: { iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void }): void };
     servico: ZoZoServico;

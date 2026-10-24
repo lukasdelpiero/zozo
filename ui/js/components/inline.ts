@@ -25,7 +25,31 @@
   }
 
   /** Valor em reais que salva ao sair */
-  function dinheiro(cfg: CampoValorNoLugar): HTMLInputElement {
+  /**
+   * Valor editável com cara de texto: mostra um botão com o valor formatado (o "R$" pequeno no alto vem de
+   * core/simbolos.ts — dentro de um <input> não daria) e, ao clicar, vira o próprio campo. Saiu do campo,
+   * volta a mostrar o valor. Mudanças em input.value (desfazer depois de um erro) atualizam o botão.
+   */
+  function vitrine(input: HTMLInputElement, rotulo: string): { el: HTMLElement; editar(): void } {
+    const ver = h("button", { type: "button", class: [input.className, "tw:cursor-text"] }) as HTMLButtonElement;
+    const proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!;
+    const ler = () => String(proto.get!.call(input));
+    const sincronizar = () => {
+      if (document.activeElement === input) return;
+      ver.textContent = ler();
+      ver.setAttribute("aria-label", ler() + ", " + rotulo);          // começa pelo texto visível (WCAG 2.5.3)
+    };
+    Object.defineProperty(input, "value", { configurable: true, get: ler, set(v: string) { proto.set!.call(input, v); sincronizar(); } });
+    const editar = () => { ver.hidden = true; input.hidden = false; input.focus(); };
+    ver.addEventListener("click", editar);
+    // depois dos outros "blur" (que gravam e formatam): volta a mostrar o valor
+    input.addEventListener("blur", () => { input.hidden = true; ver.hidden = false; sincronizar(); });
+    input.hidden = true;
+    sincronizar();
+    return { el: h("span", { class: "tw:contents" }, ver, input), editar };
+  }
+
+  function dinheiro(cfg: CampoValorNoLugar): HTMLElement {
     let atual = F.numero(cfg.valor);
     // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo: ver format.mascararValor)
     const input = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, ZoZo.pecas.noLugarValor, "money", cfg.classe], value: F.moeda(atual),
@@ -42,14 +66,14 @@
       }
       input.value = F.moeda(atual);
     });
-    return input;
+    return vitrine(input, cfg.rotulo || "Valor").el;
   }
 
   /**
    * Valor que se edita como o da transação (exibido como texto; clicou, apaga e digita), mas que só é
    * gravado quando a tela pede (ex.: "Salvar orçamento"): ler() devolve o número e definir() troca o valor.
    */
-  function dinheiroCampo(cfg: { valor: unknown; rotulo: string; classe?: string; aoEnter?: () => void }): { el: HTMLInputElement; ler(): number; definir(v: unknown): void } {
+  function dinheiroCampo(cfg: { valor: unknown; rotulo: string; classe?: string; aoEnter?: () => void }): { el: HTMLElement; campo: HTMLInputElement; editar(): void; ler(): number; definir(v: unknown): void } {
     let atual = F.numero(cfg.valor);
     const input = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, ZoZo.pecas.noLugarValor, "money", cfg.classe], value: F.moeda(atual),
       "data-com-simbolo": "", "aria-label": cfg.rotulo }) as HTMLInputElement;
@@ -63,8 +87,9 @@
       if (Number.isFinite(v) && v >= 0 && v < 1e12) { atual = Math.round(v * 100) / 100; input.removeAttribute("aria-invalid"); }
       input.value = F.moeda(atual);
     });
+    const v = vitrine(input, cfg.rotulo);
     return {
-      el: input,
+      el: v.el, campo: input, editar: v.editar,
       ler: () => (document.activeElement === input ? F.parseMoeda(input.value) : atual),
       definir(v: unknown) { atual = F.numero(v); input.value = F.moeda(atual); },
     };
@@ -82,6 +107,6 @@
     return btn;
   }
 
-  const api: ZoZoInline = { texto, dinheiro, dinheiroCampo, corDot };
+  const api: ZoZoInline = { texto, dinheiro, dinheiroCampo, vitrine, corDot };
   ZoZo.inline = api;
 })(window.ZoZo);

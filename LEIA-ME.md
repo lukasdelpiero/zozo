@@ -15,6 +15,8 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 
 ## Novidades da versão 3.17.0
 
+- **Símbolos (todo o app):** o "R$" (ou € e $) fica menor, colado e alinhado ao topo do número, e o "%" um pouco menor no alto, em qualquer valor mostrado — inclusive nos valores editáveis do painel, que aparecem formatados e viram campo ao clicar (`core/simbolos.ts`, `inline.vitrine`). Os rótulos dentro dos gráficos (SVG) continuam como antes.
+- **Passivos (correção):** a seta segue o sentido do valor e a cor diz se é bom — dívida caiu: seta ↘ verde; dívida subiu: seta ↗ vermelha.
 - **Gráficos que filtram ao passar o mouse (Dashboard e Contas):** a data aparece em cima do ponto, o trecho depois dele fica esmaecido e o topo do cartão mostra o valor e a variação até aquele dia (gasto acumulado no Gasto mensal; ativos e passivos no Patrimônio).
 - **Pílulas de variação:** verde/vermelha/cinza (com "=" quando não muda). Em passivos (cartão, empréstimo) a dívida subir é seta para baixo vermelha e cair é seta para cima verde — também na lista de contas, no painel e na cor do gráfico do painel.
 - **Fechamento do cartão:** editar mostra as **datas** do fechamento e do vencimento atuais (calendário) em vez de "1–31"; grava o dia de cada uma.

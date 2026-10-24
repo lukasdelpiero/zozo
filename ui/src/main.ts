@@ -11,6 +11,7 @@ import "./estilos.css";
 
 // Núcleo
 import "../js/core/dom.ts";
+import "../js/core/simbolos.ts";               // "R$" e "%" menores, no alto do número (em toda a tela)
 import "../js/core/icons.ts";
 import "../js/core/format.ts";
 import "../js/core/busca.ts";

@@ -184,7 +184,9 @@
         }
         input.value = F.moeda(d.valor || 0);
       });
-      return input;
+      // transação nova: já é o campo, pronto para digitar; existente: mostra o valor (com o "R$" pequeno) e edita ao clicar
+      if (novo) return input;
+      return ZoZo.inline.vitrine(input, "Valor").el;
     }
 
     /** "Despesa ▾" / "Saída ▾" acima do valor */

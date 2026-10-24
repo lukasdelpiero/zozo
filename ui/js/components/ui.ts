@@ -159,15 +159,16 @@
   /* ---------- Variação percentual (seções 19, 63) ---------- */
   /**
    * Pílula de variação. Ativo: subiu = seta para cima, verde; caiu = seta para baixo, vermelha.
-   * Passivo (cartão, empréstimo; passivo: true): a dívida subir é ruim — seta para baixo, vermelha;
-   * a dívida cair é bom — seta para cima, verde. Sem variação: "=" cinza.
+   * Passivo (cartão, empréstimo; passivo: true): subiu = seta para cima, VERMELHA (mais dívida);
+   * caiu = seta para baixo, VERDE. Sem variação: "=" cinza.
    */
   function PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string; passivo?: boolean }): HTMLElement {
     const o = opts || {};
     const n = F.numero(valor);
+    // a seta segue o sentido do valor; a cor, se é bom (verde) ou ruim (vermelho) — passivo: cair é bom
     const bom = o.passivo ? n < 0 : n > 0, ruim = o.passivo ? n > 0 : n < 0;
     const dir = bom ? "up" : ruim ? "down" : "flat";
-    const nomeIcone = dir === "up" ? "seta-sobe" : dir === "down" ? "seta-desce" : "igual";
+    const nomeIcone = n > 0 ? "seta-sobe" : n < 0 ? "seta-desce" : "igual";
     const descr = n > 0 ? (o.passivo ? "Dívida aumentou " : "Aumento de ") : n < 0 ? (o.passivo ? "Dívida diminuiu " : "Redução de ") : "Sem variação, ";
     const cls = o.plain ? { up: P.pctSimplesSobe, down: P.pctSimplesDesce, flat: P.pctSimplesIgual }[dir] : { up: P.pctSobe, down: P.pctDesce, flat: P.pctIgual }[dir];
     return h("span", { class: [cls, o.class], title: o.title, role: "img", "aria-label": descr + F.percentual(Math.abs(n)) + (o.contexto ? " " + o.contexto : "") },
@@ -175,13 +176,9 @@
       h("span", { class: P.pctValor, "aria-hidden": "true" }, F.percentual(n)));
   }
 
-  /** Valor em dinheiro com o símbolo da moeda menor e alinhado ao topo do número ("R$" pequeno) */
+  /** Valor em dinheiro (o "R$" pequeno no alto do número vem de core/simbolos.ts, como em toda a tela) */
   function Dinheiro(valor: unknown, opts?: { class?: string | false | null }): HTMLElement {
-    const texto = F.moeda(valor), simbolo = F.simbolo();
-    const i = texto.indexOf(simbolo);
-    if (i < 0) return h("span", { class: ["money", opts && opts.class] }, texto);
-    return h("span", { class: ["money", opts && opts.class] }, texto.slice(0, i),
-      h("span", { class: P.moedaSimbolo }, simbolo), texto.slice(i + simbolo.length).trimStart());
+    return h("span", { class: ["money", opts && opts.class] }, F.moeda(valor));
   }
 
   /* ---------- Barra de progresso ---------- */

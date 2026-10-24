@@ -214,7 +214,7 @@
     const areaOrcamento = h("div", { class: [ZoZo.pecas.painelTopoNumero, T.orcArea, T.colDirEditando] }, modoBtn, rotuloMes, valorOrc.el);
     function salvarOrcamento() {
       const v = valorOrc.ler();
-      if (!(v >= 0)) { valorOrc.el.setAttribute("aria-invalid", "true"); valorOrc.el.focus(); return; }
+      if (!(v >= 0)) { valorOrc.campo.setAttribute("aria-invalid", "true"); valorOrc.editar(); return; }
       const dados = modo === "fixo" ? { reservado: v, modoOrcamento: "fixo" } : { orcamentoMes: { mes: mesAtualIso, valor: v } };
       ctx.bridge.request(A.updateCategoria, Object.assign({ id: cat.id }, dados)).then(() => {
         ctx.toast("Orçamento salvo.");
@@ -320,7 +320,7 @@
     pintarModo();
     function salvar() {
       const v = valorNA.ler();
-      if (!(v >= 0)) { valorNA.el.setAttribute("aria-invalid", "true"); valorNA.el.focus(); return; }
+      if (!(v >= 0)) { valorNA.campo.setAttribute("aria-invalid", "true"); valorNA.editar(); return; }
       ctx.bridge.request(A.updateGrupo, { nome, naoAtribuido: v, modo, mes }).then((r: any) => {
         ctx.toast(r.coberto > 0 ? "Orçamento salvo. " + F.moeda(r.coberto) + " cobriram categorias acima do orçamento; " + F.moeda(r.restante) + " ficaram sem atribuir."
           : "Orçamento do grupo salvo.", { duration: r.coberto > 0 ? 7000 : 3200 });
