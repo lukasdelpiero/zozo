@@ -23,8 +23,8 @@
 
   /* Texto */
   --color-text-primary: #16213a;
-  --color-text-secondary: #71809a;
-  --color-text-muted: #9aa5b5;
+  --color-text-secondary: #4f5b71;      /* WCAG AA: ≥ 4,5:1 sobre branco e sobre os fundos claros */
+  --color-text-muted: #5b687f;          /* WCAG AA: ≥ 4,5:1 sobre branco (texto que informa, não só enfeita) */
 
   /* Financeiro */
   --color-positive: #176b3a;
@@ -33,7 +33,7 @@
   --color-negative-soft: #fbe8e8;
   --color-neutral: #4a5263;
   --color-neutral-soft: #eef0f3;
-  --color-income: #15903f;
+  --color-income: #0f7a34;               /* ≥ 4,5:1 também sobre a linha selecionada */
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
   --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */
@@ -121,10 +121,10 @@
 
   /* Menu lateral roxo (usado também pelo câmbio e pela fatura) */
   --sidebar-bg: #6948D8;
-  --sidebar-fg: rgba(255, 255, 255, 0.86);
-  --sidebar-fg-muted: rgba(255, 255, 255, 0.62);
-  --sidebar-hover: rgba(255, 255, 255, 0.10);
-  --sidebar-active: rgba(255, 255, 255, 0.18);
+  --sidebar-fg: rgba(255, 255, 255, 0.94);
+  --sidebar-fg-muted: rgba(255, 255, 255, 0.82);   /* ≥ 4,5:1 sobre o roxo do menu */
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active: rgba(255, 255, 255, 0.10);     /* texto branco ≥ 4,5:1 no item ativo */
   --sidebar-divider: rgba(255, 255, 255, 0.14);
 
   /* Botões roxos com o gradiente da marca (de cima para baixo) */

@@ -177,12 +177,13 @@
     // orçamento: dentro, mas perto do limite → laranja
     const perto = o.tone === "ok" && r >= ZoZo.regras.orcamentoPerto && r <= 1;
     const tom = o.tone === "over" ? P.barraAcima : o.tone === "allocation" ? P.barraAlocacao : perto ? P.barraPerto : P.barraOk;
-    return h("div", {
+    // span (bloco por CSS): a barra aparece dentro de textos e células (span), onde <div> não é HTML válido
+    return h("span", {
       class: [o.grande ? P.barraGrande : P.barra, o.class],
       role: "progressbar",
       "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(Math.round(pct)),
       "aria-label": perto && o.label ? o.label + " (perto do limite)" : o.label,
-    }, h("div", { class: tom, style: { width: pct + "%" } }));
+    }, h("span", { class: tom, style: { width: pct + "%" } }));
   }
 
   /* ---------- Filtros 1S | 1M | 3M | ONT | 1A | TOTAL ---------- */
@@ -316,9 +317,11 @@
     return h("section", { class: [P.secao, fechado && "is-collapsed", o.class] },
       h("header", { class: [P.secaoTopo, o.classeCabecalho || P.secaoTopoPadrao] },
         h("div", { class: [P.secaoInicio, o.classeLead] },
-          h("button", { type: "button", class: P.secaoBotao, "aria-expanded": String(!fechado), "aria-controls": corpoId, onClick: toggle },
-            icon("chevron-down", { size: 14, class: fechado ? P.secaoSetaFechada : P.secaoSeta, stroke: 2.25 }),
-            h("h2", { class: ["section__title", P.secaoTitulo] }, o.title)),
+          // o título envolve o botão (HTML: <button> não pode conter <h2>; o leitor de tela anuncia título + botão)
+          h("h2", { class: ["section__title", P.secaoTitulo] },
+            h("button", { type: "button", class: P.secaoBotao, "aria-expanded": String(!fechado), "aria-controls": corpoId, onClick: toggle },
+              icon("chevron-down", { size: 14, class: fechado ? P.secaoSetaFechada : P.secaoSeta, stroke: 2.25 }),
+              h("span", null, o.title))),
           o.adorno || null),
         o.aside ? h("div", { class: P.secaoLado }, o.aside) : null),
       o.key ? corpoArvore(o.key, h("div", { class: "section__body", id: corpoId, hidden: fechado }, ...children))

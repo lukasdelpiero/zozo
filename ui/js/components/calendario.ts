@@ -60,8 +60,10 @@
         for (let i = 0; i < vazios; i++) celulas.push(h("span", { "aria-hidden": "true" }));
         for (let dia = 1; dia <= total; dia++) {
           const iso = isoDe(ano, mes, dia);
+          // nome acessível começa pelo número visível (WCAG 2.5.3): "1 de outubro de 2026"
           celulas.push(h("button", { type: "button", class: [T.dia, iso === valor && "is-selected", iso === hoje && "is-hoje"],
-            "data-dia": String(dia), "aria-label": F.dataExtenso(iso), "aria-pressed": String(iso === valor), onClick: () => escolher(iso) }, String(dia)));
+            "data-dia": String(dia), "aria-label": dia + " de " + F.mesNome(mes).toLowerCase() + " de " + ano,
+            "aria-pressed": String(iso === valor), onClick: () => escolher(iso) }, String(dia)));
         }
         mount(grade, celulas);
         if (focarDia) { const b = dia(Math.min(focarDia, total)); if (b) b.focus(); }
@@ -97,7 +99,7 @@
         h("div", { class: T.rodape }, h("button", { type: "button", class: T.hoje, onClick: () => escolher(hoje) }, "Hoje"))));
       desenhar(atual && atual.getFullYear() === ano && atual.getMonth() === mes ? atual.getDate() : null);
       if (!grade.contains(document.activeElement)) requestAnimationFrame(() => { const f = grade.querySelector<HTMLElement>(".is-selected, .is-hoje, [data-dia]"); if (f) f.focus(); });
-    } }, { posicao: o.posicao || "esquerda", label: o.rotulo || "Calendário", focar: false, class: ZoZo.estrutura.menuCalendario });
+    } }, { posicao: o.posicao || "esquerda", label: o.rotulo || "Calendário", focar: false, class: ZoZo.estrutura.menuCalendario, papel: "dialog" });
   }
 
   /** Campo de data (botão com dd/mm/aaaa) que abre o calendário */
@@ -105,9 +107,11 @@
     let valor = cfg.valor;
     const texto = () => { const d = F.parseData(valor); return d ? pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() : "Escolher data"; };
     // campo com a cara de um input; o ícone do calendário à direita
-    const btn = h("button", { type: "button", class: [ZoZo.pecas.entrada, "tw:inline-flex tw:items-center tw:justify-between tw:gap-2 tw:cursor-pointer tw:text-left tw:[&_.icon]:text-zz-secondary tw:[&_.icon]:flex-none", cfg.classe], "aria-haspopup": "dialog", "aria-label": cfg.rotulo || "Data" },
+    // nome acessível = data visível + o rótulo do campo (WCAG 2.5.3: quem fala o que vê consegue acionar)
+    const nome = () => texto() + ", " + (cfg.rotulo || "data");
+    const btn = h("button", { type: "button", class: [ZoZo.pecas.entrada, "tw:inline-flex tw:items-center tw:justify-between tw:gap-2 tw:cursor-pointer tw:text-left tw:[&_.icon]:text-zz-secondary tw:[&_.icon]:flex-none", cfg.classe], "aria-haspopup": "dialog", "aria-label": nome() },
       h("span", null, texto()), icon("calendario", { size: 15 }));
-    btn.addEventListener("click", () => abrir(btn, valor, (iso) => { valor = iso; btn.firstChild!.textContent = texto(); cfg.aoMudar(iso); }, { rotulo: cfg.rotulo }));
+    btn.addEventListener("click", () => abrir(btn, valor, (iso) => { valor = iso; btn.firstChild!.textContent = texto(); btn.setAttribute("aria-label", nome()); cfg.aoMudar(iso); }, { rotulo: cfg.rotulo }));
     return btn;
   }
 

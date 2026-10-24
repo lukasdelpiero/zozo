@@ -97,13 +97,16 @@
     return "Muitas tentativas. Por segurança, tente novamente em " + m + (m === 1 ? " minuto." : " minutos.");
   }
 
+  const simulando = () => !!(ZoZo.testeHost && ZoZo.testeHost.simulando());
+
   function renderAuth() {
     esperandoEmail = null;
     ZoZo.auth.render(authRoot, {
       erro: authErro,
       aviso: authAviso,
       emailInicial: authEmail,
-      turnstile, captchaLogin, google: googleAtivo,
+      // modo teste "sem servidor": nada de CAPTCHA (o cadastro e o login não saem do navegador)
+      turnstile: simulando() ? null : turnstile, captchaLogin: captchaLogin && !simulando(), google: googleAtivo,
       onIrCadastro: () => { authErro = null; authAviso = null; store.set({ session: { status: "register" } }); },
       onEsqueci: (email: string) => mostrarPedirRecuperacao(email),
       onVoltar: () => { authErro = null; authAviso = null; store.set({ session: { status: "login" } }); },
@@ -212,6 +215,29 @@
       renderAuth();
       return true;
     });
+  }
+
+  /* ---------------- modo teste (só local e prévia): telas de entrada sob demanda ---------------- */
+  function telaTeste(nome: string) {
+    const mostrar = () => {
+      const em = authEmail || "teste@exemplo.test";
+      const senhaSimulada = () => { ctx.toast("Modo teste: tela de demonstração, nada foi enviado.", { tone: "aviso" }); voltarEntrada(); };
+      const telas: Record<string, () => void> = {
+        verificar: () => aguardarConfirmacao(em),
+        verificarRecuperacao: () => ZoZo.auth.aguardandoEmail(authRoot, em, { recuperacao: true, onReenviar: () => Promise.resolve(), onVoltar: voltarEntrada }),
+        linkInvalido: () => mostrarLinkInvalido(),
+        redefinir: () => mostrarPedirRecuperacao(em),
+        codigo: () => ZoZo.auth.codigoRecuperacao(authRoot, { onVoltar: voltarEntrada, onCodigo: () => Promise.resolve(FR.CODE_INVALID) }),
+        novaSenha: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: true, onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
+        novaSenhaRecomecar: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: false, onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
+        carregando: () => { ZoZo.auth.carregando(authRoot, "Entrando no ZoZo"); setTimeout(() => { if (!store.get().session.authenticated) voltarEntrada(); }, 4000); },
+      };
+      store.set({ session: { status: "login" } });
+      (telas[nome] || voltarEntrada)();
+    };
+    if (!store.get().session.authenticated) { mostrar(); return; }
+    ctx.logout();
+    const parar = store.subscribe((st) => { if (!st.session.authenticated) { parar(); setTimeout(mostrar, 0); } });
   }
 
   /** Link vencido, já usado ou adulterado */
@@ -544,6 +570,12 @@
       });
     });
   }
+
+  if (ZoZo.teste) ZoZo.teste.iniciar(ctx, {
+    tela: telaTeste,
+    entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
+    sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
+  });
 
   boot();
 })(window.ZoZo);

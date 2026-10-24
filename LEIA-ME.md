@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.15.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.16.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,13 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.16.0
+
+- **Modo teste (só no endereço local e na prévia):** botão "Modo teste" no canto com um painel de comandos — estado da sessão, **simular cadastro e login sem servidor** (a conta vive só na aba; funciona mesmo com o servidor fora do ar), dados de exemplo, simular servidor fora do ar, conflito na próxima gravação, sessão expirada, avisos e todas as telas de entrada (verifique seu e-mail, link inválido, redefinir senha, código do 2FA, nova senha). Na prévia/local a **conta demo** tem 100% dos recursos (perfis, boleto, Pix, câmbio, sem limite de criação) e as ações de conta (nome, senha, 2FA, proteção, apagar, excluir) são simuladas. Em produção nada disso existe.
+- **Acessibilidade (WCAG 2.2 AA, conferida com axe-core em todas as telas, desktop e celular — zero violações):** contraste do texto secundário, do menu lateral, dos valores positivos, das etiquetas de categoria e do botão "Excluir"; telas de entrada dentro de `<main>`; títulos do painel na ordem certa; linha do painel sem controle aninhado (o nome é o botão); nomes acessíveis que começam pelo texto visível (datas, categoria, perfil, conta); calendário como diálogo; itens marcáveis dos menus como `menuitemradio`; menus flutuantes numa região própria.
+- **HTML válido (W3C):** o `index.html` passa no validador; no DOM montado, `<button>` deixou de conter `<h2>` (o título envolve o botão) e a barra de progresso deixou de ser `<div>` dentro de `<span>`.
+- **Cloudflare:** TLS mínimo 1.2, "Always Use HTTPS" e "Block AI bots" recomendados (aplicar no painel ou liberar a edição para o Claude).
 
 ## Novidades da versão 3.15.0
 

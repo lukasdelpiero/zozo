@@ -118,9 +118,11 @@
         aoSalvar: (v) => { parte.descricao = v; } });
       const dataBtn = h("button", { type: "button", class: T.data }, dataCurta(parte.data));
       dataBtn.addEventListener("click", () => ZoZo.calendario.abrir(dataBtn, parte.data, (v) => { parte.data = v; desenhar(); }, { rotulo: "Data da parte " + (i + 1) }));
-      const catBtn = h("button", { type: "button", class: T.pilula, "aria-haspopup": "menu", "aria-label": "Categoria" }, pillCategoria(parte.categoriaId));
+      const catBtn = h("button", { type: "button", class: T.pilula, "aria-haspopup": "menu" }, pillCategoria(parte.categoriaId));
+      catBtn.setAttribute("aria-label", ((catBtn.textContent || "").trim() || "Escolher") + ", categoria da parte " + (i + 1));   // WCAG 2.5.3
       catBtn.addEventListener("click", () => menuCategoria(catBtn, parte));
-      const perfBtn = h("button", { type: "button", class: T.pilula, "aria-haspopup": "menu", "aria-label": "Perfil" }, pillPerfil(parte.perfilId));
+      const perfBtn = h("button", { type: "button", class: T.pilula, "aria-haspopup": "menu" }, pillPerfil(parte.perfilId));
+      perfBtn.setAttribute("aria-label", ((perfBtn.textContent || "").trim() || "Escolher") + ", perfil da parte " + (i + 1));
       perfBtn.addEventListener("click", () => menuPerfil(perfBtn, parte));
       const valor = ZoZo.inline.dinheiro({ valor: parte.c / 100, rotulo: "Valor da parte " + (i + 1), classe: ZoZo.pecas.dvValor,
         aoSalvar: (v) => { mudarParaPersonalizado(); fixar(i, Math.round(v * 100)); desenhar(); } });

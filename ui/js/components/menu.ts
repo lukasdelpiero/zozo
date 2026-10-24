@@ -67,10 +67,17 @@
     el.style.top = Math.max(8, top) + "px";
   }
 
+  /** Menus flutuantes ficam numa região própria (landmark): leitor de tela e auditoria sabem onde estão */
+  function camada(): HTMLElement {
+    let c = document.getElementById("camada-menus");
+    if (!c) { c = h("div", { id: "camada-menus", role: "region", "aria-label": "Menus" }); document.body.appendChild(c); }
+    return c;
+  }
+
   function resolver(sub: ItensMenu | undefined): ItemMenu[] | ConteudoMenu | undefined { return typeof sub === "function" ? sub() : sub; }
 
   function criarPainel(itens: ItensMenu, nivel: number, opts: OpcoesMenu): Painel {
-    const el = h("div", { class: [E.menuFlutuante, opts.class], role: "menu", "aria-label": opts.label || "Menu" });
+    const el = h("div", { class: [E.menuFlutuante, opts.class], role: opts.papel || "menu", "aria-label": opts.label || "Menu" });
     if (opts.largura) el.style.width = opts.largura + "px";
     const painel: Painel = { el, nivel };
     const api: ApiMenu = {
@@ -91,7 +98,8 @@
         if (it.secao) return h("div", { class: E.menuSecao }, it.secao);
         if (it.render) return it.render(api);
         const btn = h("button", {
-          type: "button", role: "menuitem", class: [it.perigo ? E.menuItemPerigo : E.menuItem, it.check && "is-checked"],
+          // item marcável = menuitemradio (aria-checked não vale em menuitem simples)
+          type: "button", role: it.check === undefined ? "menuitem" : "menuitemradio", class: [it.perigo ? E.menuItemPerigo : E.menuItem, it.check && "is-checked"],
           disabled: it.desabilitado, "aria-haspopup": it.submenu ? "menu" : undefined,
           "aria-checked": it.check === undefined ? undefined : String(!!it.check),
         },
@@ -115,7 +123,7 @@
             const filho = criarPainel(sub, nivel + 1, subOpts);
             filho.origem = btn;
             btn.classList.add("is-open");
-            document.body.appendChild(filho.el);
+            camada().appendChild(filho.el);
             ativo.niveis.push(filho);
             posicionar(filho.el, btn, "lado");
             if (foco) { const f = filho.el.querySelector<HTMLElement>("input, button"); if (f) f.focus(); }
@@ -148,7 +156,7 @@
     const estado: Ativo = { anchor, niveis: [] };
     ativo = estado;
     const raiz = criarPainel(itens, 0, o);
-    document.body.appendChild(raiz.el);
+    camada().appendChild(raiz.el);
     estado.niveis.push(raiz);
     posicionar(raiz.el, anchor, o.posicao || "direita");
     anchor.setAttribute("aria-expanded", "true");

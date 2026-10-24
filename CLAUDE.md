@@ -25,6 +25,8 @@ O padrão obrigatório está em @docs/SEGURANCA.md — leia antes de mexer em lo
 - Busca: local, em `ui/js/core/busca.ts` (os dados são cifrados de ponta a ponta — nunca use um servidor de busca como Meilisearch/Algolia, que exigiria os dados legíveis fora do navegador).
 - E-mail no servidor local: `ZOZO_DEV_EMAIL=console` (mostra os e-mails no terminal) e `ZOZO_DEV_BANCO=<arquivo>` (banco descartável).
 - Back-end: transição para FastAPI + Pydantic em `api/src/app_fastapi.py` (desligado no Cloudflare; o núcleo continua dono das regras).
+- **Modo teste** (só no endereço local e na prévia — decidido pelo endereço em `host-web.ts`, `HOSTS_PREVIA`): botão "Modo teste" com o painel (`components/teste.ts`), conta simulada sem servidor (só na memória da aba) e a demo com todos os recursos e ações de conta simuladas. Em produção `ZoZo.testeHost` não existe; o servidor continua recusando qualquer gravação da demo.
+- Acessibilidade: WCAG 2.2 AA conferida com axe-core em todas as telas (desktop e celular). Texto que informa ≥ 4,5:1 (tokens `--color-text-secondary/muted`, cores das etiquetas `color-mix(…55%,black)`); nome acessível começa pelo texto visível (WCAG 2.5.3); nada interativo dentro de botão; `<button>` não contém título nem bloco.
 - Backup e restauração do banco: `docs/RESTAURACAO.md` (export + `api/dev/conferir_backup.py`; nunca ensaiar restauração por cima do banco de usuários)
 - Publicar na **prévia** (testes): `.\api\publicar.ps1 previa`
 - Publicar em **produção**: `.\api\publicar.ps1 producao` (só depois de testar na prévia)

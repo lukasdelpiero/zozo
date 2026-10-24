@@ -38,6 +38,18 @@ declare global {
     doisFatores?: boolean;
     demo?: boolean;
     recursos?: Partial<Record<RecursoConta, boolean>>;
+    teste?: boolean;          // ambiente de teste (local ou prévia)
+    simulada?: boolean;       // conta simulada sem servidor (modo de teste)
+  }
+  /** js/bridge/host-web.ts — controles do painel de testes (só no endereço local e na prévia) */
+  interface ZoZoTesteHost {
+    simulando(): boolean;
+    simular(ligar: boolean): void;
+    falhar(codigo: string | null): void;
+    falhaAtual(): string | null;
+    conflitoNaProxima(): void;
+    carregarExemplo(): boolean;
+    estado(): { endereco: string; simulacao: boolean; falha: string | null; sessao: string };
   }
   interface SessaoEstado {
     status: "loading" | "login" | "register" | "2fa" | "authenticated";
@@ -342,6 +354,7 @@ declare global {
   interface OpcoesMenu {
     posicao?: "direita" | "esquerda" | "acima"; largura?: number; larguraSub?: number; label?: string;
     class?: string; checkEsquerda?: boolean; focar?: boolean;
+    papel?: "menu" | "dialog";      // calendário e outros painéis que não são lista de opções: "dialog"
   }
   interface ConfigListaMarcavel {
     itens: Array<{ value: string; label: string; cor?: string; icone?: string }>;
@@ -646,6 +659,9 @@ declare global {
     cambio: ZoZoCambio;
     /** js/bridge/host-web.ts — criptografia de ponta a ponta + API (só na versão web) */
     webHost?: HostPonte;
+    testeHost?: ZoZoTesteHost;
+    /** js/components/teste.ts — painel de testes (só existe com testeHost) */
+    teste?: { iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void }): void };
     servico: ZoZoServico;
     auth: ZoZoAuth;
     demo: ZoZoDemo;

@@ -324,8 +324,9 @@
           const perfilBtn = comPerfis ? campoMenu() : null;
           const desenharPerfil = () => {
             if (!perfilBtn) return;
-            perfilBtn.setAttribute("aria-label", "Perfil: " + (perfil ? perfil.nome : "nenhum escolhido"));
             mount(perfilBtn, perfil ? UI.Tag(perfil.nome, perfil.cor, { class: "tag--upper" }) : h("span", { class: P.campoMenuVazio }, "Selecione o perfil"), seta());
+            // nome acessível = o que está escrito + o campo (WCAG 2.5.3)
+            perfilBtn.setAttribute("aria-label", perfilBtn.textContent!.trim() + ", perfil");
           };
           if (perfilBtn) perfilBtn.addEventListener("click", () => ZoZo.menu.perfis(perfilBtn, ctx, {
             perfis, atual: perfil && perfil.id,
@@ -335,12 +336,12 @@
           const contaBtn = campoMenu();
           const saldoConta = h("span");
           const desenharConta = () => {
-            contaBtn.setAttribute("aria-label", "Conta a debitar: " + (conta ? conta.nome : "nenhuma escolhida"));
             mount(contaBtn, conta
               ? h("span", { class: P.lpContaLinha }, h("span", { class: P.lpContaPonto, style: { background: F.cor(conta.cor, "var(--palette-16)") } }),
                 h("span", { class: "tw:truncate" }, conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "")))
               : h("span", { class: P.campoMenuVazio }, contas.length ? "Selecione a conta" : "Nenhuma conta disponível"), seta());
             saldoConta.textContent = conta ? "Saldo: " + F.moeda(conta.valor) : "Corrente, poupança ou outros";
+            contaBtn.setAttribute("aria-label", contaBtn.textContent!.trim() + ", conta a debitar");
           };
           contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
             contas, atual: conta && conta.id, vazio: "Nenhuma conta corrente, poupança ou outros",

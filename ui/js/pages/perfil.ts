@@ -391,7 +391,7 @@
       h("span", { class: P2.numero, "aria-hidden": "true" }, String(n)),
       h("div", null, h("p", { class: P2.passoTitulo }, titulo, n === 4 ? check : null), extra || null));
 
-    const painel = h("aside", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
+    const painel = h("div", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
       h("header", { class: P2.topo },
         h("h3", { class: P2.titulo }, "Autenticação de Dois Fatores"),
         h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),

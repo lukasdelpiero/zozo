@@ -746,3 +746,46 @@ test("migração não recria documento ausente nem mascara rollback", async () =
     assert.equal(lido.aviso, ausente ? "DOCUMENT_MISSING" : "OLDER_VERSION");
   }
 });
+
+/* ---------------- modo teste (só local e prévia) ---------------- */
+test("modo teste não existe em produção: sem painel, demo continua restrita", async () => {
+  for (const hostname of ["usezozo.com.br", "zozo.zozo-finance-app.workers.dev", "zozo-previa.zozo-finance-app.workers.dev.exemplo.com", ""]) {
+    const h = carregarHost({ fetch: servidorFalso().fetch, hostname });
+    assert.equal(h.testeHost(), undefined, hostname);
+  }
+});
+
+test("prévia/local: conta simulada sem servidor — cadastro, dados e ações de conta só na memória", async () => {
+  for (const hostname of ["zozo-previa.zozo-finance-app.workers.dev", "127.0.0.1", "localhost"]) {
+    const pedidos = [];
+    const h = carregarHost({ fetch: async (url) => { pedidos.push(url); throw new TypeError("sem servidor"); }, hostname });
+    const T = h.testeHost();
+    assert.ok(T, hostname);
+    T.simular(true);
+    const r = await h.chamar("registerUser", { email: "Sim@Exemplo.test", senha: novaSenha(), nomeUsuario: "Simulada" });
+    assert.equal(r.authenticated, true);
+    assert.deepEqual(r.user.recursos, { perfis: true, boleto: true, pix: true, cambio: true });
+    assert.equal(r.user.simulada, true);
+    assert.equal((await h.chamar("loadUserData")).documento, null);
+    await h.chamar("saveUserData", { documento: { texto: "simulado" } });
+    assert.deepEqual((await h.chamar("loadUserData")).documento, { texto: "simulado" });
+    assert.deepEqual(await h.chamar("changePassword", { senhaAtual: "x", novaSenha: novaSenha() }), { alterada: true });
+    assert.equal((await h.chamar("confirmar2FA", { codigo: "123456" })).user.doisFatores, true);
+    await assert.rejects(h.chamar("desativar2FA", { codigo: "12" }), codigo("CODE_INVALID"));
+    assert.deepEqual(await h.chamar("setProtecao", { avancada: true, senha: "x" }), { avancada: true, recuperacao: false });
+    T.conflitoNaProxima();
+    await assert.rejects(h.chamar("saveUserData", { documento: {} }), codigo("DATA_CHANGED"));
+    await h.chamar("logout").catch(() => null);
+    await h.chamar("login", { email: "sim@exemplo.test", senha: "qualquer" });
+    assert.deepEqual((await h.chamar("loadUserData")).documento, { texto: "simulado" });             // a mesma conta desta aba
+    assert.deepEqual(pedidos.filter((u) => !u.endsWith("/sessao")), [], "nada foi ao servidor");
+  }
+});
+
+test("prévia: falha simulada no servidor vira o erro de sempre", async () => {
+  const srv = servidorFalso();
+  const h = carregarHost({ fetch: srv.fetch, hostname: "127.0.0.1" });
+  h.testeHost().falhar("STORAGE_UNAVAILABLE");
+  await assert.rejects(h.chamar("login", { email: "a@exemplo.test", senha: novaSenha() }), codigo("STORAGE_UNAVAILABLE"));
+  assert.equal(srv.pedidos.length, 0);
+});

@@ -56,6 +56,7 @@
   type Sessao = {
     email: string; nome: string; chave: CryptoKey; prova: string; envelope: string; versao: number;
     doisFatores: boolean; demo: boolean; recursos: RecursosConta;
+    simulada?: boolean;                        // modo de teste: conta sem servidor (só nesta aba)
   };
 
   let sessao: Sessao | null = null;
@@ -66,6 +67,32 @@
   type Recuperacao = { token: string; email: string; versao: number; manter: boolean; documento: unknown;
     historico: Array<{ versao: number; claro: unknown }> };
   let recuperacao: Recuperacao | null = null;
+
+  /* ---------------- modo de teste: SÓ no endereço local e na prévia ----------------
+     Decidido pelo endereço da página: em produção (usezozo.com.br) nada disto liga. Nunca toca dados de verdade:
+     a conta simulada vive só na memória desta aba (sem servidor) e a conta demo continua sem gravar no servidor.
+     Aqui a demo tem todos os recursos e as ações de conta (nome, senha, 2FA, apagar…) são simuladas. */
+  const HOSTS_PREVIA = ["zozo-previa.zozo-finance-app.workers.dev"];
+  const hostAtual = typeof location !== "undefined" ? location.hostname : "";
+  const TESTE = hostAtual === "127.0.0.1" || hostAtual === "localhost" || hostAtual === "[::1]" || hostAtual.endsWith(".localhost") || HOSTS_PREVIA.includes(hostAtual);
+  const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true };
+  const CHAVE_SIMULAR = "zozo.teste.simular";
+  const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown };
+  try { teste.simular = TESTE && sessionStorage.getItem(CHAVE_SIMULAR) === "1"; } catch (e) { /* sem sessionStorage */ }
+  /** Ações de conta simuladas: conta sem servidor, ou a demo no ambiente de teste */
+  const simulada = (s: Sessao) => !!s.simulada || (TESTE && s.demo);
+  const base32 = (b: Uint8Array) => {
+    const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; let bits = 0, v = 0, out = "";
+    for (const x of b) { v = (v << 8) | x; bits += 8; while (bits >= 5) { out += A[(v >>> (bits - 5)) & 31]; bits -= 5; } }
+    return bits > 0 ? out + A[(v << (5 - bits)) & 31] : out;
+  };
+  async function sessaoSimulada(email: string, nome: string, documento: unknown) {
+    teste.emailSimulado = email;
+    teste.docSimulado = documento;
+    const chave = await crypto.subtle.importKey("raw", aleatorio(32), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    sessao = { email, nome, chave, prova: "", envelope: "", versao: 0, doisFatores: false, demo: false, simulada: true, recursos: TUDO };
+    return sessaoData();
+  }
 
   /* ---------------- utilitários ---------------- */
   function b64(bytes: Uint8Array): string {
@@ -100,6 +127,7 @@
   /* ---------------- API ---------------- */
   /** Pedido à API. GET com 404 devolve null; os outros erros viram códigos conhecidos. */
   async function api(metodo: string, caminho: string, corpo?: unknown, prova?: string): Promise<RespostaApi | null> {
+    if (TESTE && teste.falha) throw teste.falha === "SESSION_EXPIRED" ? sessaoExpirada() : erro(teste.falha);   // painel de testes
     const headers: Record<string, string> = {};
     if (corpo !== undefined) headers["Content-Type"] = "application/json";
     if (prova) headers["X-ZoZo-Prova"] = prova;
@@ -416,12 +444,16 @@
   }
 
   /* ---------------- ações ---------------- */
+  // No ambiente de teste a demo (e a conta simulada) aparece como conta completa: todos os recursos e opções
   const usuario = () => (sessao ? { nomeUsuario: sessao.nome, email: sessao.email, doisFatores: sessao.doisFatores,
-    demo: sessao.demo, recursos: Object.assign({}, sessao.recursos) } : null);
+    demo: sessao.demo && !TESTE, recursos: Object.assign({}, TESTE && (sessao.demo || sessao.simulada) ? TUDO : sessao.recursos),
+    teste: TESTE, simulada: !!sessao.simulada } : null);
   const sessaoData = () => ({ authenticated: !!sessao, user: usuario() });
   function exigirSessao(): Sessao { if (!sessao) throw erro("SESSION_EXPIRED"); return sessao; }
   /** Conta de demonstração: senha, nome, 2FA, apagar e excluir não existem (o servidor também recusa) */
   function exigirContaReal(): Sessao { const s = exigirSessao(); if (s.demo) throw erro("DEMO_READ_ONLY"); return s; }
+  /** Conta real; no ambiente de teste também a demo e a simulada (quem chama simula a ação) */
+  function exigirConta(): Sessao { const s = exigirSessao(); if (s.demo && !TESTE) throw erro("DEMO_READ_ONLY"); return s; }
   /** Prova recusada durante a sessão = senha trocada em outro dispositivo: a sessão acabou */
   async function comProvaDaSessao<T>(fn: () => Promise<T>): Promise<T> {
     try { return await fn(); } catch (e) {
@@ -457,6 +489,11 @@
     async login(d) {
       sessao = null; pendente = null;
       const email = normalizarEmail(d.email);
+      if (TESTE && teste.simular) {                // simulação: sem servidor; a mesma conta simulada desta aba ou dados de exemplo
+        if (!d.senha) throw erro("WRONG_PASSWORD");
+        const exemplo = ZoZo.demo ? ZoZo.demo.documento(new Date()) : null;
+        return sessaoSimulada(email, email.split("@")[0], email === teste.emailSimulado ? teste.docSimulado : exemplo);
+      }
       const par = await parametros(email);
       const k = await derivarConta(d.senha, par);
       // confirmacao: token do link do e-mail (#confirmar=…) — a conta pendente é ativada junto com a senha
@@ -488,6 +525,7 @@
       const nome = limparNome(d.nomeUsuario);
       if (!nome) throw erro("REGISTER_FAILED");
       const email = normalizarEmail(d.email);
+      if (TESTE && teste.simular) return sessaoSimulada(email, nome, null);      // simulação: conta nova e vazia, sem servidor
       if (await senhaVazada(d.senha)) throw erro("PASSWORD_BREACHED");
       const sal = aleatorio(16);
       const k = await derivar(d.senha, sal, ITERACOES, KDF_ARGON2);
@@ -520,7 +558,7 @@
     /** Outro dispositivo/aba gravou depois da última leitura? Só o número da versão (o documento não vem) */
     async verificarAtualizacao() {
       const s = exigirSessao();
-      if (s.demo) return { mudou: false };
+      if (s.demo || s.simulada) return { mudou: false };
       const r = await comProvaDaSessao(() => api("GET", "/documento/versao", undefined, s.prova));
       const versao = Number(r && r.versao) || 0;
       return { mudou: versao > s.versao, versao };
@@ -528,6 +566,7 @@
 
     async loadUserData() {
       const s = exigirSessao();
+      if (s.simulada) return { documento: teste.docSimulado === null ? null : structuredClone(teste.docSimulado), aviso: null };
       // Demonstração: dados fictícios, sorteados a cada acesso (nada vem do servidor)
       if (s.demo) return { documento: ZoZo.demo.documento(new Date()), aviso: null };
       const d = await comProvaDaSessao(() => api("GET", "/documento", undefined, s.prova));
@@ -567,6 +606,8 @@
 
     async saveUserData(d) {
       const s = exigirSessao();
+      if (TESTE && teste.conflito) { teste.conflito = false; throw erro("DATA_CHANGED"); }    // painel de testes
+      if (s.simulada) { teste.docSimulado = structuredClone(d.documento); return { salvo: true }; }
       if (s.demo) return { salvo: true };      // demonstração: as alterações ficam só na memória desta aba
       const va = s.versao;
       const conteudo = await cifrar(s.chave, s.email, va + 1, d.documento);
@@ -579,8 +620,9 @@
     },
 
     async changePassword(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
       validarSenha(d.novaSenha);
+      if (simulada(s)) return { alterada: true };
       const atual = await derivarConta(d.senhaAtual, await parametros(s.email));
       atual.bits.fill(0);
       const doc = await api("GET", "/documento", undefined, atual.prova);     // senha errada → WRONG_PASSWORD
@@ -604,9 +646,10 @@
     },
 
     async updateUser(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
       const nome = limparNome(d.nomeUsuario);
       if (!nome) throw erro("OPERATION_FAILED");
+      if (simulada(s)) { s.nome = nome; return sessaoData(); }
       const k = await derivarConta(d.senhaAtual, await parametros(s.email));
       k.bits.fill(0);
       await api("PUT", "/conta/nome", { nome }, k.prova);                     // senha errada → WRONG_PASSWORD
@@ -615,7 +658,8 @@
     },
 
     async wipeUserData(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) { teste.docSimulado = null; return { apagado: true }; }
       const k = await derivarConta(d.senha, await parametros(s.email));
       k.bits.fill(0);
       const doc = await api("GET", "/documento", undefined, k.prova);         // confere a senha e a versão atual
@@ -629,7 +673,8 @@
     },
 
     async deleteUser(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) { sessao = null; teste.emailSimulado = ""; teste.docSimulado = null; return { excluido: true }; }
       const k = await derivarConta(d.senha, await parametros(s.email));
       k.bits.fill(0);
       await api("DELETE", "/conta", undefined, k.prova);
@@ -708,12 +753,14 @@
 
     /* ---- Proteção avançada (sem cópia da chave: esqueceu a senha, a conta recomeça vazia) ---- */
     async getProtecao() {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) return { avancada: teste.protecao, recuperacao: !teste.protecao };
       const r = await comProvaDaSessao(() => api("GET", "/custodia", undefined, s.prova));
       return { avancada: !!(r && r.avancada === true), recuperacao: !!(r && r.ativa === true) };
     },
     async setProtecao(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) { if (!d.senha) throw erro("WRONG_PASSWORD"); teste.protecao = d.avancada === true; return ACOES.getProtecao({}); }
       const k = await derivarConta(d.senha, await parametros(s.email));
       try {
         await api("PUT", "/conta/protecao", { avancada: d.avancada === true }, k.prova);   // senha errada → WRONG_PASSWORD
@@ -724,17 +771,20 @@
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */
     async iniciar2FA() {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) { const c = base32(aleatorio(20)); return { chave: c, uri: "otpauth://totp/ZoZo:" + encodeURIComponent(s.email) + "?secret=" + c + "&issuer=ZoZo%20(teste)" }; }
       return comProvaDaSessao(() => api("POST", "/2fa/iniciar", undefined, s.prova));
     },
     async confirmar2FA(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) { if (!/^\d{6}$/.test(String(d.codigo || ""))) throw erro("CODE_INVALID"); s.doisFatores = true; return sessaoData(); }
       await comProvaDaSessao(() => api("POST", "/2fa/confirmar", { codigo: String(d.codigo || "") }, s.prova));
       s.doisFatores = true;
       return sessaoData();
     },
     async desativar2FA(d) {
-      const s = exigirContaReal();
+      const s = exigirConta();
+      if (simulada(s)) { if (!/^\d{6}$/.test(String((d && d.codigo) || ""))) throw erro("CODE_INVALID"); s.doisFatores = false; return sessaoData(); }
       await comProvaDaSessao(() => api("POST", "/2fa/desativar", { codigo: String((d && d.codigo) || "") }, s.prova));
       s.doisFatores = false;
       return sessaoData();
@@ -757,4 +807,24 @@
 
   const host: HostPonte = { handle };
   ZoZo.webHost = host;
+
+  // Controles do painel de testes: só existem no endereço local e na prévia
+  if (TESTE) ZoZo.testeHost = Object.freeze({
+    simulando: () => teste.simular,
+    simular(ligar: boolean) {
+      teste.simular = !!ligar;
+      try { if (ligar) sessionStorage.setItem(CHAVE_SIMULAR, "1"); else sessionStorage.removeItem(CHAVE_SIMULAR); } catch (e) { /* ok */ }
+    },
+    falhar(codigo: string | null) { teste.falha = codigo; },
+    falhaAtual: () => teste.falha,
+    conflitoNaProxima() { teste.conflito = true; },
+    /** Dados de exemplo na conta simulada (a demo já sorteia os dela a cada leitura) */
+    carregarExemplo() {
+      if (!sessao || !sessao.simulada || !ZoZo.demo) return false;
+      teste.docSimulado = ZoZo.demo.documento(new Date());
+      return true;
+    },
+    estado: () => ({ endereco: hostAtual, simulacao: teste.simular, falha: teste.falha,
+      sessao: !sessao ? "nenhuma" : sessao.simulada ? "simulada (sem servidor)" : sessao.demo ? "demonstração" : "conta real (prévia)" }),
+  });
 })(window.ZoZo);

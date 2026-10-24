@@ -93,7 +93,7 @@
     const a = animacao ? ANIM[animacao] : null;
     const lista = filhos.filter((el): el is HTMLElement => !!el);
     if (a) lista.forEach((el, i) => { const c = a.filhos[Math.min(i, 3)]; if (c) el.classList.add(...c.split(" ")); });
-    return h("div", { class: C.raiz }, h("div", { class: C.centro }, h("div", { class: [C.cartao, a && a.cartao] }, lista)));
+    return h("main", { class: C.raiz }, h("div", { class: C.centro }, h("div", { class: [C.cartao, a && a.cartao] }, lista)));
   }
 
   // Etapa atual (sobrevive aos redesenhos após um erro). Login: 0 início · 1 e-mail · 2 senha
@@ -184,7 +184,7 @@
     const modo = st.status === "register" ? "register" : st.status === "loading" ? "loading" : st.status === "2fa" ? "2fa" : "login";
 
     if (modo === "loading") {
-      mount(root, h("div", { class: C.raiz },
+      mount(root, h("main", { class: C.raiz },
         h("div", { class: C.centro }, h("div", { class: C.carregando, role: "status" }, h("span", { class: ZoZo.pecas.girando, "aria-hidden": "true" }), h("span", null, "Carregando…")))));
       return;
     }
@@ -292,7 +292,7 @@
   function carregando(root: any, texto: any) {
     // o carregando gira por conta própria: só o texto desliza
     const frase = h("p", { class: [C.tituloEspera, ANIM.frente.filhos[1]] }, texto);
-    mount(root, h("div", { class: C.raiz },
+    mount(root, h("main", { class: C.raiz },
       h("div", { class: C.centro },
         h("div", { class: [C.cartao, "auth__card--espera"], role: "status", "aria-live": "polite" },
           logo(), frase, h("span", { class: C.spinnerEspera, "aria-hidden": "true" })))));

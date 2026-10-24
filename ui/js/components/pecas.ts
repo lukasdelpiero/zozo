@@ -14,7 +14,7 @@
 
   // Etiqueta de perfil e pílula de categoria: fundo na cor (14%/12%), texto no mesmo tom mais escuro
   const TAG = "tag tw:inline-flex tw:items-center tw:gap-1.5 tw:max-w-full tw:h-[22px] tw:pr-[9px] tw:pl-2 tw:py-0 tw:[border:0] tw:rounded-(--radius-pill) "
-    + "tw:bg-[color-mix(in_srgb,var(--tag-color)_12%,white)] tw:text-[color-mix(in_srgb,var(--tag-color)_72%,black)] tw:leading-none tw:whitespace-nowrap";
+    + "tw:bg-[color-mix(in_srgb,var(--tag-color)_12%,white)] tw:text-[color-mix(in_srgb,var(--tag-color)_55%,black)] tw:leading-none tw:whitespace-nowrap";
   const PCT = "pct tw:inline-flex tw:items-center tw:gap-[3px] tw:h-[22px] tw:px-[7px] tw:py-0 tw:rounded-(--radius-pill) tw:text-[13px] tw:font-[550] "
     + "tw:[font-variant-numeric:lining-nums_proportional-nums] tw:whitespace-nowrap";
   const CHIP = "status-chip tw:inline-flex tw:items-center tw:h-[22px] tw:px-[9px] tw:py-0 tw:rounded-(--radius-pill) tw:text-[12px] tw:font-semibold";
@@ -84,7 +84,7 @@
 
     /* Pílula de categoria (UI.CategoryLabel pill) e rótulo simples */
     pilula: "cat-pill tw:inline-flex tw:items-center tw:gap-[5px] tw:max-w-full tw:h-[22px] tw:pr-[9px] tw:pl-[7px] tw:py-0 tw:rounded-(--radius-pill) "
-      + "tw:bg-[color-mix(in_srgb,var(--tag-color)_14%,white)] tw:text-[color-mix(in_srgb,var(--tag-color)_70%,black)] tw:text-[11px] tw:font-semibold "
+      + "tw:bg-[color-mix(in_srgb,var(--tag-color)_14%,white)] tw:text-[color-mix(in_srgb,var(--tag-color)_55%,black)] tw:text-[11px] tw:font-semibold "
       + "tw:tracking-[0.03em] tw:uppercase tw:whitespace-nowrap tw:leading-none",
     pilulaIcone: "tw:text-[12px] tw:tracking-normal tw:relative tw:-top-px",   // a tinta do emoji fica ~1 px abaixo do centro
     pilulaNome: "tw:overflow-hidden tw:text-ellipsis tw:leading-[22px]",       // 22 px: acentos em maiúsculas não cortam
@@ -115,12 +115,12 @@
     chipNeutro: CHIP + " tw:bg-(--color-neutral-soft) tw:text-(--color-neutral)",
 
     /* Barra de progresso (UI.ProgressBar) */
-    barra: "progress tw:w-full tw:h-1.5 tw:rounded-(--radius-pill) tw:bg-(--color-progress-track) tw:overflow-hidden",
-    barraGrande: "progress tw:w-full tw:h-2 tw:mt-2 tw:rounded-(--radius-pill) tw:bg-(--color-progress-track) tw:overflow-hidden",
-    barraOk: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-ok) tw:[transition:width_var(--duration-medium)_var(--easing)]",
-    barraAcima: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-over) tw:[transition:width_var(--duration-medium)_var(--easing)]",
-    barraPerto: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-near) tw:[transition:width_var(--duration-medium)_var(--easing)]",
-    barraAlocacao: "tw:h-full tw:rounded-[inherit] tw:bg-(--color-allocation) tw:[transition:width_var(--duration-medium)_var(--easing)]",
+    barra: "progress tw:block tw:w-full tw:h-1.5 tw:rounded-(--radius-pill) tw:bg-(--color-progress-track) tw:overflow-hidden",
+    barraGrande: "progress tw:block tw:w-full tw:h-2 tw:mt-2 tw:rounded-(--radius-pill) tw:bg-(--color-progress-track) tw:overflow-hidden",
+    barraOk: "tw:block tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-ok) tw:[transition:width_var(--duration-medium)_var(--easing)]",
+    barraAcima: "tw:block tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-over) tw:[transition:width_var(--duration-medium)_var(--easing)]",
+    barraPerto: "tw:block tw:h-full tw:rounded-[inherit] tw:bg-(--color-progress-near) tw:[transition:width_var(--duration-medium)_var(--easing)]",
+    barraAlocacao: "tw:block tw:h-full tw:rounded-[inherit] tw:bg-(--color-allocation) tw:[transition:width_var(--duration-medium)_var(--easing)]",
 
     /* Abas de período 1S · 1M · 3M · AA · 1A · TOTAL */
     abas: "filter-tabs tw:inline-flex tw:items-center tw:gap-1",
@@ -129,7 +129,7 @@
 
     /* Ícone redondo da conta (UI.AccountIcon) e nome com os 4 últimos dígitos */
     iconeConta: "account-icon tw:size-9 tw:grid tw:place-items-center tw:rounded-[50%] tw:flex-none "
-      + "tw:bg-[color-mix(in_srgb,var(--account-color)_14%,white)] tw:text-[color-mix(in_srgb,var(--account-color)_78%,black)]",
+      + "tw:bg-[color-mix(in_srgb,var(--account-color)_14%,white)] tw:text-[color-mix(in_srgb,var(--account-color)_65%,black)]",
     nomeDigitos: "name-digits tw:inline-flex tw:items-baseline tw:gap-1.5 tw:min-w-0",
     nomeDigitosNome: "name-digits__name tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap",
     nomeDigitosDigitos: "name-digits__digits tw:text-zz-muted tw:[font-variant-numeric:lining-nums_proportional-nums] tw:flex-none",
@@ -418,6 +418,8 @@
     plLetra: "tw:col-start-3 tw:mr-2",
     plNome: "tw:col-start-4 tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     plTitulo: "tw:overflow-hidden tw:text-ellipsis tw:text-[15px] tw:font-[450]",
+    // o nome é o botão da linha (teclado e leitor de tela): sem aparência de botão
+    plTituloBotao: "tw:min-w-0 tw:p-0 tw:[border:0] tw:bg-transparent tw:text-left tw:text-inherit tw:whitespace-nowrap tw:cursor-pointer tw:rounded-sm tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2",
     plCategoria: "tw:col-start-5 tw:ml-2.5 tw:min-w-7 tw:h-[22px] tw:px-1.5 tw:grid tw:place-items-center tw:rounded-(--radius-pill) "
       + "tw:bg-[color-mix(in_srgb,var(--tag-color)_18%,white)] tw:text-[12px] tw:leading-none tw:mr-0.5",
     plValor: "money tw:col-start-6 tw:ml-2.5 tw:justify-self-end tw:min-w-[72px] tw:text-right tw:text-[15px] tw:font-[620] tw:whitespace-nowrap",

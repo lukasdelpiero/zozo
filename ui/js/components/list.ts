@@ -260,7 +260,7 @@
     categoriaPagina: "tw:area620:hidden",
     valor: "money tw:[justify-self:end] tw:inline-flex tw:items-center tw:gap-1.5 tw:base:text-[15px] tw:base:font-[620]",
     // check de pago na cor da categoria; vazio com a mesma largura (os valores ficam alinhados)
-    pago: "tw:inline-grid tw:place-items-center tw:w-3.5 tw:h-[18px] tw:flex-none tw:rounded-[50%] tw:text-[color-mix(in_srgb,var(--tag-color)_75%,black)]",
+    pago: "tw:inline-grid tw:place-items-center tw:w-3.5 tw:h-[18px] tw:flex-none tw:rounded-[50%] tw:text-[color-mix(in_srgb,var(--tag-color)_60%,black)]",
   };
   function RecurrenceRow(r: any, opts?: OpcoesLinha & { compacta?: boolean; semData?: boolean; partes?: { data?: string; titulo?: string; categoria?: string; valor?: string } }): HTMLElement {
     const o = opts || {};
@@ -338,7 +338,7 @@
         const gasto = doMes.reduce((s: number, x: any) => s + (T.gasto[x.tipo] || 0) * x.valor, 0);
         const recebido = doMes.reduce((s: number, x: any) => s + (T.recebido[x.tipo] || 0) * x.valor, 0);
         secao = h("section", { class: ZoZo.pecas.plMes }, h("header", { class: ZoZo.pecas.plMesTopo },
-          h("h4", { class: ZoZo.pecas.plMesTitulo }, F.mesAno(mes + "-01")),
+          h("h3", { class: ZoZo.pecas.plMesTitulo }, F.mesAno(mes + "-01")),
           h("span", { class: ZoZo.pecas.plMesTotal },
             recebido > 0 ? h("span", { class: "money money--income" }, F.moeda(recebido)) : null,
             recebido > 0 && gasto > 0 ? h("span", { class: ZoZo.pecas.plMesParenteses }, "(" + F.moeda(gasto) + ")") : null,
@@ -347,16 +347,17 @@
       }
       if (l.data !== diaAtual) {
         diaAtual = l.data;
-        secao.appendChild(h("h5", { class: ZoZo.pecas.plDia }, F.rotuloDia(l.data)));
+        secao.appendChild(h("h4", { class: ZoZo.pecas.plDia }, F.rotuloDia(l.data)));
         lista = h("div", { class: ZoZo.pecas.plLista });
         secao.appendChild(lista);
       }
       const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
       const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
       const marcado = marcados.has(l.id);
-      lista.appendChild(h("div", { class: [ZoZo.pecas.plLinha, marcado && "is-checked"], role: "button", tabindex: "0", "data-id": l.id,
-        onClick: () => o.onClick && o.onClick(l),
-        onKeydown: (e: KeyboardEvent) => { if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) { e.preventDefault(); if (o.onClick) o.onClick(l); } } },
+      // A linha inteira abre com o mouse; no teclado (e no leitor de tela) quem abre é o botão do nome —
+      // um "botão" com a caixa de seleção dentro seria controle aninhado (WCAG 4.1.2)
+      lista.appendChild(h("div", { class: [ZoZo.pecas.plLinha, marcado && "is-checked"], "data-id": l.id,
+        onClick: (e: MouseEvent) => { if (!(e.target as Element).closest("button, input, label") && o.onClick) o.onClick(l); } },
         UI.Checkbox(marcado, (v) => {
           const atual = new Set(ZoZo.store.get().ui.selecionados || []);
           if (v) atual.add(l.id); else atual.delete(l.id);
@@ -364,7 +365,7 @@
         }, { label: "Selecionar " + l.descricao, class: ZoZo.pecas.plCaixa }),
         marca ? h("span", { class: [ZoZo.pecas.letra, ZoZo.pecas.plLetra], title: MARCAS[marca] }, marca) : null,
         h("span", { class: ZoZo.pecas.plNome },
-          h("span", { class: ZoZo.pecas.plTitulo }, l.descricao),
+          h("button", { type: "button", class: [ZoZo.pecas.plTitulo, ZoZo.pecas.plTituloBotao], onClick: () => o.onClick && o.onClick(l) }, l.descricao),
           l.parcelaTotal ? h("span", { class: "launch-row__parcel" }, l.parcelaAtual + "/" + l.parcelaTotal) : null),
         l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, ZoZo.dom.emoji(l.categoria.icone)) : null,
         h("span", { class: [ZoZo.pecas.plValor, verde && "money--income"] }, F.moeda(l.valor))));

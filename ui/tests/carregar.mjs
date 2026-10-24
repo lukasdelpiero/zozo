@@ -42,7 +42,7 @@ export function carregar({ recursos = { perfis: true, boleto: true, pix: true, c
  * Carrega o host da versão web (bridge/host-web) com fetch e localStorage simulados.
  * O argon2 (hash-wasm) é importado de verdade: as chaves derivadas são as mesmas do navegador.
  */
-export function carregarHost({ fetch, armazenamento = new Map() } = {}) {
+export function carregarHost({ fetch, armazenamento = new Map(), hostname = "" } = {}) {
   const eventos = [];
   const localStorage = {
     getItem: (k) => (armazenamento.has(k) ? armazenamento.get(k) : null),
@@ -51,7 +51,7 @@ export function carregarHost({ fetch, armazenamento = new Map() } = {}) {
   };
   const ctx = {
     console, crypto: webcrypto, TextEncoder, TextDecoder, btoa, atob, Blob, Response, Headers, CompressionStream, DecompressionStream,
-    setTimeout, clearTimeout, fetch, localStorage,
+    setTimeout, clearTimeout, fetch, localStorage, structuredClone, location: { hostname },
     CustomEvent: class { constructor(tipo, o) { this.type = tipo; this.detail = o && o.detail; } },
     dispatchEvent: (e) => { eventos.push(e); return true; },
   };
@@ -67,5 +67,5 @@ export function carregarHost({ fetch, armazenamento = new Map() } = {}) {
     if (!r.success) throw Object.assign(new Error(r.error.code), { code: r.error.code });
     return structuredClone(r.data);                // objetos do contexto isolado viram objetos comuns (comparação)
   };
-  return { host, chamar, eventos, armazenamento };
+  return { host, chamar, eventos, armazenamento, testeHost: () => ctx.ZoZo.testeHost };
 }

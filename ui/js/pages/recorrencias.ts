@@ -44,7 +44,9 @@
 
     // Categoria acima do nome (menu com + Nova categoria)
     const cats = ((ZoZo.store.get().data.categorias || {}).categorias) || [];
-    const catBtn = h("button", { type: "button", class: ZoZo.pecas.pilulaBotao, "aria-haspopup": "menu", "aria-label": "Alterar categoria" },
+    const catBtn = h("button", { type: "button", class: ZoZo.pecas.pilulaBotao, "aria-haspopup": "menu",
+      // o nome acessível começa pelo texto visível (WCAG 2.5.3): "Energia, alterar categoria"
+      "aria-label": r.categoria ? r.categoria.nome + ", alterar categoria" : "Escolher categoria" },
       r.categoria ? UI.CategoryLabel(r.categoria, { pill: true }) : h("span", { class: ZoZo.pecas.lpMais }, ZoZo.icons.icon("mais", { size: 14 })));
     catBtn.addEventListener("click", () => ZoZo.menu.abrir(catBtn, cats.map((c: any): ItemMenu => ({
       render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, c.id === r.categoriaId && "is-checked"], onClick: () => { api.fechar(); salvarOrigem({ categoriaId: c.id }).then(reabrir).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })); } }, UI.CategoryLabel(c, { pill: true })),
