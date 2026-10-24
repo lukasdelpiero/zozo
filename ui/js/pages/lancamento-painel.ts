@@ -268,7 +268,6 @@
             onClick: () => { api.fechar(); ZoZo.categoriasShared.abrirDetalhe(c, ctx, { voltar: voltarParaCa }); } }, icon("chevron-right", { size: 14 })))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenharLista(); });
         mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), lista, h("div", { class: ZoZo.estrutura.menuSeparador }),
-          d.categoriaId ? h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => escolher(null) }, h("span", { class: ZoZo.estrutura.menuRotulo }, "Sem categoria")) : null,
           h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "",
             // recarrega as categorias antes de escolher: a nova já aparece selecionada no painel
             aoCriar: (c: any) => ctx.loadData("categorias", A.getCategorias, null, { force: true }).catch(() => null).then(() => escolher(c.id)) }); } },

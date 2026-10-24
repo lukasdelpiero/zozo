@@ -15,6 +15,8 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 
 ## Novidades da versão 3.17.0
 
+- **Cores pedidas (decisão do produto):** cinza #7f8ba4, pílulas #e51300 / #008a33 / #7f8ba4, vermelho dos menus #e51300 e botão vermelho #ff1a1a (hover #e40c0c) — ficam abaixo do contraste mínimo WCAG AA nesses textos.
+- **Ajustes:** no painel, linha sem letra (R/P/T…) sem vão entre a caixa e o nome; em "Nova recorrência" os ícones ficam alinhados; o menu de categoria do painel não tem mais "Sem categoria"; a tela inicial não abre com o foco (e o anel) no "Continuar com e-mail".
 - **Símbolos (todo o app):** o "R$" (ou € e $) fica menor, colado e alinhado ao topo do número, e o "%" um pouco menor no alto, em qualquer valor mostrado — inclusive nos valores editáveis do painel, que aparecem formatados e viram campo ao clicar (`core/simbolos.ts`, `inline.vitrine`). Os rótulos dentro dos gráficos (SVG) continuam como antes.
 - **Passivos (correção):** a seta segue o sentido do valor e a cor diz se é bom — dívida caiu: seta ↘ verde; dívida subiu: seta ↗ vermelha.
 - **Gráficos que filtram ao passar o mouse (Dashboard e Contas):** a data aparece em cima do ponto, o trecho depois dele fica esmaecido e o topo do cartão mostra o valor e a variação até aquele dia (gasto acumulado no Gasto mensal; ativos e passivos no Patrimônio).

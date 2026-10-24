@@ -255,13 +255,14 @@
     janelaLista: "tw:max-h-[360px] tw:overflow-y-auto tw:overflow-x-hidden tw:-mx-6 tw:flex tw:flex-col",
     janelaListaSemRolagemLateral: "tw:max-h-[360px] tw:overflow-y-auto tw:overflow-x-hidden tw:flex tw:flex-col",
     // transação na lista (de borda a borda da janela)
-    janelaLanc: LANC + " tw:grid-cols-[56px_minmax(0,1fr)_30px_auto] tw:py-0 tw:px-6 tw:m-0",
+    // valor numa coluna de largura fixa: os ícones de categoria ficam alinhados (à esquerda da coluna deles)
+    janelaLanc: LANC + " tw:grid-cols-[56px_minmax(0,1fr)_30px_112px] tw:py-0 tw:px-6 tw:m-0",
     janelaLancMarcavel: LANC + " tw:grid-cols-[18px_52px_minmax(0,1fr)_auto] tw:py-0 tw:px-2 tw:m-0 tw:cursor-pointer",
     janelaLancData: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     janelaLancNome: "tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden tw:text-[15px] tw:font-[450] "
       + "tw:[&>span:last-child]:overflow-hidden tw:[&>span:last-child]:text-ellipsis",
     janelaLancCat: "tw:w-[26px] tw:h-[22px] tw:grid tw:place-items-center tw:rounded-(--radius-pill) tw:bg-[color-mix(in_srgb,var(--tag-color)_16%,white)] tw:text-[12px]",
-    janelaLancValor: "money tw:text-[15px] tw:font-[620]",
+    janelaLancValor: "money tw:justify-self-end tw:text-[15px] tw:font-[620]",
   } as const;
 
   ZoZo.estrutura = E;

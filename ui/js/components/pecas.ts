@@ -422,6 +422,8 @@
       + "tw:[&.is-checked]:bg-zz-primary-soft tw:focus-visible:outline-2 tw:focus-visible:outline-[var(--color-focus)] tw:focus-visible:-outline-offset-2",
     plCaixa: "tw:col-start-2 tw:mr-2.5 tw:opacity-55 tw:group-hover/pl:opacity-100 tw:group-[.is-checked]/pl:opacity-100",
     plLetra: "tw:col-start-3 tw:mr-2",
+    // sem letra, o nome começa logo depois da caixa (ocupa a coluna da letra): nada de vão entre caixa e nome
+    plNomeSemLetra: "tw:col-[3/5]!",
     plNome: "tw:col-start-4 tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     plTitulo: "tw:overflow-hidden tw:text-ellipsis tw:text-[.9375rem] tw:font-[450]",
     // o nome é o botão da linha (teclado e leitor de tela): sem aparência de botão

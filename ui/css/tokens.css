@@ -25,7 +25,7 @@
   --color-text-primary: #16213a;
   --color-text-secondary: #4f5b71;      /* WCAG AA: ≥ 4,5:1 sobre branco e sobre os fundos claros */
   --color-text-muted: #5b687f;          /* WCAG AA: ≥ 4,5:1 sobre branco (texto que informa, não só enfeita) */
-  --color-text-cinza: #647087;          /* cinza de datas, rótulos e legendas (o #7f8ba4 pedido, escurecido até ≥ 4,5:1) */
+  --color-text-cinza: #7f8ba4;          /* cinza de datas, rótulos e legendas (cor pedida; abaixo de 4,5:1 por escolha do produto) */
 
   /* Financeiro */
   --color-positive: #176b3a;
@@ -35,12 +35,12 @@
   --color-neutral: #4a5263;
   --color-neutral-soft: #eef0f3;
   --color-income: #0f7a34;               /* ≥ 4,5:1 também sobre a linha selecionada */
-  /* Pílulas de variação (gráficos, contas): tons pedidos escurecidos até ≥ 4,5:1 sobre o fundo da pílula */
-  --color-pilula-sobe: #007f2f;  --color-pilula-sobe-fundo: #00cc4b14;
-  --color-pilula-desce: #d01100; --color-pilula-desce-fundo: #ff443314;
-  --color-pilula-igual: #647087; --color-pilula-igual-fundo: #7f8ba414;
+  /* Pílulas de variação (gráficos, contas) — cores pedidas pelo produto */
+  --color-pilula-sobe: #008a33;  --color-pilula-sobe-fundo: #00cc4b14;
+  --color-pilula-desce: #e51300; --color-pilula-desce-fundo: #ff443314;
+  --color-pilula-igual: #7f8ba4; --color-pilula-igual-fundo: #7f8ba414;
   /* Itens de menu perigosos (Excluir…): texto vermelho e realce claro */
-  --color-menu-perigo: #d01100;  --color-menu-perigo-fundo: #ff443314;
+  --color-menu-perigo: #e51300;  --color-menu-perigo-fundo: #ff443314;
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
   --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */
@@ -65,8 +65,8 @@
   --palette-13: #d81aff; --palette-14: #ff1ad9; --palette-15: #ff0f5f; --palette-16: #6078a9;
 
   /* Feedback */
-  --color-danger: #e40c0c;              /* botão vermelho (texto branco ≥ 4,5:1) */
-  --color-danger-hover: #c70a0a;
+  --color-danger: #ff1a1a;              /* botão vermelho (cor pedida pelo produto) */
+  --color-danger-hover: #e40c0c;
   --color-danger-soft: #fdecec;
   --color-warning-soft: #fff5e2;
   --color-warning-text: #84570a;

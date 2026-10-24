@@ -173,7 +173,8 @@
       setTimeout(() => location.assign("/api/google/inicio"), 350);
     };
     mount(area,
-      h("button", { type: "button", class: C.opcaoEmail, "data-autofocus": "",
+      // sem foco automático: quem chega digitando o endereço (teclado) via o anel de foco em volta do botão
+      h("button", { type: "button", class: C.opcaoEmail,
         onClick: () => { estado.etapa = 1; render(root, Object.assign({}, cfg, { erro: null })); } }, "Continuar com e-mail"),
       h("button", { type: "button", class: C.opcaoGoogle, onClick: google }, logoGoogle(), h("span", null, "Continuar com Google")));
     return h("div", { class: C.form }, area, msg, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro));

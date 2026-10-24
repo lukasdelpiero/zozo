@@ -254,8 +254,7 @@
     colunasIcone: "tw:grid-cols-[22px_minmax(0,1fr)_180px_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
     interativa: "tw:cursor-pointer tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
     normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
-    // selecionada (fundo roxo claro): a data volta ao cinza mais escuro para manter o contraste ≥ 4,5:1
-    selecionada: "tw:bg-zz-primary-soft tw:[&>span:first-child]:text-zz-secondary",
+    selecionada: "tw:bg-zz-primary-soft",
     data: "tw:base:text-zz-cinza tw:base:whitespace-nowrap " + NUMEROS,
     icone: "tw:text-[15px]",
     desc: "tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
@@ -369,7 +368,7 @@
           ZoZo.store.set({ ui: { selecionados: Array.from(atual) } });
         }, { label: "Selecionar " + l.descricao, class: ZoZo.pecas.plCaixa }),
         marca ? h("span", { class: [ZoZo.pecas.letra, ZoZo.pecas.plLetra], title: MARCAS[marca] }, marca) : null,
-        h("span", { class: ZoZo.pecas.plNome },
+        h("span", { class: [ZoZo.pecas.plNome, !marca && ZoZo.pecas.plNomeSemLetra] },
           h("button", { type: "button", class: [ZoZo.pecas.plTitulo, ZoZo.pecas.plTituloBotao], onClick: () => o.onClick && o.onClick(l) }, l.descricao),
           l.parcelaTotal ? h("span", { class: "launch-row__parcel" }, l.parcelaAtual + "/" + l.parcelaTotal) : null),
         l.categoria ? h("span", { class: ZoZo.pecas.plCategoria, title: l.categoria.nome, style: { "--tag-color": F.cor(l.categoria.cor, "var(--palette-16)") } }, ZoZo.dom.emoji(l.categoria.icone)) : null,
