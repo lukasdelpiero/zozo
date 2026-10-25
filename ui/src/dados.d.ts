@@ -169,9 +169,56 @@ declare global {
     concluirRecuperacao: { email: string; recomecou: boolean };
     getProtecao: { avancada: boolean; recuperacao: boolean };
     setProtecao: { avancada: boolean; recuperacao: boolean };
+    verificarAtualizacao: { mudou: boolean; versao?: number };
+    /** documento decifrado (o serviço confere tudo em normalizar); aviso: restaurado da cópia, documento sumido… */
+    loadUserData: { documento: unknown; aviso: string | null; somenteLeitura?: boolean };
+    saveUserData: { salvo: boolean };
+    changePassword: { alterada: boolean };
+    updateUser: RespostaSessao;
+    wipeUserData: { apagado: boolean };
+    deleteUser: { excluido: boolean };
+    iniciar2FA: { chave: string; uri: string };
+    confirmar2FA: RespostaSessao;
+    desativar2FA: RespostaSessao;
   }
-  /** Resposta de uma ação: leituras do serviço e ações de sessão tipadas; as outras, ainda `any` (etapa seguinte) */
-  type RespostaDe<K extends NomeAcao> = K extends NomeLeitura ? RespostasLeitura[K] : K extends keyof RespostasHost ? RespostasHost[K] : any;
+  /** Gravações do serviço → resposta (o serviço é conferido contra esta tabela) */
+  interface RespostasEscrita {
+    createLancamento: { lancamento: LancamentoTela };
+    updateLancamento: { lancamento: LancamentoTela };
+    deleteLancamento: { id: Id };
+    updateLancamentosEmLote: { alterados: number };
+    deleteLancamentos: { excluidos: number };
+    pagarRecorrencia: { lancamentoId: Id | null };
+    tornarRecorrente: { serieId: Id };
+    vincularRecorrencia: { serieId: Id };
+    desvincularRecorrencia: { id: Id };
+    excluirRecorrencia: { serieId: Id };
+    encerrarRecorrencia: { serieId: Id };
+    dividirLancamento: { id: Id; grupo: string };
+    salvarFatura: { ok: boolean };
+    receberFatura: { lancamento: LancamentoTela };
+    pagarFatura: { debito: LancamentoTela; receita: LancamentoTela };
+    createConta: { conta: ContaTela };
+    updateCicloCartao: { conta: ContaTela };
+    updateConta: { conta: ContaTela; id: Id; cor: string | null | undefined };
+    deleteConta: { id: Id };
+    createCategoria: { categoria: Categoria };
+    updateCategoria: { categoria: Categoria; id: Id; cor: string | null };
+    deleteCategoria: { id: Id };
+    createCategoriasSugeridas: { total: number };
+    updateGrupo: { coberto: number; restante: number };
+    desagruparCategorias: { desagrupadas: number };
+    createPerfil: { perfil: Perfil };
+    updatePerfil: { perfil: Perfil; id: Id; cor: string | null };
+    deletePerfil: { id: Id };
+    arquivarPerfil: { id: Id; arquivado: boolean };
+    updateConfig: { foto: string | null; orcamentoAtivo: boolean; pix: ChavePix | null; multicambio: boolean; moeda: Moeda; primeiraVez: boolean };
+    transferirMoeda: { transferidos: number };
+  }
+  type NomeEscrita = keyof RespostasEscrita;
+  /** Resposta de qualquer ação: leitura ou gravação do serviço, ou ação do host (sessão e conta) */
+  type RespostaDe<K extends NomeAcao> = K extends NomeLeitura ? RespostasLeitura[K] : K extends NomeEscrita ? RespostasEscrita[K]
+    : K extends keyof RespostasHost ? RespostasHost[K] : never;
 
   /** Dados guardados no estado (store.data[chave]) e a leitura que preenche cada chave */
   interface DadosEstado {

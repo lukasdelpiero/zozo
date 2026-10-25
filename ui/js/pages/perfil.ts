@@ -375,10 +375,10 @@
       onDigitar: () => { campo.marcarErro(false); },
       onCompleto: (codigo) => {
         campo.desabilitar(true);
-        ctx.bridge.request(A.confirmar2FA, { codigo }).then((r: { user: UsuarioSessao }) => {
+        ctx.bridge.request(A.confirmar2FA, { codigo }).then((r) => {
           erro.textContent = "";
           check.hidden = false;                                     // ✓ ao lado de "Insira o código de seis dígitos."
-          store.set({ session: { user: r.user } });
+          store.set({ session: { user: r.user || null } });
           if (aoAtivar) aoAtivar();
           setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); }, 700);
         }).catch((e: ErroPonte) => {
@@ -427,9 +427,9 @@
       onDigitar: () => campo.marcarErro(false),
       onCompleto: (codigo) => {
         campo.desabilitar(true);
-        ctx.bridge.request(A.desativar2FA, { codigo }).then((r: { user: UsuarioSessao }) => {
+        ctx.bridge.request(A.desativar2FA, { codigo }).then((r) => {
           janela.fechar(true);
-          store.set({ session: { user: r.user } });
+          store.set({ session: { user: r.user || null } });
           ctx.toast("Autenticação de dois fatores desativada.");
         }).catch((e: ErroPonte) => {
           erros += 1;
@@ -665,7 +665,7 @@
               .then((senha: string | null) => {
                 if (!senha) throw new ZoZo.messages.BridgeError("CANCELADO", "Alteração cancelada.");
                 return ctx.bridge.request(A.updateUser, { nomeUsuario: v, email: u.email, senhaAtual: senha });
-              }).then((sessao: { user: UsuarioSessao }) => { store.set({ session: { user: sessao.user } }); ctx.toast("Nome alterado."); }) })),
+              }).then((sessao) => { store.set({ session: { user: sessao.user || null } }); ctx.toast("Nome alterado."); }) })),
           linhaConfig("E-mail", null, h("span", { class: CF.leitura }, u.email || "")),
           demo ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
           // Senha: título em cima e, abaixo, senha atual · nova senha · Alterar (sem espremer o título ao lado)

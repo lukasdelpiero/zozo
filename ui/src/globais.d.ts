@@ -233,7 +233,7 @@ declare global {
   interface ZoZoBridge {
     /** Promise com os dados da resposta; rejeita sempre com ErroPonte (texto amigável) */
     request<K extends NomeAcao>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostaDe<K>>;
-    requestHost(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any>;
+    requestHost<K extends keyof RespostasHost>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostasHost[K]>;
     mode: ModoPonte;
     isDemo: boolean;
     ACTIONS: AcoesPonte;
@@ -395,7 +395,8 @@ declare global {
   interface CampoForm {
     nome: string; rotulo: string;
     tipo?: "texto" | "email" | "senha" | "dinheiro" | "digitos4" | "selecao" | "cor" | "emoji" | "lista";
-    obrigatorio?: boolean; opcoes?: any[]; dica?: string; max?: number; placeholder?: string; autocomplete?: string;
+    /** seleção: opções da lista; "lista": sugestões (texto) */
+    obrigatorio?: boolean; opcoes?: Array<OpcaoLista | string>; dica?: string; max?: number; placeholder?: string; autocomplete?: string;
     mostrarSe?(valores: Record<string, unknown>): boolean;
   }
   interface ConfigForm {
@@ -588,7 +589,8 @@ declare global {
   /* ---------- Módulos das páginas (o que cada um expõe em window.ZoZo) ---------- */
   /** js/data/servico.js (ainda em JavaScript): regras financeiras sobre o documento decifrado */
   interface ZoZoServico {
-    handle(action: string, data?: unknown): Promise<any>;
+    /** a resposta é RespostaDe<ação> (quem chama pela ponte recebe o tipo certo: transporte.ts) */
+    handle(action: string, data?: unknown): Promise<unknown>;
     atende(action: string): boolean;
     reset(): void;
     FREQUENCIAS: Readonly<Record<string, { dias?: number; meses?: number; rotulo: string; texto: string }>>;
@@ -629,7 +631,7 @@ declare global {
     A: Readonly<Record<string, string>>;
   }
   /** js/data/demo.ts — documento fictício da conta de demonstração */
-  interface ZoZoDemo { documento(hoje: Date, completo?: boolean): any }
+  interface ZoZoDemo { documento(hoje: Date, completo?: boolean): Documento }
   /** js/pages/boleto.ts — criação de fatura */
   interface ZoZoBoleto {
     /** receber: abre já a janela "Registrar pagamento recebido" (painel de testes) */

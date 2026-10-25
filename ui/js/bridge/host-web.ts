@@ -776,7 +776,9 @@
     async iniciar2FA() {
       const s = exigirConta();
       if (simulada(s)) { const c = base32(aleatorio(20)); return { chave: c, uri: "otpauth://totp/ZoZo:" + encodeURIComponent(s.email) + "?secret=" + c + "&issuer=ZoZo%20(teste)" }; }
-      return comProvaDaSessao(() => api("POST", "/2fa/iniciar", undefined, s.prova));
+      const r = await comProvaDaSessao(() => api("POST", "/2fa/iniciar", undefined, s.prova));
+      if (!r || typeof r.chave !== "string" || typeof r.uri !== "string") throw erro("OPERATION_FAILED");
+      return { chave: r.chave, uri: r.uri };
     },
     async confirmar2FA(d) {
       const s = exigirConta();

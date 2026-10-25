@@ -200,7 +200,7 @@
         .then((r) => {
           const bruto = r && r.documento;
           // Gravado por uma versão MAIS NOVA do ZoZo (outra aba já atualizada): não abre nem regrava com o formato antigo
-          if (bruto && typeof bruto === "object" && Number(bruto.versao) > VERSAO) throw erro("DOCUMENT_NEWER");
+          if (objeto(bruto) && Number(bruto.versao) > VERSAO) throw erro("DOCUMENT_NEWER");
           const lido = normalizar(bruto);
           doc = lido.doc;
           temDoc = true;
@@ -830,7 +830,6 @@
 
   /* ---------------- ações ---------------- */
   const A = M.ACTIONS;
-  type Acao = (d: Dados) => unknown;
   // cada leitura devolve exatamente o tipo de ui/src/dados.d.ts (RespostasLeitura): o compilador confere
   const LEITURAS: { readonly [K in NomeLeitura]: (d: Dados) => RespostasLeitura[K] } = {
     [A.getLancamentos]: getLancamentos,
@@ -1032,7 +1031,8 @@
     }).filter((x) => x.descricao || x.valor);
   }
 
-  const ESCRITAS: Record<string, Acao> = {
+  // cada gravação devolve exatamente RespostasEscrita[ação] (ui/src/dados.d.ts): o compilador confere
+  const ESCRITAS: { readonly [K in NomeEscrita]: (d: Dados) => RespostasEscrita[K] } = {
     /* Lançamentos */
     [A.createLancamento]: (d) => {
       const tipo = d.lancamento && d.lancamento.tipo === "recorrente" ? "recorrencia" : "lancamento";
@@ -1617,7 +1617,7 @@
 
   // Só as ações da própria tabela: "in" também acharia nomes herdados de Object (constructor, toString…)
   const ehLeitura = (action: string): action is NomeLeitura => Object.hasOwn(LEITURAS, action);
-  const ehEscrita = (action: string) => Object.hasOwn(ESCRITAS, action);
+  const ehEscrita = (action: string): action is NomeEscrita => Object.hasOwn(ESCRITAS, action);
   function atende(action: string) { return ehLeitura(action) || ehEscrita(action); }
 
   /** Falha inesperada (ex.: dado antigo num formato que a regra não previa) vira erro amigável com o código */
@@ -1641,7 +1641,7 @@
     try { return clone(LEITURAS[action](d)); } finally { doc = real; }
   }
 
-  function handle(action: string, data?: unknown): Promise<any> {
+  function handle(action: string, data?: unknown): Promise<unknown> {
     const d = (data && typeof data === "object" ? data : {}) as Dados;
     if (ehLeitura(action)) {
       // getConfig e a lista para transferir entre moedas enxergam o documento inteiro; o resto, só a moeda escolhida

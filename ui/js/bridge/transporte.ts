@@ -40,17 +40,17 @@
    * request(action, data) → Promise<data>
    * Rejeita sempre com BridgeError contendo apenas texto amigável.
    */
-  function request(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any> {
+  function request<K extends NomeAcao>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostaDe<K>> {
     // Ações de dados são atendidas pelo serviço de dados (que grava via host)
     if (ZoZo.servico && ZoZo.servico.atende(action)) {
       ZoZo.log.info("→ serviço", action);
-      return ZoZo.servico.handle(action, data);
+      return ZoZo.servico.handle(action, data) as Promise<RespostaDe<K>>;
     }
-    return requestHost(action, data, opts);
+    return requestHost(action as keyof RespostasHost, data, opts) as Promise<RespostaDe<K>>;
   }
 
   /** Envia diretamente ao host (sessão e armazenamento do documento cifrado) */
-  function requestHost(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any> {
+  function requestHost<K extends keyof RespostasHost>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostasHost[K]> {
     const req = M.createRequest(action, data);
     // Log sem payload para ações sensíveis (senha nunca aparece em log)
     ZoZo.log.info("→", action, req.requestId, M.SENSITIVE.has(action) ? "[dados protegidos]" : "");
@@ -62,7 +62,8 @@
         .then(() => host.handle(structuredClone(req)))
         .then((msg: RespostaPonte | null | undefined) => {
           clearTimeout(timer);
-          if (msg && msg.success) resolve(msg.data === undefined ? null : msg.data);
+          // o host é o host-web.ts, conferido contra RespostasHost (ui/src/dados.d.ts)
+          if (msg && msg.success) resolve((msg.data === undefined ? null : msg.data) as RespostasHost[K]);
           else reject(toFriendlyError(action, msg && msg.error));
         }, () => { clearTimeout(timer); reject(toFriendlyError(action, null)); });
     });

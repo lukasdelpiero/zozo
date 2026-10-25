@@ -70,7 +70,7 @@
   ];
 
   /** completo = modo teste: TODOS os tipos (contas, débito, estorno, parcelada, divisão), para conferir cada tela */
-  function documento(hoje0: Date, completo = false): any {
+  function documento(hoje0: Date, completo = false): Documento {
     const s = sorteador();
     const hoje = new Date(hoje0.getFullYear(), hoje0.getMonth(), hoje0.getDate());
     let seq = 0;
@@ -187,7 +187,7 @@
         { divisao: { id: grupo, total, partes: 2 } })));
     }
 
-    return { versao: 1, perfis, contas, categorias, lancamentos, config: {}, meta: {} };
+    return { versao: 1, perfis, contas, categorias, lancamentos, grupos: {}, config: {}, meta: {}, faturas: {} };
   }
 
   ZoZo.demo = { documento };

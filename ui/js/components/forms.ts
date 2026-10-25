@@ -32,7 +32,8 @@
   function controle(campo: CampoForm, valor: unknown, aoMudar: () => void): Controle {
     const t = campo.tipo || "texto";
     if (t === "selecao") {
-      const sel: HTMLSelectElement = UI.Select(campo.opcoes || [], { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
+      const opcoes = (campo.opcoes || []).map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+      const sel: HTMLSelectElement = UI.Select(opcoes, { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
       sel.addEventListener("change", aoMudar);
       return { el: sel, ler: () => sel.value, foco: sel };
     }
