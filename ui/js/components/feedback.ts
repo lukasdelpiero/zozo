@@ -39,6 +39,8 @@
   const camadas: HTMLElement[] = [];
   // último elemento focado em cada janela: ao fechar a de cima, a de baixo recebe o foco de volta
   const ultimoFoco = new WeakMap<HTMLElement, HTMLElement>();
+  // como descartar cada janela aberta sem chamar o onClose (fim da sessão: fecharTodas)
+  const descartes = new WeakMap<HTMLElement, () => void>();
   const isolarJanelas = () => camadas.forEach((el, i) => { el.inert = i !== camadas.length - 1; });
   const FUNDO = ["auth-root", "shell", "boleto-root"];
   function isolarFundo(abrir: boolean) {
@@ -58,15 +60,19 @@
     const tituloId = ZoZo.dom.id("modal-titulo");
     let fechado = false;
 
-    const fechar = (resultado?: unknown) => {
-      if (fechado) return;
+    const tirar = () => {
+      if (fechado) return false;
       fechado = true;
       camadas.splice(camadas.indexOf(overlay), 1);
       overlay.inert = true;
       isolarJanelas();
       isolarFundo(false);
-      overlay.classList.remove("is-visible");
       document.removeEventListener("keydown", tecla, true);
+      return true;
+    };
+    const fechar = (resultado?: unknown) => {
+      if (!tirar()) return;
+      overlay.classList.remove("is-visible");
       setTimeout(() => overlay.remove(), 180);
       // devolve o foco a quem abriu; se ele sumiu (ex.: item de menu) ou ficou atrás de outra janela,
       // volta para onde estava na janela que ficou por cima
@@ -115,6 +121,8 @@
     overlay.addEventListener("focusin", (e) => { ultimoFoco.set(overlay, e.target as HTMLElement); });
     root.appendChild(overlay);
     camadas.push(overlay);
+    // fim da sessão: sai do DOM na hora, sem animação, sem devolver o foco e sem o onClose
+    descartes.set(overlay, () => { if (tirar()) overlay.remove(); });
     isolarJanelas();
     isolarFundo(true);
     requestAnimationFrame(() => {
@@ -144,6 +152,16 @@
     });
   }
 
-  const api: ZoZoFeedback = { toast, modal, confirmarExclusao };
+  /**
+   * Fim da sessão (sair, sessão expirada, troca de conta): tira todas as janelas abertas, de cima para baixo,
+   * sem chamar o onClose nem os botões — nada aberto numa sessão pode agir na seguinte
+   * (ex.: "Confirmar alteração" do nome continuar na tela e salvar na conta que entrou depois).
+   * As promessas das janelas (confirmarExclusao, confirmarComSenha) ficam sem resposta: quem esperava não segue.
+   */
+  function fecharTodas(): void {
+    camadas.slice().reverse().forEach((el) => { const d = descartes.get(el); if (d) d(); });
+  }
+
+  const api: ZoZoFeedback = { toast, modal, confirmarExclusao, fecharTodas };
   ZoZo.feedback = api;
 })(window.ZoZo);

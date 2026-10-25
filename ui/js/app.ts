@@ -331,8 +331,22 @@
     }).catch(() => { authErro = textos.erro; });
   }
 
+  /**
+   * Único ponto que limpa a interface quando a sessão acaba (sair, sessão expirada, conta excluída) ou começa
+   * (troca de conta): fecha menus, painel lateral, fatura e todas as janelas, sem chamar o que fariam ao fechar.
+   * Nada aberto numa sessão pode continuar na tela e agir na seguinte.
+   */
+  function fecharInterfaceDaSessao() {
+    ZoZo.menu.fechar();
+    if (ctx.detail) ctx.detail.close({ silencioso: true });
+    if (ZoZo.boleto) ZoZo.boleto.close();
+    ZoZo.feedback.fecharTodas();
+    avisoProtecao = false;           // a janela da verificação do Cloudflare saiu junto: pode avisar de novo
+  }
+
   function entrar(sessao: RespostaSessao) {
     geracao += 1;
+    fecharInterfaceDaSessao();
     authErro = null; authAviso = null; esperandoEmail = null;
     if (ZoZo.servico) ZoZo.servico.reset();
     store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user || null } });
@@ -341,9 +355,7 @@
   ctx.encerrarSessao = function () {
     geracao += 1;
     ZoZo.auth.reiniciar();            // próximo login começa pela etapa do e-mail
-    ZoZo.menu.fechar();
-    if (ctx.detail) ctx.detail.close({ silencioso: true });
-    if (ZoZo.boleto) ZoZo.boleto.close();
+    fecharInterfaceDaSessao();
     if (ZoZo.servico) ZoZo.servico.reset();
     authErro = null; authEmail = "";
     store.reset();
@@ -352,10 +364,9 @@
   ctx.logout = function (mensagem?: string) {
     geracao += 1;
     ZoZo.auth.reiniciar();
+    fecharInterfaceDaSessao();         // já, sem esperar o servidor: nada mais da sessão aceita clique
     bridge.request(A.logout).catch(() => null).finally(() => {
-      ZoZo.menu.fechar();
-      if (ctx.detail) ctx.detail.close({ silencioso: true });
-      if (ZoZo.boleto) ZoZo.boleto.close();
+      fecharInterfaceDaSessao();       // e de novo: o que abriu enquanto o pedido estava em curso
       if (ZoZo.servico) ZoZo.servico.reset();
       authErro = mensagem || null; authEmail = "";
       store.reset();                 // limpa todo o estado da sessão (dados não são apagados)

@@ -318,6 +318,8 @@ declare global {
     toast(mensagem: string, opts?: OpcoesAviso): void;
     modal(opts: OpcoesModal): JanelaModal;
     confirmarExclusao(titulo: string, mensagem: string, opts?: OpcoesConfirmacao): Promise<boolean>;
+    /** Fim da sessão: tira todas as janelas abertas sem chamar o onClose */
+    fecharTodas(): void;
   }
 
   /** js/components/detail-panel.ts — painel de informações à direita */

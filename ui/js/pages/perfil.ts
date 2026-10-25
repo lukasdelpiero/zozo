@@ -723,7 +723,8 @@
       const antes = ultimo;
       if (antes && chave.every((v, k) => v === antes[k])) return;
       ultimo = chave;
-      if (!st.session.authenticated) { janela.fechar(); return; }
+      // fim da sessão: a janela pode já ter saído sem o onClose (feedback.fecharTodas) — a inscrição sai aqui
+      if (!st.session.authenticated) { janela.fechar(); if (cancelar) cancelar(); return; }
       // não redesenha enquanto o usuário digita (ex.: senha)
       const ativo = document.activeElement;
       if (!ativo || !area.contains(ativo) || ativo.tagName !== "INPUT") principal();
