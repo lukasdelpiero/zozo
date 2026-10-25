@@ -494,8 +494,8 @@ declare global {
     ListaPainel(itens: any[], opts?: { onClick?: (l: any) => void }): HTMLElement;
     LaunchRow(l: any, opts?: Record<string, unknown>): HTMLElement;
     AccountRow(c: ContaTela, opts?: Record<string, unknown>): HTMLElement;
-    CategoryRow(cat: any, opts?: Record<string, unknown>): HTMLElement;
-    CategoryGroupRow(grupo: any, opts?: Record<string, unknown>): HTMLElement;
+    CategoryRow(cat: CategoriaTela, opts?: Record<string, unknown>): HTMLElement;
+    CategoryGroupRow(grupo: BlocoGrupoCategorias, opts?: Record<string, unknown>): HTMLElement;
     RecurrenceRow(r: ItemRecorrencia, opts?: Record<string, unknown>): HTMLElement;
     AllocationRow(a: any): HTMLElement;
     SidebarAccountGroup(titulo: string, contas: any[], opts?: { onSelect?: (conta: any) => void }): HTMLElement;
@@ -612,11 +612,15 @@ declare global {
     calcular(st: any): ResumoFatura;
   }
   interface ZoZoCategoriasShared {
-    abrirFormCategoria(ctx: ContextoApp, cat: any, preset?: any, voltar?: any): void;
-    abrirDetalhe(cat: any, ctx: ContextoApp, opts?: any): void;
+    abrirFormCategoria(ctx: ContextoApp, cat: CategoriaPainel | null, preset?: Partial<Categoria> | null, voltar?: () => void): void;
+    abrirDetalhe(cat: CategoriaPainel, ctx: ContextoApp, opts?: OpcoesPainelCategoria): void;
     estruturar(categorias: CategoriaTela[], grupos: Record<string, GrupoTela> | null | undefined): BlocoCategorias[];
-    abrirGrupo(nome: string, ctx: ContextoApp, opts?: any): void;
+    abrirGrupo(nome: string, ctx: ContextoApp, opts?: OpcoesPainelGrupo): void;
   }
+  /** Painel da categoria: a do mês (CategoriaTela) ou uma recém-criada, ainda sem gasto e orçamento do mês */
+  type CategoriaPainel = Categoria & Partial<Pick<CategoriaTela, "usada" | "gasto" | "reservadoFixo" | "orcamentoPorMes">>;
+  interface OpcoesPainelCategoria { editandoOrcamento?: boolean; voltar?: () => void }
+  interface OpcoesPainelGrupo { editando?: boolean; voltar?: () => void }
   /** Card Ativos × Passivos: compacto/embutido no Dashboard, com o período em ui[chaveIntervalo] */
   interface OpcoesCardContas {
     intervalo?: string; embedded?: boolean; compact?: boolean; filtros?: boolean; alturaGrafico?: number;
