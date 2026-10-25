@@ -11,18 +11,24 @@
   const F = ZoZo.format;
   const A = ZoZo.messages.ACTIONS;
 
-  function abrirDetalhe(r: any, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown {
+  /** Frequência pelo nome (sem nome ou desconhecida: mensal) */
+  const frequencia = (nome: string | null | undefined) => {
+    const FREQ = ZoZo.servico.FREQUENCIAS;
+    return nome && Object.hasOwn(FREQ, nome) ? FREQ[nome] : FREQ.mensal;
+  };
+
+  function abrirDetalhe(r: ItemRecorrencia, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown {
     // A origem da série (lançamento que define nome, valor, categoria e frequência)
     const lancs = ZoZo.store.get().data.lancamentos;
     if (!lancs) return ctx.loadData("lancamentos", A.getLancamentos).then(() => abrirDetalhe(r, ctx, opts));
-    const origem = (lancs.lancamentos || []).find((l: any) => l.id === r.serieId);
-    const reabrir = () => ctx.loadData("recorrencias", A.getRecorrencias, null, { force: true }).then((d: any) => {
+    const origem = (lancs.lancamentos || []).find((l) => l.id === r.serieId);
+    const reabrir = () => ctx.loadData("recorrencias", A.getRecorrencias, null, { force: true }).then((d) => {
       // A série pode ter mudado de seção (ex.: virou trimestral sem ocorrência neste mês, ou foi arquivada)
-      const todas = (d.recorrencias || []).concat(d.proximas || [], d.arquivadas || []);
-      const atual = todas.find((x: any) => x.id === r.id) || todas.find((x: any) => x.serieId === r.serieId);
+      const todas = d.recorrencias.concat(d.proximas, d.arquivadas);
+      const atual = todas.find((x) => x.id === r.id) || todas.find((x) => x.serieId === r.serieId);
       if (atual) abrirDetalhe(atual, ctx, opts);
     });
-    const salvarOrigem = (campos: Record<string, unknown>): Promise<unknown> => {
+    const salvarOrigem = (campos: Partial<Lancamento>): Promise<unknown> => {
       if (!origem) return Promise.reject(new ZoZo.messages.BridgeError("OPERATION_FAILED"));
       const base = { data: origem.data, descricao: origem.descricao, valor: origem.valor, tipo: origem.tipo, contaId: origem.contaId, categoriaId: origem.categoriaId,
         perfilId: origem.perfilId, notas: origem.notas, recorrencia: origem.recorrencia, parcelaAtual: origem.parcelaAtual, parcelaTotal: origem.parcelaTotal };
@@ -33,7 +39,7 @@
     // Título: frequência com menu (parcelada fica fixa)
     const FREQ = ZoZo.servico.FREQUENCIAS;
     const freqBtn = h("button", { type: "button", class: r.recorrencia === "parcelada" ? ZoZo.pecas.tipoSelecaoFixo : ZoZo.pecas.tipoSelecao, "aria-haspopup": r.recorrencia === "parcelada" ? undefined : "menu" },
-      h("span", null, r.recorrencia === "parcelada" ? "Recorrência parcelada" : "Recorrência " + ((FREQ[r.recorrencia] || FREQ.mensal).rotulo || "").toLowerCase()),
+      h("span", null, r.recorrencia === "parcelada" ? "Recorrência parcelada" : "Recorrência " + frequencia(r.recorrencia).rotulo.toLowerCase()),
       r.recorrencia === "parcelada" ? null : ZoZo.icons.icon("chevron-down", { size: 14, stroke: 2.25 }));
     if (r.recorrencia !== "parcelada") {
       freqBtn.addEventListener("click", () => ZoZo.menu.abrir(freqBtn, Object.keys(FREQ).map((k) => ({
@@ -43,18 +49,19 @@
     }
 
     // Categoria acima do nome (menu com + Nova categoria)
-    const cats = ((ZoZo.store.get().data.categorias || {}).categorias) || [];
+    const dadosCats = ZoZo.store.get().data.categorias;
+    const cats = (dadosCats && dadosCats.categorias) || [];
     const catBtn = h("button", { type: "button", class: ZoZo.pecas.pilulaBotao, "aria-haspopup": "menu",
       // o nome acessível começa pelo texto visível (WCAG 2.5.3): "Energia, alterar categoria"
       "aria-label": r.categoria ? r.categoria.nome + ", alterar categoria" : "Escolher categoria" },
       r.categoria ? UI.CategoryLabel(r.categoria, { pill: true }) : h("span", { class: ZoZo.pecas.lpMais }, ZoZo.icons.icon("mais", { size: 14 })));
-    catBtn.addEventListener("click", () => ZoZo.menu.abrir(catBtn, cats.map((c: any): ItemMenu => ({
+    catBtn.addEventListener("click", () => ZoZo.menu.abrir(catBtn, cats.map((c): ItemMenu => ({
       render: (api) => h("button", { type: "button", class: [ZoZo.estrutura.menuItem, c.id === r.categoriaId && "is-checked"], onClick: () => { api.fechar(); salvarOrigem({ categoriaId: c.id }).then(reabrir).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })); } }, UI.CategoryLabel(c, { pill: true })),
-    })).concat([{ separador: true }, { icone: "mais", label: "Nova categoria", onClick: () => ZoZo.modais.novaCategoria(ctx, { aoCriar: (c: any) => salvarOrigem({ categoriaId: c.id }).then(reabrir) }) }]),
+    })).concat([{ separador: true }, { icone: "mais", label: "Nova categoria", onClick: () => ZoZo.modais.novaCategoria(ctx, { aoCriar: (c: { id: Id }) => salvarOrigem({ categoriaId: c.id }).then(reabrir) }) }]),
     { posicao: "esquerda", largura: 260, label: "Categoria" }));
 
-    const editarOrigem = () => ctx.loadData("lancamentos", A.getLancamentos).then((d: any) => {
-      const origem = d.lancamentos.find((l: any) => l.id === r.serieId);
+    const editarOrigem = () => ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
+      const origem = d.lancamentos.find((l) => l.id === r.serieId);
       if (origem) ZoZo.lancamentoPainel.abrir(origem, ctx, { voltar: () => abrirDetalhe(r, ctx, opts) });
     });
     const pagar = (btn: HTMLButtonElement) => {
@@ -108,23 +115,23 @@
           r.pago || r.proxima || r.encerrada ? null : h("div", { class: ZoZo.pecas.painelAcoes }, UI.Button("Registrar pagamento", { variant: "primary", icon: "check", onClick: (e: MouseEvent) => pagar(e.currentTarget as HTMLButtonElement) })),
           grafico,
           C.detalheSecao(null,
-            C.detalheLinha("Recorrência", r.recorrencia === "parcelada" ? "Parcelada" : (ZoZo.servico.FREQUENCIAS[r.recorrencia] || ZoZo.servico.FREQUENCIAS.mensal).texto),
+            C.detalheLinha("Recorrência", r.recorrencia === "parcelada" ? "Parcelada" : frequencia(r.recorrencia).texto),
             r.recorrencia === "parcelada" ? C.detalheLinha("Parcela", r.parcela + " de " + r.parcelaTotal) : null,
-            ZoZo.servico.FREQUENCIAS[r.recorrencia] && ZoZo.servico.FREQUENCIAS[r.recorrencia].dias ? null : C.detalheLinha("Dia do mês", String(Number(r.data.slice(8, 10))))),
+            r.recorrencia !== "parcelada" && frequencia(r.recorrencia).dias ? null : C.detalheLinha("Dia do mês", String(Number(r.data.slice(8, 10))))),
           C.detalheSecao("Transações", historico));
 
-        ctx.bridge.request(A.getSerieRecorrencia, { serieId: r.serieId }).then((d: any) => {
+        ctx.bridge.request(A.getSerieRecorrencia, { serieId: r.serieId }).then((d) => {
           const cs = getComputedStyle(document.documentElement);
           const cor = cs.getPropertyValue("--color-progress-over").trim();
           ZoZo.charts.renderLineChart(grafico, [{ name: "Valor", color: cor, pontos: true,
-            points: d.pontos.map((p: any) => ({ data: p.data, valor: p.valor, vazio: !p.pago })) }], {
+            points: d.pontos.map((p) => ({ data: p.data, valor: p.valor, vazio: !p.pago })) }], {
             height: 150, ariaLabel: "Valores da recorrência por mês",
-            rotuloX: (p: any) => { const dt = F.parseData(p.data) || new Date(); return F.mesAbrev(dt.getMonth()) + " " + String(dt.getFullYear()).slice(2); },
-            rotuloTooltip: (p: any) => { const dt = F.parseData(p.data) || new Date(); return F.mesNome(dt.getMonth()) + " " + dt.getFullYear(); },
+            rotuloX: (p) => { const dt = F.parseData(p.data) || new Date(); return F.mesAbrev(dt.getMonth()) + " " + String(dt.getFullYear()).slice(2); },
+            rotuloTooltip: (p) => { const dt = F.parseData(p.data) || new Date(); return F.mesNome(dt.getMonth()) + " " + dt.getFullYear(); },
           });
           mount(historico, d.lancamentos.length
             // o pagamento abre aqui mesmo, com a seta para voltar a esta recorrência
-            ? L.ListaPainel(d.lancamentos, { onClick: (l: any) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe(r, ctx, opts) }) })
+            ? L.ListaPainel(d.lancamentos, { onClick: (l: LancamentoTela) => { ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => { abrirDetalhe(r, ctx, opts); } }); } })
             : UI.EmptyState("Nenhum pagamento registrado ainda."));
         }).catch(() => mount(historico, UI.ErrorState(ZoZo.messages.FRIENDLY.LOAD_FAILED)));
       },
@@ -158,13 +165,13 @@
         }),
         UI.Section({ key: "rec:mes", title: "Este mês" },
           itens.length
-            ? h("div", { class: ZoZo.pecas.listaLinhas }, itens.map((r: any) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))
+            ? h("div", { class: ZoZo.pecas.listaLinhas }, itens.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))
             : UI.EmptyState("Nenhuma recorrência neste mês.",
               { icon: "recorrencias", action: { label: "Nova recorrência", icon: "mais", onClick: () => novaRecorrencia(ctx) } })),
         (d.proximas || []).length ? UI.Section({ key: "rec:proximas", title: "Próximos meses" },
-          h("div", { class: ZoZo.pecas.listaLinhas }, d.proximas.map((r: any) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))) : null,
+          h("div", { class: ZoZo.pecas.listaLinhas }, d.proximas.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, onClick: () => abrirDetalhe(r, ctx) })))) : null,
         (d.arquivadas || []).length ? UI.Section({ key: "rec:arquivadas", title: "Arquivadas" },
-          h("div", { class: ZoZo.pecas.listaLinhas }, d.arquivadas.map((r: any) => L.RecurrenceRow(r, { selected: r.id === sel, semData: true, onClick: () => abrirDetalhe(r, ctx) })))) : null);
+          h("div", { class: ZoZo.pecas.listaLinhas }, d.arquivadas.map((r) => L.RecurrenceRow(r, { selected: r.id === sel, semData: true, onClick: () => abrirDetalhe(r, ctx) })))) : null);
     },
   };
 

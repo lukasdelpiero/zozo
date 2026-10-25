@@ -34,7 +34,7 @@
         if (!inv) return;
         const excluidas = ZoZo.store.get().ui.invExcluidas || [];
         ZoZo.dom.mount(el, h("div", { class: ZoZo.estrutura.menuSecao }, "Contas incluídas"),
-          (inv.contas || []).map((c: any) => h("div", { class: ZoZo.estrutura.menuInterruptor },
+          (inv.contas || []).map((c) => h("div", { class: ZoZo.estrutura.menuInterruptor },
             h("span", { class: ZoZo.estrutura.menuAmostra, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
             h("span", { class: ZoZo.estrutura.menuInterruptorRotulo }, L.nomeComDigitos(c.nome, c.ultimos4Digitos)),
             UI.Toggle("", { checked: !excluidas.includes(c.id), onChange: (v: boolean) => {
@@ -54,7 +54,7 @@
     const serie = UI.recortarSerie(resumo.serie, intervalo);
     const chart = h("div", { class: T.grafico });
     // Uma única linha: verde quando sobe, vermelha quando desce (seção 30)
-    ZoZo.charts.renderLineChart(chart, [{ name: "Evolução", colorBySlope: true, points: serie.map((p: any) => ({ data: p.data, valor: p.valor })) }],
+    ZoZo.charts.renderLineChart(chart, [{ name: "Evolução", colorBySlope: true, points: serie.map((p) => ({ data: p.data, valor: p.valor })) }],
       { height: 190, ariaLabel: "Evolução dos investimentos" });
 
     const engrenagem = UI.IconButton("configuracoes", "Contas incluídas no gráfico", { class: T.engrenagem, expanded: false });
@@ -89,7 +89,7 @@
         EvolucaoCard(state, ctx),
         UI.Section({ key: "inv:contas", title: "Contas", class: "tw:mt-5!" },
           inv.contas && inv.contas.length
-            ? h("div", { class: ZoZo.pecas.listaLinhas }, inv.contas.map((c: any) => L.AccountRow(c, {
+            ? h("div", { class: ZoZo.pecas.listaLinhas }, inv.contas.map((c) => L.AccountRow(c, {
               subtitulo: "Investimento", selected: c.id === sel,
               onClick: () => ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos"),
             })))

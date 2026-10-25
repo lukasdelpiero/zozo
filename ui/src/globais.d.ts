@@ -490,10 +490,10 @@ declare global {
   interface ZoZoList {
     ListaPainel(itens: any[], opts?: { onClick?: (l: any) => void }): HTMLElement;
     LaunchRow(l: any, opts?: Record<string, unknown>): HTMLElement;
-    AccountRow(c: any, opts?: Record<string, unknown>): HTMLElement;
+    AccountRow(c: ContaTela, opts?: Record<string, unknown>): HTMLElement;
     CategoryRow(cat: any, opts?: Record<string, unknown>): HTMLElement;
     CategoryGroupRow(grupo: any, opts?: Record<string, unknown>): HTMLElement;
-    RecurrenceRow(r: any, opts?: Record<string, unknown>): HTMLElement;
+    RecurrenceRow(r: ItemRecorrencia, opts?: Record<string, unknown>): HTMLElement;
     AllocationRow(a: any): HTMLElement;
     SidebarAccountGroup(titulo: string, contas: any[], opts?: { onSelect?: (conta: any) => void }): HTMLElement;
     nomeComDigitos(nome: string, digitos?: string | null, cls?: string): HTMLElement;
@@ -632,7 +632,7 @@ declare global {
     AvatarPerfil(p: any): HTMLElement;
     abrirDetalhe(p: any, ctx: ContextoApp, opts?: any): void;
   }
-  interface ZoZoRecorrenciasShared { abrirDetalhe(r: any, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown }
+  interface ZoZoRecorrenciasShared { abrirDetalhe(r: ItemRecorrencia, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown }
   /** src/emoji-picker.ts */
   interface ZoZoEmojiPicker {
     abrir(anchor: HTMLElement, opts?: { atual?: string; aoEscolher?: (emoji: string) => void; posicao?: string }): void;
