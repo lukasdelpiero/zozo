@@ -1,7 +1,10 @@
 /* =============================================================
    ZoZo — Criação de fatura (antigo "boleto", seção 49)
-   Editor · lista de transações · contribuições, descontos e
-   arredondamentos · resumo · pré-visualização A4 · impressão
+   Editor · lista de transações (cartão pelo período de fechamento) ·
+   contribuições, descontos e arredondamentos (guardados por mês) ·
+   pagamentos recebidos · saldo anterior · resumo · pré-visualização A4 ·
+   impressão. As regras de dinheiro ficam no serviço (getBoletoData,
+   salvarFatura, receberFatura, calcularFatura).
    (os nomes internos ZoZo.boleto / getBoletoData continuam)
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
@@ -42,6 +45,15 @@
     contador: "tw:not-empty:min-w-[22px] tw:not-empty:h-5 tw:not-empty:px-1.5 tw:not-empty:inline-grid tw:not-empty:place-items-center tw:not-empty:rounded-(--radius-pill) "
       + "tw:not-empty:bg-zz-primary-soft tw:not-empty:text-zz-primary tw:not-empty:text-[11.5px]",
     periodo: "tw:grid tw:gap-3 tw:grid-cols-[1.4fr_1fr]",
+    // período de cada cartão (do fechamento anterior ao dia antes do fechamento)
+    periodosCartao: "tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-0.5 tw:text-[13px] tw:text-zz-secondary tw:empty:hidden",
+    // pagamentos recebidos do perfil
+    recebidos: "tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:empty:hidden",
+    recebido: "tw:grid tw:grid-cols-[46px_minmax(0,1fr)_auto] tw:gap-3 tw:items-center tw:min-h-8 tw:px-2 tw:text-[13px] tw:-mx-2 tw:odd:bg-(--color-background) tw:odd:rounded-md",
+    selo: "tw:self-start tw:inline-flex tw:items-center tw:gap-1.5 tw:h-6 tw:px-2.5 tw:rounded-(--radius-pill) tw:text-[12px] tw:font-[620] tw:empty:hidden",
+    seloPago: "tw:bg-(--color-aviso-sucesso-fundo) tw:text-(--color-aviso-sucesso)",
+    seloFalta: "tw:bg-zz-warning-soft tw:text-zz-warning-text",
+    docSelo: "tw:font-[620] tw:text-(--color-aviso-sucesso)",
     avisoPix: "tw:mt-2 tw:mx-0 tw:mb-0 tw:text-[13px] tw:text-zz-secondary tw:empty:hidden",
     // lista de transações do editor
     lista: "tw:max-h-[260px] tw:overflow-y-auto tw:-mx-2 tw:my-0",
@@ -93,20 +105,23 @@
     docPixTexto: "tw:mt-0.5 tw:mx-0 tw:mb-0 tw:max-w-[150px] tw:text-left tw:text-[12px] tw:font-[620] tw:leading-[1.35] tw:text-[#6948D8]",
   };
 
-  /* ---------------- Cálculo (regras configuráveis em js/config/regras.ts) ---------------- */
+  /* ---------------- Cálculo: o mesmo do serviço (regras em js/config/regras.ts) ---------------- */
   function sinalDoTipo(tipo: any) {
     const s = R().sinalPorTipo[tipo];
     return s === undefined ? 1 : s;
   }
   const r2 = (n: any) => Math.round(n * 100) / 100;
-  function calcular(st: any) {
-    // Soma em CENTAVOS inteiros: cada linha é arredondada antes de somar (o total confere com as linhas exibidas)
-    const c = (v: any) => Math.round(F.numero(v) * 100);
-    const lanc = (st.lancamentos || []).reduce((s: any, l: any) => s + c(l.valor) * sinalDoTipo(l.tipo), 0);
-    const contrib = (st.contribuicoes || []).reduce((s: any, d: any) => s + Math.abs(c(d.valor)), 0) * R().sinalContribuicao;
-    const desc = st.descontos.reduce((s: any, d: any) => s + Math.abs(c(d.valor)), 0) * R().sinalDesconto;
-    const arr = st.arredondamentos.reduce((s: any, d: any) => s + c(d.valor), 0) * R().sinalArredondamento;
-    return { lancamentos: lanc / 100, contribuicoes: contrib / 100, descontos: desc / 100, arredondamentos: arr / 100, total: (lanc + contrib + desc + arr) / 100 };
+  /** Resumo da fatura com os ajustes como estão na tela (ainda não gravados), o saldo anterior e o que já foi recebido */
+  function calcular(st: any): ResumoFatura {
+    const recebido = (st.recebimentos || []).reduce((s: number, l: any) => s + Math.round(F.numero(l.valor) * 100), 0) / 100;
+    return ZoZo.servico.calcularFatura({ lancamentos: st.lancamentos || [], contribuicoes: st.contribuicoes, descontos: st.descontos,
+      arredondamentos: st.arredondamentos, saldoAnterior: st.saldoAnterior || 0, recebido });
+  }
+  /** Situação da fatura: paga, falta pagar uma parte ou em aberto (sem nenhum pagamento) */
+  function situacao(t: ResumoFatura): { texto: string; classe: string } | null {
+    if (t.recebido > 0 && t.aPagar <= 0) return { texto: "Paga", classe: T.seloPago };
+    if (t.recebido > 0) return { texto: "Falta " + F.moeda(t.aPagar), classe: T.seloFalta };
+    return null;
   }
 
   /** Valor com sinal explícito para o resumo e o documento */
@@ -147,6 +162,7 @@
   }
 
   /* ---------------- Contribuições / descontos / arredondamentos ---------------- */
+  /** Lista editável de ajustes; desenhar() de novo quando a lista muda de fora (ajustes guardados do mês carregados) */
   function Ajustes(lista: any, cfg: any) {
     const wrap = h("div", { class: T.ajustes });
     const desenhar = () => {
@@ -180,7 +196,7 @@
         } }));
     };
     desenhar();
-    return wrap;
+    return { el: wrap, desenhar };
   }
 
   /* ---------------- Resumo (editor e documento) ---------------- */
@@ -188,12 +204,15 @@
     const t = calcular(st);
     const o = opts || {};
     const linha = (rotulo: any, valor: any) => h("div", { class: T.resumoLinha }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
+    // saldo anterior e pagamentos recebidos só aparecem quando existem
     return h("div", { class: o.doc ? T.resumoDoc : T.resumo },
       linha("Total das transações", t.lancamentos),
       linha("Contribuições", t.contribuicoes),
       linha("Descontos", t.descontos),
       linha("Arredondamentos", t.arredondamentos),
-      h("div", { class: o.doc ? T.resumoTotalDoc : T.resumoTotal }, h("span", null, "Total a pagar"), h("strong", { class: "money" }, comSinal(t.total))));
+      t.saldoAnterior ? linha(t.saldoAnterior > 0 ? "Saldo anterior em aberto" : "Crédito anterior", t.saldoAnterior) : null,
+      t.recebido ? linha("Pagamentos recebidos", -t.recebido) : null,
+      h("div", { class: o.doc ? T.resumoTotalDoc : T.resumoTotal }, h("span", null, "Total a pagar"), h("strong", { class: "money" }, comSinal(t.aPagar))));
   }
 
   /* ---------------- Pix (QR code no canto inferior esquerdo, ao lado do resumo) ----------------
@@ -203,12 +222,12 @@
   function FaturaPix(st: any) {
     st.pixCodigo = null;
     const t = calcular(st);
-    if (!pronto(st) || !st.pix || !(t.total > 0)) return null;
-    const codigo = ZoZo.pix.payload({ chave: st.pix.chave, nome: st.pix.nome, cidade: st.pix.cidade, valor: t.total });
+    if (!pronto(st) || !st.pix || !(t.aPagar > 0)) return null;
+    const codigo = ZoZo.pix.payload({ chave: st.pix.chave, nome: st.pix.nome, cidade: st.pix.cidade, valor: t.aPagar });
     if (!codigo) return null;
     st.pixCodigo = codigo;
     return h("section", { class: T.docPix, "aria-label": "Pagamento por Pix" },
-      ZoZo.verificacao.QR(codigo, 132, "Código QR do Pix para pagar " + F.moeda(t.total)),
+      ZoZo.verificacao.QR(codigo, 132, "Código QR do Pix para pagar " + F.moeda(t.aPagar)),
       h("p", { class: T.docPixTexto }, "Leia o QR no celular e pague por Pix"));
   }
 
@@ -241,11 +260,17 @@
         h("div", { class: T.docMarca }, h("img", { class: T.docLogo, src: LOGO_FATURA, alt: "ZoZo", width: "44", height: "44", decoding: "sync" })),
         h("div", { class: T.docTitulo },
           h("p", { class: T.docPerfil }, maiusculas(st.perfil ? st.perfil.nome : "—")),
-          h("p", { class: T.docFatura }, h("span", { class: T.docFaturaRotulo }, "FATURA"), " ", h("span", { class: T.docFaturaData }, diaMesAno(st.dataFatura))))),
+          h("p", { class: T.docFatura }, h("span", { class: T.docFaturaRotulo }, "FATURA"), " ", h("span", { class: T.docFaturaData }, diaMesAno(st.dataFatura)),
+            ok && (situacao(calcular(st)) || { texto: "" }).texto === "Paga" ? [" · ", h("span", { class: T.docSelo }, "PAGA")] : null))),
       h("section", null, h("h3", { class: T.docBlocoTitulo }, "Transações"), transacoes),
       ajustes("Contribuições", st.contribuicoes, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalContribuicao),
       ajustes("Descontos", st.descontos, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalDesconto),
       ajustes("Arredondamentos", st.arredondamentos, (x: any) => F.numero(x.valor) * R().sinalArredondamento),
+      ok && st.recebimentos.length ? h("section", null,
+        h("h3", { class: T.docBlocoTitulo }, "Pagamentos recebidos"),
+        h("table", { class: T.docTabelaAjuste }, h("tbody", null, st.recebimentos.map((l: any) => h("tr", null,
+          h("td", null, diaMesAno(l.data)),
+          h("td", { class: T.docNum }, comSinal(-F.numero(l.valor)))))))) : null,
       h("div", { class: T.docRodape }, FaturaPix(st), Resumo(st, { doc: true })));
   }
 
@@ -282,6 +307,7 @@
       perfilId: o.perfilId || "", perfil: null, mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), dataFatura: F.iso(hoje),
       lancamentos: null, carregadoPara: null, carregando: false, erro: null,
       contribuicoes: [], descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
+      recebimentos: [], saldoAnterior: 0, periodos: [],
     };
     const root = document.getElementById("boleto-root") || document.body;
     const shell = document.getElementById("shell");
@@ -299,6 +325,9 @@
     const imprimirBtn = UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
 
     function atualizarResumo() {
+      const sit = pronto(st) ? situacao(calcular(st)) : null;
+      seloEl.textContent = sit ? sit.texto : "";
+      seloEl.className = [T.selo, sit ? sit.classe : ""].join(" ");
       mount(resumoEl, Resumo(st));
       mount(docEl, Documento(st));
       copiarPix.hidden = !st.pixCodigo;
@@ -309,9 +338,39 @@
     function atualizarLista() {
       contadorEl.textContent = st.lancamentos && !st.carregando ? String(st.lancamentos.length) : "";
       mount(listaEl, ListaTransacoes(st));
+      const ok = pronto(st);
+      mount(periodosEl, ok ? st.periodos.map((p: any) => h("li", null,
+        p.nome + (p.ultimos4Digitos ? " " + p.ultimos4Digitos : "") + (p.semFechamento ? ": mês inteiro (cadastre o fechamento no cartão para usar o ciclo)"
+        : ": compras de " + F.dataCurta(p.inicio) + " a " + F.dataCurta(p.fim)))) : null);
+      mount(recebidosEl, ok ? st.recebimentos.map((l: any) => h("li", { class: T.recebido },
+        h("span", { class: T.itemData }, diaMes(l.data)),
+        h("span", { class: T.itemNome }, l.nomeConta || "Conta"),
+        h("span", { class: "money money--income" }, F.moeda(l.valor)))) : null);
+      receberBtn.disabled = !ok;
       atualizarResumo();
     }
+    /* Ajustes ficam guardados para o perfil e o mês: grava um pouco depois da última digitação (e ao fechar) */
+    let espera: ReturnType<typeof setTimeout> | null = null;
+    function gravarAjustes() {
+      if (espera) { clearTimeout(espera); espera = null; }
+      if (!pronto(st) || !st.ajustesMudaram) return;
+      st.ajustesMudaram = false;
+      const lista = (l: any[]) => l.map((x) => ({ descricao: x.descricao, valor: x.valor }));
+      ctx.bridge.request(A.salvarFatura, { perfilId: st.perfilId, mes: st.mes, ano: st.ano,
+        contribuicoes: lista(st.contribuicoes), descontos: lista(st.descontos), arredondamentos: lista(st.arredondamentos) })
+        .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
+    }
+    function ajustesMudaram() {
+      if (pronto(st)) st.ajustesMudaram = true;
+      if (espera) clearTimeout(espera);
+      espera = setTimeout(gravarAjustes, 700);
+      atualizarResumo();
+    }
+    /** Lista de ajustes da tela = a guardada (troca o conteúdo: os editores continuam ligados ao mesmo array) */
+    const repor = (alvo: any[], guardados: any[]) => alvo.splice(0, alvo.length, ...(guardados || []).map((x: any) => ({
+      id: crypto.randomUUID(), descricao: x.descricao, valor: x.valor, valorTexto: x.valor ? F.numero(x.valor).toFixed(2).replace(".", ",") : "" })));
     function carregar() {
+      gravarAjustes();                                  // ajustes do perfil/mês anterior não se perdem
       const meu = ++token;
       // Trocou perfil ou período: a fatura anterior sai na hora (nada de dados antigos com filtros novos)
       st.lancamentos = null; st.carregadoPara = null; st.pixCodigo = null;
@@ -321,8 +380,14 @@
       ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, mes: st.mes, ano: st.ano }).then((d: any) => {
         if (meu !== token || chave !== chaveFiltro(st)) return;
         st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || st.perfil; st.pix = d.pix || null;
+        st.recebimentos = d.recebimentos || []; st.saldoAnterior = F.numero(d.saldoAnterior) || 0; st.periodos = d.periodos || [];
+        const aj = d.ajustes || {};
+        repor(st.contribuicoes, aj.contribuicoes); repor(st.descontos, aj.descontos); repor(st.arredondamentos, aj.arredondamentos);
+        editoresAjuste.forEach((e) => e.desenhar());
+        st.ajustesMudaram = false;
         st.carregadoPara = chave;
         atualizarLista();
+        if (o.receber && !receberAberto) { receberAberto = true; registrarPagamento(); }
       }).catch((e: any) => {
         if (meu !== token) return;
         st.carregando = false; st.erro = e.friendly; st.lancamentos = null; atualizarLista();
@@ -362,13 +427,28 @@
       imprimirDocumento(st);
     }
 
-    const secaoAjuste = (titulo: any, lista: any, cfg: any) => h("section", { class: T.secao },
-      h("h3", { class: T.secaoTitulo }, titulo), Ajustes(lista, Object.assign({ onChange: atualizarResumo }, cfg)));
+    const editoresAjuste: Array<{ desenhar(): void }> = [];
+    const secaoAjuste = (titulo: any, lista: any, cfg: any) => {
+      const ed = Ajustes(lista, Object.assign({ onChange: ajustesMudaram }, cfg));
+      editoresAjuste.push(ed);
+      return h("section", { class: T.secao }, h("h3", { class: T.secaoTitulo }, titulo), ed.el);
+    };
+
+    /* Pagamento recebido do perfil: entra como Receita na conta escolhida e abate desta fatura */
+    let receberAberto = false;
+    function registrarPagamento() {
+      if (!pronto(st) || !st.perfil) return;
+      ZoZo.modais.receberFatura(ctx, { perfil: st.perfil, mes: st.mes, ano: st.ano, aPagar: calcular(st).aPagar, aoReceber: () => carregar() });
+    }
+    const receberBtn = UI.Button("Registrar pagamento recebido", { variant: "secondary", size: "sm", icon: "mais", class: "btn--block", onClick: () => registrarPagamento() });
+    const recebidosEl = h("ul", { class: T.recebidos, "aria-label": "Pagamentos recebidos" });
+    const periodosEl = h("ul", { class: T.periodosCartao, "aria-label": "Período de cada cartão" });
+    const seloEl = h("span", { class: T.selo, role: "status" });
 
     const editor = h("div", { class: T.editor },
       h("section", { class: T.secao },
         UI.Field("Perfil", perfilSel),
-        h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Período"), h("div", { class: T.periodo }, mesSel, anoSel)),
+        h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Fatura de"), h("div", { class: T.periodo }, mesSel, anoSel), periodosEl),
         UI.Field("Data da fatura", dataInput)),
       h("section", { class: T.secao },
         h("h3", { class: T.secaoTitulo }, "Transações", contadorEl),
@@ -376,7 +456,8 @@
       secaoAjuste("Contribuições", st.contribuicoes, { chave: "contrib", rotulo: "Contribuição", adicionar: "Adicionar contribuição", prefixo: F.simbolo(), aceitaNegativo: false }),
       secaoAjuste("Descontos", st.descontos, { chave: "desc", rotulo: "Desconto", adicionar: "Adicionar desconto", prefixo: "− " + F.simbolo(), aceitaNegativo: false }),
       secaoAjuste("Arredondamentos", st.arredondamentos, { chave: "arr", rotulo: "Arredondamento", adicionar: "Adicionar arredondamento", prefixo: F.simbolo(), aceitaNegativo: R().arredondamentoAceitaNegativo }),
-      h("section", { class: T.secaoResumo }, resumoEl, avisoPix, copiarPix, imprimirBtn));
+      h("section", { class: T.secao + " tw:gap-3" }, h("h3", { class: T.secaoTitulo }, "Pagamentos recebidos"), recebidosEl, receberBtn),
+      h("section", { class: T.secaoResumo }, seloEl, resumoEl, avisoPix, copiarPix, imprimirBtn));
 
     const preview = h("div", { class: T.previa }, h("div", { class: T.escala }, docEl));
 
@@ -410,6 +491,7 @@
     atual = {
       carregar,
       close() {
+        gravarAjustes();
         ro.disconnect();
         document.removeEventListener("keydown", tecla);
         document.body.classList.remove("has-boleto", "is-printing-boleto");

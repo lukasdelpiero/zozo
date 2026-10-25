@@ -391,6 +391,66 @@
     }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
+  /* ---------------- Pagamento recebido da fatura de um perfil (janela da fatura) ----------------
+     O perfil pagou o que devia: a Receita entra na conta onde o dinheiro caiu (corrente, poupança ou outros), com o
+     perfil e a categoria "Reembolso", e abate da fatura do mês. O valor começa com o que falta pagar (pode ser uma
+     parte ou a mais). O serviço confere tudo de novo (js/data/servico.ts → receberFatura). */
+  function receberFatura(ctx: ContextoApp, cfg: { perfil: { id: string; nome: string }; mes: number; ano: number; aPagar: number; aoReceber?: () => void }) {
+    ctx.loadData("contas", A.getContas).then((dc: any) => {
+      const contas = ((dc && dc.contas) || []).filter((c: any) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
+      const P = ZoZo.pecas;
+      const FR = ZoZo.messages.FRIENDLY;
+      let conta: any = contas.length === 1 ? contas[0] : null;
+      let data = F.iso(new Date());
+      janela({
+        titulo: "Registrar pagamento recebido",
+        classe: "modal--nova-conta modal--titulo-central",
+        passo: (api) => {
+          const valor = campoDinheiro(cfg.aPagar > 0 ? cfg.aPagar : "");
+          const erro = h("p", { class: P.erroForm, role: "alert" });
+          const seta = () => ZoZo.icons.icon("chevron-down", { size: 14, stroke: 2.25 });
+          const contaBtn = h("button", { type: "button", class: [P.entrada, P.campoMenu], "aria-haspopup": "menu" });
+          const desenharConta = () => {
+            mount(contaBtn, conta
+              ? h("span", { class: P.lpContaLinha }, h("span", { class: P.lpContaPonto, style: { background: F.cor(conta.cor, "var(--palette-16)") } }),
+                h("span", { class: "tw:truncate" }, conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "")))
+              : h("span", { class: P.campoMenuVazio }, contas.length ? "Selecione a conta" : "Nenhuma conta disponível"), seta());
+            contaBtn.setAttribute("aria-label", contaBtn.textContent!.trim() + ", conta onde o dinheiro entrou");
+          };
+          contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
+            contas, atual: conta && conta.id, vazio: "Nenhuma conta corrente, poupança ou outros",
+            aoEscolher: (c: any) => { conta = c; desenharConta(); },
+          }));
+          desenharConta();
+          const dataCampo = ZoZo.calendario.Campo({ valor: data, rotulo: "data do pagamento", aoMudar: (v) => { if (F.parseData(v)) data = v; } });
+
+          const enviar = (btn: HTMLButtonElement) => {
+            const v = valor.ler();
+            const problema = !(Number.isFinite(v) && Math.round(v * 100) > 0) ? FR.PAYMENT_INVALID : !conta ? FR.RECEIPT_ACCOUNT : "";
+            if (problema) { erro.textContent = problema; return; }
+            erro.textContent = "";
+            btn.disabled = true;
+            ctx.bridge.request(A.receberFatura, { perfilId: cfg.perfil.id, mes: cfg.mes, ano: cfg.ano, contaId: conta.id, valor: v, data })
+              .then(() => { api.fechar(); ctx.toast("Pagamento registrado."); return ctx.recarregarTudo().then(() => { if (cfg.aoReceber) cfg.aoReceber(); }); })
+              .catch((e: ErroPonte) => { erro.textContent = e.friendly; btn.disabled = false; });
+          };
+          return {
+            corpo: h("div", { class: ZoZo.estrutura.janelaForm },
+              h("p", { class: ZoZo.estrutura.modalTexto }, "Entra como receita no perfil " + cfg.perfil.nome + " e abate da fatura de "
+                + F.mesNome(cfg.mes - 1).toLowerCase() + " de " + cfg.ano + "."),
+              h("div", { class: P.linhaForm2 }, UI.Field("Valor recebido", valor.el), UI.Field("Data", dataCampo)),
+              UI.Field("Conta onde o dinheiro entrou", contaBtn, { hint: "Corrente, poupança ou outros" }),
+              erro),
+            botoes: [
+              { label: "Cancelar", onClick: () => api.fechar() },
+              { label: "Registrar", primario: true, onClick: enviar },
+            ],
+          };
+        },
+      });
+    }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+  }
+
   /* ---------------- Nova recorrência ---------------- */
   const FREQ_OPCOES = [
     ["semanal", "A cada semana"], ["quinzenal", "A cada 2 semanas"], ["mensal", "A cada mês"], ["bimestral", "A cada 2 meses"],
@@ -552,5 +612,5 @@
     });
   }
 
-  ZoZo.modais = { janela, novoPerfil, novaCategoria, criarGrupo, novaConta, novaRecorrencia, frequencia, confirmarComSenha, seletorIcone, Interruptor, pagarFatura };
+  ZoZo.modais = { janela, novoPerfil, novaCategoria, criarGrupo, novaConta, novaRecorrencia, frequencia, confirmarComSenha, seletorIcone, Interruptor, pagarFatura, receberFatura };
 })(window.ZoZo);

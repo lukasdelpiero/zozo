@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.17.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.18.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,20 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.18.0
+
+- **Fatura de perfis (cobrança):**
+  - pagar o **cartão** ("Pagar fatura" ou transferência de entrada no cartão) não abate mais a cobrança do perfil — é você pagando o banco;
+  - **"Registrar pagamento recebido"**: o que o perfil pagou entra como receita na conta escolhida (categoria "Reembolso") e abate da fatura do mês, com o selo "Paga" ou "Falta R$ X" e o Pix pelo que falta;
+  - cartão com fechamento cadastrado usa o **ciclo** (do fechamento anterior ao dia antes do fechamento; o período aparece no editor); sem fechamento, o mês inteiro;
+  - **saldo anterior**: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais) passa para o mês seguinte;
+  - contribuições, descontos e arredondamentos ficam **guardados** por perfil e mês.
+- **Páginas públicas** (sem login e sem JavaScript): `/sobre` (apresentação, página inicial informada ao Google), `/politica-privacidade` e `/termos-uso`; links na tela de entrada e em Configurações › Sobre.
+- **Transações:** nomes curtos ("PIX") não deixam mais um vão antes da conta.
+- **Avisos:** fundo translúcido com texto na cor do tom (aviso #f58000, sucesso #008a33, erro #e51300).
+- **Desempenho:** o QR code e o painel de testes carregam só quando usados (pacote principal menor). Entrada das páginas no mesmo ritmo em todas as telas.
+- **Segurança:** etapas da recuperação de senha limitadas por IP. TypeScript recusa código não usado.
 
 ## Novidades da versão 3.17.0
 

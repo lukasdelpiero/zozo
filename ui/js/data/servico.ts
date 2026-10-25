@@ -53,7 +53,15 @@
     moeda?: Moeda; debito?: boolean; valorParcela?: number; valorTotal?: number; efeito?: Efeito; divisao?: Divisao | null;
     automatico?: boolean; editado?: boolean; ignorados?: string[]; ocorrencia?: string; valorInvalido?: boolean;
     debitado?: { contaId: Id; valor: number };          // formato anterior (2.8–3.1)
+    /** "Pagar fatura": o par débito (conta) + receita (cartão) do pagamento do CARTÃO ao banco (não é cobrança de perfil) */
+    pagamentoCartao?: boolean;
+    /** Receita que quita a fatura de um perfil: o mês ("AAAA-MM") da fatura paga (o perfil é o do lançamento) */
+    faturaPerfil?: string;
   }
+  /** Ajuste da fatura de um perfil (contribuição, desconto ou arredondamento) */
+  interface AjusteFatura { descricao: string; valor: number }
+  /** Ajustes guardados de uma fatura (chave "perfilId|AAAA-MM") */
+  interface FaturaGuardada { contribuicoes: AjusteFatura[]; descontos: AjusteFatura[]; arredondamentos: AjusteFatura[] }
   interface GrupoOrcamento { naoAtribuido: number; orcamentos: Record<string, number> }
   interface ConfigDoc {
     foto?: string; orcamentoAtivo?: boolean; pix?: { chave: string; nome: string; cidade: string };
@@ -62,6 +70,7 @@
   interface Documento {
     versao: number; perfis: Perfil[]; contas: Conta[]; categorias: Categoria[]; lancamentos: Lancamento[];
     grupos: Record<string, GrupoOrcamento>; config: ConfigDoc; meta: { ultimaGravacao?: string; saldoPorTransacao?: number };
+    faturas: Record<string, FaturaGuardada>;
   }
   interface Frequencia { dias?: number; meses?: number; rotulo: string; texto: string }
   /** Data de uma série dentro de um mês (parcela: só nas parceladas) */
@@ -173,7 +182,7 @@
 
   /* ---------------- documento ---------------- */
   function vazio(): Documento {
-    return { versao: VERSAO, perfis: [], contas: [], categorias: [], lancamentos: [], grupos: {}, config: {}, meta: {} };
+    return { versao: VERSAO, perfis: [], contas: [], categorias: [], lancamentos: [], grupos: {}, config: {}, meta: {}, faturas: {} };
   }
   const objeto = (x: unknown): x is Record<string, any> => !!x && typeof x === "object" && !Array.isArray(x);
   /**
@@ -225,6 +234,7 @@
     });
     if (!out.config || typeof out.config !== "object") out.config = {};
     if (!objeto(out.grupos)) out.grupos = {};
+    if (!objeto(out.faturas)) out.faturas = {};             // ajustes das faturas de perfis (documento anterior: nenhum)
     if (!out.meta || typeof out.meta !== "object") out.meta = {};
     out.lancamentos.forEach((l: any) => {
       if (l.recorrencia === "fixa") l.recorrencia = "mensal";                         // versão anterior
@@ -498,6 +508,9 @@
       if (atual.valorTotal) out.valorTotal = atual.valorTotal;
     }
     if (atual && atual.efeito) out.efeito = atual.efeito;                       // efeito no saldo (conciliado em sincronizarSaldos)
+    // Marcas de pagamento: continuam ao editar (valor, data, notas…) enquanto o lançamento segue do mesmo tipo
+    if (atual && atual.pagamentoCartao && tipo === atual.tipo) out.pagamentoCartao = true;
+    if (atual && atual.faturaPerfil && tipo === "receita") out.faturaPerfil = atual.faturaPerfil;
     // A competência acompanha a data quando o lançamento não é ocorrência de série
     if (!out.serieId) out.competencia = mesDe(data);
     return out;
@@ -956,21 +969,123 @@
         ultimosLancamentos: getLancamentos().lancamentos.filter((l) => l.data <= hoje).slice(0, 6),
       };
     },
-    /** Fatura de um perfil no mês: SÓ transações feitas em cartão de crédito ou empréstimo */
+    /**
+     * Fatura (cobrança) de um perfil: transações de cartão de crédito e empréstimo do perfil, os ajustes guardados,
+     * os pagamentos recebidos, o saldo anterior e o período de cada cartão (regras em cobrancaDoMes / saldoAnterior).
+     */
     [A.getBoletoData]: (d) => {
       exigir(boletoLiberado() && avancado());
-      const ano = numero(d.ano), mes = numero(d.mes);                    // só número inteiro ("3x" é recusado)
-      if (!(Number.isInteger(ano) && Number.isInteger(mes) && ano >= 2000 && ano <= 2100 && mes >= 1 && mes <= 12)) throw erro("OPERATION_FAILED");
-      const prefixo = ano + "-" + pad(mes);
+      const mes = mesDoPedido(d);
       const perfil = doc.perfis.find((p) => p.id === d.perfilId) || null;
-      const naFatura = new Set<string | null | undefined>(doc.contas.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo").map((c) => c.id));
-      const lancamentos = getLancamentos().lancamentos
-        .filter((l) => l.perfilId === d.perfilId && l.data.startsWith(prefixo) && naFatura.has(l.contaId))
-        .sort((a, b) => a.data.localeCompare(b.data));
-      // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
-      return { perfil, lancamentos, moeda: moedaAtual(), pix: pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null };
+      const itens = perfil ? cobrancaDoMes(perfil.id, mes) : [];
+      const guardada = perfil ? doc.faturas[perfil.id + "|" + mes] : undefined;
+      const ajustes = { contribuicoes: guardada ? guardada.contribuicoes : [], descontos: guardada ? guardada.descontos : [], arredondamentos: guardada ? guardada.arredondamentos : [] };
+      // período de cada cartão que aparece na fatura (do fechamento anterior até o dia antes do fechamento)
+      const periodos = doc.contas.filter((c) => c.tipo === "cartao" && itens.some((l) => l.contaId === c.id)).map((c) => {
+        const f = faixaDoCartao(c, mes);
+        return { contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f ? f.inicio : mes + "-01", fim: f ? diaAnterior(f.fim) : dataNoMes(mes, 31), semFechamento: !f };
+      });
+      return {
+        perfil, mes, moeda: moedaAtual(),
+        lancamentos: itens.map(enriquecer),
+        ajustes, periodos,
+        recebimentos: perfil ? recebimentosDoMes(perfil.id, mes).map(enriquecer) : [],
+        saldoAnterior: perfil ? saldoAnterior(perfil.id, mes) : 0,
+        // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
+        pix: pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null,
+      };
     },
   };
+
+  /* ---------------- Fatura de perfis (cobrança) ----------------
+     • Entram as transações do perfil em cartão de crédito e empréstimo. Cartão com fechamento: as compras do
+       fechamento anterior (inclusive) até o dia antes do fechamento do mês (compra no dia do fechamento vai para
+       a fatura seguinte); sem fechamento, e no empréstimo: o mês do calendário.
+     • Pagar o CARTÃO (o par do "Pagar fatura" e a transferência de entrada no cartão) é você pagando o banco:
+       não abate a cobrança do perfil. O que abate são os pagamentos RECEBIDOS do perfil (receberFatura).
+     • Saldo anterior: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais)
+       em cada mês passa para o seguinte. Antes disso nada é cobrado de novo.
+     • O total segue regras.boleto (sinal por tipo, contribuições, descontos e arredondamentos), em centavos. */
+  const somarMes = (mes: string, n: number) => { const [a, m] = mes.split("-").map(Number); const d = new Date(a, m - 1 + n, 1); return d.getFullYear() + "-" + pad(d.getMonth() + 1); };
+  const diaAnterior = (dataIso: string) => { const [a, m, d] = dataIso.split("-").map(Number); return iso(new Date(a, m - 1, d - 1)); };
+  const MES_FATURA = /^(\d{4})-(\d{2})$/;
+  const mesFaturaValido = (v: unknown) => { const m = MES_FATURA.exec(String(v || "")); return !!m && Number(m[1]) >= 2000 && Number(m[1]) <= 2100 && Number(m[2]) >= 1 && Number(m[2]) <= 12; };
+  /** Mês da fatura pedido pela interface ({ mes: 1–12, ano: 2000–2100 }, só inteiros) → "AAAA-MM" */
+  function mesDoPedido(d: Dados): string {
+    const ano = numero(d.ano), mes = numero(d.mes);                    // só número inteiro ("3x" é recusado)
+    if (!(Number.isInteger(ano) && Number.isInteger(mes) && ano >= 2000 && ano <= 2100 && mes >= 1 && mes <= 12)) throw erro("OPERATION_FAILED");
+    return ano + "-" + pad(mes);
+  }
+  /** Compras de um cartão que entram na fatura do mês: [fechamento anterior, fechamento do mês) — sem fechamento: null */
+  function faixaDoCartao(c: Conta, mes: string): { inicio: string; fim: string } | null {
+    const f = Number(cicloDoCartao(c, mes).fechamento), fa = Number(cicloDoCartao(c, somarMes(mes, -1)).fechamento);
+    if (!(f >= 1 && fa >= 1)) return null;
+    return { inicio: dataNoMes(somarMes(mes, -1), fa), fim: dataNoMes(mes, f) };
+  }
+  // pagamento do cartão gravado antes da marca pagamentoCartao (3.17 e anteriores): o texto que o "Pagar fatura" gerava
+  const PAGAMENTO_ANTIGO = "Pagamento da fatura do cartão de crédito ";
+  function pagamentoDoCartao(l: Lancamento, conta: Conta): boolean {
+    if (conta.tipo !== "cartao") return false;
+    if (l.tipo === "interno") return l.sentido === "entrada";
+    return l.tipo === "receita" && (!!l.pagamentoCartao || (l.descricao === "Pagamento fatura" && String(l.notas || "").startsWith(PAGAMENTO_ANTIGO)));
+  }
+  /** Transações cobradas do perfil na fatura do mês, em ordem de data */
+  function cobrancaDoMes(perfilId: Id, mes: string): Lancamento[] {
+    const contas = new Map(doc.contas.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo").map((c) => [c.id, c] as const));
+    const faixas = new Map<Id, { inicio: string; fim: string } | null>();
+    return doc.lancamentos.filter((l) => {
+      const c = l.perfilId === perfilId && !l.valorInvalido && l.contaId ? contas.get(l.contaId) : undefined;
+      if (!c || pagamentoDoCartao(l, c)) return false;
+      if (c.tipo !== "cartao") return l.data.startsWith(mes);
+      if (!faixas.has(c.id)) faixas.set(c.id, faixaDoCartao(c, mes));
+      const f = faixas.get(c.id);
+      return f ? l.data >= f.inicio && l.data < f.fim : l.data.startsWith(mes);
+    }).sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
+  }
+  /** Pagamentos recebidos do perfil para a fatura do mês */
+  const recebimentosDoMes = (perfilId: Id, mes: string) => doc.lancamentos
+    .filter((l) => l.tipo === "receita" && l.perfilId === perfilId && l.faturaPerfil === mes && !l.valorInvalido)
+    .sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
+  const centavos = (v: unknown) => { const n = numero(v); return Number.isFinite(n) ? Math.round(n * 100) : 0; };
+  /**
+   * Total de uma fatura pelas regras de regras.boleto, em centavos (cada linha arredondada antes de somar: o total
+   * confere com as linhas exibidas). A tela usa a mesma conta (ZoZo.servico.calcularFatura) enquanto os ajustes são editados.
+   */
+  function calcularFatura(f: { lancamentos?: Array<{ valor: unknown; tipo: string }>; contribuicoes?: Array<{ valor: unknown }>; descontos?: Array<{ valor: unknown }>;
+    arredondamentos?: Array<{ valor: unknown }>; saldoAnterior?: unknown; recebido?: unknown }) {
+    const B = R().boleto;
+    const sinal = (tipo: string) => (Object.hasOwn(B.sinalPorTipo, tipo) ? B.sinalPorTipo[tipo] : 1);
+    const lanc = (f.lancamentos || []).reduce((s, l) => s + centavos(l.valor) * sinal(l.tipo), 0);
+    const contrib = (f.contribuicoes || []).reduce((s, x) => s + Math.abs(centavos(x.valor)), 0) * B.sinalContribuicao;
+    const desc = (f.descontos || []).reduce((s, x) => s + Math.abs(centavos(x.valor)), 0) * B.sinalDesconto;
+    const arr = (f.arredondamentos || []).reduce((s, x) => s + centavos(x.valor), 0) * B.sinalArredondamento;
+    const total = lanc + contrib + desc + arr, anterior = centavos(f.saldoAnterior || 0), recebido = centavos(f.recebido || 0);
+    return { lancamentos: lanc / 100, contribuicoes: contrib / 100, descontos: desc / 100, arredondamentos: arr / 100, total: total / 100,
+      saldoAnterior: anterior / 100, recebido: recebido / 100, aPagar: (total + anterior - recebido) / 100 };
+  }
+  const somaRecebida = (lista: Lancamento[]) => lista.reduce((s, l) => s + centavos(l.valor), 0) / 100;
+  /** O que ficou em aberto (positivo) ou pago a mais (negativo) nas faturas anteriores, desde a 1ª com pagamento registrado */
+  function saldoAnterior(perfilId: Id, mes: string): number {
+    const meses = doc.lancamentos.filter((l) => l.tipo === "receita" && l.perfilId === perfilId && mesFaturaValido(l.faturaPerfil)).map((l) => l.faturaPerfil as string).sort();
+    if (!meses.length || meses[0] >= mes) return 0;
+    let saldo = 0;
+    for (let k = meses[0], n = 0; k < mes && n < 1200; k = somarMes(k, 1), n++) {
+      const g = doc.faturas[perfilId + "|" + k];
+      const t = calcularFatura(Object.assign({ lancamentos: cobrancaDoMes(perfilId, k) }, g || {}));
+      saldo += centavos(t.total) - centavos(somaRecebida(recebimentosDoMes(perfilId, k)));
+    }
+    return saldo / 100;
+  }
+  /** Ajustes enviados pela interface: até 30 por tipo, nome no limite, valor finito (negativo só onde a regra aceita) */
+  function lerAjustes(v: unknown, aceitaNegativo: boolean): AjusteFatura[] {
+    if (v === undefined || v === null) return [];
+    if (!Array.isArray(v) || v.length > 30) throw erro("OPERATION_FAILED");
+    return v.map((x) => {
+      const valor = numero(objeto(x) ? x.valor : undefined);
+      if (!Number.isFinite(valor) || Math.abs(valor) > 1e12) throw erro("OPERATION_FAILED");
+      return { descricao: texto(objeto(x) ? x.descricao : "", NOME()), valor: r2(aceitaNegativo ? valor : Math.abs(valor)) };
+    }).filter((x) => x.descricao || x.valor);
+  }
 
   const ESCRITAS: Record<string, Acao> = {
     /* Lançamentos */
@@ -1168,6 +1283,49 @@
      * fatura em aberto; conta corrente, poupança ou outros, da mesma moeda, com saldo para o valor; perfil
      * obrigatório quando o recurso Perfis existe e há perfis ativos. Categoria do débito: "Fatura" (criada se faltar).
      */
+    /** Ajustes da fatura de um perfil (contribuições, descontos, arredondamentos): ficam guardados para o mês */
+    [A.salvarFatura]: (d) => {
+      exigir(boletoLiberado() && avancado());
+      const mes = mesDoPedido(d);
+      const perfil = doc.perfis.find((p) => p.id === d.perfilId);
+      if (!perfil) throw erro("OPERATION_FAILED");
+      const f: FaturaGuardada = { contribuicoes: lerAjustes(d.contribuicoes, false), descontos: lerAjustes(d.descontos, false),
+        arredondamentos: lerAjustes(d.arredondamentos, !!R().boleto.arredondamentoAceitaNegativo) };
+      const chave = perfil.id + "|" + mes;
+      if (f.contribuicoes.length + f.descontos.length + f.arredondamentos.length) doc.faturas[chave] = f; else delete doc.faturas[chave];
+      return { ok: true };
+    },
+    /**
+     * Pagamento recebido da fatura de um perfil: Receita na conta onde o dinheiro entrou (corrente, poupança ou
+     * outros, da moeda do perfil), com o perfil, a categoria "Reembolso" (criada se faltar) e a marca do mês pago.
+     */
+    [A.receberFatura]: (d) => {
+      exigir(boletoLiberado() && avancado());
+      conferirLimiteDemo("pagamento");
+      const mes = mesDoPedido(d);
+      const perfil = doc.perfis.find((p) => p.id === d.perfilId);
+      if (!perfil || moedaDe(perfil) !== moedaAtual()) throw erro("PROFILE_REQUIRED");
+      if (perfil.arquivado) throw erro("PROFILE_ARCHIVED");
+      const conta = doc.contas.find((c) => c.id === d.contaId);
+      if (!conta || !CONTAS_PAGAMENTO.includes(conta.tipo) || moedaDe(conta) !== moedaDe(perfil)) throw erro("RECEIPT_ACCOUNT");
+      const valor = numero(d.valor);
+      if (!(r2(valor) > 0) || valor > 1e12) throw erro("PAYMENT_INVALID");
+      const data = d.data === undefined || d.data === null || d.data === "" ? hojeIso() : dataValida(d.data);
+      if (!data) throw erro("OPERATION_FAILED");
+      const daMoeda = doc.categorias.filter((c) => moedaDe(c) === moedaDe(perfil) && c.nome.trim().toLowerCase() === "reembolso");
+      let categoria = daMoeda.find((c) => c.status === "regular") || daMoeda[0];
+      if (!categoria) {
+        categoria = Object.assign({ id: novoId("k") }, lerCategoria({ nome: "Reembolso", icone: "💸" }), { moeda: moedaDe(perfil) });
+        doc.categorias.push(categoria);
+      }
+      const nomeMes = ZoZo.format.mesAno(mes + "-01");
+      const l = Object.assign({ id: novoId("l") }, lerLancamento({ tipo: "receita", data, valor, contaId: conta.id, categoriaId: categoria.id, perfilId: perfil.id,
+        descricao: "Fatura " + perfil.nome, notas: "Pagamento recebido da fatura de " + perfil.nome + " (" + nomeMes + ")." }, null));
+      l.faturaPerfil = mes;
+      doc.lancamentos.push(l);
+      contarDemo("pagamento");
+      return { lancamento: enriquecer(l) };
+    },
     [A.pagarFatura]: (d) => {
       conferirLimiteDemo("pagamento");
       const cartao = doc.contas.find((c) => c.id === d.cartaoId && c.tipo === "cartao");
@@ -1197,6 +1355,7 @@
       const base = { data, descricao: "Pagamento fatura", valor: centavos / 100, perfilId, notas };
       const debito = Object.assign({ id: novoId("l") }, lerLancamento(Object.assign({ tipo: "debito", contaId: conta.id, categoriaId: categoria.id }, base), null));
       const receita = Object.assign({ id: novoId("l") }, lerLancamento(Object.assign({ tipo: "receita", contaId: cartao.id, categoriaId: null }, base), null));
+      debito.pagamentoCartao = true; receita.pagamentoCartao = true;     // pagar o cartão não abate a cobrança do perfil
       doc.lancamentos.push(debito, receita);
       contarDemo("pagamento");
       return { debito: enriquecer(debito), receita: enriquecer(receita) };
@@ -1379,7 +1538,8 @@
       exigir(avancado());
       if (!doc.perfis.some((p) => p.id === d.id)) throw erro("OPERATION_FAILED");
       doc.perfis = doc.perfis.filter((p) => p.id !== d.id);
-      doc.lancamentos.forEach((l) => { if (l.perfilId === d.id) l.perfilId = null; });
+      doc.lancamentos.forEach((l) => { if (l.perfilId === d.id) { l.perfilId = null; delete l.faturaPerfil; } });
+      Object.keys(doc.faturas).forEach((k) => { if (k.startsWith(d.id + "|")) delete doc.faturas[k]; });
       return { id: d.id };
     },
 
@@ -1552,5 +1712,5 @@
   /** Promessa que resolve quando todas as gravações pendentes terminarem (antes de sair, trocar senha ou apagar dados) */
   const aguardarGravacoes = () => fila.catch(() => null);
 
-  ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor };
+  ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor, calcularFatura };
 })(window.ZoZo);

@@ -10,7 +10,7 @@
   "use strict";
 
   /** Identificação do programa */
-  ZoZo.sobre = Object.freeze({ versao: "3.17.0", autor: "Lukas Del Piero Barros" });
+  ZoZo.sobre = Object.freeze({ versao: "3.18.0", autor: "Lukas Del Piero Barros" });
 
   const regras: ZoZoRegras = {
     /** Máximo de caracteres do nome de lançamentos, contas, categorias e perfis (nomes longos aparecem cortados com "…") */

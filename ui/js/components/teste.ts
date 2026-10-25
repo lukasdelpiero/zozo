@@ -171,7 +171,9 @@
           linha(...([["corrente", "Nova conta: banco"], ["cartao", "Nova conta: cartão"], ["investimento", "Nova conta: investimento"],
             ["emprestimo", "Nova conta: empréstimo"], ["outros", "Nova conta: outros"]] as Array<[string, string]>)
             .map(([tipo, rotulo]) => ir(rotulo, () => ZoZo.modais.novaConta(ctx, tipo, {}))),
-            ir("Pagar fatura", async () => ZoZo.modais.pagarFatura(ctx, await cartao()))),
+            ir("Pagar fatura", async () => ZoZo.modais.pagarFatura(ctx, await cartao())),
+            // abre a fatura do 1º perfil e, com os dados carregados, a janela do pagamento recebido
+            ir("Fatura: pagamento recebido", async () => ZoZo.boleto.open(ctx, { perfilId: (await primeira(() => perfis(ctx), "perfil")).id, receber: true }))),
           sub("Categorias e perfis"),
           linha(ir("Nova categoria", () => ZoZo.modais.novaCategoria(ctx, {})),
             ir("Criar grupo", () => ZoZo.modais.criarGrupo(() => undefined)),

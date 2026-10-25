@@ -532,6 +532,7 @@ declare global {
     Interruptor(rotulo: string, ligado: boolean, aoMudar: (ligado: boolean) => void, nomeAcessivel?: string): HTMLElement;
     /** Pagar a fatura do cartão (débito na conta escolhida + receita no cartão) */
     pagarFatura(ctx: ContextoApp, cartao: any, aoPagar?: () => void): void;
+    receberFatura(ctx: ContextoApp, cfg: { perfil: { id: string; nome: string }; mes: number; ano: number; aPagar: number; aoReceber?: () => void }): void;
     /** criar perfil, categoria, grupo, conta e recorrência; confirmar com senha */
     [acao: string]: any;
   }
@@ -574,7 +575,11 @@ declare global {
     aguardarGravacoes(): Promise<unknown>;
     gravando(): boolean;
     recarregarDoServidor(): boolean;
+    /** Total da fatura de um perfil (regras.boleto, em centavos): o mesmo cálculo do serviço, para a tela enquanto edita */
+    calcularFatura(f: { lancamentos?: Array<{ valor: unknown; tipo: string }>; contribuicoes?: Array<{ valor: unknown }>; descontos?: Array<{ valor: unknown }>;
+      arredondamentos?: Array<{ valor: unknown }>; saldoAnterior?: unknown; recebido?: unknown }): ResumoFatura;
   }
+  interface ResumoFatura { lancamentos: number; contribuicoes: number; descontos: number; arredondamentos: number; total: number; saldoAnterior: number; recebido: number; aPagar: number }
   /** js/components/auth.ts */
   interface ZoZoAuth {
     render(root: HTMLElement, cfg: any): void;
@@ -594,9 +599,10 @@ declare global {
   interface ZoZoDemo { documento(hoje: Date, completo?: boolean): any }
   /** js/pages/boleto.ts — criação de fatura */
   interface ZoZoBoleto {
-    open(ctx: ContextoApp, opts?: { perfilId?: string | null }): void;
+    /** receber: abre já a janela "Registrar pagamento recebido" (painel de testes) */
+    open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean }): void;
     close(): void;
-    calcular(st: any): { lancamentos: number; contribuicoes: number; descontos: number; arredondamentos: number; total: number };
+    calcular(st: any): ResumoFatura;
   }
   interface ZoZoCategoriasShared {
     abrirFormCategoria(ctx: ContextoApp, cat: any, preset?: any, voltar?: any): void;

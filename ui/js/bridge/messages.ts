@@ -86,6 +86,8 @@
     // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador) e pagamento da fatura do cartão
     getBoletoData: "getBoletoData",
     pagarFatura: "pagarFatura",
+    salvarFatura: "salvarFatura",       // ajustes da fatura de um perfil
+    receberFatura: "receberFatura",     // pagamento recebido da fatura de um perfil
 
     // Grupos de categorias e multicâmbio
     updateGrupo: "updateGrupo",
@@ -143,6 +145,7 @@
     PAYMENT_INVALID: "Informe um valor de pagamento maior que zero.",
     PAYMENT_ABOVE_INVOICE: "O valor é maior que a fatura em aberto.",
     PAYMENT_ACCOUNT: "Escolha uma conta corrente, poupança ou outros para debitar o pagamento.",
+    RECEIPT_ACCOUNT: "Escolha a conta corrente, poupança ou outros onde o pagamento entrou.",
     INSUFFICIENT_FUNDS: "A conta escolhida não tem saldo suficiente para este pagamento.",
     PROFILE_REQUIRED: "Escolha o perfil do pagamento.",
     NO_INVOICE: "Este cartão não tem fatura em aberto.",
