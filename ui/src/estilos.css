@@ -31,6 +31,7 @@
 @source "../js";
 @source "../index.html";
 @source "../politica-privacidade.html";
+@source "../termos-uso.html";
 @source not "../mock";
 
 @theme inline {
