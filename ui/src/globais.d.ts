@@ -691,12 +691,11 @@ declare global {
     mock?: { host?: HostPonte; [k: string]: unknown };
   }
 
-  /** qrcode-generator (npm), exposto em window.qrcode por src/main.ts para o 2FA */
+  /** qrcode-generator (npm), carregado sob demanda por components/verificacao.ts (QR do 2FA e do Pix) */
   type QrCodeFactory = typeof import("qrcode-generator");
 
   interface Window {
     ZoZo: ZoZoGlobal;
-    qrcode: QrCodeFactory;
     turnstile?: Turnstile;
     ZOZO_DEMO?: { nome?: string; email?: string; senha?: string };
   }

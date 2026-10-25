@@ -67,7 +67,7 @@
     return { el, mostrar(valor: number, pct: number) { valorEl.textContent = F.moeda(valor); mount(pctEl, UI.PercentageChange(pct, { passivo })); } };
   }
 
-  function ContasChartCard(state: any, ctx: ContextoApp, opts?: any) {
+  function ContasChartCard(state: any, _ctx: ContextoApp, opts?: any) {
     const o = opts || {};
     const resumo = state.data.contas.resumo;
     const intervalo = o.intervalo || state.ui.intervaloContas;

@@ -352,3 +352,5 @@
 
   ZoZo.teste = { iniciar };
 })(window.ZoZo);
+
+export {};   // módulo: carregado sob demanda por app.ts (import dinâmico)

@@ -7,7 +7,7 @@
    • CampoCodigo(cfg): seis caixas de um dígito (avança sozinho, aceita
      colar o código inteiro, Backspace volta) → cfg.onCompleto(codigo).
    • QR(texto, px): QR code em SVG montado com ZoZo.dom (sem innerHTML),
-     usando a biblioteca qrcode-generator (npm, exposta em window.qrcode).
+     usando a biblioteca qrcode-generator (npm, baixada só quando um QR aparece).
    TypeScript: tipos em src/globais.d.ts (ZoZoVerificacao).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
@@ -101,19 +101,29 @@
   /* ---------------- QR code ---------------- */
   /** QR em SVG com a margem recomendada (4 módulos brancos). rotulo: o que o código é (leitor de tela) */
   /** margem: zona branca em volta (módulos). Num fundo branco pode ser 0 — o desenho alinha com o texto ao lado */
+  // qrcode-generator só é baixado quando um QR aparece (ativar o 2FA, Pix da fatura): fora do pacote principal
+  let gerador: Promise<QrCodeFactory> | null = null;
+  const carregarGerador = () => (gerador ||= import("qrcode-generator").then((m) => m.default));
+
+  /** QR em SVG: o quadro (do tamanho final, sem pular a tela) sai na hora e os módulos entram assim que o gerador carrega */
   function QR(texto: string, px?: number, rotulo?: string, margem = 4): SVGElement {
-    const q = window.qrcode(0, "M");
-    q.addData(texto);
-    q.make();
-    const n = q.getModuleCount(), borda = Math.max(0, margem), total = n + borda * 2;
-    let d = "";
-    for (let r = 0; r < n; r++) {
-      for (let col = 0; col < n; col++) if (q.isDark(r, col)) d += "M" + (col + borda) + " " + (r + borda) + "h1v1h-1z";
-    }
-    return s("svg", { class: "qr", viewBox: "0 0 " + total + " " + total, width: String(px || 176), height: String(px || 176),
-      role: "img", "aria-label": rotulo || "Código QR para o aplicativo autenticador", "shape-rendering": "crispEdges" },
-      s("rect", { width: String(total), height: String(total), fill: "#ffffff" }),
-      s("path", { d, fill: "#0f2742" }));
+    const tam = String(px || 176);
+    const svg = s("svg", { class: "qr", width: tam, height: tam, role: "img", "aria-busy": "true",
+      "aria-label": rotulo || "Código QR para o aplicativo autenticador", "shape-rendering": "crispEdges" });
+    carregarGerador().then((qrcode) => {
+      const q = qrcode(0, "M");
+      q.addData(texto);
+      q.make();
+      const n = q.getModuleCount(), borda = Math.max(0, margem), total = n + borda * 2;
+      let d = "";
+      for (let r = 0; r < n; r++) {
+        for (let col = 0; col < n; col++) if (q.isDark(r, col)) d += "M" + (col + borda) + " " + (r + borda) + "h1v1h-1z";
+      }
+      svg.setAttribute("viewBox", "0 0 " + total + " " + total);
+      svg.append(s("rect", { width: String(total), height: String(total), fill: "#ffffff" }), s("path", { d, fill: "#0f2742" }));
+      svg.removeAttribute("aria-busy");
+    }).catch(() => { svg.removeAttribute("aria-busy"); svg.setAttribute("aria-label", "Não foi possível gerar o código QR. Recarregue a página."); });
+    return svg;
   }
 
   /* ---------------- Senha: oculta por padrão, com "mostrar", e sem copiar ----------------

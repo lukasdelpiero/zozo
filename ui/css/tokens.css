@@ -31,7 +31,6 @@
   --color-positive: #176b3a;
   --color-positive-soft: #e5f3e9;
   --color-negative: #9d2525;
-  --color-negative-soft: #fbe8e8;
   --color-neutral: #4a5263;
   --color-neutral-soft: #eef0f3;
   --color-income: #0f7a34;               /* ≥ 4,5:1 também sobre a linha selecionada */
@@ -61,7 +60,6 @@
   --color-chart-up: #19a14a;
   --color-chart-down: #e5484d;
   --color-chart-flat: #9aa5b5;
-  --color-chart-grid: #e7e9ee;
 
   /* Paleta de cores (contas, categorias e perfis) */
   --palette-01: #ff1a1a; --palette-02: #ff5d04; --palette-03: #f58000; --palette-04: #bc6d09;
@@ -80,7 +78,6 @@
   /* Raios */
   --radius-small: 8px;
   --radius-medium: 12px;
-  --radius-large: 20px;
   --radius-pill: 999px;
 
   /* Espaçamentos */
@@ -106,16 +103,8 @@
 
   /* Tipografia */
   --font-family: "Matter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  --font-size-xs: 11.5px;
-  --font-size-sm: 13px;
   --font-size-md: 15px;
-  --font-size-lg: 17px;
-  --font-size-xl: 20px;
-  --font-size-2xl: 24px;
-  --font-size-3xl: 28px;
-  --font-weight-regular: 400;
   --font-weight-medium: 500;
-  --font-weight-semibold: 600;
   --line-height: 1.45;
 
   /* Elevação */

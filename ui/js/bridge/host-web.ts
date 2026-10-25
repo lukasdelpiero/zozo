@@ -450,9 +450,7 @@
     teste: TESTE, simulada: !!sessao.simulada } : null);
   const sessaoData = () => ({ authenticated: !!sessao, user: usuario() });
   function exigirSessao(): Sessao { if (!sessao) throw erro("SESSION_EXPIRED"); return sessao; }
-  /** Conta de demonstração: senha, nome, 2FA, apagar e excluir não existem (o servidor também recusa) */
-  function exigirContaReal(): Sessao { const s = exigirSessao(); if (s.demo) throw erro("DEMO_READ_ONLY"); return s; }
-  /** Conta real; no ambiente de teste também a demo e a simulada (quem chama simula a ação) */
+  /** Conta real (a demo não troca senha, nome, 2FA, nem apaga ou exclui; o servidor também recusa); no ambiente de teste também a demo e a simulada (quem chama simula a ação) */
   function exigirConta(): Sessao { const s = exigirSessao(); if (s.demo && !TESTE) throw erro("DEMO_READ_ONLY"); return s; }
   /** Prova recusada durante a sessão = senha trocada em outro dispositivo: a sessão acabou */
   async function comProvaDaSessao<T>(fn: () => Promise<T>): Promise<T> {

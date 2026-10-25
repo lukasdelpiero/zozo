@@ -35,11 +35,12 @@
       top: "tw:[grid-area:top] tw:self-start tw:na-tela:self-stretch",
       proximos: "tw:[grid-area:proximos] tw:self-start tw:na-tela:self-stretch",
     },
-    // os blocos entram em sequência ao abrir a página; os que têm gráfico só deslizam (o gráfico se desenha já visível)
-    entrada: ["tw:in-[.page--entrar]:motion-safe:animate-zz-bloco", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-50",
-      "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-100", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-150"],
-    entradaGrafico: ["tw:in-[.page--entrar]:motion-safe:animate-zz-desliza", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-50",
-      "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-100", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-150"],
+    // os blocos entram em sequência ao abrir a página, no mesmo ritmo das outras páginas (css/movimento.css: 380 ms, +40 ms);
+    // os que têm gráfico só deslizam (o gráfico se desenha já visível)
+    entrada: ["tw:in-[.page--entrar]:motion-safe:animate-zz-bloco", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-40",
+      "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-80", "tw:in-[.page--entrar]:motion-safe:animate-zz-bloco-120"],
+    entradaGrafico: ["tw:in-[.page--entrar]:motion-safe:animate-zz-desliza", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-40",
+      "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-80", "tw:in-[.page--entrar]:motion-safe:animate-zz-desliza-120"],
     card: ZoZo.pecas.card + " tw:p-5 tw:na-tela:flex tw:na-tela:flex-col tw:na-tela:flex-[1_1_auto] tw:na-tela:min-h-0 tw:na-tela:overflow-hidden tw:na-tela:baixa860:p-4",
     cardEstica: "tw:flex-1",
     cardFixo: "tw:flex-none",

@@ -113,14 +113,14 @@
   @keyframes zz-chips { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
   /* Dashboard: os cards entram em sequência (0/50/100/150 ms); os que têm gráfico só deslizam (sem esmaecer) */
-  --animate-zz-bloco: zz-bloco 420ms var(--easing) both;
-  --animate-zz-bloco-50: zz-bloco 420ms var(--easing) 50ms both;
-  --animate-zz-bloco-100: zz-bloco 420ms var(--easing) 100ms both;
-  --animate-zz-bloco-150: zz-bloco 420ms var(--easing) 150ms both;
-  --animate-zz-desliza: zz-desliza 420ms var(--easing) both;
-  --animate-zz-desliza-50: zz-desliza 420ms var(--easing) 50ms both;
-  --animate-zz-desliza-100: zz-desliza 420ms var(--easing) 100ms both;
-  --animate-zz-desliza-150: zz-desliza 420ms var(--easing) 150ms both;
+  --animate-zz-bloco: zz-bloco 380ms var(--easing) both;
+  --animate-zz-bloco-40: zz-bloco 380ms var(--easing) 40ms both;
+  --animate-zz-bloco-80: zz-bloco 380ms var(--easing) 80ms both;
+  --animate-zz-bloco-120: zz-bloco 380ms var(--easing) 120ms both;
+  --animate-zz-desliza: zz-desliza 380ms var(--easing) both;
+  --animate-zz-desliza-40: zz-desliza 380ms var(--easing) 40ms both;
+  --animate-zz-desliza-80: zz-desliza 380ms var(--easing) 80ms both;
+  --animate-zz-desliza-120: zz-desliza 380ms var(--easing) 120ms both;
   @keyframes zz-bloco { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   @keyframes zz-desliza { from { transform: translateY(10px); } to { transform: none; } }
 

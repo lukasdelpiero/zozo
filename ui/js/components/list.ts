@@ -77,9 +77,10 @@
     desc: "tw:flex tw:items-baseline tw:gap-1.5 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     data: "tw:flex-none tw:w-[52px] " + NUMEROS,
     letra: "tw:self-center tw:flex-none",
-    titulo: "tw:flex-[0_1_auto] tw:min-w-[3em] tw:overflow-hidden tw:text-ellipsis tw:text-zz-text tw:text-[15px] tw:font-[450]",
+    // nome sem largura mínima (nome curto como "PIX" não abre vão antes da conta); faltando espaço, a conta encolhe antes
+    titulo: "tw:flex-[0_1_auto] tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:text-zz-text tw:text-[15px] tw:font-[450]",
     parcela: "tw:flex-none tw:py-px tw:px-1.5 tw:rounded-md tw:bg-(--color-neutral-soft) tw:text-(--color-neutral) tw:text-[11.5px] tw:font-semibold " + NUMEROS,
-    conta: "tw:inline-flex tw:items-baseline tw:gap-1.5 tw:flex-[0_8_auto] tw:min-w-0 tw:overflow-hidden tw:area420:hidden",
+    conta: "tw:inline-flex tw:items-baseline tw:gap-1.5 tw:flex-[0_100_auto] tw:min-w-0 tw:overflow-hidden tw:area420:hidden",
     contaNome: "tw:flex-none tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:text-zz-muted",
     contaDigitos: "tw:flex-none tw:text-zz-muted " + NUMEROS,
     // etiquetas de categoria/perfil têm largura máxima: o nome do lançamento nunca é espremido até sumir

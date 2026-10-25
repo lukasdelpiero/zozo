@@ -31,7 +31,7 @@
       if (inflight[key] && !o.force) return inflight[key];
       const minha = geracao;
       const pedido = (ordem[key] = (ordem[key] || 0) + 1);
-      store.set((s) => ({ loading: { [key]: true }, errors: { [key]: null } }));
+      store.set(() => ({ loading: { [key]: true }, errors: { [key]: null } }));
       const p = bridge.request(action, payload).then((data) => {
         if (minha !== geracao) throw new ZoZo.messages.BridgeError("SESSION_EXPIRED", FR.SESSION_EXPIRED);   // outra sessão
         if (pedido !== ordem[key]) return store.get().data[key];                                               // chegou uma mais nova
@@ -584,7 +584,8 @@
     });
   }
 
-  if (ZoZo.teste) ZoZo.teste.iniciar(ctx, {
+  // painel de testes: só no endereço local e na prévia, num pacote à parte (o site publicado não o baixa)
+  if (ZoZo.testeHost) import("./components/teste").then(() => ZoZo.teste && ZoZo.teste.iniciar(ctx, {
     tela: telaTeste,
     entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
     sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
@@ -593,7 +594,7 @@
       if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
       return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r: any) => entrar(r));
     },
-  });
+  })).catch(() => null);
 
   boot();
 })(window.ZoZo);

@@ -561,7 +561,7 @@
 
   ZoZo.pages.configuracoes = {
     titulo: "Configurações",
-    carregar: (ctx, force) => ctx.loadData("config", A.getConfig, null, { force: true }),
+    carregar: (ctx) => ctx.loadData("config", A.getConfig, null, { force: true }),   // sempre relê (outro dispositivo pode ter mudado)
     deps: (s) => [s.session.user, s.session.storageAvailable, s.data.config],
     render(state, ctx) {
       const u = state.session.user || {};

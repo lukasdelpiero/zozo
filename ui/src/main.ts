@@ -53,10 +53,8 @@ import "../js/components/sidebar.ts";
 import "../js/components/topbar.ts";
 import "../js/components/cambio.ts";
 import "../js/components/detail-panel.ts";
-import "./qrcode-global.ts";                 // window.qrcode (QR code do 2FA)
 import "../js/components/verificacao.ts";
 import "../js/components/auth.ts";
-import "../js/components/teste.ts";           // modo teste: só no endereço local e na prévia
 
 // Páginas
 import "../js/router.ts";

@@ -8,6 +8,8 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "strict": true,
+    "noUnusedLocals": true,              // código morto não passa
+    "noUnusedParameters": true,
     "noEmit": true,
     "allowJs": false,
     "isolatedModules": true,
