@@ -123,7 +123,8 @@
           linha(...([["dashboard", "Dashboard"], ["lancamentos", "Transações"], ["contas", "Contas"], ["investimentos", "Investimentos"],
             ["categorias", "Categorias"], ["recorrencias", "Recorrências"], ["perfil", "Perfis"]] as Array<[string, string]>)
             .map(([rota, rotulo]) => ir(rotulo, () => ctx.router.navigate(rota))),
-          ir("Fatura (boleto)", () => ZoZo.boleto.open(ctx, {})))),
+          ir("Fatura (boleto)", () => ZoZo.boleto.open(ctx, {})),
+          ir("Política de privacidade", () => { window.open("/politica-privacidade", "_blank", "noopener"); }))),
 
         secao("Etapas da entrada", false,
           logado() ? h("p", { class: C.nota }, "Abrir uma etapa da entrada encerra a sessão desta aba.") : null,

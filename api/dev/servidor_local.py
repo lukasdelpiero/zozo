@@ -147,6 +147,8 @@ class Manipulador(http.server.BaseHTTPRequestHandler):
         if caminho == "/":
             caminho = "/index.html"
         alvo = (UI / caminho.lstrip("/")).resolve()
+        if not alvo.suffix and alvo.with_suffix(".html").is_file():   # como o Cloudflare: /politica-privacidade → .html
+            alvo = alvo.with_suffix(".html")
         if UI not in alvo.parents or not alvo.is_file():          # impede sair da pasta public
             aviso = b"nao encontrado" if (UI / "index.html").is_file() else b"interface nao montada: rode  npm run build  (ou use  npm run dev)"
             return self._enviar(404, {"Content-Type": "text/plain; charset=utf-8"}, aviso)

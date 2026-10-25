@@ -587,6 +587,7 @@
           h("h3", { class: "tw:m-0 tw:mb-(--space-2) tw:pb-(--space-2) tw:border-b tw:border-zz-border tw:text-(length:--t-15) tw:font-[550]" }, "Sobre"),
           linha("Versão", "ZoZo v" + ZoZo.sobre.versao),
           linha("Autor", ZoZo.sobre.autor),
+          linha("Privacidade", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade")),
         ];
       } else if (abaConfig === "geral") {
         conteudo = [

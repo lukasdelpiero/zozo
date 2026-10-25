@@ -30,6 +30,7 @@
 /* Onde procurar classes tw: (só os arquivos da interface) */
 @source "../js";
 @source "../index.html";
+@source "../politica-privacidade.html";
 @source not "../mock";
 
 @theme inline {

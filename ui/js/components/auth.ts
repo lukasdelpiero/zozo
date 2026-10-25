@@ -35,7 +35,10 @@
     + "tw:disabled:cursor-default tw:disabled:translate-y-0 tw:disabled:[filter:saturate(0.4)_opacity(0.7)]";
   const TEXTO = "tw:m-0 tw:text-center tw:leading-[1.5] tw:wrap-anywhere";
   const C = {
-    raiz: "auth tw:fixed tw:inset-0 tw:grid tw:grid-rows-[1fr] tw:overflow-auto tw:bg-[#f8f9fb]",
+    raiz: "auth tw:fixed tw:inset-0 tw:grid tw:grid-rows-[1fr_auto] tw:overflow-auto tw:bg-[#f8f9fb]",
+    // link da política embaixo da tela, fora do cartão (o cartão fica no mesmo lugar em todas as etapas)
+    politica: "tw:justify-self-center tw:mb-4 tw:text-[13px] tw:font-[450] tw:text-zz-secondary tw:no-underline tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline "
+      + "tw:rounded tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2",
     centro: "auth__center tw:grid tw:place-items-center tw:p-6 tw:celular:p-4",
     cartao: "auth__card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-start tw:w-[min(580px,100%)] tw:h-[575px] tw:min-h-0 "
       + "tw:overflow-hidden tw:pt-[88px] tw:px-[90px] tw:pb-10 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl "
@@ -93,7 +96,8 @@
     const a = animacao ? ANIM[animacao] : null;
     const lista = filhos.filter((el): el is HTMLElement => !!el);
     if (a) lista.forEach((el, i) => { const c = a.filhos[Math.min(i, 3)]; if (c) el.classList.add(...c.split(" ")); });
-    return h("main", { class: C.raiz }, h("div", { class: C.centro }, h("div", { class: [C.cartao, a && a.cartao] }, lista)));
+    return h("main", { class: C.raiz }, h("div", { class: C.centro }, h("div", { class: [C.cartao, a && a.cartao] }, lista)),
+      h("a", { class: C.politica, href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade"));
   }
 
   // Etapa atual (sobrevive aos redesenhos após um erro). Login: 0 início · 1 e-mail · 2 senha
