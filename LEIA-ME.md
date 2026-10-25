@@ -398,7 +398,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 ## Testar no seu computador
 
 - **Primeira vez:** `npm ci` na pasta `ZoZo` (instala Vite, TypeScript e Tailwind nas versões do `package-lock.json`).
-- **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados e host web, com a criptografia) · `npm run typecheck` (TypeScript).
+- **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados e host web, com a criptografia) · `npm run typecheck` (TypeScript) · `cd api; uv run mypy` (tipos do back-end, modo estrito).
 - **E-mail no computador:** `$env:ZOZO_DEV_EMAIL = "console"` antes do `python api/dev/servidor_local.py` liga a confirmação e **mostra os e-mails no terminal** (nada é enviado). `$env:ZOZO_DEV_BANCO` aponta para outro arquivo SQLite (ex.: um banco descartável).
 - **Aplicativo completo com a API Python:** `python api/dev/servidor_local.py` (http://127.0.0.1:8787, serve a interface montada por `npm run build`). Para mexer na interface: `npm run dev` → http://127.0.0.1:5173 (recarga instantânea; repassa `/api/*` para o servidor Python). Cadastre uma conta; o CAPTCHA usa as chaves de teste da Cloudflare, que sempre aprovam.
 - **Sem servidor (só a interface):** no endereço local ou na prévia, o botão **Modo teste** abre o painel de testes; "Simular cadastro e login sem servidor" cria uma conta só na memória da aba e "Entrar com dados de exemplo" já entra com todos os tipos de dados.

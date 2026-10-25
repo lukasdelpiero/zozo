@@ -52,6 +52,8 @@ import re
 import secrets
 import time
 import unicodedata
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Protocol
 from urllib.parse import parse_qs, urlsplit
 
 import emails
@@ -111,6 +113,30 @@ _PREFIXO_SHA1 = re.compile(r"^[0-9A-F]{5}$")
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _AGORA_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 
+# ---------------- tipos ----------------
+Linha = dict[str, Any]                    # linha do banco (coluna → valor)
+Comando = tuple[str, tuple[Any, ...]]     # comando parametrizado: (sql, parâmetros)
+Json = dict[str, Any]                     # corpo JSON lido do pedido (cada campo é conferido antes de usar)
+
+
+class Banco(Protocol):
+    """Adaptador do banco (D1 no Cloudflare, SQLite no servidor local e nos testes)."""
+    async def primeiro(self, sql: str, *params: Any) -> Linha | None: ...
+    async def todos(self, sql: str, *params: Any) -> list[Linha]: ...
+    async def executar(self, sql: str, *params: Any) -> int: ...
+    async def lote(self, comandos: Sequence[Comando]) -> list[int]: ...
+
+
+class Servicos(Protocol):
+    """Pedidos HTTP para fora (Turnstile, Google, Resend, lista de senhas vazadas)."""
+    async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]: ...
+    async def http_post(self, url: str, campos: Mapping[str, str]) -> tuple[int, str]: ...
+    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str) -> tuple[int, str]: ...
+
+
+Config = Mapping[str, Any]                # SEGREDO, chaves, listas de recursos… (ver o topo do arquivo)
+
+
 CABECALHOS = {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
@@ -121,20 +147,20 @@ CABECALHOS = {
 
 
 class Resposta:
-    def __init__(self, status, dados=None, cabecalhos=None):
+    def __init__(self, status: int, dados: Any = None, cabecalhos: Mapping[str, str] | None = None) -> None:
         self.status = status
         self.dados = dados
         self.cabecalhos = dict(cabecalhos or {})
 
     @property
-    def corpo(self):
+    def corpo(self) -> str | None:
         return None if self.dados is None or self.status == 204 else json.dumps(self.dados, ensure_ascii=False)
 
 
 class Pedido:
     """Pedido já lido pelo adaptador (o corpo só é lido depois de conferir o tamanho)."""
 
-    def __init__(self, metodo, url, cabecalhos, corpo=""):
+    def __init__(self, metodo: str, url: str, cabecalhos: Mapping[str, str] | None, corpo: str | None = "") -> None:
         self.metodo = str(metodo).upper()
         # URL fora do padrão (ex.: mais de 20 campos na query, host IPv6 malformado) não pode estourar
         # antes do tratamento central: o pedido fica marcado e atender() responde 400
@@ -153,10 +179,10 @@ class Pedido:
         self.corpo = corpo or ""
         self.ip = (self.cab("cf-connecting-ip") or "").strip()[:64] or "desconhecido"
 
-    def cab(self, nome):
+    def cab(self, nome: str) -> str | None:
         return self.cabecalhos.get(nome.lower())
 
-    def cookie(self, nome):
+    def cookie(self, nome: str) -> str | None:
         for parte in (self.cab("cookie") or "").split(";"):
             k, _, v = parte.strip().partition("=")
             if k == nome:
@@ -165,7 +191,7 @@ class Pedido:
 
 
 class Falha(Exception):
-    def __init__(self, status, codigo, extra=None):
+    def __init__(self, status: int, codigo: str, extra: dict[str, Any] | None = None) -> None:
         super().__init__(codigo)
         self.status = status
         self.codigo = codigo
@@ -173,20 +199,20 @@ class Falha(Exception):
 
 
 class Contexto:
-    def __init__(self, pedido, banco, servicos, config, log, agora):
+    def __init__(self, pedido: Pedido, banco: Banco, servicos: Servicos, config: Config, log: Callable[[str], object], agora: float) -> None:
         self.pedido, self.banco, self.servicos, self.config, self.log = pedido, banco, servicos, config, log
         self.agora = int(agora)
         self.segredo = str(config.get("SEGREDO") or "")
         self.req = secrets.token_hex(8)
-        self.cabecalhos = {}          # cabeçalhos extras da resposta (Set-Cookie)
+        self.cabecalhos: dict[str, str] = {}          # cabeçalhos extras da resposta (Set-Cookie)
 
-    def h(self, valor):
+    def h(self, valor: object) -> str:
         """Identificador estável e não reversível (e-mail, IP) para chaves e logs."""
         return hmac.new(self.segredo.encode(), str(valor).encode("utf-8"), hashlib.sha256).hexdigest()[:32]
 
-    def evento(self, nome, email=None, **campos):
+    def evento(self, nome: str, email: str | None = None, **campos: Any) -> None:
         """Evento de segurança: sem senha, prova, cookie, código ou e-mail em texto."""
-        dados = {"evento": nome, "req": self.req, "ip": self.h(self.pedido.ip)[:12]}
+        dados: dict[str, Any] = {"evento": nome, "req": self.req, "ip": self.h(self.pedido.ip)[:12]}
         if email:
             dados["conta"] = self.h(email)[:12]
         dados.update(campos)
@@ -194,7 +220,7 @@ class Contexto:
 
 
 # ---------------- validações ----------------
-def _b64(valor, minimo, maximo):
+def _b64(valor: object, minimo: int, maximo: int) -> bytes:
     """Decodifica base64 padrão estrito; lança Falha(400) se inválido."""
     if not isinstance(valor, str) or not (minimo <= len(valor) <= maximo) or len(valor) % 4 or not _B64.match(valor):
         raise Falha(400, "INVALID_REQUEST")
@@ -204,30 +230,30 @@ def _b64(valor, minimo, maximo):
         raise Falha(400, "INVALID_REQUEST") from ex
 
 
-def _sal(valor):
+def _sal(valor: object) -> str:
     if not 16 <= len(_b64(valor, 24, 88)) <= 64:
         raise Falha(400, "INVALID_REQUEST")
-    return valor
+    return str(valor)                                  # _b64 já conferiu que é texto
 
 
-def _prova(valor):
+def _prova(valor: object) -> bytes:
     bruto = _b64(valor, 44, 44)
     if len(bruto) != 32:
         raise Falha(400, "INVALID_REQUEST")
     return bruto
 
 
-def _verificador(prova_bruta):
+def _verificador(prova_bruta: bytes) -> str:
     return hashlib.sha256(prova_bruta).hexdigest()
 
 
-def _iteracoes(valor):
+def _iteracoes(valor: object) -> int:
     if not isinstance(valor, int) or isinstance(valor, bool) or not ITERACOES_MIN <= valor <= ITERACOES_MAX:
         raise Falha(400, "INVALID_REQUEST")
     return valor
 
 
-def _kdf(valor):
+def _kdf(valor: object) -> str:
     """Derivação usada pelo navegador. Ausente = PBKDF2 (navegador de versão anterior)."""
     if valor is None:
         return KDF_PBKDF2
@@ -236,36 +262,36 @@ def _kdf(valor):
     return valor
 
 
-def _versao(valor):
+def _versao(valor: object) -> int:
     if not isinstance(valor, int) or isinstance(valor, bool) or not 0 <= valor < MAX_VERSAO:
         raise Falha(400, "INVALID_REQUEST")
     return valor
 
 
-def _conteudo(valor):
+def _conteudo(valor: object) -> str:
     if isinstance(valor, str) and len(valor) > LIMITE_CONTEUDO:
         raise Falha(413, "DOCUMENT_TOO_LARGE")
     bruto = _b64(valor, 4, LIMITE_CONTEUDO)
     # formato | IV (12) | cifrado + etiqueta GCM (16+)
     if len(bruto) < 1 + 12 + 17 or bruto[0] != FORMATO_DOCUMENTO:
         raise Falha(400, "INVALID_REQUEST")
-    return valor
+    return str(valor)                                  # _b64 já conferiu que é texto
 
 
-def _nome(valor):
+def _nome(valor: object) -> str:
     texto = unicodedata.normalize("NFC", str(valor if valor is not None else ""))
     texto = "".join(c for c in texto if unicodedata.category(c) not in ("Cc", "Cf", "Cs", "Co", "Cn"))
     return texto.strip()[:80]
 
 
-def _email(valor):
+def _email(valor: object) -> str:
     e = str(valor or "").strip().lower() if isinstance(valor, str) else ""
     if not e or len(e) > 254 or not _EMAIL.match(e) or any(unicodedata.category(c).startswith("C") for c in e):
         raise Falha(400, "INVALID_REQUEST")
     return e
 
 
-def _json(pedido):
+def _json(pedido: Pedido) -> Json:
     if not (pedido.cab("content-type") or "").lower().startswith("application/json"):
         raise Falha(415, "INVALID_REQUEST")
     if len(pedido.corpo.encode("utf-8")) > LIMITE_CORPO:
@@ -279,7 +305,7 @@ def _json(pedido):
     return dados
 
 
-def _mesma_origem(pedido):
+def _mesma_origem(pedido: Pedido) -> None:
     """Bloqueia pedidos de escrita vindos de outros sites (CSRF)."""
     if pedido.metodo in ("GET", "HEAD", "OPTIONS"):
         return
@@ -303,16 +329,16 @@ mesma_origem = _mesma_origem       # pública para o app FastAPI (app_fastapi.py
 
 
 # ---------------- limites (bloqueio progressivo e contadores por IP) ----------------
-async def _limite(ctx, chave):
+async def _limite(ctx: Contexto, chave: str) -> Linha | None:
     return await ctx.banco.primeiro("SELECT falhas, ultima, bloqueado_ate FROM limites WHERE chave = ?", chave)
 
 
-def _proxima(ctx, linha):
+def _proxima(ctx: Contexto, linha: Linha | None) -> int:
     """Número que a próxima tentativa terá (o contador zera após 24 h sem falhas)."""
     return 1 if not linha or ctx.agora - linha["ultima"] >= ESQUECE_S else linha["falhas"] + 1
 
 
-async def _reservar(ctx, chave):
+async def _reservar(ctx: Contexto, chave: str) -> Linha | None:
     """
     Conta a tentativa ANTES de conferir (um único comando atômico): pedidos em paralelo
     não leem o contador antigo. Na 5ª e na 10ª tentativa o bloqueio já é gravado aqui;
@@ -328,12 +354,12 @@ async def _reservar(ctx, chave):
         chave, a, a, z, a, z, BLOQUEIO_1, a + BLOQUEIO_1_S, BLOQUEIO_2, a + BLOQUEIO_2_S, a, a)
 
 
-async def _registrar_falha(ctx, chave):
+async def _registrar_falha(ctx: Contexto, chave: str) -> Linha | None:
     """Mesma contagem de _reservar, usada depois de conferir (rotas que já exigem sessão)."""
     return await _reservar(ctx, chave)
 
 
-async def _contar(ctx, chave, limite, janela):
+async def _contar(ctx: Contexto, chave: str, limite: int, janela: int) -> bool:
     """Contador por janela fixa (cadastro/consultas por IP). True se passou do limite."""
     a = ctx.agora
     r = await ctx.banco.primeiro(
@@ -341,22 +367,22 @@ async def _contar(ctx, chave, limite, janela):
         "falhas = CASE WHEN ? - limites.ultima >= ? THEN 1 ELSE limites.falhas + 1 END, "
         "ultima = CASE WHEN ? - limites.ultima >= ? THEN ? ELSE limites.ultima END RETURNING falhas",
         chave, a, a, janela, a, janela, a)
-    return bool(r) and r["falhas"] > limite
+    return r is not None and r["falhas"] > limite
 
 
-def _bloqueado(ctx, linha):
+def _bloqueado(ctx: Contexto, linha: Linha | None) -> Falha | None:
     if linha and linha["bloqueado_ate"] > ctx.agora:
         return Falha(429, "TOO_MANY_ATTEMPTS", {"espera": linha["bloqueado_ate"] - ctx.agora})
     return None
 
 
-async def _limpar_login(ctx, email):
+async def _limpar_login(ctx: Contexto, email: str) -> None:
     h = ctx.h(email)
     await ctx.banco.executar("DELETE FROM limites WHERE chave LIKE ? OR chave = ? OR chave = ?",
                              f"login|{h}|%", f"conta|{h}", f"2fa|{h}")
 
 
-async def _captcha_ok(ctx, token):
+async def _captcha_ok(ctx: Contexto, token: object) -> bool:
     """
     Turnstile. Sem CAPTCHA configurado (nem chave pública nem secreta: desenvolvimento), a etapa é pulada
     (o bloqueio continua valendo). Chave pública SEM a secreta é configuração incompleta: recusa (não
@@ -380,21 +406,21 @@ async def _captcha_ok(ctx, token):
 
 
 # ---------------- sessões ----------------
-def _hash_token(token):
+def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 
-def _nome_cookie(ctx):
+def _nome_cookie(ctx: Contexto) -> str:
     return COOKIE_DEV if str(ctx.config.get("COOKIE_SEGURO", "1")) == "0" else COOKIE_SEGURO
 
 
-def _definir_cookie(ctx, valor=None):
+def _definir_cookie(ctx: Contexto, valor: str | None = None) -> None:
     atributos = "Path=/; HttpOnly; SameSite=Strict" + ("" if _nome_cookie(ctx) == COOKIE_DEV else "; Secure")
     # Sem Max-Age/Expires: cookie de sessão (o navegador apaga ao ser fechado)
     ctx.cabecalhos["Set-Cookie"] = f"{_nome_cookie(ctx)}={valor}; {atributos}" if valor else f"{_nome_cookie(ctx)}=; Max-Age=0; {atributos}"
 
 
-def _envelope(ctx, token):
+def _envelope(ctx: Contexto, token: str) -> str:
     """
     Chave AES que cifra a chave dos dados guardada no navegador. Derivada do cookie (que o JavaScript
     não lê) com o SEGREDO do servidor e NUNCA gravada: quem tiver o banco e o armazenamento do
@@ -403,7 +429,7 @@ def _envelope(ctx, token):
     return base64.b64encode(hmac.new(ctx.segredo.encode(), ("zozo/envelope/v2|" + token).encode("ascii"), hashlib.sha256).digest()).decode("ascii")
 
 
-async def _criar_sessao(ctx, email, estado):
+async def _criar_sessao(ctx: Contexto, email: str, estado: str) -> str:
     anterior = ctx.pedido.cookie(_nome_cookie(ctx))
     if anterior and len(anterior) <= 128:            # o cookie será trocado: a sessão antiga deste navegador termina
         await ctx.banco.executar("DELETE FROM sessoes WHERE id = ?", _hash_token(anterior))
@@ -427,7 +453,7 @@ async def _criar_sessao(ctx, email, estado):
     return envelope
 
 
-async def _sessao(ctx, estado="ativa"):
+async def _sessao(ctx: Contexto, estado: str = "ativa") -> Linha | None:
     """Sessão válida do cookie (ou None). Sessões vencidas são apagadas."""
     token = ctx.pedido.cookie(_nome_cookie(ctx))
     if not token or len(token) > 128:
@@ -448,11 +474,11 @@ async def _sessao(ctx, estado="ativa"):
     return s
 
 
-async def _encerrar_outras(ctx, email, manter_id):
+async def _encerrar_outras(ctx: Contexto, email: str, manter_id: str) -> None:
     await ctx.banco.executar("DELETE FROM sessoes WHERE email = ? AND id != ?", email, manter_id)
 
 
-def _na_lista(ctx, segredo, email, verificado):
+def _na_lista(ctx: Contexto, segredo: str, email: str, verificado: object) -> bool:
     """
     E-mail liberado num segredo de lista (separada por vírgula) — e só se a conta tiver o e-mail
     CONFIRMADO (pelo Google; as contas anteriores à 2.5 foram marcadas na migração 0005).
@@ -469,12 +495,12 @@ def _na_lista(ctx, segredo, email, verificado):
     return email in lista
 
 
-def _avancado(ctx, email, verificado=False):
+def _avancado(ctx: Contexto, email: str, verificado: object = False) -> bool:
     """Perfis, faturas e Pix: segredo RECURSOS_AVANCADOS."""
     return _na_lista(ctx, "RECURSOS_AVANCADOS", email, verificado)
 
 
-def _sessao_publica(ctx, email, nome, envelope, dois_fatores, verificado=False):
+def _sessao_publica(ctx: Contexto, email: str, nome: str, envelope: str, dois_fatores: object, verificado: object = False) -> Json:
     av = _avancado(ctx, email, verificado)
     # Levar transações de uma moeda para outra (multicâmbio): contas avançadas + segredo RECURSOS_CAMBIO
     cambio = av or _na_lista(ctx, "RECURSOS_CAMBIO", email, verificado)
@@ -483,7 +509,7 @@ def _sessao_publica(ctx, email, nome, envelope, dois_fatores, verificado=False):
 
 
 # ---------------- prova da senha (rotas com sessão) ----------------
-async def _conferir_prova(ctx, email):
+async def _conferir_prova(ctx: Contexto, email: str) -> Linha:
     """Confere a prova do cabeçalho X-ZoZo-Prova. Erros contam no mesmo bloqueio do login (e-mail + IP)."""
     conta = await ctx.banco.primeiro(
         "SELECT nome, verificador, totp_segredo, totp_pendente, totp_ultimo_passo, protecao_avancada FROM contas WHERE email = ?", email)
@@ -507,7 +533,7 @@ async def _conferir_prova(ctx, email):
     return conta
 
 
-def _gravar_documento(email, versao_anterior, conteudo):
+def _gravar_documento(email: str, versao_anterior: int, conteudo: str) -> Comando:
     """Comandos que gravam o documento só se a versão no banco ainda for a lida (concorrência otimista)."""
     if versao_anterior == 0:
         return ("INSERT INTO documentos (email, versao, conteudo) SELECT ?, 1, ? "
@@ -518,11 +544,11 @@ def _gravar_documento(email, versao_anterior, conteudo):
 
 # A tabela "guarda" só aceita ok = 1: se o comando anterior não alterou exatamente
 # uma linha, a inserção falha e o lote inteiro é desfeito (nada fica pela metade).
-_GUARDA = ("INSERT INTO guarda (ok) VALUES (changes())", ())
-_LIMPA_GUARDA = ("DELETE FROM guarda", ())
+_GUARDA: Comando = ("INSERT INTO guarda (ok) VALUES (changes())", ())
+_LIMPA_GUARDA: Comando = ("DELETE FROM guarda", ())
 
 
-async def _lote_atomico(banco, comandos):
+async def _lote_atomico(banco: Banco, comandos: Sequence[Comando]) -> list[int]:
     try:
         return await banco.lote(comandos)
     except Exception as ex:  # noqa: BLE001 — o driver do banco lança tipos variados
@@ -532,7 +558,7 @@ async def _lote_atomico(banco, comandos):
 
 
 # ---------------- rotas públicas (sem sessão) ----------------
-async def _parametros(ctx):
+async def _parametros(ctx: Contexto) -> Resposta:
     """Sal e iterações para o navegador derivar a senha. E-mail sem conta recebe um sal simulado e estável."""
     email = _email(ctx.pedido.query.get("email"))
     if await _contar(ctx, f"consulta|{ctx.h(ctx.pedido.ip)}", CONSULTAS_POR_IP, CONSULTA_JANELA_S):
@@ -547,7 +573,7 @@ async def _parametros(ctx):
     return Resposta(200, {"sal": base64.b64encode(falso).decode("ascii"), "iteracoes": ITERACOES_MIN, "kdf": KDF_ARGON2})
 
 
-async def _cadastrar(ctx):
+async def _cadastrar(ctx: Contexto) -> Resposta:
     b = _json(ctx.pedido)
     if await _contar(ctx, f"cadastro|{ctx.h(ctx.pedido.ip)}", CADASTROS_POR_IP, CADASTRO_JANELA_S):
         ctx.evento("cadastro_limitado")
@@ -566,7 +592,7 @@ async def _cadastrar(ctx):
     if emails.ativo(ctx.config) and not google_ok:
         return await _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf)
     # O Google provou a posse do e-mail: um cadastro PENDENTE (nunca confirmado, talvez de outra pessoa) dá lugar a este
-    descartar = [("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if google_ok else []
+    descartar: list[Comando] = [("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if google_ok else []
     n = (await ctx.banco.lote(descartar + [(
         "INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador, email_verificado, kdf) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (email, nome, sal, it, _verificador(prova), verificado, kdf))]))[-1]
@@ -578,11 +604,11 @@ async def _cadastrar(ctx):
 
 
 # ---------------- confirmação de e-mail ----------------
-def _hash_link(token):
+def _hash_link(token: str) -> str:
     return hashlib.sha256(("zozo/email/v1|" + token).encode("utf-8")).hexdigest()
 
 
-async def _enviar_confirmacao(ctx, email, verificador):
+async def _enviar_confirmacao(ctx: Contexto, email: str, verificador: str) -> None:
     """
     Novo link e o e-mail. Limitado por endereço. Links anteriores do MESMO cadastro (mesma senha) continuam
     valendo até vencer — um reenvio não estraga o e-mail que a pessoa está para abrir; os de um cadastro
@@ -602,7 +628,7 @@ async def _enviar_confirmacao(ctx, email, verificador):
     ctx.evento("email_confirmacao_enviado" if ok else "email_falhou", email)
 
 
-async def _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf):
+async def _cadastrar_pendente(ctx: Contexto, email: str, nome: str, sal: str, it: int, prova: bytes, kdf: str) -> Resposta:
     """
     Cadastro com e-mail ligado: a conta nasce pendente e só entra depois do link.
     Resposta SEMPRE igual (202) — e-mail novo, pendente ou já cadastrado —, para não revelar quem tem conta.
@@ -620,7 +646,8 @@ async def _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf):
         ctx.evento("cadastro_email_existente", email)
         return Resposta(202, {"confirmar": True})
     verificador = _verificador(prova)
-    await ctx.banco.lote(([("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if existente else []) + [
+    pendente: list[Comando] = [("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if existente else []
+    await ctx.banco.lote(pendente + [
         ("INSERT OR IGNORE INTO contas (email, nome, sal, iteracoes, verificador, email_verificado, kdf, confirmacao_pendente) "
          "VALUES (?, ?, ?, ?, ?, 0, ?, 1)", (email, nome, sal, it, verificador, kdf)),
     ])
@@ -629,7 +656,7 @@ async def _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf):
     return Resposta(202, {"confirmar": True})
 
 
-async def _confirmar_no_login(ctx, email, token):
+async def _confirmar_no_login(ctx: Contexto, email: str, token: object) -> None:
     """
     Confirma o e-mail DENTRO do login, depois de a senha conferir: o token prova a posse da caixa de
     entrada e a prova prova a senha. Só o link mais recente vale, uma única vez e por 24 h.
@@ -653,7 +680,7 @@ async def _confirmar_no_login(ctx, email, token):
     ctx.evento("email_confirmado", email)
 
 
-async def _conferir_link(ctx):
+async def _conferir_link(ctx: Contexto) -> Resposta:
     """
     Tela aberta pelo link do e-mail: diz se o link ainda serve, SEM usá-lo (a conta só é ativada no login,
     com o link E a senha). Devolve o e-mail do cadastro para a tela já pedir a senha certa: quem tem o
@@ -676,7 +703,7 @@ async def _conferir_link(ctx):
     return Resposta(200, {"email": t["email"], "ativa": False})
 
 
-async def _reenviar_confirmacao(ctx):
+async def _reenviar_confirmacao(ctx: Contexto) -> Resposta:
     """Sempre 202 (não revela se o e-mail tem cadastro pendente)."""
     b = _json(ctx.pedido)
     email = _email(b.get("email"))
@@ -690,7 +717,7 @@ async def _reenviar_confirmacao(ctx):
 
 
 # ---------------- troca da chave com o histórico recifrado (migração Argon2id e recuperação de senha) ----------------
-async def _guardar_etapa(ctx, email, b, campos):
+async def _guardar_etapa(ctx: Contexto, email: str, b: Json, campos: set[str]) -> None:
     """Uma cópia do histórico já recifrada com a chave nova, guardada à parte (kdf_etapas) até o fechamento."""
     if set(b) != campos:
         raise Falha(400, "INVALID_REQUEST")
@@ -705,7 +732,7 @@ async def _guardar_etapa(ctx, email, b, campos):
     ])
 
 
-async def _historico_recifrado(ctx, email, b, sal, completo):
+async def _historico_recifrado(ctx: Contexto, email: str, b: Json, sal: str, completo: bool) -> tuple[list[Comando], list[Comando]]:
     """
     Confere o histórico recifrado (o que veio junto + o das etapas com este sal) e devolve os comandos da
     transação: (antes da gravação do documento, depois dela). Só versões que existem, sem repetir.
@@ -717,7 +744,7 @@ async def _historico_recifrado(ctx, email, b, sal, completo):
         raise Falha(400, "INVALID_REQUEST")
     existentes = {int(r["versao"]): r["criado_em"] for r in await ctx.banco.todos(
         "SELECT versao, criado_em FROM historico WHERE email = ?", email)}
-    novas = []
+    novas: list[tuple[int, str]] = []
     for item in hist:
         if not isinstance(item, dict) or set(item) != {"versao", "conteudo"}:
             raise Falha(400, "INVALID_REQUEST")
@@ -735,12 +762,12 @@ async def _historico_recifrado(ctx, email, b, sal, completo):
         raise Falha(409, "DATA_CHANGED")
     # cópias das etapas: ganham a data original e entram no histórico; a guarda confere que vieram TODAS
     # (se outra tentativa trocou as etapas no meio do caminho, a transação inteira é desfeita)
-    antes = [
+    antes: list[Comando] = [
         ("UPDATE kdf_etapas SET criado_em = (SELECT h.criado_em FROM historico h WHERE h.email = kdf_etapas.email "
          "AND h.versao = kdf_etapas.versao ORDER BY h.id DESC LIMIT 1) WHERE email = ? AND sal = ?", (email, sal)),
         ("INSERT INTO guarda (ok) VALUES (changes() = ?)", (len(etapas),)), _LIMPA_GUARDA,
     ] if etapas else []
-    depois = [
+    depois: list[Comando] = [
         # o histórico passa a ser o recifrado, com as datas originais
         ("DELETE FROM historico WHERE email = ?", (email,)),
         *[("INSERT INTO historico (email, versao, conteudo, criado_em) VALUES (?, ?, ?, ?)", (email, v, cv, existentes[v])) for v, cv in novas],
@@ -753,17 +780,17 @@ async def _historico_recifrado(ctx, email, b, sal, completo):
 
 
 # ---------------- recuperação de senha ("Esqueci minha senha") ----------------
-def _hash_recuperacao(token):
+def _hash_recuperacao(token: str) -> str:
     return hashlib.sha256(("zozo/recuperar/v1|" + token).encode("utf-8")).hexdigest()
 
 
-def _chave_custodia(ctx, email, nonce):
+def _chave_custodia(ctx: Contexto, email: str, nonce: str) -> str:
     """Chave que tranca a cópia da chave dos dados. Só o servidor calcula (HMAC do SEGREDO); não fica guardada."""
     return base64.b64encode(hmac.new(ctx.segredo.encode(), ("zozo/custodia/v1|" + email + "|" + nonce).encode("utf-8"),
                                      hashlib.sha256).digest()).decode("ascii")
 
 
-async def _pedir_recuperacao(ctx):
+async def _pedir_recuperacao(ctx: Contexto) -> Resposta:
     """Sempre 202 (não revela se o e-mail tem conta). Link de 1 h; no máximo 3 e-mails por hora por endereço."""
     b = _json(ctx.pedido)
     email = _email(b.get("email"))
@@ -789,7 +816,7 @@ async def _pedir_recuperacao(ctx):
     return Resposta(202, {"ok": True})
 
 
-async def _token_recuperacao(ctx, token, aberto=False):
+async def _token_recuperacao(ctx: Contexto, token: object, aberto: bool = False) -> Linha:
     """Link válido: existe, não usado, no prazo e da senha ATUAL (trocou a senha, os links antigos morrem)."""
     if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", token):
         raise Falha(400, "TOKEN_INVALID")
@@ -803,7 +830,7 @@ async def _token_recuperacao(ctx, token, aberto=False):
     return t
 
 
-async def _abrir_recuperacao(ctx):
+async def _abrir_recuperacao(ctx: Contexto) -> Resposta:
     """
     Link do e-mail aberto (+ código do 2FA, se a conta tiver): devolve a cópia da chave e a chave de custódia,
     o documento e o histórico (cifrados) — o navegador abre, recifra com a senha nova e conclui.
@@ -835,7 +862,7 @@ async def _abrir_recuperacao(ctx):
     cu = None if t["protecao_avancada"] else await ctx.banco.primeiro(
         "SELECT nonce, chave FROM custodia WHERE email = ? AND verificador = ?", email, t["verificador"])
     doc = await ctx.banco.primeiro("SELECT versao, conteudo FROM documentos WHERE email = ?", email)
-    resposta = {"email": email, "versao": int(doc["versao"]) if doc else 0, "custodia": None, "documento": None, "historico": []}
+    resposta: Json = {"email": email, "versao": int(doc["versao"]) if doc else 0, "custodia": None, "documento": None, "historico": []}
     if cu:
         resposta["custodia"] = {"nonce": cu["nonce"], "chave": cu["chave"], "r": _chave_custodia(ctx, email, cu["nonce"])}
         resposta["documento"] = {"versao": int(doc["versao"]), "conteudo": doc["conteudo"]} if doc else None
@@ -845,14 +872,14 @@ async def _abrir_recuperacao(ctx):
     return Resposta(200, resposta)
 
 
-async def _limite_passos_recuperacao(ctx):
+async def _limite_passos_recuperacao(ctx: Contexto) -> None:
     """Etapas e conclusão da recuperação gravam muito: limite por IP (quem tem o link não enche o banco em laço)."""
     if await _contar(ctx, f"recuperar-passo|{ctx.h(ctx.pedido.ip)}", PASSOS_RECUPERACAO_POR_IP, RECUPERACAO_JANELA_S):
         ctx.evento("recuperacao_limitada")
         raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": RECUPERACAO_JANELA_S})
 
 
-async def _etapa_recuperacao(ctx):
+async def _etapa_recuperacao(ctx: Contexto) -> Resposta:
     """Histórico grande na recuperação: uma cópia recifrada por pedido (como na migração em etapas)."""
     await _limite_passos_recuperacao(ctx)
     b = _json(ctx.pedido)
@@ -861,7 +888,7 @@ async def _etapa_recuperacao(ctx):
     return Resposta(200, {"ok": True})
 
 
-async def _concluir_recuperacao(ctx):
+async def _concluir_recuperacao(ctx: Contexto) -> Resposta:
     """
     Senha nova numa transação: link usado, nova senha (Argon2id), documento recifrado (modo "manter", com a
     cópia da chave) ou vazio (modo "recomecar": proteção avançada ou sem cópia), histórico, cópia da chave
@@ -884,7 +911,7 @@ async def _concluir_recuperacao(ctx):
     else:
         if b.get("historico", []) != []:
             raise Falha(400, "INVALID_REQUEST")
-        antes, depois = [], [("DELETE FROM historico WHERE email = ?", (email,)), ("DELETE FROM kdf_etapas WHERE email = ?", (email,))]
+        antes, depois = [], [("DELETE FROM historico WHERE email = ?", (email,)), ("DELETE FROM kdf_etapas WHERE email = ?", (email,))]  # recomeçar: sem cópias
     await _lote_atomico(ctx.banco, [
         ("UPDATE tokens_recuperacao SET usado = 1 WHERE hash = ? AND usado = 0 AND aberto = 1", (t["hash"],)), _GUARDA, _LIMPA_GUARDA,
         *antes,
@@ -903,7 +930,7 @@ async def _concluir_recuperacao(ctx):
     return Resposta(200, {"ok": True})
 
 
-async def _avisar(ctx, email, mensagem, evento):
+async def _avisar(ctx: Contexto, email: str, mensagem: emails.Mensagem, evento: str) -> None:
     """Aviso de segurança por e-mail (senha trocada, 2FA desligado): nunca atrapalha a operação."""
     if not emails.ativo(ctx.config):
         return
@@ -911,7 +938,7 @@ async def _avisar(ctx, email, mensagem, evento):
     ctx.evento(evento if ok else "email_falhou", email)
 
 
-async def _entrar(ctx):
+async def _entrar(ctx: Contexto) -> Resposta:
     b = _json(ctx.pedido)
     email = _email(b.get("email"))
     if await _contar(ctx, f"entrada|{ctx.h(ctx.pedido.ip)}", ENTRADAS_POR_IP, ENTRADA_JANELA_S):
@@ -923,7 +950,7 @@ async def _entrar(ctx):
     if bloqueio:
         ctx.evento("login_bloqueado", email)
         raise bloqueio
-    suspeita = bool(conta_lim) and ctx.agora - conta_lim["ultima"] < CONTA_JANELA_S and conta_lim["falhas"] >= CONTA_CAPTCHA
+    suspeita = conta_lim is not None and ctx.agora - conta_lim["ultima"] < CONTA_JANELA_S and conta_lim["falhas"] >= CONTA_CAPTCHA
     precisa = _proxima(ctx, linha) > LOGIN_SEM_CAPTCHA or suspeita
     if precisa and not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile")):
         raise Falha(428, "CAPTCHA_REQUIRED")
@@ -938,7 +965,7 @@ async def _entrar(ctx):
         calculado = ""
     # Conta inexistente: compara com um valor qualquer (mesmo caminho, mesma resposta)
     ok = hmac.compare_digest(calculado, str(conta["verificador"]) if conta else "0" * 64) and bool(conta) and bool(calculado)
-    if not ok:
+    if not ok or conta is None:                       # (ok já exige a conta; o "is None" é para o verificador de tipos)
         await _contar(ctx, f"conta|{ctx.h(email)}", CONTA_CAPTCHA, CONTA_JANELA_S)
         ctx.evento("login_falhou", email, tentativa=r["falhas"])
         if r["falhas"] == BLOQUEIO_2:
@@ -974,7 +1001,7 @@ async def _entrar(ctx):
     return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, False, verificado))
 
 
-async def _marcar_verificado(ctx, email, atual):
+async def _marcar_verificado(ctx: Contexto, email: str, atual: object) -> bool:
     """Senha certa + Google confirmou este e-mail agora: a conta passa a ter o e-mail verificado."""
     if atual:
         return True
@@ -986,7 +1013,7 @@ async def _marcar_verificado(ctx, email, atual):
     return False
 
 
-async def _segundo_fator(ctx):
+async def _segundo_fator(ctx: Contexto) -> Resposta:
     s = await _sessao(ctx, "2fa")
     if not s:
         raise Falha(401, "UNAUTHORIZED")
@@ -998,12 +1025,12 @@ async def _segundo_fator(ctx):
         raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
     conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, totp_ultimo_passo, email_verificado FROM contas WHERE email = ?", email)
     segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta else None
-    passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"]) if segredo else None
+    passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"]) if segredo and conta else None
     if passo is not None:      # grava o passo usado: o mesmo código não serve de novo (nem em paralelo)
         n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?",
                                      passo, email, passo)
         passo = passo if n == 1 else None
-    if passo is None:
+    if passo is None or conta is None:
         ctx.evento("2fa_falhou", email, tentativa=r["falhas"])
         extra = {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {}
         raise Falha(401, "CODE_INVALID", extra)
@@ -1015,7 +1042,7 @@ async def _segundo_fator(ctx):
     return Resposta(200, _sessao_publica(ctx, email, conta["nome"], envelope, True, conta["email_verificado"]))
 
 
-async def _senha_vazada(ctx):
+async def _senha_vazada(ctx: Contexto) -> Resposta:
     # k-anonimato: só os 5 primeiros caracteres do SHA-1 saem do navegador
     prefixo = ctx.pedido.caminho.rsplit("/", 1)[-1].upper()
     if not _PREFIXO_SHA1.match(prefixo):
@@ -1030,38 +1057,38 @@ async def _senha_vazada(ctx):
 
 
 # ---------------- Continuar com Google ----------------
-def _google_config(ctx):
+def _google_config(ctx: Contexto) -> tuple[str, str] | None:
     cid, seg = str(ctx.config.get("GOOGLE_CLIENT_ID") or ""), str(ctx.config.get("GOOGLE_CLIENT_SECRET") or "")
     return (cid, seg) if cid and seg else None
 
 
-def _origem(ctx):
+def _origem(ctx: Contexto) -> str:
     return ("http" if str(ctx.config.get("COOKIE_SEGURO", "1")) == "0" else "https") + "://" + ctx.pedido.host
 
 
-def _cookie_curto(ctx, nome, valor, samesite):
+def _cookie_curto(ctx: Contexto, nome: str, valor: str, samesite: str) -> None:
     seguro = str(ctx.config.get("COOKIE_SEGURO", "1")) != "0"
     nome = ("__Host-" + nome) if seguro else nome
     ctx.cabecalhos["Set-Cookie"] = (f"{nome}={valor}; Path=/; HttpOnly; SameSite={samesite}; Max-Age={google.VALIDADE_S}"
                                     + ("; Secure" if seguro else ""))
 
 
-def _ler_cookie_curto(ctx, nome):
+def _ler_cookie_curto(ctx: Contexto, nome: str) -> dict[str, Any] | None:
     seguro = str(ctx.config.get("COOKIE_SEGURO", "1")) != "0"
     return google.ler_assinado(ctx.segredo, ctx.pedido.cookie(("__Host-" + nome) if seguro else nome), ctx.agora)
 
 
-def _google_confirmado(ctx, email):
+def _google_confirmado(ctx: Contexto, email: str) -> bool:
     """True se o Google confirmou ESTE e-mail há menos de 10 min (dispensa o CAPTCHA)."""
     c = _ler_cookie_curto(ctx, COOKIE_GOOGLE)
-    return bool(c) and c.get("m") == email
+    return c is not None and c.get("m") == email
 
 
-def _redirecionar(destino):
+def _redirecionar(destino: str) -> Resposta:
     return Resposta(302, None, {"Location": destino})
 
 
-async def _google_inicio(ctx):
+async def _google_inicio(ctx: Contexto) -> Resposta:
     cfg = _google_config(ctx)
     if not cfg:
         return _redirecionar("/?google=indisponivel")
@@ -1072,7 +1099,7 @@ async def _google_inicio(ctx):
     return _redirecionar(url)
 
 
-async def _google_retorno(ctx):
+async def _google_retorno(ctx: Contexto) -> Resposta:
     cfg = _google_config(ctx)
     c = _ler_cookie_curto(ctx, COOKIE_OAUTH)
     q = ctx.pedido.query
@@ -1081,9 +1108,12 @@ async def _google_retorno(ctx):
         return _redirecionar("/?google=erro")
     if q.get("error"):
         return _redirecionar("/?google=cancelado")
+    codigo = q.get("code")
+    if not codigo:
+        return _redirecionar("/?google=erro")
     try:
         ident = await google.trocar_codigo(ctx.servicos, cfg[0], cfg[1], _origem(ctx) + "/api/google/retorno",
-                                           q.get("code"), str(c.get("v")), str(c.get("n")), ctx.agora)
+                                           codigo, str(c.get("v")), str(c.get("n")), ctx.agora)
     except Exception:  # noqa: BLE001 — Google indisponível
         ident = None
     if not ident:
@@ -1098,7 +1128,7 @@ async def _google_retorno(ctx):
     return _redirecionar("/?google=ok")
 
 
-async def _google_identidade(ctx):
+async def _google_identidade(ctx: Contexto) -> Resposta:
     c = _ler_cookie_curto(ctx, COOKIE_GOOGLE)
     if not c:
         raise Falha(404, "NOT_FOUND")
@@ -1116,7 +1146,7 @@ _PROTEGIDAS = {
 _SEM_CORPO = {"/api/2fa/iniciar", "/api/custodia/chave"}
 
 
-async def _rota(ctx):
+async def _rota(ctx: Contexto) -> Resposta:
     p = ctx.pedido
     m, c = p.metodo, p.caminho
 
@@ -1155,7 +1185,12 @@ async def _rota(ctx):
                 _definir_cookie(ctx)                   # cookie que não vale mais: apaga (a sessão parcial do 2FA fica)
             return Resposta(204)                       # sem sessão: resposta normal (não é erro para quem só abriu o site)
         conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, email_verificado FROM contas WHERE email = ?", s["email"])
-        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], _envelope(ctx, p.cookie(_nome_cookie(ctx))), conta["totp_segredo"],
+        token = p.cookie(_nome_cookie(ctx))
+        if not conta or not token:                     # conta excluída no meio da sessão: a sessão acaba
+            await ctx.banco.executar("DELETE FROM sessoes WHERE id = ?", s["id"])
+            _definir_cookie(ctx)
+            return Resposta(204)
+        return Resposta(200, _sessao_publica(ctx, s["email"], conta["nome"], _envelope(ctx, token), conta["totp_segredo"],
                                              conta["email_verificado"]))
     if m == "DELETE" and c == "/api/sessao":
         token = p.cookie(_nome_cookie(ctx))
@@ -1370,14 +1405,14 @@ async def _rota(ctx):
 
     if c == "/api/2fa/desativar":
         # Exige um código ATUAL do aplicativo (fator recente): a sessão e a prova guardadas não bastam
-        segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta["totp_segredo"] else None
-        if not segredo:
+        segredo_atual = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta["totp_segredo"] else None
+        if not segredo_atual:
             raise Falha(409, "2FA_NOT_PENDING")
         chave = f"2fa|{ctx.h(email)}"
         r = await _reservar(ctx, chave)
         if not r:
             raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS")
-        passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"])
+        passo = totp.conferir(segredo_atual, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"])
         if passo is None:
             ctx.evento("2fa_desativacao_recusada", email, tentativa=r["falhas"])
             raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
@@ -1392,7 +1427,8 @@ async def _rota(ctx):
     raise Falha(404, "NOT_FOUND")
 
 
-async def atender(pedido, banco, servicos, config, log=print, agora=None):
+async def atender(pedido: Pedido, banco: Banco, servicos: Servicos, config: Config, log: Callable[[str], object] = print,
+                  agora: float | None = None) -> Resposta:
     """Atende um pedido /api/*. Nunca devolve detalhes técnicos ao navegador."""
     ctx = Contexto(pedido, banco, servicos, config, log, time.time() if agora is None else agora)
     try:

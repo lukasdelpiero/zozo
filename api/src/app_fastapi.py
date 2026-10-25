@@ -19,7 +19,8 @@ e configuração de cada pedido (entry.py no Worker; os testes, em memória).
 """
 import json
 import secrets
-from typing import Annotated, Any, Callable, Literal
+from collections.abc import Callable, Mapping
+from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
@@ -242,10 +243,11 @@ def criar_app(dependencias: Dependencias) -> FastAPI:
                 # só o tipo do erro e o nome do campo QUANDO ele é do contrato: nunca o valor, e um campo
                 # desconhecido (o nome vem do cliente e pode conter qualquer coisa) vira "<extra>"
                 conhecidos = set(modelo.model_fields)
-                def campo(e):
+                def campo(e: Mapping[str, Any]) -> str:
                     nome = e["loc"][0] if e.get("loc") else ""
                     return nome if isinstance(nome, str) and nome in conhecidos else ("<extra>" if nome else "<corpo>")
-                tipo = lambda e: "".join(c for c in str(e.get("type", ""))[:40] if c.isalnum() or c == "_")
+                def tipo(e: Mapping[str, Any]) -> str:
+                    return "".join(c for c in str(e.get("type", ""))[:40] if c.isalnum() or c == "_")
                 log(json.dumps({"evento": "corpo_invalido", "rota": pedido.caminho if pedido.caminho in {c for _, c in MODELOS} else "<outra>",
                                 "erros": sorted({f"{campo(e)}:{tipo(e)}" for e in erro.errors()})[:10]}))
                 return _falha(400, "INVALID_REQUEST")

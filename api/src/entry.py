@@ -15,13 +15,20 @@ Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET,
 Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 """
 import json
+from collections.abc import Mapping, Sequence
+from http import HTTPMethod
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlencode
 
 from pyodide.ffi import to_js
-from workers import Response, WorkerEntrypoint, fetch
+from workers import Request, Response, WorkerEntrypoint, fetch
 
 import nucleo
 
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+_JSNULL: object
 try:                                  # Pyodide recente representa o null do JS assim
     from pyodide.ffi import jsnull as _JSNULL
 except ImportError:                   # pragma: no cover
@@ -32,7 +39,7 @@ _CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_I
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 
-def _py(valor):
+def _py(valor: Any) -> Any:                  # objeto do JS → Python (null → None)
     if valor is None or (_JSNULL is not None and valor is _JSNULL):
         return None
     return valor.to_py() if hasattr(valor, "to_py") else valor
@@ -41,28 +48,29 @@ def _py(valor):
 class BancoD1:
     """Banco D1. Parâmetros são sempre str/int (None viraria `undefined`, que o D1 recusa)."""
 
-    def __init__(self, db):
+    def __init__(self, db: Any) -> None:
         self.db = db
 
-    def _comando(self, sql, params):
+    def _comando(self, sql: str, params: Sequence[Any]) -> Any:
         for p in params:
             if not isinstance(p, (str, int)) or isinstance(p, bool):
                 raise TypeError("parâmetro SQL inválido")
         st = self.db.prepare(sql)
         return st.bind(*params) if params else st
 
-    async def primeiro(self, sql, *params):
-        return _py(await self._comando(sql, params).first())
+    async def primeiro(self, sql: str, *params: Any) -> nucleo.Linha | None:
+        linha = _py(await self._comando(sql, params).first())
+        return dict(linha) if linha is not None else None
 
-    async def todos(self, sql, *params):
+    async def todos(self, sql: str, *params: Any) -> list[nucleo.Linha]:
         r = _py(await self._comando(sql, params).all())
         return list(r.get("results") or [])
 
-    async def executar(self, sql, *params):
+    async def executar(self, sql: str, *params: Any) -> int:
         r = _py(await self._comando(sql, params).run())
         return int(r["meta"]["changes"])
 
-    async def lote(self, comandos):
+    async def lote(self, comandos: Sequence[nucleo.Comando]) -> list[int]:
         # O SDK do Python Workers (pywrangler recente) devolve os comandos EMBRULHADOS (_BindingWrapper, objeto
         # Python). Passados ao to_js, viravam proxies "emprestados", destruídos antes de o D1 ler o lote
         # ("borrowed proxy was automatically destroyed") e TODO lote falhava (cadastro com e-mail, troca de senha,
@@ -73,38 +81,38 @@ class BancoD1:
 
 
 class Servicos:
-    async def http_get(self, url, cabecalhos):
-        r = await fetch(url, method="GET", headers=dict(cabecalhos))
+    async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]:
+        r = await fetch(url, method=HTTPMethod.GET, headers=dict(cabecalhos))
         return int(r.status), await r.text()
 
-    async def http_post(self, url, campos):
-        r = await fetch(url, method="POST", body=urlencode(campos),
+    async def http_post(self, url: str, campos: Mapping[str, str]) -> tuple[int, str]:
+        r = await fetch(url, method=HTTPMethod.POST, body=urlencode(campos),
                         headers={"Content-Type": "application/x-www-form-urlencoded"})
         return int(r.status), await r.text()
 
-    async def http_post_json(self, url, cabecalhos, corpo):
-        r = await fetch(url, method="POST", body=corpo, headers=dict(cabecalhos))
+    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str) -> tuple[int, str]:
+        r = await fetch(url, method=HTTPMethod.POST, body=corpo, headers=dict(cabecalhos))
         return int(r.status), (await r.text())[:2000]          # resposta do Resend: só o começo interessa
 
 
-def _cabecalhos(request):
+def _cabecalhos(request: Request) -> dict[str, str]:
     h = request.headers
     return {n: h.get(n) for n in _CABECALHOS if h.get(n) is not None}
 
 
-def _metodo(request):
+def _metodo(request: Request) -> str:
     m = request.method
     return str(getattr(m, "value", m)).upper()
 
 
-def _config(env):
+def _config(env: Any) -> dict[str, str]:
     return {k: str(getattr(env, k, "") or "") for k in _CONFIG}
 
 
-_APP_FASTAPI = None
+_APP_FASTAPI: "FastAPI | Literal[False] | None" = None   # False: o pacote não está no Worker
 
 
-def _app_fastapi():
+def _app_fastapi() -> "FastAPI | None":
     """App FastAPI (transição). None se o pacote não estiver no Worker (aí o pedido é RECUSADO: ver fetch)."""
     global _APP_FASTAPI
     if _APP_FASTAPI is None:
@@ -120,7 +128,7 @@ def _app_fastapi():
 
 
 class Default(WorkerEntrypoint):
-    async def fetch(self, request):
+    async def fetch(self, request: Request) -> Response:
         env = self.env
         if str(getattr(env, "API_FASTAPI", "") or "") == "1":
             app = _app_fastapi()
@@ -129,7 +137,8 @@ class Default(WorkerEntrypoint):
                 # assim "API_FASTAPI = 1" sempre significa que a validação Pydantic está mesmo valendo
                 return _responder(nucleo.Resposta(503, {"erro": "UNAVAILABLE"}))
             import asgi                              # noqa: PLC0415 — adaptador ASGI do Python Workers
-            return await asgi.fetch(app, request.js_object, env)
+            via_fastapi: Response = await asgi.fetch(app, request.js_object, env)
+            return via_fastapi
         config = _config(env)
         cab = _cabecalhos(request)
         metodo = _metodo(request)
@@ -155,5 +164,5 @@ class Default(WorkerEntrypoint):
         return _responder(resposta)
 
 
-def _responder(r):
+def _responder(r: nucleo.Resposta) -> Response:
     return Response(r.corpo, status=r.status, headers=dict(nucleo.CABECALHOS, **r.cabecalhos))

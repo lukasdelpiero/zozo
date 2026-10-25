@@ -8,7 +8,21 @@ dependencies = []
 [dependency-groups]
 dev = [
     "fastapi==0.141.1",
+    "mypy==2.4.0",
     "pydantic==2.13.5",
     "starlette==1.7.0",
     "workers-py",
 ]
+
+# Tipos do back-end: uv run mypy (confere src/; os módulos do Cloudflare — pyodide, workers, js — só existem no Worker)
+[tool.mypy]
+files = ["src"]
+mypy_path = "src"
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["pyodide", "pyodide.*", "workers", "js", "asgi"]
+ignore_missing_imports = true
+

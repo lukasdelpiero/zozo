@@ -20,29 +20,42 @@ Regras de segurança:
 import html
 import json
 import time
+from collections.abc import Mapping
+from typing import Any, Protocol, TypedDict
 
 RESEND_URL = "https://api.resend.com/emails"
 _CHAVES = ("RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA")
 
 
-def _url_base(config):
+class Mensagem(TypedDict):
+    """E-mail montado: assunto, texto simples e HTML."""
+    subject: str
+    text: str
+    html: str
+
+
+class _Servicos(Protocol):
+    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str) -> tuple[int, str]: ...
+
+
+def _url_base(config: Mapping[str, Any]) -> str:
     u = str(config.get("URL_PUBLICA") or "").strip().rstrip("/")
     seguro = u.startswith("https://") or u.startswith("http://127.0.0.1") or u.startswith("http://localhost")
     return u if seguro and len(u) <= 200 and not any(c in u for c in "\"'<> \r\n") else ""
 
 
-def ativo(config):
+def ativo(config: Mapping[str, Any]) -> bool:
     """E-mail ligado = os três itens configurados e a URL pública válida."""
     return all(str(config.get(k) or "").strip() for k in _CHAVES) and bool(_url_base(config))
 
 
-def _quando(agora):
+def _quando(agora: float) -> str:
     """Data e hora de Brasília (UTC-3, sem horário de verão desde 2019)."""
     t = time.gmtime(int(agora) - 3 * 3600)
     return f"{t.tm_mday:02d}/{t.tm_mon:02d}/{t.tm_year} às {t.tm_hour:02d}:{t.tm_min:02d}"
 
 
-def _montar(assunto, saudacao, paragrafos, botao=None, rodape=None):
+def _montar(assunto: str, saudacao: str, paragrafos: list[str], botao: tuple[str, str] | None = None, rodape: str | None = None) -> Mensagem:
     """Texto simples + HTML mínimo (sem imagens remotas, sem rastreamento)."""
     texto = [saudacao, ""] + paragrafos
     if botao:
@@ -64,12 +77,12 @@ def _montar(assunto, saudacao, paragrafos, botao=None, rodape=None):
     return {"subject": assunto, "text": "\n".join(texto), "html": pagina}
 
 
-def _ola(nome):
+def _ola(nome: str | None) -> str:
     nome = str(nome or "").strip()
     return f"Olá, {nome}!" if nome else "Olá!"
 
 
-def confirmacao(config, token):
+def confirmacao(config: Mapping[str, Any], token: str) -> Mensagem:
     link = f"{_url_base(config)}/#confirmar={token}"
     return _montar("Confirme seu e-mail no ZoZo", "Olá!",
                    ["Para terminar de criar sua conta no ZoZo, toque no botão abaixo e entre com a senha que você criou.",
@@ -78,7 +91,7 @@ def confirmacao(config, token):
                    rodape="Se você não criou uma conta no ZoZo, ignore este e-mail: nada será criado sem a confirmação.")
 
 
-def ja_tem_conta(config):
+def ja_tem_conta(config: Mapping[str, Any]) -> Mensagem:
     return _montar("Tentativa de cadastro no ZoZo", "Olá!",
                    ["Alguém tentou criar uma conta no ZoZo com este e-mail, mas ele já tem uma conta.",
                     "Se foi você, é só entrar com a sua senha."],
@@ -86,7 +99,7 @@ def ja_tem_conta(config):
                    rodape="Se não foi você, sua conta continua protegida: nada foi alterado.")
 
 
-def recuperacao(config, token, nome):
+def recuperacao(config: Mapping[str, Any], token: str, nome: str | None) -> Mensagem:
     """Link de "Esqueci minha senha" (a conta já é confirmada: o nome vai escapado)."""
     link = f"{_url_base(config)}/#recuperar={token}"
     return _montar("Redefina sua senha do ZoZo", _ola(nome),
@@ -96,7 +109,7 @@ def recuperacao(config, token, nome):
                    rodape="Não pediu? Ignore este e-mail: sua senha continua a mesma e ninguém entra sem este link.")
 
 
-def senha_redefinida(nome, agora, recomecou):
+def senha_redefinida(nome: str | None, agora: float, recomecou: bool) -> Mensagem:
     paragrafos = [f"A senha da sua conta no ZoZo foi redefinida pelo link do e-mail em {_quando(agora)} (horário de Brasília).",
                   "Todos os dispositivos foram desconectados: entre de novo com a senha nova."]
     if recomecou:
@@ -105,24 +118,24 @@ def senha_redefinida(nome, agora, recomecou):
                    rodape="Não foi você? Redefina a senha agora pelo \"Esqueci minha senha\" e ative a verificação em duas etapas.")
 
 
-def senha_alterada(nome, agora):
+def senha_alterada(nome: str | None, agora: float) -> Mensagem:
     return _montar("Sua senha do ZoZo foi alterada", _ola(nome),
                    [f"A senha da sua conta no ZoZo foi alterada em {_quando(agora)} (horário de Brasília).",
                     "Os outros dispositivos conectados foram desconectados."],
                    rodape="Não foi você? Entre em contato com o suporte do ZoZo imediatamente e ative a verificação em duas etapas.")
 
 
-def dois_fatores_desativado(nome, agora):
+def dois_fatores_desativado(nome: str | None, agora: float) -> Mensagem:
     return _montar("Verificação em duas etapas desativada", _ola(nome),
                    [f"A verificação em duas etapas (2FA) da sua conta no ZoZo foi desativada em {_quando(agora)} (horário de Brasília)."],
                    rodape="Não foi você? Troque sua senha e ative o 2FA de novo.")
 
 
-async def enviar(servicos, config, para, mensagem):
+async def enviar(servicos: _Servicos, config: Mapping[str, Any], para: str, mensagem: Mensagem) -> bool:
     """Envia pelo Resend. Nunca lança: devolve True/False (quem chama registra o evento)."""
     if not ativo(config):
         return False
-    corpo = {"from": str(config.get("EMAIL_REMETENTE")).strip(), "to": [para]}
+    corpo: dict[str, object] = {"from": str(config.get("EMAIL_REMETENTE")).strip(), "to": [para]}
     corpo.update(mensagem)
     try:
         status, _ = await servicos.http_post_json(

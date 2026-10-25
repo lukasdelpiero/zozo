@@ -22,6 +22,8 @@ import hmac
 import json
 import secrets
 import time
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any, Protocol
 from urllib.parse import urlencode
 
 AUTORIZAR = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -29,24 +31,25 @@ TOKEN = "https://oauth2.googleapis.com/token"
 CHAVES = "https://www.googleapis.com/oauth2/v3/certs"
 EMISSORES = ("https://accounts.google.com", "accounts.google.com")
 VALIDADE_S = 600
-_cache = {"chaves": None, "em": 0.0}
+_cache_chaves: list[dict[str, Any]] | None = None     # chaves públicas do Google (1 h)
+_cache_em = 0.0
 
 # Prefixo DER do DigestInfo para SHA-256 (RFC 8017, seção 9.2, nota 1)
 _DIGEST_INFO_SHA256 = bytes.fromhex("3031300d060960864801650304020105000420")
 _MIN_BITS_RSA = 2048
 
 
-def b64url(texto):
+def b64url(texto: str) -> bytes:
     if not isinstance(texto, str) or not texto or len(texto) > 16384:
         raise ValueError("base64url inválido")
     return base64.urlsafe_b64decode(texto + "=" * (-len(texto) % 4))
 
 
-def _inteiro(texto):
+def _inteiro(texto: str) -> int:
     return int.from_bytes(b64url(texto), "big")
 
 
-def verificar_rs256(jwk, mensagem, assinatura):
+def verificar_rs256(jwk: Mapping[str, Any], mensagem: bytes, assinatura: bytes) -> bool:
     """True se `assinatura` (bytes) é uma assinatura RS256 válida de `mensagem` (bytes)."""
     try:
         if jwk.get("kty") != "RSA":
@@ -68,17 +71,17 @@ def verificar_rs256(jwk, mensagem, assinatura):
     return hmac.compare_digest(recebido, esperado)
 
 
-def b64u(dados):
+def b64u(dados: bytes) -> str:
     return base64.urlsafe_b64encode(dados).rstrip(b"=").decode("ascii")
 
 
-def _assinar(segredo, carga):
+def _assinar(segredo: str, carga: Mapping[str, Any]) -> str:
     corpo = b64u(json.dumps(carga, separators=(",", ":")).encode("utf-8"))
     mac = b64u(hmac.new(segredo.encode(), ("zozo-google|" + corpo).encode("ascii"), hashlib.sha256).digest())
     return corpo + "." + mac
 
 
-def ler_assinado(segredo, texto, agora):
+def ler_assinado(segredo: str, texto: str | None, agora: float) -> dict[str, Any] | None:
     """Carga (dict) de um cookie assinado válido e não vencido, ou None."""
     if not isinstance(texto, str) or texto.count(".") != 1 or len(texto) > 2048:
         return None
@@ -95,7 +98,7 @@ def ler_assinado(segredo, texto, agora):
     return carga
 
 
-def inicio(segredo, client_id, redirect_uri, agora):
+def inicio(segredo: str, client_id: str, redirect_uri: str, agora: float) -> tuple[str, str]:
     """(url de autorização do Google, valor do cookie com state/nonce/verificador)."""
     state, nonce, verificador = secrets.token_urlsafe(24), secrets.token_urlsafe(24), secrets.token_urlsafe(48)
     desafio = b64u(hashlib.sha256(verificador.encode("ascii")).digest())
@@ -107,24 +110,31 @@ def inicio(segredo, client_id, redirect_uri, agora):
     return url, _assinar(segredo, {"s": state, "n": nonce, "v": verificador, "e": int(agora) + VALIDADE_S})
 
 
-def identidade_assinada(segredo, email, nome, agora):
+def identidade_assinada(segredo: str, email: str, nome: str, agora: float) -> str:
     """Cookie curto que lembra o e-mail confirmado pelo Google até o usuário digitar a senha."""
     return _assinar(segredo, {"m": email, "nm": nome, "e": int(agora) + VALIDADE_S})
 
 
-async def _chaves(http_get, forcar=False):
+async def _chaves(http_get: Callable[[str, Mapping[str, str]], Awaitable[tuple[int, str]]], forcar: bool = False) -> list[dict[str, Any]]:
+    global _cache_chaves, _cache_em
     agora = time.time()
-    if _cache["chaves"] is not None and not forcar and agora - _cache["em"] < 3600:
-        return _cache["chaves"]
+    if _cache_chaves is not None and not forcar and agora - _cache_em < 3600:
+        return _cache_chaves
     status, corpo = await http_get(CHAVES, {})
     if status != 200:
         raise ValueError("chaves do Google indisponíveis")
     chaves = [k for k in json.loads(corpo).get("keys", []) if isinstance(k, dict)]
-    _cache.update(chaves=chaves, em=agora)
+    _cache_chaves, _cache_em = chaves, agora
     return chaves
 
 
-async def trocar_codigo(servicos, client_id, client_secret, redirect_uri, codigo, verificador, nonce, agora):
+class _Servicos(Protocol):
+    async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]: ...
+    async def http_post(self, url: str, campos: Mapping[str, str]) -> tuple[int, str]: ...
+
+
+async def trocar_codigo(servicos: _Servicos, client_id: str, client_secret: str, redirect_uri: str, codigo: str, verificador: str,
+                        nonce: str, agora: float) -> dict[str, str] | None:
     """E-mail e nome confirmados pelo Google, ou None (qualquer falha = não autenticado)."""
     if not isinstance(codigo, str) or not codigo or len(codigo) > 2048:
         return None

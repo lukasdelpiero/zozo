@@ -22,29 +22,29 @@ JANELA = 1                       # aceita o passo anterior e o seguinte
 TAMANHO_SEGREDO = 20             # 160 bits (recomendação da RFC 4226)
 
 
-def novo_segredo():
+def novo_segredo() -> bytes:
     return secrets.token_bytes(TAMANHO_SEGREDO)
 
 
-def base32(segredo):
+def base32(segredo: bytes) -> str:
     return base64.b32encode(segredo).decode("ascii").rstrip("=")
 
 
-def uri(segredo, email, emissor="ZoZo"):
+def uri(segredo: bytes, email: str, emissor: str = "ZoZo") -> str:
     """otpauth:// lido pelo QR code do aplicativo autenticador."""
     rotulo = quote(f"{emissor}:{email}", safe="@:")
     return (f"otpauth://totp/{rotulo}?secret={base32(segredo)}&issuer={quote(emissor)}"
             f"&algorithm=SHA1&digits={DIGITOS}&period={PASSO}")
 
 
-def codigo(segredo, passo):
+def codigo(segredo: bytes, passo: int) -> str:
     mac = hmac.new(segredo, struct.pack(">Q", passo), hashlib.sha1).digest()
     o = mac[-1] & 0x0F
     n = (struct.unpack(">I", mac[o:o + 4])[0] & 0x7FFFFFFF) % (10 ** DIGITOS)
     return str(n).zfill(DIGITOS)
 
 
-def conferir(segredo, texto, agora, ultimo_passo=0):
+def conferir(segredo: bytes, texto: object, agora: float, ultimo_passo: int = 0) -> int | None:
     """
     Passo (int) em que o código vale, ou None.
     Recusa passos já usados (<= ultimo_passo): um código não serve duas vezes.
@@ -62,13 +62,13 @@ def conferir(segredo, texto, agora, ultimo_passo=0):
 
 
 # ---------------- segredo cifrado com o SEGREDO do servidor ----------------
-def _chaves(segredo_servidor):
+def _chaves(segredo_servidor: str) -> tuple[bytes, bytes]:
     base = hashlib.sha256(("zozo/totp|" + segredo_servidor).encode("utf-8")).digest()
     return (hmac.new(base, b"cifra", hashlib.sha256).digest(),
             hmac.new(base, b"etiqueta", hashlib.sha256).digest())
 
 
-def _fluxo(chave, nonce, tamanho):
+def _fluxo(chave: bytes, nonce: bytes, tamanho: int) -> bytes:
     saida, i = b"", 0
     while len(saida) < tamanho:
         saida += hmac.new(chave, nonce + struct.pack(">I", i), hashlib.sha256).digest()
@@ -76,7 +76,7 @@ def _fluxo(chave, nonce, tamanho):
     return saida[:tamanho]
 
 
-def cifrar(segredo, segredo_servidor):
+def cifrar(segredo: bytes, segredo_servidor: str) -> str:
     kc, ke = _chaves(segredo_servidor)
     nonce = secrets.token_bytes(16)
     ct = bytes(a ^ b for a, b in zip(segredo, _fluxo(kc, nonce, len(segredo))))
@@ -84,7 +84,7 @@ def cifrar(segredo, segredo_servidor):
     return base64.b64encode(nonce + ct + tag).decode("ascii")
 
 
-def decifrar(texto, segredo_servidor):
+def decifrar(texto: str, segredo_servidor: str) -> bytes | None:
     """Segredo (bytes) ou None se ausente/adulterado/cifrado com outro SEGREDO."""
     try:
         bruto = base64.b64decode(str(texto or ""), validate=True)

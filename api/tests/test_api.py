@@ -345,6 +345,17 @@ class TesteContaESessao(Base):
         self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
         self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 401)
 
+    def test_sessao_sem_conta_acaba(self):
+        # a chave estrangeira apaga as sessões junto com a conta; se uma sobrar (ex.: chaves desligadas numa
+        # migração), a sessão órfã acaba em vez de dar erro 500 ou abrir algo
+        self.con.execute("PRAGMA foreign_keys = OFF")
+        self.con.execute("DELETE FROM contas WHERE email = ?", (EMAIL,))
+        self.con.execute("PRAGMA foreign_keys = ON")
+        self.assertEqual(self.api("GET", "/api/sessao")[0], 204)
+        self.assertNotIn("__Host-zozo", self.api.cookies)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM sessoes WHERE email = ?", (EMAIL,)).fetchone()[0], 0)
+        self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[0], 401)
+
     def test_limite_da_sessao_e_24h(self):
         self.assertEqual((nucleo.SESSAO_MAXIMA_S, nucleo.SESSAO_OCIOSA_S), (86400, 86400))
 
@@ -662,7 +673,7 @@ class TesteGoogle(Base):
 
     def setUp(self):
         super().setUp()
-        google._cache.update(chaves=None, em=0.0)
+        google._cache_chaves = None
         self.cfg = dict(CONFIG, GOOGLE_CLIENT_ID=self.CID, GOOGLE_CLIENT_SECRET="segredo-google", TURNSTILE_SECRET="t")
         self.cli = Cliente(self.banco, config=self.cfg, ip="192.0.2.80")
 

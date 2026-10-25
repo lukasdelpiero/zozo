@@ -16,7 +16,7 @@ O padrão obrigatório está em @docs/SEGURANCA.md — leia antes de mexer em lo
 
 ## Comandos
 
-- Testes da API: `cd api; uv run python -m unittest discover -s tests -v` (inclui o app FastAPI; com `python` puro os testes do FastAPI são pulados)
+- Testes da API: `cd api; uv run python -m unittest discover -s tests -v` (inclui o app FastAPI; com `python` puro os testes do FastAPI são pulados) · Tipos do back-end: `cd api; uv run mypy` (modo estrito em `api/src`; mudou uma função, anote parâmetros e retorno — `Banco`/`Servicos`/`Config` em `nucleo.py`)
 - Testes do serviço de dados e do host web (criptografia, API falsa): `npm test` · Tipos: `npm run typecheck`
 - Interface com recarga instantânea: `npm run dev` → http://127.0.0.1:5173 (com a API local; sem servidor: Modo teste › simular cadastro e login)
 - API local + interface montada: `npm run build` e `python api/dev/servidor_local.py` → http://127.0.0.1:8787
