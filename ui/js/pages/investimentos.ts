@@ -91,7 +91,7 @@
           inv.contas && inv.contas.length
             ? h("div", { class: ZoZo.pecas.listaLinhas }, inv.contas.map((c) => L.AccountRow(c, {
               subtitulo: "Investimento", selected: c.id === sel,
-              onClick: () => ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos"),
+              onClick: () => ZoZo.contasShared.abrirDetalheConta(c, ctx),
             })))
             : UI.EmptyState("Nenhuma conta de investimento cadastrada.", { icon: "investimentos" })),
         UI.Section({ key: "inv:alocacoes", title: "Alocações", class: "tw:mt-5!" },
@@ -102,7 +102,7 @@
     selecionar(sel, ctx) {
       const dados = ZoZo.store.get().data.investimentos;
       const c = ((dados && dados.contas) || []).find((x) => x.id === sel.id);
-      if (c) ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos");
+      if (c) ZoZo.contasShared.abrirDetalheConta(c, ctx);
     },
   };
   ZoZo.pages.investimentos = pagina;

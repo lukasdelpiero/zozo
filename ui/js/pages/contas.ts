@@ -57,7 +57,7 @@
   ];
 
   /* ---------- Card do gráfico de Contas (Ativos × Passivos) ---------- */
-  function metade(ponto: any, titulo: any, dados: any, embutido: any, passivo: boolean) {
+  function metade(ponto: string, titulo: string, dados: ValorVariacao, embutido: boolean, passivo: boolean) {
     const valorEl = h("span", { class: embutido ? T.valorEmbutido : T.valor }, F.moeda(dados.valor));
     const pctEl = h("span", { class: "tw:contents" }, UI.PercentageChange(dados.variacaoPercentual, { passivo }));
     const el = h("div", { class: T.metade },
@@ -67,15 +67,16 @@
     return { el, mostrar(valor: number, pct: number) { valorEl.textContent = F.moeda(valor); mount(pctEl, UI.PercentageChange(pct, { passivo })); } };
   }
 
-  function ContasChartCard(state: any, _ctx: ContextoApp, opts?: any) {
+  /** Card Ativos × Passivos (Contas e, compacto, no Dashboard); o período fica em ui[chaveIntervalo] */
+  function ContasChartCard(contas: RespostaContas, ui: EstadoUi, opts?: OpcoesCardContas) {
     const o = opts || {};
-    const resumo = state.data.contas.resumo;
-    const intervalo = o.intervalo || state.ui.intervaloContas;
+    const resumo = contas.resumo;
+    const intervalo = o.intervalo || ui.intervaloContas;
     const serie = UI.recortarSerie(resumo.serie, intervalo);
     const chart = h("div", { class: T.grafico });
     const css = getComputedStyle(document.documentElement);
-    const ativos = metade(T.pontoAtivos, "Ativos", resumo.ativos, o.embedded, false);
-    const passivos = metade(T.pontoPassivos, "Passivos", resumo.passivos, o.embedded, true);
+    const ativos = metade(T.pontoAtivos, "Ativos", resumo.ativos, !!o.embedded, false);
+    const passivos = metade(T.pontoPassivos, "Passivos", resumo.passivos, !!o.embedded, true);
     const variacaoAte = (v: number, v0: number) => (v0 ? Math.round(((v - v0) / Math.abs(v0)) * 10000) / 100 : 0);
     ZoZo.charts.renderLineChart(chart, [
       // degradê: o de Ativos desce até a linha de Passivos; o de Passivos, até o fim do gráfico
@@ -121,7 +122,7 @@
    *   Fechamento [data]  Vencimento [data] — as datas do ciclo atual (ou do mês escolhido); grava o dia de cada uma
    * Os DOIS são obrigatórios (não dá para mudar só um); a mesma regra vale no serviço de dados.
    */
-  function areaCiclo(conta: any, ctx: ContextoApp, aoSalvar: any) {
+  function areaCiclo(conta: ContaTela, ctx: ContextoApp, aoSalvar: (c: ContaTela) => void) {
     const hoje = new Date();
     const meses = Array.from({ length: 13 }, (_, i) => { const d = new Date(hoje.getFullYear(), hoje.getMonth() + i - 1, 1); return F.iso(d).slice(0, 7); });
     const soEsteMes = !!(conta.cicloAtual && conta.cicloAtual.soEsteMes);
@@ -159,19 +160,19 @@
     pintar();
     return {
       el: h("div", { class: T.cicloArea }, modoBtn, mesSel, diasEl, erro),
-      salvar(btn: any) {
+      salvar(btn: HTMLButtonElement | null) {
         if (!fechIso || !vencIso) { erro.textContent = ZoZo.messages.FRIENDLY.CARD_CYCLE_INVALID; return; }
         if (btn) btn.disabled = true;
         // grava o DIA de cada data (a regra do ciclo continua por dia do mês)
         ctx.bridge.request(A.updateCicloCartao, { id: conta.id, fechamento: String(Number(fechIso.slice(8, 10))), vencimento: String(Number(vencIso.slice(8, 10))), modo, mes: modo === "mes" ? mes : undefined })
-          .then((r: any) => ctx.recarregarTudo().then(() => aoSalvar(r.conta)))
-          .catch((e: any) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
+          .then((r: { conta: ContaTela }) => ctx.recarregarTudo().then(() => aoSalvar(r.conta)))
+          .catch((e: ErroPonte) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
       },
     };
   }
 
   /** 4 últimos dígitos editáveis no lugar: um clique e já é um campo (sem borda, fundo transparente) */
-  function campoDigitos(conta: any, ctx: ContextoApp) {
+  function campoDigitos(conta: ContaTela, ctx: ContextoApp) {
     let atual = conta.ultimos4Digitos || "";
     const input = h("input", { type: "text", inputmode: "numeric", autocomplete: "off", maxlength: "4", placeholder: "0000", value: atual,
       class: T.digitos, "aria-label": "4 últimos dígitos" });
@@ -183,26 +184,27 @@
       if (v && !/^\d{4}$/.test(v)) { input.setAttribute("aria-invalid", "true"); ctx.toast(ZoZo.messages.FRIENDLY.DIGITS_INVALID, { tone: "error" }); input.value = atual; return; }
       const antes = atual; atual = v;
       ctx.bridge.request(A.updateConta, { id: conta.id, ultimos4Digitos: v }).then(() => ctx.recarregarTudo())
-        .catch((e: any) => { atual = antes; input.value = antes; ctx.toast(e.friendly, { tone: "error" }); });
+        .catch((e: ErroPonte) => { atual = antes; input.value = antes; ctx.toast(e.friendly, { tone: "error" }); });
     });
     return input;
   }
 
-  function abrirDetalheConta(conta: any, ctx: ContextoApp, origem: any, opts?: any) {
+  /** opts: editandoCiclo = fechamento do cartão em edição no painel; voltar = seta "voltar" */
+  function abrirDetalheConta(conta: ContaTela, ctx: ContextoApp, opts?: OpcoesPainelConta) {
     const passivo = conta.tipo === "cartao" || conta.tipo === "emprestimo";
     let intervalo = conta.tipo === "investimento" ? "1M" : "3M";
     const editandoCiclo = !!(opts && opts.editandoCiclo) && conta.tipo === "cartao";
-    const contaAtual = () => (((ZoZo.store.get().data.contas || {}).contas) || []).find((x: any) => x.id === conta.id) || conta;
-    const reabrir = (extra: any, atual?: any) => abrirDetalheConta(atual || conta, ctx, origem, Object.assign({}, opts, extra));
-    const ciclo = editandoCiclo ? areaCiclo(conta, ctx, (c: any) => reabrir({ editandoCiclo: false }, Object.assign({}, conta, c))) : null;
+    const contaAtual = () => { const dados = ZoZo.store.get().data.contas; return ((dados && dados.contas) || []).find((x) => x.id === conta.id) || conta; };
+    const reabrir = (extra: OpcoesPainelConta, atual?: ContaTela) => abrirDetalheConta(atual || conta, ctx, Object.assign({}, opts, extra));
+    const ciclo = editandoCiclo ? areaCiclo(conta, ctx, (c) => reabrir({ editandoCiclo: false }, Object.assign({}, conta, c))) : null;
     const excluir = () => ZoZo.feedback.confirmarExclusao("Excluir conta?", "Tem certeza de que deseja excluir esta conta?")
       .then((ok) => ok && ctx.bridge.request(A.deleteConta, { id: conta.id }).then(() => { ctx.detail.close({ silencioso: true }); ctx.toast("Conta excluída."); return ctx.recarregarTudo(); })
-        .catch((e: any) => ctx.toast(e.friendly, { tone: "error" })));
+        .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })));
     const ocultar = () => ctx.bridge.request(A.updateConta, { id: conta.id, oculta: !conta.oculta }).then(() => {
       ctx.toast(conta.oculta ? "Conta visível novamente." : "Conta oculta: ela não entra mais nos totais.");
       ctx.detail.close({ silencioso: true });
       return ctx.recarregarTudo();
-    }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
+    }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
     ctx.detail.open({
       title: conta.tipo === "investimento" ? "Investimento" : conta.tipo === "cartao" ? "Cartão de crédito"
         : (L.SUBTITULO_CONTA[conta.tipo] ? "Conta " + L.SUBTITULO_CONTA[conta.tipo].toLowerCase() : "Conta"),
@@ -220,12 +222,12 @@
         { separador: true },
         { label: "Excluir conta", perigo: true, onClick: excluir },
       ],
-      render(body: any) {
+      render(body: HTMLElement) {
         const listaEl = h("div", { class: ZoZo.pecas.painelLista }, UI.Skeleton(3, { short: true }));
         const graficoEl = h("div", { class: ZoZo.pecas.painelGrafico });
         const filtrosEl = h("div", { class: T.filtros });
         const difEl = h("span");
-        let serie: any[] = [];
+        let serie: PontoGrafico[] = [];
         const desenhar = () => {
           const recorte = UI.recortarSerie(serie, intervalo);
           const subiu = recorte.length > 1 && recorte[recorte.length - 1].valor >= recorte[0].valor;
@@ -264,7 +266,7 @@
           graficoEl, filtrosEl,
           C.detalheSecao(null, listaEl));
 
-        ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r: any) => {
+        ctx.bridge.request(A.getContaHistorico, { id: conta.id }).then((r) => {
           serie = r.serie;
           const dif = r.diferenca;
           // passivo (cartão, empréstimo): a dívida subir é ruim (vermelho); cair é bom (verde)
@@ -273,14 +275,13 @@
           desenhar();
         }).catch(() => mount(graficoEl, h("p", { class: "tw:text-zz-muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
 
-        ctx.loadData("lancamentos", A.getLancamentos).then((d: any) => {
-          const itens = d.lancamentos.filter((l: any) => l.contaId === conta.id).slice(0, 8);
+        ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
+          const itens = d.lancamentos.filter((l) => l.contaId === conta.id).slice(0, 8);
           mount(listaEl, itens.length
             // a transação abre aqui mesmo, com a seta para voltar a esta conta
-            ? L.ListaPainel(itens, { onClick: (l) => ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta((((ZoZo.store.get().data.contas || {}).contas) || []).find((x: any) => x.id === conta.id) || conta, ctx, origem, opts) }) })
+            ? L.ListaPainel(itens, { onClick: (l: LancamentoTela) => { ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta(contaAtual(), ctx, opts) }); } })
             : UI.EmptyState("Nenhuma transação nesta conta."));
-        }).catch((e: any) => mount(listaEl, UI.ErrorState(e.friendly)));
-        void origem;
+        }).catch((e: ErroPonte) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });
   }
@@ -301,34 +302,34 @@
 
       const mostrar: Record<string, boolean> = (state.ui.mostrarOcultas as Record<string, boolean>) || {};
       const secoes = GRUPOS.map((g) => {
-        const doGrupo = contas.filter((c: any) => g.tipos.includes(c.tipo));
+        const doGrupo = contas.filter((c) => g.tipos.includes(c.tipo));
         if (!doGrupo.length) return null;
-        const temOcultas = doGrupo.some((c: any) => c.oculta);
+        const temOcultas = doGrupo.some((c) => c.oculta);
         const exibindo = !!mostrar[g.key];
-        const itens = doGrupo.filter((c: any) => !c.oculta || exibindo);
+        const itens = doGrupo.filter((c) => !c.oculta || exibindo);
         const olho = temOcultas ? h("button", {
           type: "button", class: [ZoZo.pecasFn.botaoIcone("", true), exibindo ? T.olhoAtivo : T.olho],
           "aria-pressed": String(exibindo), title: exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
           "aria-label": exibindo ? "Esconder contas ocultas" : "Mostrar contas ocultas",
-          onClick: (e: any) => { e.stopPropagation(); ZoZo.store.set({ ui: { mostrarOcultas: Object.assign({}, mostrar, { [g.key]: !exibindo }) } }); },
+          onClick: (e: MouseEvent) => { e.stopPropagation(); ZoZo.store.set({ ui: { mostrarOcultas: Object.assign({}, mostrar, { [g.key]: !exibindo }) } }); },
         }, ZoZo.icons.icon(exibindo ? "olho" : "olho-fechado", { size: 15 })) : null;
         return UI.Section({ key: "contas:" + g.key, title: g.titulo, adorno: olho, class: T.secao },
           itens.length ? null : h("p", { class: T.aviso }, "Todas as contas deste grupo estão ocultas."),
-          h("div", { class: T.lista }, itens.map((c: any) => L.AccountRow(c, {
+          h("div", { class: T.lista }, itens.map((c) => L.AccountRow(c, {
             selected: c.id === sel,
-            onClick: () => abrirDetalheConta(c, ctx, "contas"),
+            onClick: () => abrirDetalheConta(c, ctx),
           }))));
       });
 
       return C.pagina("page--contas",
-        ContasChartCard(state, ctx),
+        ContasChartCard(C.carregado(state, "contas"), state.ui),
         contas.length ? secoes
           : UI.EmptyState("Nenhuma conta cadastrada.", { icon: "contas", action: { label: "Nova conta", icon: "mais", onClick: () => ZoZo.modais.novaConta(ctx, "corrente") } }));
     },
     selecionar(sel, ctx) {
       const dados = ZoZo.store.get().data.contas;
       const c = ((dados && dados.contas) || []).find((x) => x.id === sel.id);
-      if (c) abrirDetalheConta(c, ctx, "contas");
+      if (c) abrirDetalheConta(c, ctx);
     },
   };
 

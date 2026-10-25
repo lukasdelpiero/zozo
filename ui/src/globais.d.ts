@@ -614,9 +614,15 @@ declare global {
     estruturar(categorias: any, grupos: any): any[];
     abrirGrupo(nome: string, ctx: ContextoApp, opts?: any): void;
   }
+  /** Card Ativos × Passivos: compacto/embutido no Dashboard, com o período em ui[chaveIntervalo] */
+  interface OpcoesCardContas {
+    intervalo?: string; embedded?: boolean; compact?: boolean; filtros?: boolean; alturaGrafico?: number;
+    chaveIntervalo?: string; rotuloFiltro?: string;
+  }
+  interface OpcoesPainelConta { editandoCiclo?: boolean; voltar?: () => void }
   interface ZoZoContasShared {
-    ContasChartCard(state: { data: any; ui: EstadoZoZo["ui"] }, ctx: ContextoApp, opts?: any): HTMLElement;
-    abrirDetalheConta(conta: any, ctx: ContextoApp, origem?: any, opts?: any): void;
+    ContasChartCard(contas: RespostaContas, ui: EstadoUi, opts?: OpcoesCardContas): HTMLElement;
+    abrirDetalheConta(conta: ContaTela, ctx: ContextoApp, opts?: OpcoesPainelConta): void;
   }
   /** Painel da transação: preset = campos já preenchidos numa nova; recemCriada = entrada animada; voltar = seta "voltar" */
   interface OpcoesPainelLancamento { preset?: Partial<Lancamento>; recemCriada?: boolean; voltar?: () => void }

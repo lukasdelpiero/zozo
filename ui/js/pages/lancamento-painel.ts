@@ -257,9 +257,8 @@
             { icone: "emprestimo", label: "Empréstimos", onClick: () => novaConta("emprestimo") },
             { icone: "carteira", label: "Outros", onClick: () => novaConta("outros") }] }],
       }));
-      const origem = conta && conta.tipo === "investimento" ? "investimentos" : "contas";
       return h("div", { class: ZoZo.pecas.lpContaLinha }, btn,
-        conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, origem, { voltar: voltarParaCa }), 16) : null);
+        conta ? seta(conta.nome, () => ZoZo.contasShared.abrirDetalheConta(conta, ctx, { voltar: voltarParaCa }), 16) : null);
     }
     /** Cria a conta e já a escolhe nesta transação */
     function novaConta(tipo: TipoConta) {

@@ -98,9 +98,9 @@
       });
       const tipoLanc = (tipo: string, rotulo: string, teste: (l: any) => boolean) =>
         ir(rotulo, naPagina("lancamentos", async () => ZoZo.lancamentosShared.abrirVisualizacao(achar(await lancamentos(ctx), teste, "transação do tipo " + tipo), ctx)));
-      const tipoConta = (tipo: string, rotulo: string, opts?: any) =>
+      const tipoConta = (tipo: string, rotulo: string, opts?: OpcoesPainelConta) =>
         ir(rotulo, naPagina(tipo === "investimento" ? "investimentos" : "contas", async () => ZoZo.contasShared.abrirDetalheConta(
-          achar(await contas(ctx), (c: any) => c.tipo === tipo, "conta do tipo " + tipo), ctx, tipo === "investimento" ? "investimentos" : "contas", opts)));
+          achar(await contas(ctx), (c) => c.tipo === tipo, "conta do tipo " + tipo), ctx, opts)));
       const primeira = async (fn: () => Promise<any[]>, oque: string) => achar(await fn(), () => true, oque);
       const regular = async () => achar(await lancamentos(ctx), (l: any) => l.tipo === "regular", "transação regular");
       const cartao = async () => achar(await contas(ctx), (c: any) => c.tipo === "cartao", "cartão de crédito");
