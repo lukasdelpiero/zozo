@@ -186,8 +186,12 @@
               ZoZo.configuracoes.abrir(ctx, "conta");
               setTimeout(() => { const b = Array.from(document.querySelectorAll<HTMLButtonElement>(".modal button")).find((x) => /Ativar 2FA|Desativar 2FA/.test(x.textContent || "")); if (b) b.click(); }, 400);
             }),
-            ir("Confirmar com senha", () => ZoZo.modais.confirmarComSenha({ titulo: "Apagar todos os dados?", botao: "Apagar dados", mensagem: "Exemplo do modo teste: nada é apagado." }), false),
-            ir("Confirmar exclusão", () => ZoZo.feedback.confirmarExclusao("Excluir conta?", "Exemplo do modo teste: nada é excluído.", { confirmar: "Excluir" }), false))),
+            ir("2FA: desativar (código)", () => ZoZo.configuracoes.desativar2FA(ctx))),
+          sub("Confirmações de ação (os textos de cada uma; confirmar aqui não faz nada)"),
+          linha(...CONFIRMACOES.map(([rotulo, titulo, mensagem, opts]) =>
+            ir(rotulo, () => ZoZo.feedback.confirmarExclusao(titulo, mensagem, opts), false))),
+          sub("Confirmações com senha"),
+          linha(...CONFIRMACOES_SENHA.map(([rotulo, cfg]) => ir(rotulo, () => ZoZo.modais.confirmarComSenha(cfg), false)))),
 
         secao("Menus", false,
           h("p", { class: C.nota }, "Abrem no botão \"Modo teste\". Os menus próprios de cada tela abrem pelos botões dela (abra a tela ou o painel acima)."),
@@ -242,6 +246,28 @@
     }
     desenhar();
   }
+
+  /* ---------- janelas de confirmação do app (mesmos títulos, textos e botões; aqui só aparecem) ----------
+     Ao criar uma confirmação nova no app, acrescente-a aqui também. */
+  const CONFIRMACOES: Array<[string, string, string, OpcoesConfirmacao?]> = [
+    ["Excluir transação", "Excluir transação?", "Tem certeza de que deseja excluir esta transação?"],
+    ["Excluir transação parcelada", "Excluir transação?", "Tem certeza de que deseja excluir esta transação? As parcelas futuras desta compra também serão excluídas; as já pagas continuam."],
+    ["Excluir várias transações", "Excluir transações?", "Tem certeza de que deseja excluir estas 3 transações?"],
+    ["Remover recorrência (da transação)", "Remover recorrência?", "As parcelas e ocorrências futuras desta série serão excluídas. As transações já lançadas continuam, sem recorrência. Essa ação não pode ser desfeita.", { confirmar: "Remover" }],
+    ["Excluir recorrência", "Excluir recorrência?", "Isso removerá a recorrência e o vínculo com as transações. Não é possível desfazer essa ação.", { cancelar: "Manter recorrência", confirmar: "Excluir recorrência" }],
+    ["Excluir conta (bancária, cartão…)", "Excluir conta?", "Tem certeza de que deseja excluir esta conta?"],
+    ["Excluir categoria", "Excluir categoria?", "A categoria “Restaurantes” e o histórico de orçamentos dela serão apagados. Essa ação não pode ser desfeita. As transações dessa categoria serão movidas para “Outros”."],
+    ["Desagrupar categorias", "Desagrupar categorias?", "O valor não planejado do grupo será apagado. Os orçamentos das categorias individuais continuam valendo. Essa ação não pode ser desfeita.", { confirmar: "Desagrupar" }],
+    ["Excluir perfil", "Excluir perfil?", "Tem certeza de que deseja excluir este perfil?"],
+    ["Verificação de segurança (Cloudflare)", "Verificação de segurança", ZoZo.messages.FRIENDLY.CF_CHALLENGE + " O que não foi salvo precisará ser refeito.", { confirmar: "Recarregar página", cancelar: "Agora não", variante: "primary" }],
+  ];
+  const CONFIRMACOES_SENHA: Array<[string, { titulo: string; botao: string; mensagem: string }]> = [
+    ["Alterar nome", { titulo: "Confirmar alteração", botao: "Salvar", mensagem: "Digite sua senha para alterar o nome." }],
+    ["Apagar todos os dados", { titulo: "Apagar todos os dados?", botao: "Apagar dados", mensagem: "Transações, contas, categorias e perfis serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." }],
+    ["Excluir conta do ZoZo", { titulo: "Excluir conta?", botao: "Excluir conta", mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." }],
+    ["Ativar proteção avançada", { titulo: "Ativar proteção avançada?", botao: "Ativar", mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar." }],
+    ["Desativar proteção avançada", { titulo: "Desativar proteção avançada?", botao: "Desativar", mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha para confirmar." }],
+  ];
 
   /* ---------- galeria de gráficos (dados de exemplo, sem conta) ---------- */
   function serie(n: number, inicio: number, passo: number, onda: number): PontoGrafico[] {

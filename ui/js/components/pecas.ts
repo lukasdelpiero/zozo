@@ -155,7 +155,7 @@
     vazioTexto: "tw:text-[15px]",
 
     /* Avisos (toasts): só erros e avisos aparecem */
-    aviso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-text tw:text-white tw:text-[14px] "
+    aviso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-(--color-aviso-alerta) tw:text-white tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
@@ -163,9 +163,12 @@
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
+    // sucesso: o mesmo aviso, em verde
+    avisoSucesso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-(--color-aviso-sucesso) tw:text-white tw:text-[14px] "
+      + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
+      + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
+      + "tw:[&.is-visible]:[transform:none]",
     avisoIcone: "tw:flex-none tw:mt-0.5",
-    avisoIconeAviso: "tw:flex-none tw:mt-0.5 tw:text-[#ffb36b]",
-    avisoIconeOk: "tw:flex-none tw:mt-0.5 tw:text-[#6fdca4]",
     avisoTexto: "tw:min-w-0 tw:[overflow-wrap:anywhere]",
 
     /* Card (UI.Card) */

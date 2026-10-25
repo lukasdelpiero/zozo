@@ -100,11 +100,12 @@
 
   /* ---------------- QR code ---------------- */
   /** QR em SVG com a margem recomendada (4 módulos brancos). rotulo: o que o código é (leitor de tela) */
-  function QR(texto: string, px?: number, rotulo?: string): SVGElement {
+  /** margem: zona branca em volta (módulos). Num fundo branco pode ser 0 — o desenho alinha com o texto ao lado */
+  function QR(texto: string, px?: number, rotulo?: string, margem = 4): SVGElement {
     const q = window.qrcode(0, "M");
     q.addData(texto);
     q.make();
-    const n = q.getModuleCount(), borda = 4, total = n + borda * 2;
+    const n = q.getModuleCount(), borda = Math.max(0, margem), total = n + borda * 2;
     let d = "";
     for (let r = 0; r < n; r++) {
       for (let col = 0; col < n; col++) if (q.isDark(r, col)) d += "M" + (col + borda) + " " + (r + borda) + "h1v1h-1z";

@@ -78,7 +78,7 @@
     passoTitulo: "tw:mt-px tw:mx-0 tw:mb-0 tw:flex tw:items-center tw:gap-2 tw:text-[15px] tw:font-[450] tw:text-zz-text",
     dica: "tw:mt-1 tw:mx-0 tw:mb-0 tw:text-[13px] tw:text-zz-muted",
     ok: "tw:size-[18px] tw:inline-grid tw:place-items-center tw:rounded-[50%] tw:bg-zz-positive tw:text-white tw:flex-none tw:[&[hidden]]:hidden",
-    qr: "tw:w-[176px] tw:min-h-[176px] tw:mt-3 tw:mx-0 tw:mb-2 tw:grid tw:place-items-center tw:[&_.qr]:block tw:[&_.qr]:rounded-lg",
+    qr: "tw:w-[168px] tw:min-h-[168px] tw:mt-3 tw:mx-0 tw:mb-3 tw:grid tw:place-items-center tw:[&_.qr]:block",
     chaveLinha: "tw:flex tw:items-center tw:gap-1.5",
     chave: "tw:text-[13px] tw:tracking-[0.04em] tw:text-zz-secondary tw:break-all",
     erro: "tw:mt-2.5 tw:mx-0 tw:mb-0 tw:text-[13px] tw:font-[450] tw:text-zz-text tw:empty:hidden",
@@ -407,7 +407,8 @@
     ctx.bridge.request(A.iniciar2FA).then((r: any) => {
       chave = r.chave;
       chaveTexto.textContent = r.chave.replace(/(.{4})/g, "$1 ").trim();
-      mount(qrArea, V.QR(r.uri, 176));
+      // sem a margem branca do desenho: o QR alinha à esquerda com o texto do passo (o painel já é branco em volta)
+      mount(qrArea, V.QR(r.uri, 168, undefined, 0));
       qrArea.removeAttribute("aria-busy");
       campo.foco();
     }).catch((e: any) => { mount(qrArea, h("p", { class: P2.erro }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
@@ -724,5 +725,5 @@
     ctx.loadData("config", A.getConfig, null, { force: true }).catch(() => null);
   }
 
-  ZoZo.configuracoes = { abrir: abrirConfiguracoes };
+  ZoZo.configuracoes = { abrir: abrirConfiguracoes, desativar2FA: (ctx: ContextoApp) => desativar2FA(ctx) };
 })(window.ZoZo);

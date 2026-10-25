@@ -15,6 +15,9 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 
 ## Novidades da versão 3.17.0
 
+- **Avisos no rodapé:** aviso em laranja #ff5d04, erro em vermelho #ff1a1a e sucesso em verde #069713 (ícone e texto brancos).
+- **2FA:** o QR Code fica alinhado à esquerda com o texto do passo (sem a margem branca interna, o painel já é branco em volta).
+- **Painel de testes:** todas as janelas de confirmação de ação (excluir transação/várias/parcelada, remover e excluir recorrência, excluir conta, categoria e perfil, desagrupar, verificação de segurança, alterar nome, apagar dados, excluir a conta do ZoZo, proteção avançada e desativar 2FA).
 - **Painel de testes completo (local/prévia):** abre qualquer tela, todas as etapas da entrada (login, cadastro, 2FA, confirmação e recuperação), todos os painéis laterais por tipo (e os modos de edição: fechamento, orçamento, formulários), todas as janelas e passos (nova conta ×5, pagar fatura, categoria, grupo, perfil, nova recorrência 1 e 2, dividir, câmbio, configurações, 2FA, confirmações), os menus (completo, contas, perfis, calendário, emojis), uma galeria de gráficos e uma galeria de componentes (botões, pílulas, etiquetas, valores, campos, barras, filtros, estados). "Entrar com dados de exemplo" cria uma conta simulada com **todos os tipos** (contas, débito, estorno, parcelada, divisão).
 - **Aviso de erro** com fundo #ff1a1a. **Pílulas** de Transações recentes e de Recorrências encostadas à direita (a categoria acompanha o perfil, como em Transações).
 - **Cores pedidas (decisão do produto):** cinza #7f8ba4, pílulas #e51300 / #008a33 / #7f8ba4, vermelho dos menus #e51300 e botão vermelho #ff1a1a (hover #e40c0c) — ficam abaixo do contraste mínimo WCAG AA nesses textos.

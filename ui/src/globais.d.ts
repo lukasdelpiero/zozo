@@ -423,7 +423,7 @@ declare global {
   interface ZoZoVerificacao {
     Captcha(sitekey: string): CaptchaWidget;
     CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6;
-    QR(texto: string, px?: number, rotulo?: string): SVGElement;
+    QR(texto: string, px?: number, rotulo?: string, margem?: number): SVGElement;
     protegerSenha(input: HTMLInputElement): HTMLInputElement;
     ComRevelar(input: HTMLInputElement, classe?: string): HTMLElement;
   }
@@ -683,7 +683,7 @@ declare global {
     recorrenciasShared: ZoZoRecorrenciasShared;
     usuario: { Avatar(foto: string | null, nome: string, tamanho?: number): HTMLElement };
     exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): void;
-    configuracoes: { abrir(ctx: ContextoApp, aba?: string): void };
+    configuracoes: { abrir(ctx: ContextoApp, aba?: string): void; desativar2FA(ctx: ContextoApp): void };
     emojiPicker: ZoZoEmojiPicker;
     /** contexto da interface (app.ts), para depuração e para os módulos que não o recebem por parâmetro */
     ctx: ContextoApp;
