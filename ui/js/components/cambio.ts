@@ -17,8 +17,10 @@
   const A = ZoZo.messages.ACTIONS;
   const store = ZoZo.store;
 
-  type Moeda = { codigo: CodigoMoeda; nome: string; simbolo: string };
-  const MOEDAS: Moeda[] = [
+  type InfoMoeda = { codigo: CodigoMoeda; nome: string; simbolo: string };
+  /** Transação na janela de transferência (da moeda atual ou de outra) */
+  type ItemTransferencia = { id: Id; data: string; descricao: string; valor: number; moeda?: Moeda };
+  const MOEDAS: InfoMoeda[] = [
     { codigo: "BRL", nome: "Real", simbolo: "R$" },
     { codigo: "EUR", nome: "Euro", simbolo: "€" },
     { codigo: "USD", nome: "Dólar", simbolo: "$" },
@@ -45,7 +47,7 @@
 
   /* Bandeiras desenhadas em SVG (o Windows não mostra emoji de bandeira) */
   /** Moeda pelo código (desconhecido: Real) */
-  const moedaDe = (codigo: unknown): Moeda => MOEDAS.find((m) => m.codigo === codigo) || MOEDAS[0];
+  const moedaDe = (codigo: unknown): InfoMoeda => MOEDAS.find((m) => m.codigo === codigo) || MOEDAS[0];
   const svg = (...filhos: FilhoDom[]) => s("svg", { viewBox: "0 0 20 14", width: "20", height: "14", class: T.bandeira, "aria-hidden": "true" }, ...filhos);
   const BANDEIRAS: Record<string, () => SVGElement> = {
     BRL: () => svg(s("rect", { width: "20", height: "14", rx: "2", fill: "#009c3b" }),
@@ -82,22 +84,22 @@
     const primeiraVez = codigo !== "BRL" && !(cfg.moedasIniciadas || ["BRL"]).includes(codigo);
     // Transferir transações para outra moeda: só contas liberadas (segredo RECURSOS_CAMBIO no servidor)
     // a lista é lida ANTES de trocar (são as transações da moeda atual)
-    const anteriores = primeiraVez && ZoZo.recursos.cambio() ? ctx.bridge.request(A.getLancamentos).then((d: any) => d.lancamentos || []).catch(() => []) : Promise.resolve([]);
+    const anteriores = primeiraVez && ZoZo.recursos.cambio() ? ctx.bridge.request(A.getLancamentos).then((d): ItemTransferencia[] => d.lancamentos || []).catch((): ItemTransferencia[] => []) : Promise.resolve<ItemTransferencia[]>([]);
     const origem = moedaDe(cfg.moeda || "BRL");
-    return anteriores.then((lista: any) => {
+    return anteriores.then((lista) => {
       // A tela troca assim que a escolha é aplicada na memória; a gravação no servidor segue em paralelo
       // (se falhar, avisa e volta para a moeda anterior)
       const gravacao = ctx.bridge.request(A.updateConfig, { moeda: codigo });
-      gravacao.catch((e: any) => {
+      gravacao.catch((e: ErroPonte) => {
         ctx.toast(e.friendly, { tone: "error" });
-        ctx.loadData("config", A.getConfig, null, { force: true }).then((c: any) => aplicarMoeda(ctx, (c && c.moeda) || origem.codigo)).catch(() => null);
+        ctx.loadData("config", A.getConfig, null, { force: true }).then((c) => aplicarMoeda(ctx, (c && c.moeda) || origem.codigo)).catch(() => null);
       });
       return ctx.loadData("config", A.getConfig, null, { force: true }).then(() => aplicarMoeda(ctx, codigo)).then(() => {
         const m = moedaDe(codigo);
         ctx.toast("Moeda: " + m.nome + " (" + m.simbolo + ").");
-        if (primeiraVez && lista.length && ZoZo.recursos.cambio()) oferecerTransferencia(ctx, lista.map((l: any) => Object.assign({ moeda: origem.codigo }, l)), m, { primeiraVez: true });
+        if (primeiraVez && lista.length && ZoZo.recursos.cambio()) oferecerTransferencia(ctx, lista.map((l) => Object.assign({ moeda: origem.codigo }, l)), m, { primeiraVez: true });
       });
-    }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
+    }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
   /**
@@ -110,13 +112,13 @@
     const atual = moedaDe(config().moeda || "BRL");
     const outras = MOEDAS.filter((m) => m.codigo !== atual.codigo);
     let modo = "importar", outra = outras[0];
-    let lista: any[] | null = null, termo = "", carga = 0;
+    let lista: ItemTransferencia[] | null = null, termo = "", carga = 0;
     const marcadas = new Set<string>();
-    const norm = (t: any) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     ZoZo.modais.janela({
       titulo: "Transferir entre moedas",
       classe: "modal--recorrencia modal--cambio",
-      passo: function passo(api: any) {
+      passo: function passo(api: ApiJanela) {
         const descricao = h("p", { class: [ZoZo.estrutura.modalTexto, T.aviso] });
         const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" }) as HTMLInputElement;
         const itensEl = h("div", { class: ZoZo.estrutura.janelaListaSemRolagemLateral });
@@ -137,8 +139,8 @@
         }
         function desenharLista() {
           if (!lista) { mount(itensEl, UI.Skeleton(4, { short: true })); return; }
-          const itens = lista.filter((l: any) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
-          mount(itensEl, itens.length ? itens.map((l: any) => {
+          const itens = lista.filter((l) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
+          mount(itensEl, itens.length ? itens.map((l) => {
             const cb = h("input", { type: "checkbox", class: T.marcar, "aria-label": "Transferir " + l.descricao }) as HTMLInputElement;
             cb.checked = marcadas.has(l.id);
             cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
@@ -151,11 +153,11 @@
         function recarregar() {
           lista = null; marcadas.clear(); contar(); desenharTopo(); desenharLista();
           const minha = ++carga;
-          const pedido = modo === "importar"
-            ? ctx.bridge.request(A.getLancamentosOutrasMoedas).then((r: any) => r.lancamentos.filter((l: any) => l.moeda === outra.codigo))
-            : ctx.bridge.request(A.getLancamentos).then((r: any) => (r.lancamentos || []).slice().sort((a: any, b: any) => b.data.localeCompare(a.data)));
-          pedido.then((ls: any) => { if (minha === carga) { lista = ls; desenharLista(); } })
-            .catch((e: any) => { if (minha === carga) mount(itensEl, UI.ErrorState(e.friendly)); });
+          const pedido: Promise<ItemTransferencia[]> = modo === "importar"
+            ? ctx.bridge.request(A.getLancamentosOutrasMoedas).then((r) => r.lancamentos.filter((l) => l.moeda === outra.codigo))
+            : ctx.bridge.request(A.getLancamentos).then((r) => (r.lancamentos || []).slice().sort((a, b) => b.data.localeCompare(a.data)));
+          pedido.then((ls) => { if (minha === carga) { lista = ls; desenharLista(); } })
+            .catch((e: ErroPonte) => { if (minha === carga) mount(itensEl, UI.ErrorState(e.friendly)); });
         }
         moedaBtn.addEventListener("click", () => ZoZo.menu.abrir(moedaBtn, outras.map((m) => ({
           label: m.nome + " (" + m.simbolo + ")", check: m.codigo === outra.codigo,
@@ -174,12 +176,12 @@
           rodapeEsquerda: moedaBtn,
           botoes: [
             { label: "Cancelar", onClick: () => api.fechar() },
-            { label: "Transferir", primario: true, desabilitado: true, ref: (b: any) => { botao = b; contar(); }, onClick: (btn: any) => {
+            { label: "Transferir", primario: true, desabilitado: true, ref: (b) => { botao = b; contar(); }, onClick: (btn) => {
               btn.disabled = true;
               ctx.bridge.request(A.transferirMoeda, { ids: Array.from(marcadas), destino: destino().codigo }).then(() => {
                 api.fechar();
                 return ctx.recarregarTudo();
-              }).catch((e: any) => { btn.disabled = false; ctx.toast(e.friendly, { tone: "error" }); });
+              }).catch((e: ErroPonte) => { btn.disabled = false; ctx.toast(e.friendly, { tone: "error" }); });
             } },
           ],
         };
@@ -189,26 +191,26 @@
   const disponivelTransferir = () => ligado() && ZoZo.recursos.cambio();
 
   /** Janela: escolher transações (de qualquer outra moeda) para levar a "destino". O valor não é convertido. */
-  function oferecerTransferencia(ctx: ContextoApp, todas: any[], destino: Moeda, opts?: { primeiraVez?: boolean }) {
+  function oferecerTransferencia(ctx: ContextoApp, todas: ItemTransferencia[], destino: InfoMoeda, opts?: { primeiraVez?: boolean }) {
     const o = opts || {};
     const simbolo = (codigo: unknown) => moedaDe(codigo).simbolo;
     const marcadas = new Set<string>();
     // as de hoje para trás primeiro (mais novas no topo); parcelas futuras no fim
     const hoje = F.iso(new Date());
-    const lista = todas.slice().sort((a: any, b: any) => Number(a.data > hoje) - Number(b.data > hoje) || (a.data > hoje ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data)));
+    const lista = todas.slice().sort((a, b) => Number(a.data > hoje) - Number(b.data > hoje) || (a.data > hoje ? a.data.localeCompare(b.data) : b.data.localeCompare(a.data)));
     ZoZo.modais.janela({
       titulo: o.primeiraVez ? "Usar transações em " + destino.nome + "?" : "Trazer transações para " + destino.nome,
       classe: "modal--recorrencia modal--cambio",
-      passo: function passo(api: any) {
+      passo: function passo(api: ApiJanela) {
         let termo = "";
-        const norm = (t: any) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
         const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" }) as HTMLInputElement;
         const itensEl = h("div", { class: ZoZo.estrutura.janelaListaSemRolagemLateral });
         let botao: HTMLButtonElement | null = null;
         const contar = () => { if (botao) botao.disabled = !marcadas.size; };          // só "Transferir", sem contador
         const desenhar = () => {
-          const itens = lista.filter((l: any) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
-          mount(itensEl, itens.length ? itens.map((l: any) => {
+          const itens = lista.filter((l) => !termo || norm(l.descricao).includes(termo)).slice(0, 400);
+          mount(itensEl, itens.length ? itens.map((l) => {
             const cb = h("input", { type: "checkbox", class: T.marcar, "aria-label": "Transferir " + l.descricao }) as HTMLInputElement;
             cb.checked = marcadas.has(l.id);
             cb.addEventListener("change", () => { if (cb.checked) marcadas.add(l.id); else marcadas.delete(l.id); contar(); });
@@ -227,13 +229,13 @@
             h("div", { class: ZoZo.estrutura.janelaPesquisa }, ZoZo.icons.icon("pesquisar", { size: 15 }), busca), itensEl),
           botoes: [
             { label: o.primeiraVez ? "Agora não" : "Cancelar", onClick: () => api.fechar() },
-            { label: "Transferir", primario: true, desabilitado: true, ref: (b: any) => { botao = b; contar(); }, onClick: (btn: any) => {
+            { label: "Transferir", primario: true, desabilitado: true, ref: (b) => { botao = b; contar(); }, onClick: (btn) => {
               btn.disabled = true;
-              ctx.bridge.request(A.transferirMoeda, { ids: Array.from(marcadas) }).then((r: any) => {
+              ctx.bridge.request(A.transferirMoeda, { ids: Array.from(marcadas) }).then((r: { transferidos: number }) => {
                 api.fechar();
                 ctx.toast(r.transferidos === 1 ? "1 transação transferida." : r.transferidos + " transações transferidas.");
                 return ctx.recarregarTudo();
-              }).catch((e: any) => { btn.disabled = false; ctx.toast(e.friendly, { tone: "error" }); });
+              }).catch((e: ErroPonte) => { btn.disabled = false; ctx.toast(e.friendly, { tone: "error" }); });
             } },
           ],
         };
@@ -254,16 +256,16 @@
   }
 
   /** Configurações › Geral › Multicâmbio */
-  function SecaoConfig(ctx: ContextoApp, cfg: any) {
+  function SecaoConfig(ctx: ContextoApp, cfg: Partial<RespostaConfig>) {
     const P = ZoZo.pecas;
     return h("div", { class: P.cfgLinha },
       h("div", { class: P.cfgTexto },
         h("span", { class: P.cfgTitulo }, "Ativar multicâmbio"),
         h("span", { class: P.cfgSub }, "Trabalhar com diferentes câmbios (Real, Euro e Dólar)")),
-      h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v: any) => ctx.bridge.request(A.updateConfig, { multicambio: v })
+      h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, ZoZo.modais.Interruptor("", !!cfg.multicambio, (v) => ctx.bridge.request(A.updateConfig, { multicambio: v })
         .then(() => ctx.loadData("config", A.getConfig, null, { force: true }))
-        .then((c: any) => { ctx.toast(v ? "Multicâmbio ativado: escolha a moeda no menu lateral." : "Multicâmbio desativado"); return aplicarMoeda(ctx, (c && c.moeda) || "BRL"); })
-        .catch((e: any) => ctx.toast(e.friendly, { tone: "error" })), "Ativar multicâmbio")));
+        .then((c) => { ctx.toast(v ? "Multicâmbio ativado: escolha a moeda no menu lateral." : "Multicâmbio desativado"); return aplicarMoeda(ctx, (c && c.moeda) || "BRL"); })
+        .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })), "Ativar multicâmbio")));
   }
 
   ZoZo.cambio = { Seletor, SecaoConfig, aplicarMoeda, trocar, abrirTransferencia, disponivelTransferir, MOEDAS };

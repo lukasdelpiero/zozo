@@ -489,10 +489,16 @@
 
     // Ajuste de escala do papel A4 à área disponível
     const scaler = preview.firstElementChild as HTMLElement | null;
+    // a folha A4 inteira sempre cabe na área (telas pequenas: até 25%); a escala muda logo depois, fora do
+    // observador (mudar o tamanho dentro dele gera o aviso "ResizeObserver loop" do navegador)
+    let ajuste = 0;
     const ro = new ResizeObserver(() => {
-      // a folha A4 inteira sempre cabe na área (telas pequenas: até 25%)
-      const largura = preview.clientWidth - (preview.clientWidth < 600 ? 32 : 64);
-      if (scaler) scaler.style.zoom = String(Math.min(1, Math.max(0.25, largura / 794)));
+      clearTimeout(ajuste);
+      ajuste = window.setTimeout(() => {
+        const largura = preview.clientWidth - (preview.clientWidth < 600 ? 32 : 64);
+        const zoom = String(Math.min(1, Math.max(0.25, largura / 794)));
+        if (scaler && scaler.style.zoom !== zoom) scaler.style.zoom = zoom;
+      }, 0);
     });
     ro.observe(preview);
 

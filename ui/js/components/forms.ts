@@ -29,7 +29,7 @@
   /** Controle de um campo: el (o que entra no formulário), ler() e o elemento que recebe o foco */
   type Controle = { el: HTMLElement; ler: () => unknown; foco: HTMLElement | null; input?: HTMLElement; prefixo?: string; semLabelFor?: boolean };
 
-  function controle(campo: CampoForm, valor: any, aoMudar: () => void): Controle {
+  function controle(campo: CampoForm, valor: unknown, aoMudar: () => void): Controle {
     const t = campo.tipo || "texto";
     if (t === "selecao") {
       const sel: HTMLSelectElement = UI.Select(campo.opcoes || [], { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
@@ -44,7 +44,7 @@
       return { el: wrap, ler: () => atual, foco: null, semLabelFor: true };
     }
     if (t === "emoji") {
-      let atual = valor || "📦";
+      let atual = typeof valor === "string" && valor ? valor : "📦";
       const btn = h("button", { type: "button", class: ZoZo.pecas.iconeEscolha, "aria-label": "Escolher ícone", "aria-haspopup": "dialog" }, atual);
       btn.addEventListener("click", () => ZoZo.emojiPicker.abrir(btn, { atual, aoEscolher: (e: string) => { atual = e; btn.textContent = e; aoMudar(); } }));
       return { el: h("div", { class: T.emoji }, btn), ler: () => atual, foco: btn, input: btn };
@@ -56,7 +56,7 @@
       return { el: input, ler: () => F.parseMoeda(input.value), foco: input, input, prefixo: F.simbolo() };
     }
     const input: HTMLInputElement = UI.Input({
-      name: campo.nome, value: valor || "",
+      name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor),
       type: t === "email" ? "email" : t === "senha" ? "password" : "text",
       autocomplete: t === "senha" ? (campo.autocomplete || "current-password") : t === "email" ? "email" : "off",
       inputmode: t === "digitos4" ? "numeric" : undefined,

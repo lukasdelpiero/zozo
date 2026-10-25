@@ -222,7 +222,7 @@
   }
 
   /** Recorta uma série [{data,...}] conforme o intervalo (apenas visualização) */
-  function recortarSerie(serie: any[] | null | undefined, intervalo: string): any[] {
+  function recortarSerie<T extends { data: string }>(serie: T[] | null | undefined, intervalo: string): T[] {
     if (!Array.isArray(serie) || !serie.length) return [];
     const ultima = F.parseData(serie[serie.length - 1].data) || new Date();
     const ini = new Date(ultima);

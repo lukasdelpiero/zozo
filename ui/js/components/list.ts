@@ -95,7 +95,7 @@
     ? destacar(texto).map((p) => (typeof p === "string" ? p : h("mark", { class: LR.destaque }, p.marca)))
     : texto);
 
-  function LaunchRow(l: any, opts?: OpcoesLinha & { marcado?: boolean; onMarcar?: (marcado: boolean) => void; resumo?: boolean; mostrarData?: boolean; destacar?: Destacar | null }): HTMLElement {
+  function LaunchRow(l: LancamentoTela, opts?: OpcoesLinha & { marcado?: boolean; onMarcar?: (marcado: boolean) => void; resumo?: boolean; mostrarData?: boolean; destacar?: Destacar | null }): HTMLElement {
     const o = opts || {};
     const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
     const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
@@ -151,7 +151,7 @@
     variacao: "tw:[justify-self:end] tw:text-[13px] tw:font-[550] tw:[&_.pct]:text-[13px] tw:[&_.pct]:font-[550] tw:area620:col-start-3 tw:area620:row-start-2",
     valor: "tw:[justify-self:end] tw:text-[15px] tw:font-[550] tw:area620:col-start-3 tw:area620:row-start-1",
   };
-  function AccountRow(c: any, opts?: OpcoesLinha & { subtitulo?: string }): HTMLElement {
+  function AccountRow(c: ContaTela, opts?: OpcoesLinha & { subtitulo?: string }): HTMLElement {
     const o = opts || {};
     const sub = c.oculta ? "Ocultado" : o.subtitulo !== undefined ? o.subtitulo : SUBTITULO_CONTA[c.tipo];
     const icone = UI.AccountIcon(c);
@@ -203,7 +203,7 @@
     return UI.ProgressBar(ratio, { tone: acima ? "over" : "ok", label: acima ? "Gasto acima do reservado" : "Gasto dentro do reservado" });
   }
 
-  function CategoryRow(cat: any, opts?: OpcoesLinha & { filho?: boolean; pill?: boolean; excluida?: boolean }): HTMLElement {
+  function CategoryRow(cat: CategoriaTela, opts?: OpcoesLinha & { filho?: boolean; pill?: boolean; excluida?: boolean }): HTMLElement {
     const o = opts || {};
     return h(o.onClick ? "button" : "div", {
       type: o.onClick ? "button" : undefined,
@@ -220,7 +220,7 @@
       o.excluida ? null : h("span", { class: ["money", CR.reservado, "tw:text-zz-secondary"] }, F.moeda(cat.reservado)));
   }
 
-  function CategoryGroupRow(grupo: any, opts?: OpcoesLinha & { fechado?: boolean; excluida?: boolean; onToggle?: () => void }): HTMLElement {
+  function CategoryGroupRow(grupo: BlocoGrupoCategorias, opts?: OpcoesLinha & { fechado?: boolean; excluida?: boolean; onToggle?: () => void }): HTMLElement {
     const o = opts || {};
     // A linha do grupo abre o painel do grupo (orçamento "não atribuído", desagrupar); a seta só abre/fecha.
     // Teclado e leitor de tela: o NOME é o botão que abre o painel e a seta é outro botão, lado a lado
@@ -268,7 +268,7 @@
     // check de pago na cor da categoria; vazio com a mesma largura (os valores ficam alinhados)
     pago: "tw:inline-grid tw:place-items-center tw:w-3.5 tw:h-[18px] tw:flex-none tw:rounded-[50%] tw:text-[color-mix(in_srgb,var(--tag-color)_60%,black)]",
   };
-  function RecurrenceRow(r: any, opts?: OpcoesLinha & { compacta?: boolean; semData?: boolean; partes?: { data?: string; titulo?: string; categoria?: string; valor?: string } }): HTMLElement {
+  function RecurrenceRow(r: ItemRecorrencia, opts?: OpcoesLinha & { compacta?: boolean; semData?: boolean; partes?: { data?: string; titulo?: string; categoria?: string; valor?: string } }): HTMLElement {
     const o = opts || {};
     const p = o.partes || {};     // classes extras por parte: { data, titulo, categoria, valor }
     const colunas = o.compacta ? null : o.semData ? RR.colunasIcone : RR.colunas;
@@ -301,7 +301,7 @@
     tipo: "tw:flex tw:items-center tw:gap-2.5 tw:min-w-0",
     pct: "tw:[justify-self:end] tw:font-medium " + NUMEROS,
   };
-  function AllocationRow(a: any): HTMLElement {
+  function AllocationRow(a: AlocacaoInvestimento): HTMLElement {
     return h("div", { class: AL.linha },
       h("span", { class: AL.tipo }, h("span", null, a.tipoInvestimento)),
       h("span", null, UI.ProgressBar(F.numero(a.percentual) / 100, { tone: "allocation", label: a.tipoInvestimento })),
@@ -309,7 +309,7 @@
   }
 
   /* ---------- Sidebar: grupo de contas (seção 7) ---------- */
-  function SidebarAccountGroup(titulo: string, contas: any[], opts?: { onSelect?: (conta: any) => void }): HTMLElement {
+  function SidebarAccountGroup(titulo: string, contas: ContaTela[], opts?: { onSelect?: (conta: ContaTela) => void }): HTMLElement {
     const o = opts || {};
     const key = "sidebar:" + titulo;
     const fechado = !!ZoZo.store.get().ui.gruposFechados[key];
@@ -320,7 +320,7 @@
         icon("chevron-down", { size: 12, class: fechado ? E.grupoSetaFechado : E.grupoSeta, stroke: 2.5 }),
         h("span", null, titulo)),
       fechado ? null : UI.corpoArvore(key, h("ul", null,
-        contas.map((c: any) => h("li", null, h("button", { type: "button", class: E.conta, onClick: () => o.onSelect && o.onSelect(c) },
+        contas.map((c) => h("li", null, h("button", { type: "button", class: E.conta, onClick: () => o.onSelect && o.onSelect(c) },
           h("span", { class: E.contaPonto, style: { background: F.cor(c.cor, "var(--palette-16)") }, "aria-hidden": "true" }),
           h("span", { class: E.contaNome }, c.nome),
           h("span", { class: E.contaValor }, F.moeda(c.valor, { inteiro: true, comSinal: true }))))))));
@@ -328,7 +328,7 @@
 
   /* ---------- Lista de lançamentos nos painéis (formato do Copilot) ----------
      Mês (total) → dia → [☐] [T|R|I|P] Nome ........ [ícone da categoria] valor */
-  function ListaPainel(itens: any[], opts?: { onClick?: (l: any) => void }): HTMLElement {
+  function ListaPainel(itens: LancamentoTela[], opts?: { onClick?: (l: LancamentoTela) => void }): HTMLElement {
     const o = opts || {};
     const T = ZoZo.regras.totais;
     const marcados = new Set(ZoZo.store.get().ui.selecionados || []);
@@ -336,13 +336,13 @@
     const blocos: HTMLElement[] = [];
     let mesAtual: string | null = null, diaAtual: string | null = null;
     let secao: HTMLElement = h("section"), lista: HTMLElement = h("div");
-    ordenados.forEach((l: any) => {
+    ordenados.forEach((l) => {
       const mes = l.data.slice(0, 7);
       if (mes !== mesAtual) {
         mesAtual = mes; diaAtual = null;
-        const doMes = ordenados.filter((x: any) => x.data.startsWith(mes));
-        const gasto = doMes.reduce((s: number, x: any) => s + (T.gasto[x.tipo] || 0) * x.valor, 0);
-        const recebido = doMes.reduce((s: number, x: any) => s + (T.recebido[x.tipo] || 0) * x.valor, 0);
+        const doMes = ordenados.filter((x) => x.data.startsWith(mes));
+        const gasto = doMes.reduce((s: number, x) => s + (T.gasto[x.tipo] || 0) * x.valor, 0);
+        const recebido = doMes.reduce((s: number, x) => s + (T.recebido[x.tipo] || 0) * x.valor, 0);
         secao = h("section", { class: ZoZo.pecas.plMes }, h("header", { class: ZoZo.pecas.plMesTopo },
           h("h3", { class: ZoZo.pecas.plMesTitulo }, F.mesAno(mes + "-01")),
           h("span", { class: ZoZo.pecas.plMesTotal },

@@ -91,8 +91,9 @@ declare global {
     contas: ContaTela[];
     resumo: { ativos: ValorVariacao; passivos: ValorVariacao; serie: Array<{ data: string; ativos: number; passivos: number }> };
   }
+  interface AlocacaoInvestimento { tipoInvestimento: string; icone: string; percentual: number }
   interface RespostaInvestimentos {
-    contas: ContaTela[]; incluidas: Id[]; alocacoes: Array<{ tipoInvestimento: string; icone: string; percentual: number }>;
+    contas: ContaTela[]; incluidas: Id[]; alocacoes: AlocacaoInvestimento[];
     resumo: ValorVariacao & { serie: Array<{ data: string; valor: number }> };
   }
   interface RespostaCategorias { mes: string; resumo: { gasto: number; reservado: number }; categorias: CategoriaTela[]; grupos: Record<string, GrupoTela> }
@@ -148,8 +149,29 @@ declare global {
     | "pagarRecorrencia" | "encerrarRecorrencia" | "excluirRecorrencia" | "tornarRecorrente" | "vincularRecorrencia" | "desvincularRecorrencia"
     | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura"
     | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
-  /** Resposta de uma ação: leituras já tipadas; as outras, ainda `any` (tipadas aos poucos, tela por tela) */
-  type RespostaDe<K extends NomeAcao> = K extends NomeLeitura ? RespostasLeitura[K] : any;
+  /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
+  /** Sessão como a interface a recebe; doisFatores sem authenticated = falta o código do 2FA */
+  interface RespostaSessao { authenticated: boolean; user?: UsuarioSessao | null; email?: string; doisFatores?: boolean }
+  interface RespostasHost {
+    getArmazenamento: { available: boolean; turnstile?: string | null; google?: boolean; desafio?: boolean };
+    getGoogle: { email: string; nome?: string; contaExiste: boolean } | null;
+    getSession: RespostaSessao;
+    login: RespostaSessao;
+    verificar2FA: RespostaSessao;
+    logout: RespostaSessao;
+    /** e-mail ligado no servidor: falta confirmar pelo link (confirmarEmail) */
+    registerUser: RespostaSessao & { confirmarEmail?: boolean };
+    reenviarConfirmacao: { enviado: boolean };
+    conferirLink: { email: string; ativa: boolean };
+    pedirRecuperacao: { enviado: boolean };
+    /** manter: os dados abrem com a cópia da chave (false = a conta recomeça vazia) */
+    abrirRecuperacao: { email: string; manter: boolean };
+    concluirRecuperacao: { email: string; recomecou: boolean };
+    getProtecao: { avancada: boolean; recuperacao: boolean };
+    setProtecao: { avancada: boolean; recuperacao: boolean };
+  }
+  /** Resposta de uma ação: leituras do serviço e ações de sessão tipadas; as outras, ainda `any` (etapa seguinte) */
+  type RespostaDe<K extends NomeAcao> = K extends NomeLeitura ? RespostasLeitura[K] : K extends keyof RespostasHost ? RespostasHost[K] : any;
 
   /** Dados guardados no estado (store.data[chave]) e a leitura que preenche cada chave */
   interface DadosEstado {

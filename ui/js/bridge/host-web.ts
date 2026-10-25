@@ -460,14 +460,19 @@
     }
   }
 
-  const ACOES: Record<string, (d: Dados) => Promise<unknown>> = {
+  // as ações de sessão e conta devolvem exatamente RespostasHost[ação] (ui/src/dados.d.ts): o compilador confere
+  type AcoesHost = { [K in keyof RespostasHost]: (d: Dados) => Promise<RespostasHost[K]> } & Record<string, (d: Dados) => Promise<unknown>>;
+  const ACOES: AcoesHost = {
     async getArmazenamento() {
       try { const p = (await api("GET", "/publico")) || {}; return { available: true, turnstile: p.turnstile || null, google: !!p.google }; }
       catch (e) { return { available: false, desafio: codigoDe(e) === "CF_CHALLENGE" }; }
     },
 
     /** Depois do "Continuar com Google": e-mail confirmado, nome e se a conta já existe (ou null) */
-    async getGoogle() { return api("GET", "/google/identidade"); },
+    async getGoogle() {
+      const r = await api("GET", "/google/identidade");
+      return r && typeof r.email === "string" ? { email: r.email, nome: typeof r.nome === "string" ? r.nome : "", contaExiste: r.contaExiste === true } : null;
+    },
 
     /** Sessão aberta (cookie) + chave guardada neste navegador → entra sem pedir a senha */
     async getSession() {
@@ -500,7 +505,7 @@
       // senha aceita numa conta antiga: as chaves Argon2id são preparadas agora (a senha não fica guardada para o 2FA)
       const legado = !!par && (par.kdf === undefined || par.kdf === KDF_PBKDF2) && !(r && r.demo === true);
       const migracao = legado ? await prepararArgon2(d.senha).catch(() => null) : null;   // falhou ao preparar: entra assim mesmo
-      if (r && r.doisFatores && !r.envelope) { pendente = { email, k, migracao }; return { doisFatores: true }; }
+      if (r && r.doisFatores && !r.envelope) { pendente = { email, k, migracao }; return { authenticated: false, doisFatores: true }; }
       const dados = await concluir(r, k, !!migracao);
       await migrarParaArgon2(migracao, k.bits);
       return dados;
@@ -529,7 +534,7 @@
       const k = await derivar(d.senha, sal, ITERACOES, KDF_ARGON2);
       const r = await api("POST", "/conta", { email, nome, sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: k.prova, turnstile: d.turnstile || undefined });
       // E-mail ligado: a conta só entra depois do link de confirmação (nada fica guardado aqui até lá)
-      if (r && r.confirmar && !r.envelope) { k.bits.fill(0); return { confirmarEmail: true, email }; }
+      if (r && r.confirmar && !r.envelope) { k.bits.fill(0); return { authenticated: false, confirmarEmail: true, email }; }
       return concluir(r, k);
     },
 

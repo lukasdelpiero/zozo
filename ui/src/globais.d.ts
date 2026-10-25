@@ -272,7 +272,6 @@ declare global {
     pagina(cls: string, ...children: FilhoDom[]): HTMLElement;
     valorResumo(valor: unknown, subtitulo: string, align: "left" | "right"): HTMLElement;
     cardResumoDonut(cfg: CardResumo): HTMLElement;
-    segmentosPorCategoria(itens: any[], campoValor: string): SegmentoRosca[];
     detalheLinha(rotulo: string, valor: FilhoDom, cls?: string): HTMLElement;
     detalheSecao(titulo: string | null, ...children: FilhoDom[]): HTMLElement;
   }
@@ -469,7 +468,7 @@ declare global {
     ProgressBar(ratio: unknown, opts?: { tone?: "ok" | "over" | "allocation"; grande?: boolean; class?: string; label?: string }): HTMLElement;
     FilterTabs(valor: string, onChange: (v: string, teclado?: boolean) => void, opts?: { itens?: string[]; label?: string }): HTMLElement;
     /** pontos com { data, … } (os demais campos variam: valor, ativos, passivos…) */
-    recortarSerie(serie: any[] | null | undefined, intervalo: string): any[];
+    recortarSerie<T extends { data: string }>(serie: T[] | null | undefined, intervalo: string): T[];
     Segmented(itens: ItemSegmentado[], valor: string, onChange: (v: string, teclado?: boolean) => void, opts?: { class?: string; label?: string }): HTMLElement;
     Card(opts: { class?: string; label?: string; title?: string; link?: { label: string; onClick: () => void } } | null, ...children: FilhoDom[]): HTMLElement;
     Section(opts: OpcoesSecao | null, ...children: FilhoDom[]): HTMLElement;
@@ -491,14 +490,14 @@ declare global {
 
   /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
   interface ZoZoList {
-    ListaPainel(itens: any[], opts?: { onClick?: (l: any) => void }): HTMLElement;
-    LaunchRow(l: any, opts?: Record<string, unknown>): HTMLElement;
+    ListaPainel(itens: LancamentoTela[], opts?: { onClick?: (l: LancamentoTela) => void }): HTMLElement;
+    LaunchRow(l: LancamentoTela, opts?: Record<string, unknown>): HTMLElement;
     AccountRow(c: ContaTela, opts?: Record<string, unknown>): HTMLElement;
     CategoryRow(cat: CategoriaTela, opts?: Record<string, unknown>): HTMLElement;
     CategoryGroupRow(grupo: BlocoGrupoCategorias, opts?: Record<string, unknown>): HTMLElement;
     RecurrenceRow(r: ItemRecorrencia, opts?: Record<string, unknown>): HTMLElement;
-    AllocationRow(a: any): HTMLElement;
-    SidebarAccountGroup(titulo: string, contas: any[], opts?: { onSelect?: (conta: any) => void }): HTMLElement;
+    AllocationRow(a: AlocacaoInvestimento): HTMLElement;
+    SidebarAccountGroup(titulo: string, contas: ContaTela[], opts?: { onSelect?: (conta: ContaTela) => void }): HTMLElement;
     nomeComDigitos(nome: string, digitos?: string | null, cls?: string): HTMLElement;
     SUBTITULO_CONTA: Record<string, string>;
   }
@@ -602,10 +601,23 @@ declare global {
   }
   interface ResumoFatura { lancamentos: number; contribuicoes: number; descontos: number; arredondamentos: number; total: number; saldoAnterior: number; recebido: number; aPagar: number }
   /** js/components/auth.ts */
+  /** Tela de entrada (components/auth.ts): mensagens, CAPTCHA, Google e o que fazer em cada etapa (app.ts) */
+  interface ConfigEntrada {
+    erro?: string | null; aviso?: string | null; emailInicial?: string;
+    turnstile?: string | null; captchaLogin?: boolean; google?: boolean;
+    /** 2FA: rótulo do "voltar" (sem ele: "Entrar com outra conta") */
+    voltar?: string;
+    onIrCadastro(): void; onVoltar(): void; onEsqueci?(email: string): void;
+    onLogin(cred: { email: string; senha: string; turnstile?: string }): void;
+    onCadastro(dados: { nomeUsuario: string; email: string; senha: string; turnstile?: string }): void;
+    /** código do 2FA → mensagem de erro (ou null: entrou) */
+    onCodigo(codigo: string): Promise<string | null>;
+    onCancelar2FA(): void;
+  }
   interface ZoZoAuth {
-    render(root: HTMLElement, cfg: any): void;
+    render(root: HTMLElement, cfg: ConfigEntrada): void;
     reiniciar(): void;
-    prepararGoogle(dados: any): void;
+    prepararGoogle(dados: { email: string; nome?: string; contaExiste: boolean }): void;
     carregando(root: HTMLElement, texto: string): void;
     prepararLogin(email: string): void;
     irPara(modo: "login" | "register", etapa: number, email: string): void;

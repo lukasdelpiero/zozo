@@ -87,7 +87,9 @@
     clear(container);
     container.classList.add(...P.graficoLinha.split(" "));
 
-    const validas: Array<SerieGrafico & { _y: (v: number) => number; _base: number }> = (series || []).filter((sr) => sr.points && sr.points.length) as any;
+    // cópias das séries com a escala de cada uma (_y: valor → altura; _base: fim da área degradê): as de quem chamou não mudam
+    type SerieDesenho = SerieGrafico & { _y: (v: number) => number; _base: number };
+    const validas: SerieDesenho[] = (series || []).filter((sr) => sr.points && sr.points.length).map((sr) => Object.assign({}, sr, { _y: (v: number) => v, _base: 0 }));
     if (!validas.length) {
       container.appendChild(h("div", { class: P.graficoVazio, style: { height: o.height + "px" } }, "Sem dados para o período."));
       return { destroy() {} };
@@ -108,27 +110,27 @@
       const H = o.height;
       const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 6 };      // modo filtro: espaço para a data em cima do ponto
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
-      const n = Math.max(...validas.map((sr: any) => sr.points.length));
+      const n = Math.max(...validas.map((sr) => sr.points.length));
 
       const escala = (pts: PontoGrafico[]) => {
         let mn = Infinity, mx = -Infinity;
-        pts.forEach((p: any) => { mn = Math.min(mn, p.valor); mx = Math.max(mx, p.valor); });
+        pts.forEach((p) => { mn = Math.min(mn, p.valor); mx = Math.max(mx, p.valor); });
         if (mn === mx) { mn -= 1; mx += 1; }
         const pd = (mx - mn) * 0.12;
         return [mn - pd, mx + pd];
       };
       const todas: PontoGrafico[] = [];
-      validas.forEach((sr: any) => sr.points.forEach((p: any) => todas.push(p)));
+      validas.forEach((sr) => sr.points.forEach((p) => todas.push(p)));
       const global = escala(todas);
-      validas.forEach((sr: any, k: any) => {
+      validas.forEach((sr, k) => {
         if (o.independentScale) {
           const [mn, mx] = escala(sr.points);
           const altura = ih / validas.length;
           const topo = m.t + altura * k;
-          sr._y = (v: any) => topo + altura - ((v - mn) / (mx - mn)) * altura;
+          sr._y = (v) => topo + altura - ((v - mn) / (mx - mn)) * altura;
           sr._base = topo + altura;                 // a área degradê vai só até o fim da faixa desta série
         } else {
-          sr._y = (v: any) => m.t + ih - ((v - global[0]) / (global[1] - global[0])) * ih;
+          sr._y = (v) => m.t + ih - ((v - global[0]) / (global[1] - global[0])) * ih;
           sr._base = m.t + ih;
         }
       });
@@ -140,7 +142,7 @@
 
 
       if (!o.semEixo) {
-        const ref = validas.reduce((a: any, b: any) => (a.points.length >= b.points.length ? a : b)).points;
+        const ref = validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
         // Início, meio e fim — sem repetir (séries curtas) e sem o do meio quando não cabe entre os outros dois
         const ultimo = ref.length - 1, meio = Math.floor(ultimo / 2);
         const indices = ultimo <= 0 ? [0] : (meio > 0 && meio < ultimo && iw >= 240) ? [0, meio, ultimo] : [0, ultimo];
@@ -163,16 +165,16 @@
 
       // Degradê sob a linha (todas as linhas de todos os gráficos, menos as tracejadas de referência).
       // Com duas linhas, o degradê da de cima desce até a de baixo (preenche o espaço entre elas).
-      const caminho = (sr: any) => sr.points.map((p: any, i: any) => (i ? "L" : "M") + x(i, sr.points.length).toFixed(1) + " " + sr._y(p.valor).toFixed(1)).join(" ");
-      const degrade = (cor: any) => {
+      const caminho = (sr: SerieDesenho) => sr.points.map((p, i) => (i ? "L" : "M") + x(i, sr.points.length).toFixed(1) + " " + sr._y(p.valor).toFixed(1)).join(" ");
+      const degrade = (cor: string | undefined) => {
         const gid = "zz-grad-" + (++seq);
         tela.insertBefore(s("defs", null, s("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 },
           s("stop", { offset: "0%", "stop-color": cor, "stop-opacity": 0.22 }),
           s("stop", { offset: "100%", "stop-color": cor, "stop-opacity": 0 }))), tela.firstChild);
         return `url(#${gid})`;
       };
-      const comArea = validas.filter((sr: any) => sr.area !== false && !sr.tracejado);
-      validas.forEach((sr: any) => {
+      const comArea = validas.filter((sr) => sr.area !== false && !sr.tracejado);
+      validas.forEach((sr) => {
         if (sr.area === false || sr.tracejado) return;
         const pts = sr.points, L = pts.length;
         const corArea = sr.colorBySlope ? (L > 1 && pts[L - 1].valor < pts[0].valor ? css("--color-chart-down") : css("--color-chart-up")) : sr.color;
@@ -180,7 +182,7 @@
         let contorno;
         if (abaixo && abaixo.points.length === L) {
           // até a linha de baixo: vai pela linha desta série e volta pela de baixo
-          const volta = abaixo.points.map((p: any, i: any) => [x(i, L), abaixo._y(p.valor)]).reverse().map(([px, py]: number[]) => `L${px.toFixed(1)} ${py.toFixed(1)}`).join(" ");
+          const volta = abaixo.points.map((p, i) => [x(i, L), abaixo._y(p.valor)]).reverse().map(([px, py]) => `L${px.toFixed(1)} ${py.toFixed(1)}`).join(" ");
           contorno = caminho(sr) + " " + volta + " Z";
         } else {
           contorno = caminho(sr) + ` L${x(L - 1, L).toFixed(1)} ${sr._base} L${x(0, L).toFixed(1)} ${sr._base} Z`;
@@ -188,7 +190,7 @@
         g.appendChild(s("path", { d: contorno, fill: degrade(corArea), stroke: "none", class: "line-chart__area" }));
       });
 
-      validas.forEach((sr: any) => {
+      validas.forEach((sr) => {
         const y = sr._y;
         const pts = sr.points;
         const L = pts.length;
@@ -208,7 +210,7 @@
         } else {
           const d = caminho(sr);
           g.appendChild(s("path", { d, fill: "none", stroke: sr.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": sr.tracejado ? "4 5" : null }));
-          if (sr.pontos) pts.forEach((p: any, i: any) => g.appendChild(s("circle", { cx: x(i, L), cy: y(p.valor), r: 3.5, fill: p.vazio ? "#fff" : sr.color, stroke: sr.color, "stroke-width": 2 })));
+          if (sr.pontos) pts.forEach((p, i) => g.appendChild(s("circle", { cx: x(i, L), cy: y(p.valor), r: 3.5, fill: p.vazio ? "#fff" : sr.color, stroke: sr.color, "stroke-width": 2 })));
         }
         const last = pts[L - 1];
         const corFim = sr.colorBySlope ? (L > 1 && last.valor < pts[0].valor ? css("--color-chart-down") : css("--color-chart-up")) : sr.color;
@@ -221,11 +223,11 @@
       const dataTopo = o.aoPassar ? s("text", { x: 0, y: 12, class: P.graficoDataTopo, "text-anchor": "middle", visibility: "hidden" }) : null;
       if (veu) tela.appendChild(veu);
       const cursor = s("line", { y1: m.t, y2: m.t + ih, class: P.graficoCursor, visibility: "hidden" });
-      const marcadores = validas.map((sr: any) => s("circle", o.aoPassar
+      const marcadores = validas.map((sr) => s("circle", o.aoPassar
         ? { r: 4.5, fill: "#fff", stroke: sr.colorBySlope ? css("--color-chart-up") : sr.color, "stroke-width": 2.5, visibility: "hidden" }
         : { r: 3.5, fill: sr.colorBySlope ? css("--color-chart-up") : sr.color, visibility: "hidden" }));
       tela.appendChild(cursor);
-      marcadores.forEach((c: any) => tela.appendChild(c));
+      marcadores.forEach((c) => tela.appendChild(c));
       if (dataTopo) tela.appendChild(dataTopo);
       const area = s("rect", { x: m.l, y: 0, width: iw, height: H, fill: "transparent" });
       tela.appendChild(area);
@@ -237,7 +239,7 @@
         cursor.setAttribute("x1", String(x(i, n))); cursor.setAttribute("x2", String(x(i, n))); cursor.setAttribute("visibility", "visible");
         clear(tooltip);
         let ponto = null as PontoGrafico | null;     // preenchido no forEach abaixo
-        validas.forEach((sr: any, k: any) => {
+        validas.forEach((sr, k) => {
           const p = sr.points[Math.min(i, sr.points.length - 1)];
           ponto = ponto || p;
           marcadores[k].setAttribute("cx", String(x(Math.min(i, sr.points.length - 1), sr.points.length)));
@@ -253,7 +255,7 @@
           const dt = F.parseData(ponto && (ponto as PontoGrafico).data);
           dataTopo.textContent = dt ? (String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()) + " " + dt.getFullYear()).toUpperCase() : "";
           dataTopo.setAttribute("x", String(Math.min(Math.max(xc, 44), W - 44))); dataTopo.setAttribute("visibility", "visible");
-          o.aoPassar(validas.map((sr: any) => sr.points[Math.min(i, sr.points.length - 1)] || null));
+          o.aoPassar(validas.map((sr) => sr.points[Math.min(i, sr.points.length - 1)] || null));
           return;                                    // no modo filtro o topo do cartão mostra os valores (sem caixinha)
         }
         tooltip.insertBefore(h("div", { class: P.dicaData }, ponto && o.rotuloTooltip ? o.rotuloTooltip(ponto) : F.dataExtenso(ponto && ponto.data)), tooltip.firstChild);
@@ -262,7 +264,7 @@
       };
       const esconder = () => {
         cursor.setAttribute("visibility", "hidden");
-        marcadores.forEach((c: any) => c.setAttribute("visibility", "hidden"));
+        marcadores.forEach((c) => c.setAttribute("visibility", "hidden"));
         tooltip.classList.remove("is-visible");
         if (veu) veu.setAttribute("visibility", "hidden");
         if (dataTopo) dataTopo.setAttribute("visibility", "hidden");
@@ -321,10 +323,10 @@
       g.appendChild(arc);
       arcos.push({ el: arc, ini: 0, len: alvo * C });
     } else {
-      const validos = (segments || []).filter((sg: any) => F.numero(sg.valor) > 0);
-      const total = validos.reduce((acc: number, sg: any) => acc + F.numero(sg.valor), 0);
+      const validos = (segments || []).filter((sg) => F.numero(sg.valor) > 0);
+      const total = validos.reduce((acc: number, sg) => acc + F.numero(sg.valor), 0);
       let offset = 0;
-      validos.forEach((sg: any) => {
+      validos.forEach((sg) => {
         const len = (F.numero(sg.valor) / total) * C;
         arcos.push({ el: barra(F.cor(sg.cor, css("--color-text-muted")), offset, sg.label + ": " + F.moeda(sg.valor)), ini: offset, len });
         offset += len;

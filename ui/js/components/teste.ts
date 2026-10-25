@@ -75,7 +75,7 @@
     const ir = (rotulo: string, acao: () => unknown, precisaConta = true) => botaoCmd(rotulo, () => {
       if (precisaConta && !logado()) { avisar("Entre primeiro: \"Entrar com dados de exemplo\", no topo do painel."); return; }
       fechar();
-      setTimeout(() => Promise.resolve().then(acao).catch((e: any) => avisar((e && (e.friendly || e.message)) || "Não deu para abrir.")), 220);
+      setTimeout(() => Promise.resolve().then(acao).catch((e: Partial<ErroPonte>) => avisar((e && (e.friendly || e.message)) || "Não deu para abrir.")), 220);
     });
     /** Painel lateral só aparece nas páginas que têm a coluna dele (no Dashboard não): vai à página antes */
     const naPagina = (rota: string, acao: () => unknown) => () => { ctx.router.navigate(rota); return new Promise((ok) => setTimeout(ok, 450)).then(acao); };
@@ -96,14 +96,14 @@
       const simular = ZoZo.modais.Interruptor("Simular cadastro e login sem servidor", e.simulacao, (v) => {
         T!.simular(v); app.entradaMudou(); desenhar();
       });
-      const tipoLanc = (tipo: string, rotulo: string, teste: (l: any) => boolean) =>
+      const tipoLanc = (tipo: string, rotulo: string, teste: (l: LancamentoTela) => boolean) =>
         ir(rotulo, naPagina("lancamentos", async () => ZoZo.lancamentosShared.abrirVisualizacao(achar(await lancamentos(ctx), teste, "transação do tipo " + tipo), ctx)));
       const tipoConta = (tipo: string, rotulo: string, opts?: OpcoesPainelConta) =>
         ir(rotulo, naPagina(tipo === "investimento" ? "investimentos" : "contas", async () => ZoZo.contasShared.abrirDetalheConta(
           achar(await contas(ctx), (c) => c.tipo === tipo, "conta do tipo " + tipo), ctx, opts)));
-      const primeira = async (fn: () => Promise<any[]>, oque: string) => achar(await fn(), () => true, oque);
-      const regular = async () => achar(await lancamentos(ctx), (l: any) => l.tipo === "regular", "transação regular");
-      const cartao = async () => achar(await contas(ctx), (c: any) => c.tipo === "cartao", "cartão de crédito");
+      const primeira = async <X>(fn: () => Promise<X[]>, oque: string) => achar(await fn(), () => true, oque);
+      const regular = async () => achar(await lancamentos(ctx), (l) => l.tipo === "regular", "transação regular");
+      const cartao = async () => achar(await contas(ctx), (c) => c.tipo === "cartao", "cartão de crédito");
 
       mount(area,
         h("dl", { class: C.estado }, ...linhas.flatMap(([r, v]) => [h("dt", { class: C.rotulo }, r), h("dd", { class: C.valor }, v)])),
@@ -154,10 +154,10 @@
           linha(
             ir("Categoria", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(await primeira(() => categorias(ctx), "categoria"), ctx))),
             ir("Categoria: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(
-              achar(await categorias(ctx), (c: any) => c.status === "regular", "categoria regular"), ctx, { editandoOrcamento: true }))),
+              achar(await categorias(ctx), (c) => c.status === "regular", "categoria regular"), ctx, { editandoOrcamento: true }))),
             ir("Categoria: editar (formulário)", naPagina("categorias", async () => ZoZo.categoriasShared.abrirFormCategoria(ctx, await primeira(() => categorias(ctx), "categoria")))),
-            ir("Grupo de categorias", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo!, ctx))),
-            ir("Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo!, ctx, { editando: true }))),
+            ir("Grupo de categorias", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c) => !!c.grupo, "grupo").grupo!, ctx))),
+            ir("Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c) => !!c.grupo, "grupo").grupo!, ctx, { editando: true }))),
             ir("Recorrência", naPagina("recorrencias", async () => ZoZo.recorrenciasShared.abrirDetalhe(await primeira(() => recorrencias(ctx), "recorrência"), ctx))),
             ir("Perfil", naPagina("perfil", async () => ZoZo.perfilShared.abrirDetalhe(await primeira(() => perfis(ctx), "perfil"), ctx))),
             ir("Perfil: editar (formulário)", naPagina("perfil", async () => ZoZo.perfilShared.abrirFormPerfil(ctx, await primeira(() => perfis(ctx), "perfil")))))),

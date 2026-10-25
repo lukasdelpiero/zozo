@@ -92,7 +92,7 @@
   let errosCodigo = 0;           // erros seguidos do código 2FA (1º: "não funcionou"; depois: "algo deu errado")
 
   /** Mensagem do bloqueio com o tempo que falta, quando o servidor informa */
-  function textoBloqueio(e: any) {
+  function textoBloqueio(e: Partial<ErroPonte>) {
     const s = Number(e && e.espera) || 0;
     if (!s) return FR.TOO_MANY_ATTEMPTS;
     if (s >= 3600) { const hs = Math.ceil(s / 3600); return "Muitas tentativas. Por segurança, tente novamente em " + hs + (hs === 1 ? " hora." : " horas."); }
@@ -113,8 +113,7 @@
       onIrCadastro: () => { authErro = null; authAviso = null; store.set({ session: { status: "register" } }); },
       onEsqueci: (email: string) => mostrarPedirRecuperacao(email),
       onVoltar: () => { authErro = null; authAviso = null; store.set({ session: { status: "login" } }); },
-      onErro: (msg: any, email: any) => { authErro = msg; if (email !== undefined) authEmail = email; renderAuth(); },
-      onLogin: (cred: any) => {
+      onLogin: (cred) => {
         authEmail = cred.email;
         ZoZo.auth.carregando(authRoot, "Entrando no ZoZo");
         const ativando = !!authConfirmacao;
@@ -135,18 +134,18 @@
         });
       },
       /** Código do 2FA no login → Promise<mensagem de erro | null> */
-      onCodigo: (codigo: any) => bridge.request(A.verificar2FA, { codigo }).then((r) => { errosCodigo = 0; entrar(r); return null; }).catch((e) => {
+      onCodigo: (codigo) => bridge.request(A.verificar2FA, { codigo }).then((r) => { errosCodigo = 0; entrar(r); return null; }).catch((e) => {
         if (e.code === "SESSION_EXPIRED") { authErro = FR.SESSION_EXPIRED; store.set({ session: { status: "login" } }); renderAuth(); return null; }
         if (e.code === "TOO_MANY_ATTEMPTS" || e.espera) return textoBloqueio(e);
         errosCodigo += 1;
         return errosCodigo === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN;
       }),
       onCancelar2FA: () => { ZoZo.auth.reiniciar(); bridge.request(A.logout).catch(() => null); authErro = null; store.set({ session: { status: "login" } }); },
-      onCadastro: (dados: any) => {
+      onCadastro: (dados) => {
         ZoZo.auth.carregando(authRoot, "Preparando sua conta...");
         bridge.request(A.registerUser, dados).then((r) => {
           salvarCredencial(dados.email, dados.senha, dados.nomeUsuario);
-          if (r && r.confirmarEmail) { authEmail = r.email; aguardarConfirmacao(r.email); return; }    // e-mail ligado: falta o link
+          if (r && r.confirmarEmail) { authEmail = r.email || dados.email; aguardarConfirmacao(authEmail); return; }    // e-mail ligado: falta o link
           entrar(r);
         }).catch((e) => {
           authErro = e.code === "TOO_MANY_ATTEMPTS" ? textoBloqueio(e)
@@ -178,14 +177,14 @@
   function mostrarNovaSenha(r: { email: string; manter: boolean }, erroTela?: string) {
     ZoZo.auth.novaSenha(authRoot, { email: r.email, manter: r.manter, erro: erroTela || null, onVoltar: voltarEntrada, onSalvar: (senha) => {
       ZoZo.auth.carregando(authRoot, "Redefinindo sua senha...");
-      bridge.request(A.concluirRecuperacao, { senha, recomecar: !r.manter }, { timeout: 120000 }).then((x: any) => {
+      bridge.request(A.concluirRecuperacao, { senha, recomecar: !r.manter }, { timeout: 120000 }).then((x) => {
         authEmail = x.email; authErro = null; authAviso = null;
         ZoZo.auth.prepararLogin(x.email);
         store.set({ session: { status: "login" } });
         renderAuth();
         ctx.toast(x.recomecou ? "Senha redefinida. A conta recomeçou vazia: entre com a senha nova." : "Senha redefinida. Entre com a senha nova.",
           { tone: "success", importante: true, duration: 8000 });
-      }).catch((e: any) => {
+      }).catch((e: ErroPonte) => {
         if (e.code === "TOKEN_INVALID") { mostrarLinkInvalido(); return; }
         mostrarNovaSenha(r, ["PASSWORD_BREACHED", "WEAK_PASSWORD"].includes(e.code) ? FR[e.code] : (e.friendly || FR.OPERATION_FAILED));
       });
@@ -204,10 +203,10 @@
     store.set({ session: { status: "login" } });
     if (!TOKEN_LINK.test(token)) { mostrarLinkInvalido(); return Promise.resolve(true); }
     ZoZo.auth.carregando(authRoot, "Abrindo sua conta...");
-    return bridge.request(A.abrirRecuperacao, { token }, { timeout: 60000 }).then((r: any) => { mostrarNovaSenha(r); return true; }).catch((e: any) => {
+    return bridge.request(A.abrirRecuperacao, { token }, { timeout: 60000 }).then((r) => { mostrarNovaSenha(r); return true; }).catch((e: ErroPonte) => {
       if (e.code === "CODE_REQUIRED") {
         ZoZo.auth.codigoRecuperacao(authRoot, { onVoltar: voltarEntrada, onCodigo: (codigo) =>
-          bridge.request(A.abrirRecuperacao, { token, codigo }, { timeout: 60000 }).then((r: any) => { mostrarNovaSenha(r); return null; }).catch((x: any) => {
+          bridge.request(A.abrirRecuperacao, { token, codigo }, { timeout: 60000 }).then((r) => { mostrarNovaSenha(r); return null; }).catch((x: ErroPonte) => {
             if (x.code === "TOKEN_INVALID") { mostrarLinkInvalido(); return null; }
             return x.code === "TOO_MANY_ATTEMPTS" || x.espera ? textoBloqueio(x) : FR.CODE_INVALID;
           }) });
@@ -307,9 +306,10 @@
   }
 
   /** Oferece salvar no gerenciador de senhas do navegador (Chrome/Edge; os demais detectam pelo formulário) */
-  function salvarCredencial(email: any, senha: any, nome?: any) {
+  function salvarCredencial(email: string, senha: string, nome?: string) {
     try {
-      const Credencial = (window as any).PasswordCredential;      // Chrome/Edge: oferece salvar no gerenciador de senhas
+      // Chrome/Edge (não está em todos os navegadores nem nos tipos do TypeScript)
+      const Credencial = (window as unknown as { PasswordCredential?: new (d: { id: string; password: string; name: string }) => Credential }).PasswordCredential;      // Chrome/Edge: oferece salvar no gerenciador de senhas
       if (!Credencial || !navigator.credentials || !email || !senha) return;
       navigator.credentials.store(new Credencial({ id: email, password: senha, name: nome || email })).catch(() => null);
     } catch (e) { /* navegador sem suporte */ }
@@ -331,11 +331,11 @@
     }).catch(() => { authErro = textos.erro; });
   }
 
-  function entrar(sessao: any) {
+  function entrar(sessao: RespostaSessao) {
     geracao += 1;
     authErro = null; authAviso = null; esperandoEmail = null;
     if (ZoZo.servico) ZoZo.servico.reset();
-    store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user } });
+    store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user || null } });
   }
 
   ctx.encerrarSessao = function () {
@@ -349,7 +349,7 @@
     store.reset();
   };
 
-  ctx.logout = function (mensagem: any) {
+  ctx.logout = function (mensagem?: string) {
     geracao += 1;
     ZoZo.auth.reiniciar();
     bridge.request(A.logout).catch(() => null).finally(() => {
@@ -390,7 +390,7 @@
       toggleMenu.title = texto;
       toggleMenu.setAttribute("aria-expanded", String(aberto));
     };
-    const gaveta = (abrir: any) => { shellRoot.dataset.gaveta = abrir ? "aberta" : ""; rotularToggle(); };
+    const gaveta = (abrir: boolean) => { shellRoot.dataset.gaveta = abrir ? "aberta" : ""; rotularToggle(); };
     toggleMenu.addEventListener("click", () => {
       if (celular.matches) { gaveta(shellRoot.dataset.gaveta !== "aberta"); return; }
       const fechar = shellRoot.dataset.menu !== "recolhido";
@@ -553,7 +553,7 @@
     renderAuth();
     Promise.all([
       bridge.request(A.getArmazenamento).catch(() => null),
-      bridge.request(A.getSession).catch(() => ({ authenticated: false })),
+      bridge.request(A.getSession).catch((): RespostaSessao => ({ authenticated: false })),
     ]).then(([armazenamento, sessao]) => {
       // A proteção do Cloudflare barrou a API logo na abertura: recarrega uma vez (o navegador refaz a verificação)
       if (armazenamento && armazenamento.desafio) {
@@ -595,7 +595,7 @@
     // conta simulada com dados de exemplo (sem servidor): o painel precisa de dados para abrir painéis e janelas
     entrarSimulado: () => {
       if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
-      return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r: any) => entrar(r));
+      return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r) => entrar(r));
     },
   })).catch(() => null);
 

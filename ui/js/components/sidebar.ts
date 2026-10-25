@@ -73,10 +73,10 @@
       if (!contas) {
         mount(contasEl, state.errors.contas ? h("p", { class: E.nota }, state.errors.contas) : UI.Skeleton(5, { class: "skeleton--sidebar" }));
       } else {
-        const grupos = GRUPOS.map((g) => ({ titulo: g.titulo, contas: contas.filter((c: any) => !c.oculta && g.tipos.includes(c.tipo)) })).filter((g) => g.contas.length);
+        const grupos = GRUPOS.map((g) => ({ titulo: g.titulo, contas: contas.filter((c) => !c.oculta && g.tipos.includes(c.tipo)) })).filter((g) => g.contas.length);
         mount(contasEl, grupos.length
           ? grupos.map((g) => ZoZo.list.SidebarAccountGroup(g.titulo, g.contas, {
-            onSelect: (c: any) => ctx.navigate(c.tipo === "investimento" ? "investimentos" : "contas", { select: { tipo: "conta", id: c.id } }),
+            onSelect: (c) => ctx.navigate(c.tipo === "investimento" ? "investimentos" : "contas", { select: { tipo: "conta", id: c.id } }),
           }))
           : h("p", { class: E.nota }, "Nenhuma conta cadastrada."));
       }

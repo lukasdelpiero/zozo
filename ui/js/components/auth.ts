@@ -111,13 +111,14 @@
   let estado: Estado = { modo: null, etapa: 0, email: "", nome: "", google: false };
   let ultimoPasso: string | null = null, ultimaEtapa = 0;   // para animar só quando a etapa muda
 
-  function campo(cfg: any) {
+  /** Campo do formulário de entrada: atributos do input + rótulo acessível */
+  function campo(cfg: Record<string, unknown> & { rotulo: string }) {
     const input = UI.Input(Object.assign({ class: C.input, required: true }, cfg));
     input.setAttribute("aria-label", cfg.rotulo);
     return input;
   }
 
-  function campoSenha(autocomplete: any) {
+  function campoSenha(autocomplete: string) {
     const input = campo({ type: "password", name: "password", id: "password", autocomplete, placeholder: "Insira sua senha", rotulo: "Senha" });
     return { input, wrap: V().ComRevelar(input) };
   }
@@ -126,8 +127,8 @@
     class: "tw:sr-only", tabindex: "-1", "aria-hidden": "true", readonly: true });
 
   const botao = (texto: string) => h("button", { type: "submit", class: C.botao }, h("span", { class: "btn__label" }, texto)) as HTMLButtonElement;
-  const aviso = (msg: any) => h("p", { class: C.erro, role: "alert" }, msg || "");
-  const rodape = (pergunta: any, acao: any, onClick: any) => h("p", { class: C.rodape },
+  const aviso = (msg: string | null | undefined) => h("p", { class: C.erro, role: "alert" }, msg || "");
+  const rodape = (pergunta: string | null, acao: string, onClick: () => void) => h("p", { class: C.rodape },
     pergunta ? h("span", null, pergunta + " ") : null, h("button", { type: "button", class: C.link, onClick }, acao));
 
   /** Logo oficial "G" do Google (cores da marca) */
@@ -147,7 +148,7 @@
   }
 
   /** Tela do 2FA no login: mesmo cartão, título "Autentique sua conta" e seis campos */
-  function corpo2FA(cfg: any) {
+  function corpo2FA(cfg: Pick<ConfigEntrada, "erro" | "voltar" | "onCodigo" | "onCancelar2FA">) {
     const erro = h("p", { class: C.erro2fa, role: "alert" }, cfg.erro || "");
     const campoCod = V().CampoCodigo({
       rotulo: "Código de 6 dígitos do aplicativo 2FA",
@@ -172,7 +173,7 @@
   }
 
   /** Primeira tela: Continuar com e-mail · Continuar com Google · Inscreva-se */
-  function corpoInicio(root: any, cfg: any, erro: any) {
+  function corpoInicio(root: HTMLElement, cfg: ConfigEntrada, erro: string | null) {
     const area = h("div", { class: C.opcoes });
     const msg = aviso(erro);
     const google = () => {
@@ -190,7 +191,7 @@
     return h("div", { class: C.form }, area, msg, rodape("Não tem uma conta?", "Inscreva-se", cfg.onIrCadastro));
   }
 
-  function render(root: any, cfg: any) {
+  function render(root: HTMLElement, cfg: ConfigEntrada) {
     const st = ZoZo.store.get().session;
     const modo = st.status === "register" ? "register" : st.status === "loading" ? "loading" : st.status === "2fa" ? "2fa" : "login";
 
@@ -204,7 +205,7 @@
 
     // Erros de senha errada viram a mensagem padrão; os demais (ex.: bloqueio) aparecem como vieram
     const erro = cfg.erro ? (cfg.erro === FR.INVALID_CREDENTIALS ? ERRO_LOGIN : cfg.erro) : null;
-    const voltar = (etapa: any) => () => { estado.etapa = etapa; estado.google = false; render(root, Object.assign({}, cfg, { erro: null })); };
+    const voltar = (etapa: number) => () => { estado.etapa = etapa; estado.google = false; render(root, Object.assign({}, cfg, { erro: null })); };
     let titulo, corpo;
 
     if (modo === "2fa") {
@@ -218,7 +219,7 @@
       const email = campo({ type: "email", name: "email", id: "email", autocomplete: "username", inputmode: "email", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: estado.email });
       email.dataset.autofocus = "";
       const msg = aviso(erro);
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
         e.preventDefault();
         if (!EMAIL_OK.test(email.value.trim())) { msg.textContent = "Insira um e-mail válido."; email.focus(); return; }
         estado.email = email.value.trim(); estado.etapa = 2;
@@ -232,7 +233,7 @@
       const captcha = cfg.captchaLogin && cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile) : null;
       const msg = aviso(erro);
       const nota = estado.google ? h("p", { class: C.nota }, "E-mail confirmado pelo Google. Digite sua senha do ZoZo: é ela que protege seus dados com criptografia.") : null;
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
         e.preventDefault();
         if (!senha.input.value) { senha.input.focus(); return; }
         if (captcha && !captcha.token()) { msg.textContent = FR.CAPTCHA_REQUIRED; return; }
@@ -240,7 +241,7 @@
         enviar.disabled = true; enviar.classList.add("is-busy");
         cfg.onLogin({ email: estado.email, senha: senha.input.value, turnstile: captcha ? captcha.token() : undefined });
       } }, nota, h("div", { class: C.campos }, emailOculto(), senha.wrap,
-        cfg.onEsqueci ? h("button", { type: "button", class: C.esqueci, onClick: () => cfg.onEsqueci(estado.email) }, "Esqueci minha senha") : null),
+        cfg.onEsqueci ? h("button", { type: "button", class: C.esqueci, onClick: () => { if (cfg.onEsqueci) cfg.onEsqueci(estado.email); } }, "Esqueci minha senha") : null),
       captcha ? captcha.el : null, enviar, msg,
         rodape(estado.email, "Usar outro e-mail", voltar(1)));
     } else if (estado.etapa === 1) {
@@ -250,7 +251,7 @@
       nome.maxLength = 80;
       const email = campo({ type: "email", name: "email", id: "email", autocomplete: "username", inputmode: "email", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: estado.email });
       const msg = aviso(erro);
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
         e.preventDefault();
         if (!nome.value.trim()) { msg.textContent = "Insira seu primeiro nome."; nome.focus(); return; }
         if (!EMAIL_OK.test(email.value.trim())) { msg.textContent = "Insira um e-mail válido."; email.focus(); return; }
@@ -266,7 +267,7 @@
       const captcha = cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile) : null;   // Google já confirmou a pessoa
       const msg = aviso(erro);
       const nota = estado.google ? h("p", { class: C.nota }, "E-mail confirmado pelo Google. Crie a senha do ZoZo: ela é a chave da criptografia dos seus dados e não pode ser recuperada.") : null;
-      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+      corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
         e.preventDefault();
         if (senha.input.value.length < 8) { msg.textContent = "Use pelo menos 8 caracteres."; senha.input.focus(); return; }
         if (captcha && !captcha.token()) { msg.textContent = FR.CAPTCHA_REQUIRED; return; }
@@ -296,11 +297,11 @@
       corpo, demo,
     ]));
 
-    requestAnimationFrame(() => { const a = root.querySelector("[data-autofocus]"); if (a) a.focus(); });
+    requestAnimationFrame(() => { const a = root.querySelector<HTMLElement>("[data-autofocus]"); if (a) a.focus(); });
   }
 
   /** Cartão de espera durante o login/cadastro: logo, texto ("Entrando no ZoZo" / "Preparando sua conta...") e carregando */
-  function carregando(root: any, texto: any) {
+  function carregando(root: HTMLElement, texto: string) {
     // o carregando gira por conta própria: só o texto desliza
     const frase = h("p", { class: [C.tituloEspera, ANIM.frente.filhos[1]] }, texto);
     mount(root, h("main", { class: C.raiz },
@@ -319,7 +320,7 @@
   function prepararLogin(email: string) { estado = { modo: "login", etapa: 2, email, nome: "", google: false }; }
 
   /** Depois do Google: pula direto para a senha (conta existente) ou para "Crie sua senha" (cadastro) */
-  function prepararGoogle(dados: any) {
+  function prepararGoogle(dados: { email: string; nome?: string; contaExiste: boolean }) {
     estado = dados.contaExiste
       ? { modo: "login", etapa: 2, email: dados.email, nome: "", google: true }
       : { modo: "register", etapa: 2, email: dados.email, nome: dados.nome || dados.email.split("@")[0], google: true };
@@ -329,7 +330,7 @@
    * Cadastro feito, falta confirmar o e-mail (ou tentou entrar sem confirmar). "Reenviar link": carregando
    * enquanto envia, depois 60 s de espera. Quando o link é aberto neste navegador, a tela vira o login (app.ts).
    */
-  function aguardandoEmail(root: any, email: any, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }) {
+  function aguardandoEmail(root: HTMLElement, email: string, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }) {
     const titulo = h("h1", { class: C.titulo, tabindex: "-1" }, "Verifique seu e-mail");
     // Mesmo botão de ação das outras etapas (botao: 44 px, logo abaixo da área de campos)
     const reenviar = botao("Reenviar link");
@@ -351,7 +352,7 @@
       reenviar.replaceChildren(h("span", { class: C.girandoBotao, "aria-hidden": "true" }), h("span", { class: "tw:sr-only" }, "Enviando…"));
       falha.textContent = "";
       Promise.resolve(cfg.onReenviar())
-        .catch((e: any) => { falha.textContent = (e && e.friendly) || "Não foi possível reenviar agora. Tente de novo em instantes."; })
+        .catch((e: Partial<ErroPonte>) => { falha.textContent = (e && e.friendly) || "Não foi possível reenviar agora. Tente de novo em instantes."; })
         .finally(() => { espera = 60; contar(); });
     });
     mount(root, cartao("frente", [
@@ -371,15 +372,15 @@
   }
 
   /** "Esqueci minha senha": e-mail da conta → link por e-mail */
-  function pedirRecuperacao(root: any, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }) {
+  function pedirRecuperacao(root: HTMLElement, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }) {
     const email = campo({ type: "email", name: "email", id: "email", autocomplete: "username", inputmode: "email", placeholder: "Insira seu e-mail", rotulo: "E-mail", value: cfg.email || "" });
     const enviar = botao("Enviar link");
     const msg = aviso(null);
-    const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+    const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
       e.preventDefault();
       if (!EMAIL_OK.test(email.value.trim())) { msg.textContent = "Insira um e-mail válido."; email.focus(); return; }
       enviar.disabled = true; enviar.classList.add("is-busy"); msg.textContent = "";
-      Promise.resolve(cfg.onEnviar(email.value.trim())).catch((er: any) => {
+      Promise.resolve(cfg.onEnviar(email.value.trim())).catch((er: Partial<ErroPonte>) => {
         msg.textContent = (er && er.friendly) || "Não foi possível enviar agora. Tente de novo em instantes.";
         enviar.disabled = false; enviar.classList.remove("is-busy");
       });
@@ -391,7 +392,7 @@
   }
 
   /** Conta com 2FA: o código do aplicativo antes de criar a senha nova */
-  function codigoRecuperacao(root: any, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }) {
+  function codigoRecuperacao(root: HTMLElement, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }) {
     mount(root, cartao("frente", [logo(), h("h1", { class: C.titulo }, "Autentique sua conta"),
       corpo2FA({ onCodigo: cfg.onCodigo, onCancelar2FA: cfg.onVoltar, voltar: "Voltar para tela de entrada" })]));
   }
@@ -400,13 +401,13 @@
    * Senha nova depois do link. manter = os dados voltam com a senha nova; senão (proteção avançada ou sem
    * cópia da chave) a tela avisa que a conta recomeça vazia e o botão diz isso.
    */
-  function novaSenha(root: any, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }) {
+  function novaSenha(root: HTMLElement, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }) {
     estado.email = cfg.email;                          // e-mail oculto do formulário (gerenciador de senhas)
     const senha = campoSenha("new-password");
     senha.input.setAttribute("minlength", "8");
     const enviar = botao(cfg.manter ? "Salvar senha nova" : "Recomeçar com senha nova");
     const msg = aviso(cfg.erro || null);
-    const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: any) => {
+    const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
       e.preventDefault();
       if (senha.input.value.length < 8) { msg.textContent = "Use pelo menos 8 caracteres."; senha.input.focus(); return; }
       if (senha.input.type === "text") senha.wrap.querySelector<HTMLElement>(".input-reveal")?.click();
@@ -422,7 +423,7 @@
   }
 
   /** Link do e-mail vencido, já usado ou adulterado: só o aviso e, no pé do cartão, a volta para a entrada */
-  function linkInvalido(root: any, cfg: { onVoltar: () => void }) {
+  function linkInvalido(root: HTMLElement, cfg: { onVoltar: () => void }) {
     const voltar = rodape(null, "Voltar para tela de entrada", cfg.onVoltar);
     mount(root, cartao("entrar", [
       logo(),

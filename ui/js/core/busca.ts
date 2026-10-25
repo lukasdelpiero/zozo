@@ -89,7 +89,7 @@
   }
 
   type Postagens = Map<number, number>;                               // item → peso do campo (o maior)
-  const indices = new WeakMap<object, Map<string, IndiceBusca<any>>>();
+  const indices = new WeakMap<object, Map<string, unknown>>();          // índice por lista e chave (o tipo volta em indice<T>)
 
   function criarIndice<T>(itens: readonly T[], campos: (item: T) => CampoBusca[]): IndiceBusca<T> {
     const vocab = new Map<string, Postagens>();

@@ -51,19 +51,6 @@
       valorResumo(cfg.direita.texto !== undefined ? cfg.direita.texto : cfg.direita.valor, cfg.direita.label, "left"));
   }
 
-  /** Agrupa itens por categoria para o donut (cor da categoria) */
-  function segmentosPorCategoria(itens: any[], campoValor: string): SegmentoRosca[] {
-    const mapa = new Map<string, SegmentoRosca>();
-    itens.forEach((it) => {
-      const c = it.categoria || { nome: it.nome, cor: it.cor };
-      if (!c || !c.nome) return;
-      const atual = mapa.get(c.nome) || { label: c.nome, cor: c.cor, valor: 0 };
-      atual.valor += F.numero(it[campoValor]);
-      mapa.set(c.nome, atual);
-    });
-    return Array.from(mapa.values()).sort((a, b) => b.valor - a.valor);
-  }
-
   /** Linha de detalhe "rótulo ...... valor" no painel direito */
   function detalheLinha(rotulo: string, valor: FilhoDom, cls?: string): HTMLElement {
     return h("div", { class: [ZoZo.pecas.painelLinha, cls] }, h("span", { class: ZoZo.pecas.painelLinhaRotulo }, rotulo), h("span", { class: ZoZo.pecas.painelLinhaValor }, valor));
@@ -73,6 +60,6 @@
     return h("section", { class: ZoZo.pecas.painelSecao }, titulo ? h("h3", { class: ZoZo.pecas.painelSecaoTitulo }, titulo) : null, ...children);
   }
 
-  const api: ZoZoPagesComum = { estadoCarregamento, carregado, pagina, valorResumo, cardResumoDonut, segmentosPorCategoria, detalheLinha, detalheSecao };
+  const api: ZoZoPagesComum = { estadoCarregamento, carregado, pagina, valorResumo, cardResumoDonut, detalheLinha, detalheSecao };
   ZoZo.pagesComum = api;
 })(window.ZoZo);
