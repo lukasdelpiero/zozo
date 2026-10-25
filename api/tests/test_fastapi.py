@@ -3,8 +3,8 @@ Testes do app FastAPI (transição; api/src/app_fastapi.py).
 
     cd api && uv run python -m unittest discover -s tests -v
 
-Sem o FastAPI instalado (python do sistema), estes testes são pulados; o publicar.ps1
-roda com `uv run`, que instala o grupo de desenvolvimento (pyproject.toml).
+Sem o FastAPI instalado (python do sistema), estes testes são pulados; com `uv run`
+ele vem das dependências do projeto (as mesmas versões que vão para o Worker).
 """
 import asyncio
 import json

@@ -7,7 +7,7 @@ Aplicativo web com design baseado no Copilot Money.
 | Camada | Tecnologia |
 |---|---|
 | Front-end | **Vite + TypeScript + Tailwind CSS** (pasta `ui`) |
-| Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`); transição para **FastAPI + Pydantic** iniciada (`app_fastapi.py`, desligada no Cloudflare) |
+| Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`); **FastAPI + Pydantic** na frente do núcleo (`app_fastapi.py`): ligado na prévia (`API_FASTAPI`), produção ainda no caminho direto |
 | Dados | **Cloudflare D1** (banco SQL) — documentos financeiros cifrados; nomes e e-mails de cadastro legíveis para a API; cópia da chave para "Esqueci minha senha" (exceto com a proteção avançada) |
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
@@ -26,6 +26,8 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 - **Avisos:** fundo translúcido com texto na cor do tom (aviso #f58000, sucesso #008a33, erro #e51300).
 - **Desempenho:** o QR code e o painel de testes carregam só quando usados (pacote principal menor). Entrada das páginas no mesmo ritmo em todas as telas.
 - **Segurança:** etapas da recuperação de senha limitadas por IP. TypeScript recusa código não usado.
+- **Back-end:** tipos conferidos com **mypy** (modo estrito) em todo `api/src`; a sessão de uma conta que não existe mais é encerrada (antes: erro 500). **FastAPI + Pydantic** vão no pacote do Worker (Pydantic 2.12.5, a versão compilada para o Pyodide; ~2,2 MB comprimido) e ficam **ligados na prévia**: todo JSON é validado com modelos estritos antes das regras de sempre. Produção continua no caminho direto até a prévia ser aprovada.
+- **Interface:** sem o modo `?mock=1` (a demonstração e o Modo teste cobrem o uso sem servidor); nenhuma resposta da API sem tipo.
 
 ## Novidades da versão 3.17.0
 
@@ -348,13 +350,13 @@ ZoZo/
     ├── src/nucleo.py         rotas, sessões, bloqueio progressivo, prova de senha
     ├── src/totp.py           2FA (TOTP RFC 6238) e cifra do segredo do 2FA
     ├── src/google.py         "Continuar com Google" (OpenID Connect + PKCE)
-    ├── src/app_fastapi.py    transição: FastAPI + Pydantic na frente do núcleo (desligado: API_FASTAPI)
+    ├── src/app_fastapi.py    FastAPI + Pydantic na frente do núcleo (API_FASTAPI = "1": ligado na prévia)
     ├── migracoes/            tabelas do banco (aplicadas em ordem, uma vez)
     ├── wrangler.toml         produção + prévia
     ├── publicar.ps1          testes → interface → migrações → publicação
     ├── cabecalhos_ui.json    cabeçalhos de segurança da interface (build e servidor local)
     ├── dev/servidor_local.py servidor para testar no seu computador (SQLite)
-    └── tests/                test_api.py (63) · test_fastapi.py (8)
+    └── tests/                test_api.py (104) · test_fastapi.py (11)
 ```
 
 ## Ambientes e publicação

@@ -8,9 +8,8 @@ Só traduz entre o Cloudflare e o núcleo (nucleo.py):
 A interface (pasta public) é servida pelo próprio Cloudflare (assets);
 este código só recebe os caminhos /api/*.
 Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
-  API_FASTAPI = "1"  → transição: os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py)
-                       antes do núcleo. Desligado por padrão; ligar primeiro só na prévia, depois de
-                       mover fastapi/pydantic para [project].dependencies (pyproject.toml).
+  API_FASTAPI = "1"  → os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py) antes do
+                       núcleo. Ligado na prévia; produção só depois de aprovado lá.
 Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO, RESEND_API_KEY
 Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 """
@@ -109,6 +108,16 @@ def _config(env: Any) -> dict[str, str]:
     return {k: str(getattr(env, k, "") or "") for k in _CONFIG}
 
 
+# Importado no carregamento (não no 1º pedido): o Cloudflare guarda o estado depois dos imports do topo num
+# "snapshot" de memória, então FastAPI + Pydantic não custam CPU a cada isolado novo. O app só é usado com
+# API_FASTAPI = "1"; sem isso os pedidos seguem direto para o núcleo.
+try:
+    import asgi                                      # adaptador ASGI do Python Workers
+    from app_fastapi import criar_app
+    _TEM_FASTAPI = True
+except ImportError:                                  # pragma: no cover — pacote fora do Worker
+    _TEM_FASTAPI = False
+
 _APP_FASTAPI: "FastAPI | Literal[False] | None" = None   # False: o pacote não está no Worker
 
 
@@ -116,9 +125,7 @@ def _app_fastapi() -> "FastAPI | None":
     """App FastAPI (transição). None se o pacote não estiver no Worker (aí o pedido é RECUSADO: ver fetch)."""
     global _APP_FASTAPI
     if _APP_FASTAPI is None:
-        try:
-            from app_fastapi import criar_app       # noqa: PLC0415 — só carrega quando ligado
-        except ImportError:
+        if not _TEM_FASTAPI:
             print(json.dumps({"evento": "fastapi_indisponivel"}))
             _APP_FASTAPI = False
         else:
@@ -136,7 +143,6 @@ class Default(WorkerEntrypoint):
                 # Ligado mas sem o pacote: falha VISÍVEL (503) em vez de voltar em silêncio ao caminho antigo —
                 # assim "API_FASTAPI = 1" sempre significa que a validação Pydantic está mesmo valendo
                 return _responder(nucleo.Resposta(503, {"erro": "UNAVAILABLE"}))
-            import asgi                              # noqa: PLC0415 — adaptador ASGI do Python Workers
             via_fastapi: Response = await asgi.fetch(app, request.js_object, env)
             return via_fastapi
         config = _config(env)

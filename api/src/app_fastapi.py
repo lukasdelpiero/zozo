@@ -8,10 +8,10 @@ entrega o pedido ao mesmo núcleo de sempre (nucleo.atender), que continua sendo
 a única fonte das regras: sessão, prova da senha, limites, 2FA, criptografia.
 Assim nada de segurança fica duplicado ou diferente entre os dois caminhos.
 
-Etapa 2: ligar na PRÉVIA (variável API_FASTAPI = "1" no wrangler.toml, ambiente
-previa) depois de mover fastapi/pydantic para [project].dependencies e conferir o
-tamanho do pacote do Worker. Produção continua no caminho atual até a prévia
-aprovar. Etapa 3: mover rota por rota do nucleo._rota para endpoints FastAPI.
+Etapa 2 (feita): fastapi/pydantic no pacote do Worker ([project].dependencies; o
+pydantic-core é o compilado para o Pyodide) e API_FASTAPI = "1" na PRÉVIA. Produção
+continua no caminho direto até a prévia aprovar (aí: API_FASTAPI = "1" em [vars]).
+Etapa 3: mover rota por rota do nucleo._rota para endpoints FastAPI.
 
 Este módulo não importa nada do Cloudflare: os testes rodam com o SQLite local
 (api/tests/test_fastapi.py). Quem cria o app informa como obter banco, serviços
