@@ -160,7 +160,7 @@
             ir("Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo!, ctx, { editando: true }))),
             ir("Recorrência", naPagina("recorrencias", async () => ZoZo.recorrenciasShared.abrirDetalhe(await primeira(() => recorrencias(ctx), "recorrência"), ctx))),
             ir("Perfil", naPagina("perfil", async () => ZoZo.perfilShared.abrirDetalhe(await primeira(() => perfis(ctx), "perfil"), ctx))),
-            ir("Perfil: editar (formulário)", naPagina("perfil", async () => ZoZo.perfilShared.abrirFormPerfil(ctx, await primeira(() => perfis(ctx), "perfil"), null))))),
+            ir("Perfil: editar (formulário)", naPagina("perfil", async () => ZoZo.perfilShared.abrirFormPerfil(ctx, await primeira(() => perfis(ctx), "perfil")))))),
 
         secao("Janelas (todos os passos)", false,
           sub("Contas"),

@@ -550,7 +550,7 @@ declare global {
     disponivelTransferir(): boolean;
     abrirTransferencia(ctx: ContextoApp): void;
     Seletor(ctx: ContextoApp): HTMLElement | null;
-    SecaoConfig(ctx: ContextoApp, cfg: any): HTMLElement;
+    SecaoConfig(ctx: ContextoApp, cfg: Partial<RespostaConfig>): HTMLElement;
   }
 
   /** js/app.ts — contexto compartilhado com páginas e componentes (ctx) */
@@ -641,10 +641,12 @@ declare global {
     FILTROS_VAZIOS(): FiltrosLancamentos;
   }
   interface ZoZoPerfilShared {
-    abrirFormPerfil(ctx: ContextoApp, p: any, voltar?: any): void;
-    AvatarPerfil(p: any): HTMLElement;
-    abrirDetalhe(p: any, ctx: ContextoApp, opts?: any): void;
+    abrirFormPerfil(ctx: ContextoApp, p: PerfilPainel | null, voltar?: () => void): void;
+    AvatarPerfil(p: Pick<Perfil, "nome" | "cor">): HTMLElement;
+    abrirDetalhe(p: PerfilPainel, ctx: ContextoApp, opts?: { voltar?: () => void }): void;
   }
+  /** Painel do perfil: o da lista (com gasto e quantidade) ou um recém-criado */
+  type PerfilPainel = Perfil & Partial<Pick<PerfilTela, "gasto" | "quantidade">>;
   interface ZoZoRecorrenciasShared { abrirDetalhe(r: ItemRecorrencia, ctx: ContextoApp, opts?: { voltar?: () => void }): unknown }
   /** src/emoji-picker.ts */
   interface ZoZoEmojiPicker {
@@ -706,7 +708,7 @@ declare global {
     lancamentosShared: ZoZoLancamentosShared;
     perfilShared: ZoZoPerfilShared;
     recorrenciasShared: ZoZoRecorrenciasShared;
-    usuario: { Avatar(foto: string | null, nome: string, tamanho?: number): HTMLElement };
+    usuario: { Avatar(foto: string | null | undefined, nome: string | undefined, tamanho?: number): HTMLElement };
     exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): void;
     configuracoes: { abrir(ctx: ContextoApp, aba?: string): void; desativar2FA(ctx: ContextoApp): void };
     emojiPicker: ZoZoEmojiPicker;
