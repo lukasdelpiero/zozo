@@ -73,6 +73,7 @@ REENVIO_LOGIN_S = 600                     # entrar sem confirmar manda um link n
 LINKS_POR_IP, LINK_JANELA_S = 30, 3600                # conferências de link (tela "Verifique seu e-mail") por IP
 RECUPERACAO_S = 3600                      # link de "Esqueci minha senha": 1 hora
 RECUPERACOES_POR_IP, RECUPERACAO_JANELA_S = 5, 3600   # pedidos de recuperação por IP
+PASSOS_RECUPERACAO_POR_IP = 60                        # etapas + conclusões de recuperação por IP por hora (cada etapa grava até 2 MB)
 FORMATO_DOCUMENTO = 2           # primeiro byte do documento cifrado (versão do formato)
 MAX_VERSAO = 2**53 - 1
 
@@ -844,8 +845,16 @@ async def _abrir_recuperacao(ctx):
     return Resposta(200, resposta)
 
 
+async def _limite_passos_recuperacao(ctx):
+    """Etapas e conclusão da recuperação gravam muito: limite por IP (quem tem o link não enche o banco em laço)."""
+    if await _contar(ctx, f"recuperar-passo|{ctx.h(ctx.pedido.ip)}", PASSOS_RECUPERACAO_POR_IP, RECUPERACAO_JANELA_S):
+        ctx.evento("recuperacao_limitada")
+        raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": RECUPERACAO_JANELA_S})
+
+
 async def _etapa_recuperacao(ctx):
     """Histórico grande na recuperação: uma cópia recifrada por pedido (como na migração em etapas)."""
+    await _limite_passos_recuperacao(ctx)
     b = _json(ctx.pedido)
     t = await _token_recuperacao(ctx, b.get("token"), aberto=True)
     await _guardar_etapa(ctx, t["email"], {k: v for k, v in b.items() if k != "token"}, {"sal", "versao", "conteudo"})
@@ -858,6 +867,7 @@ async def _concluir_recuperacao(ctx):
     cópia da chave) ou vazio (modo "recomecar": proteção avançada ou sem cópia), histórico, cópia da chave
     antiga apagada e TODAS as sessões encerradas. Depois, login normal com a senha nova.
     """
+    await _limite_passos_recuperacao(ctx)
     b = _json(ctx.pedido)
     t = await _token_recuperacao(ctx, b.get("token"), aberto=True)
     email = t["email"]

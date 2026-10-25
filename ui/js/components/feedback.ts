@@ -20,7 +20,7 @@
     const ok = tone === "success" && !!o.importante;
     if (tone !== "error" && tone !== "aviso" && !ok) return;
     const P = ZoZo.pecas;
-    // fundo por tom: erro vermelho, aviso laranja, sucesso verde (ícone e texto brancos)
+    // por tom: erro vermelho, aviso laranja, sucesso verde (fundo claro e texto/ícone na cor do tom)
     const el = h("div", { class: tone === "error" ? P.avisoErro : ok ? P.avisoSucesso : P.aviso, role: tone === "error" ? "alert" : "status" },
       icon(ok ? "check" : "alerta", { size: 16, class: P.avisoIcone }),
       h("span", { class: P.avisoTexto }, mensagem));

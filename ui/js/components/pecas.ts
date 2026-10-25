@@ -155,16 +155,16 @@
     vazioTexto: "tw:text-[15px]",
 
     /* Avisos (toasts): só erros e avisos aparecem */
-    aviso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-(--color-aviso-alerta) tw:text-white tw:text-[14px] "
+    aviso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-alerta-fundo),var(--color-aviso-alerta-fundo))] tw:text-(--color-aviso-alerta) tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
-    avisoErro: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-(--color-aviso-erro) tw:text-white tw:text-[14px] "
+    avisoErro: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-erro-fundo),var(--color-aviso-erro-fundo))] tw:text-(--color-aviso-erro) tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
-    // sucesso: o mesmo aviso, em verde
-    avisoSucesso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-(--color-aviso-sucesso) tw:text-white tw:text-[14px] "
+    // fundo: a cor translúcida pedida por cima do branco (o aviso flutua sobre a página e não pode ficar transparente)
+    avisoSucesso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-sucesso-fundo),var(--color-aviso-sucesso-fundo))] tw:text-(--color-aviso-sucesso) tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",

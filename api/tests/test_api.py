@@ -1256,6 +1256,15 @@ class TesteRecuperacao(Base):
         self.assertEqual(nova("PUT", "/api/conta/protecao", {"avancada": False}, prova=corpo["prova"])[0], 200)
         self.assertIn("nonce", nova("POST", "/api/custodia/chave", prova=corpo["prova"])[1])          # recuperação de volta
 
+    def test_etapas_e_conclusao_da_recuperacao_limitadas_por_ip(self):
+        # quem tem um link aberto não grava cópias de 2 MB em laço: o IP é limitado (link inventado também conta)
+        for _ in range(nucleo.PASSOS_RECUPERACAO_POR_IP):
+            self.rec("PUT", "/api/recuperacao/historico", {"token": "A" * 43, "sal": b64(os.urandom(16)), "versao": 1, "conteudo": conteudo()})
+        st, r = self.rec("PUT", "/api/recuperacao/historico", {"token": "A" * 43, "sal": b64(os.urandom(16)), "versao": 1, "conteudo": conteudo()})
+        self.assertEqual((st, r["erro"]), (429, "TOO_MANY_ATTEMPTS"))
+        self.assertEqual(self.concluir("A" * 43)[0][1]["erro"], "TOO_MANY_ATTEMPTS")
+        self.assertEqual(self.con.execute("SELECT count(*) FROM kdf_etapas").fetchone()[0], 0)
+
     def test_custodia_validada_e_presa_a_sessao_e_prova(self):
         r, _ = self.guardar_custodia()
         self.assertEqual(self.api("POST", "/api/custodia/chave", prova=self.prova)[1], {"atual": True})

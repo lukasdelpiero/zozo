@@ -42,9 +42,10 @@
   /* Itens de menu perigosos (Excluir…): texto vermelho e realce claro */
   --color-menu-perigo: #e51300;  --color-menu-perigo-fundo: #ff443314;
   /* Avisos no rodapé (toast) */
-  --color-aviso-erro: #ff1a1a;
-  --color-aviso-alerta: #ff5d04;
-  --color-aviso-sucesso: #069713;
+  /* fundo translúcido (sobre branco: ver pecas.aviso*) e texto/ícone na cor cheia */
+  --color-aviso-erro: #e51300;     --color-aviso-erro-fundo: #ff443314;
+  --color-aviso-alerta: #f58000;   --color-aviso-alerta-fundo: #f580001f;
+  --color-aviso-sucesso: #008a33;  --color-aviso-sucesso-fundo: #00cc4b14;
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
   --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */
