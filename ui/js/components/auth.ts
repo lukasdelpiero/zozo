@@ -66,7 +66,6 @@
     indoGoogle: "tw:flex tw:flex-col tw:items-center tw:gap-2.5",
     indoTexto: "tw:m-0 tw:text-[15px] tw:font-[550] tw:text-zz-text",
     nota: "tw:m-0 tw:mb-1 tw:text-center tw:text-[13px] tw:text-zz-secondary",
-    demo: "tw:mt-4 tw:px-3 tw:py-2 tw:rounded-lg tw:bg-zz-primary-softer tw:text-center tw:text-[13px] tw:text-zz-muted",
     carregando: "tw:flex tw:items-center tw:gap-3 tw:text-zz-secondary",
     sub2fa: "tw:m-0 tw:text-center tw:text-[15px] tw:font-[450] tw:text-zz-text",
     erro2fa: "tw:m-0 tw:text-center tw:text-[15px] tw:font-[450] tw:text-zz-text tw:empty:hidden",
@@ -278,9 +277,6 @@
         rodape(estado.email, "Voltar", voltar(1)));
     }
 
-    // Modo demonstração: só um lembrete (as credenciais ficam no arquivo local ui/mock/credenciais.local.js)
-    const demo = modo === "login" && estado.etapa <= 1 && ZoZo.bridge.isDemo
-      ? h("p", { class: C.demo }, "Modo de demonstração — use a conta de prévia configurada neste computador.") : null;
 
     // Animação: o cartão surge na 1ª vez; ao trocar de etapa o conteúdo desliza (para a frente ou para trás).
     // Redesenho da mesma etapa (ex.: mensagem de erro) não anima.
@@ -294,7 +290,7 @@
       st.storageAvailable === false ? h("div", { class: C.alerta, role: "status" }, icon("nuvem", { size: 16, class: "tw:flex-none tw:m-0" }), h("span", null, FR.STORAGE_UNAVAILABLE)) : null,
       // aviso positivo (ex.: "Quase lá!") — os erros ficam no próprio formulário
       cfg.aviso ? h("p", { class: C.ok, role: "status" }, icon("check", { size: 15, class: "tw:flex-none" }), h("span", null, cfg.aviso)) : null,
-      corpo, demo,
+      corpo,
     ]));
 
     requestAnimationFrame(() => { const a = root.querySelector<HTMLElement>("[data-autofocus]"); if (a) a.focus(); });

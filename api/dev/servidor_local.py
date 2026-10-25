@@ -188,7 +188,7 @@ if __name__ == "__main__":
         pass
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORTA), Manipulador)
     print(f"ZoZo (desenvolvimento): API e interface montada em http://127.0.0.1:{PORTA}  ·  "
-          "com recarga instantânea: npm run dev (http://127.0.0.1:5173 ; demonstração: /?mock=1)  ·  Ctrl+C para parar")
+          "com recarga instantânea: npm run dev (http://127.0.0.1:5173)  ·  Ctrl+C para parar")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

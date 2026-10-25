@@ -572,7 +572,7 @@
       store.set({ session: { storageAvailable: !!(armazenamento && armazenamento.available) } });
       if (sessao && sessao.authenticated) {
         const linkConfirmacao = /^#confirmar=/.test(location.hash), linkRecuperacao = /^#recuperar=/.test(location.hash);
-        history.replaceState(null, "", location.pathname + (location.search.includes("mock=1") ? "?mock=1" : ""));
+        history.replaceState(null, "", location.pathname);
         entrar(sessao);
         // link de confirmação aberto com outra conta já conectada: o token não é usado nesta sessão
         if (linkConfirmacao) ctx.toast("Você já está conectado. Para ativar a conta nova, saia desta conta e abra o link do e-mail de novo.", { tone: "aviso", duration: 10000 });

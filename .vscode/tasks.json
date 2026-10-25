@@ -43,7 +43,7 @@
     },
     {
       "label": "ZoZo: rodar no computador",
-      "detail": "http://127.0.0.1:8787 (demonstração: /?mock=1)",
+      "detail": "http://127.0.0.1:8787",
       "type": "process",
       "command": "python",
       "args": [

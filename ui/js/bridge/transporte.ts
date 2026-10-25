@@ -4,10 +4,8 @@
    Única porta de saída da interface: tudo vira mensagem JSON.
 
    Modos:
-   • web   → versão publicada (bridge/host-web.ts + API Python no Cloudflare)
-   • mock  → modo demonstração (pasta mock: só existe no desenvolvimento;
-             usado ao abrir o index.html direto do disco ou com ?mock=1)
-   • none  → sem host: toda requisição falha com mensagem amigável
+   • web   → bridge/host-web.ts + API Python (Cloudflare, prévia ou servidor local)
+   • none  → sem host (ex.: index.html aberto direto do disco): toda requisição falha com mensagem amigável
    TypeScript: tipos em src/globais.d.ts (ZoZoBridge).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
@@ -16,11 +14,9 @@
   const TIMEOUT_MS = 60000;
 
   const doDisco = location.protocol === "file:";
-  const pedeMock = /[?&]mock=1\b/.test(location.search);
-  const mock: HostPonte | undefined = ZoZo.mock && ZoZo.mock.host;
   const webHost: HostPonte | undefined = ZoZo.webHost;
-  const mode: ModoPonte = mock && (pedeMock || doDisco || !webHost) ? "mock" : webHost && !doDisco ? "web" : "none";
-  const alvo: HostPonte | null = mode === "web" ? webHost || null : mode === "mock" ? mock || null : null;
+  const mode: ModoPonte = webHost && !doDisco ? "web" : "none";
+  const alvo: HostPonte | null = mode === "web" ? webHost || null : null;
 
   function toFriendlyError(action: string, error: RespostaPonte["error"] | null | undefined): ErroPonte {
     const code = (error && error.code) || "UNKNOWN_ERROR";
@@ -69,6 +65,6 @@
     });
   }
 
-  const api: ZoZoBridge = { request, requestHost, mode, isDemo: mode === "mock", ACTIONS: M.ACTIONS };
+  const api: ZoZoBridge = { request, requestHost, mode, ACTIONS: M.ACTIONS };
   ZoZo.bridge = api;
 })(window.ZoZo);

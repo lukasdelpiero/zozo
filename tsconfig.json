@@ -1,5 +1,5 @@
 {
-  // Toda a interface é TypeScript verificado com "strict". Só ui/mock (demonstração local, fora do build) é JS.
+  // Toda a interface é TypeScript verificado com "strict".
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

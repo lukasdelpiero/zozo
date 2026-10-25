@@ -33,7 +33,6 @@
 @source "../politica-privacidade.html";
 @source "../termos-uso.html";
 @source "../sobre.html";
-@source not "../mock";
 
 @theme inline {
   --color-zz-primary: var(--color-primary);

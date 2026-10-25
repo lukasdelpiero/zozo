@@ -21,9 +21,6 @@ import "../js/config/regras.ts";
 // Bridge: contrato de mensagens
 import "../js/bridge/messages.ts";
 
-// Modo de demonstração (?mock=1): só no servidor de desenvolvimento; o build troca por um módulo vazio
-import "virtual:zozo-mock";
-
 // Host web: criptografia no navegador + API Python no Cloudflare
 import "../js/bridge/host-web.ts";
 

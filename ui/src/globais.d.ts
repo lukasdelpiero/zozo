@@ -226,8 +226,8 @@ declare global {
     BridgeError: new (code?: string, friendly?: string) => ErroPonte;
   }
 
-  /** js/bridge/transporte.ts — única saída da interface: tudo vira mensagem JSON (web, mock ou nenhum host) */
-  type ModoPonte = "web" | "mock" | "none";
+  /** js/bridge/transporte.ts — única saída da interface: tudo vira mensagem JSON (host web ou nenhum) */
+  type ModoPonte = "web" | "none";
   interface HostPonte { handle(req: PedidoPonte): Promise<RespostaPonte> | RespostaPonte }
   interface OpcoesPedido { timeout?: number }
   interface ZoZoBridge {
@@ -235,7 +235,6 @@ declare global {
     request<K extends NomeAcao>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostaDe<K>>;
     requestHost<K extends keyof RespostasHost>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostasHost[K]>;
     mode: ModoPonte;
-    isDemo: boolean;
     ACTIONS: AcoesPonte;
   }
 
@@ -741,8 +740,6 @@ declare global {
     emojiPicker: ZoZoEmojiPicker;
     /** contexto da interface (app.ts), para depuração e para os módulos que não o recebem por parâmetro */
     ctx: ContextoApp;
-    /** só no servidor de desenvolvimento com ?mock=1 (ui/mock, fora do build) */
-    mock?: { host?: HostPonte; [k: string]: unknown };
   }
 
   /** qrcode-generator (npm), carregado sob demanda por components/verificacao.ts (QR do 2FA e do Pix) */
@@ -751,6 +748,5 @@ declare global {
   interface Window {
     ZoZo: ZoZoGlobal;
     turnstile?: Turnstile;
-    ZOZO_DEMO?: { nome?: string; email?: string; senha?: string };
   }
 }

@@ -9,6 +9,7 @@ python_modules/
 .wrangler/
 # segredos locais (nunca no git)
 api/dev/.segredo-local
+# arquivo pessoal do antigo modo ?mock=1 (removido): continua fora do git
 ui/mock/credenciais.local.js
 .dev.vars
 api/restauracao.log

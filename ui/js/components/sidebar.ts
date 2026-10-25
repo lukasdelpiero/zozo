@@ -64,10 +64,9 @@
 
       mount(navEl, NAV.filter(visivel).map((n) => navItem(n, state.currentPage, ctx.navigate)));
       mount(cambioEl, ZoZo.cambio.Seletor(ctx));            // Câmbio (só com o multicâmbio ligado)
-      // Demonstração (modo local ou conta demo): nada é gravado
-      mount(avisoEl, ZoZo.bridge.isDemo || ZoZo.recursos.demo()
-        ? h("p", { class: E.demo, role: "note" }, icon("alerta", { size: 14, class: E.demoIcone }),
-          ZoZo.bridge.isDemo ? "Modo de demonstração: nada é salvo no servidor." : "Conta de demonstração: dados fictícios, nada é salvo.")
+      // Conta de demonstração: nada é gravado
+      mount(avisoEl, ZoZo.recursos.demo()
+        ? h("p", { class: E.demo, role: "note" }, icon("alerta", { size: 14, class: E.demoIcone }), "Conta de demonstração: dados fictícios, nada é salvo.")
         : null);
 
       if (!contas) {

@@ -6,7 +6,7 @@ Aplicativo web com design baseado no Copilot Money.
 
 | Camada | Tecnologia |
 |---|---|
-| Front-end | **Vite + TypeScript + Tailwind CSS** (pasta `ui`); JavaScript em `ui/mock` somente para desenvolvimento |
+| Front-end | **Vite + TypeScript + Tailwind CSS** (pasta `ui`) |
 | Back-end | Python 3 no **Cloudflare Python Workers** (pasta `api/src`); transição para **FastAPI + Pydantic** iniciada (`app_fastapi.py`, desligada no Cloudflare) |
 | Dados | **Cloudflare D1** (banco SQL) — documentos financeiros cifrados; nomes e e-mails de cadastro legíveis para a API; cópia da chave para "Esqueci minha senha" (exceto com a proteção avançada) |
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
@@ -335,15 +335,14 @@ ZoZo/
 │   ├── css/                  tokens · base · layout · components · pages · tipografia · print
 │   ├── js/
 │   │   ├── core/             dom (sem innerHTML) · icons · format.ts (pt-BR) · state
-│   │   ├── config/regras.js  regras configuráveis (inclui limiteNome = 50)
-│   │   ├── data/servico.js   regras de dados (lançamentos, parcelas, recorrências…)
+│   │   ├── config/regras.ts  regras configuráveis (inclui limiteNome = 50)
+│   │   ├── data/servico.ts   regras de dados (lançamentos, parcelas, recorrências…)
 │   │   ├── data/pix.ts       Pix copia e cola / QR (BR Code do BACEN)
-│   │   ├── data/demo.js      dados sorteados da conta de demonstração
-│   │   ├── bridge/           messages.js (contrato) · host-web.js (criptografia + API) · transporte.js
-│   │   ├── components/       … · verificacao.js (CAPTCHA, código de 6 dígitos, QR code — qrcode-generator do npm) · cambio.js
-│   │   ├── pages/ · router.js · app.js
+│   │   ├── data/demo.ts      dados sorteados da conta de demonstração
+│   │   ├── bridge/           messages.ts (contrato) · host-web.ts (criptografia + API) · transporte.ts
+│   │   ├── components/       … · verificacao.ts (CAPTCHA, código de 6 dígitos, QR code — qrcode-generator do npm, sob demanda) · cambio.ts
+│   │   ├── pages/ · router.ts · app.ts
 │   ├── tests/                testes do serviço de dados e do host web (node --test)
-│   └── mock/                 modo demonstração (só no npm run dev; nunca no build)
 └── api/                      ← back-end (Python 3)
     ├── src/entry.py          ponto de entrada no Cloudflare (D1, fetch, cookies)
     ├── src/nucleo.py         rotas, sessões, bloqueio progressivo, prova de senha
@@ -402,12 +401,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 - **Testes:** `cd api; uv run python -m unittest discover -s tests -v` (API + FastAPI) · `npm test` (serviço de dados e host web, com a criptografia) · `npm run typecheck` (TypeScript).
 - **E-mail no computador:** `$env:ZOZO_DEV_EMAIL = "console"` antes do `python api/dev/servidor_local.py` liga a confirmação e **mostra os e-mails no terminal** (nada é enviado). `$env:ZOZO_DEV_BANCO` aponta para outro arquivo SQLite (ex.: um banco descartável).
 - **Aplicativo completo com a API Python:** `python api/dev/servidor_local.py` (http://127.0.0.1:8787, serve a interface montada por `npm run build`). Para mexer na interface: `npm run dev` → http://127.0.0.1:5173 (recarga instantânea; repassa `/api/*` para o servidor Python). Cadastre uma conta; o CAPTCHA usa as chaves de teste da Cloudflare, que sempre aprovam.
-- **Modo demonstração (só interface, dados no navegador):** `npm run dev` e abra http://127.0.0.1:5173/?mock=1. A conta é definida por você:
-  1. No VS Code, em `ui/mock/`, copie `credenciais.exemplo.js` para **`credenciais.local.js`** (botão direito › Copiar / Colar e renomeie).
-  2. Troque `TROQUE-ESTA-SENHA` pela sua senha (mínimo de 8 caracteres) e salve.
-  3. Entre com **insight@usezozo.com.br** e essa senha.
-
-  O `credenciais.local.js` está no `.gitignore` (não vai para o GitHub) e a pasta `mock` nunca é publicada. Se o arquivo tiver erro de digitação, o `npm run dev` avisa e segue sem a conta de prévia.
+- **Sem servidor (só a interface):** no endereço local ou na prévia, o botão **Modo teste** abre o painel de testes; "Simular cadastro e login sem servidor" cria uma conta só na memória da aba e "Entrar com dados de exemplo" já entra com todos os tipos de dados.
 
 ## Segurança
 
@@ -450,7 +444,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 ## Limites
 
 - Cada conta guarda um documento de até ~1,9 MB **já comprimido e cifrado** (limite de linha do D1). Isso corresponde a dezenas de milhares de lançamentos; a foto do perfil ocupa ~100–300 KB. Ao chegar no limite, a gravação é recusada com aviso e nada é perdido.
-- Nomes de lançamentos, contas, categorias e perfis: até 50 caracteres (`limiteNome` em `regras.js`).
+- Nomes de lançamentos, contas, categorias e perfis: até 50 caracteres (`limiteNome` em `regras.ts`).
 
 ## Funcionalidades
 
@@ -460,7 +454,7 @@ Se o desafio acontecer mesmo assim, o ZoZo mostra "Verificação de segurança" 
 - **Contas e Investimentos**, **Categorias** (com orçamento fixo ou por mês e grupos com valor não atribuído), **Perfis** (com boleto por perfil e Pix — só contas liberadas).
 - **Configurações:** orçamento, armazenamento e última gravação; foto, nome, alterar senha, **2FA**, exportar CSV, apagar dados, sair, excluir conta.
 
-## Regras configuráveis (`ui/js/config/regras.js`)
+## Regras configuráveis (`ui/js/config/regras.ts`)
 
 `limiteNome` · `categorias.sinalGastoPorTipo` · `totais` · `recorrencias.pagoSomenteComLancamento` · `boleto.*` · `tiposInvestimento` · `categoriasSugeridas` · `modelosCategoria` · `paleta`.
 
@@ -470,7 +464,7 @@ O ZoZo não usa framework: o visual vem de `ui/css/tokens.css` (cores, espaços,
 
 1. **Conecte o Figma ao Claude Code** (recomendado): no Figma desktop, abra o arquivo › menu **Figma › Preferências › Enable Dev Mode MCP Server**. Depois, num terminal, `claude mcp add --transport http figma-dev-mode http://127.0.0.1:3845/mcp`. Selecione um frame no Figma e peça ao Claude Code: *"atualize o card X do ZoZo conforme o frame selecionado, usando os tokens existentes"*.
 2. **Organize o Figma com Variáveis** (cores, espaçamentos, raios, tipografia) com nomes parecidos com os de `tokens.css` (`color-primary`, `space-4`, `radius-large`…). Exporte (Dev Mode › Variables, ou o plugin *Variables to CSS*) e peça para mapear em `tokens.css` — a interface toda muda de uma vez.
-3. **Ícones:** exporte como SVG de traço (24×24, stroke) e eles entram em `ui/js/core/icons.js`.
+3. **Ícones:** exporte como SVG de traço (24×24, stroke) e eles entram em `ui/js/core/icons.ts`.
 4. **Fontes:** coloque os `.woff2` em `ui/assets/fonts/` (a CSP só permite fontes do próprio site).
 5. **Não cole HTML/CSS gerado automaticamente** sem revisão: a CSP bloqueia estilos e scripts inline, e o código precisa usar `ZoZo.dom` (sem `innerHTML`).
-6. Teste em `/?mock=1`, depois na prévia, e só então publique.
+6. Teste no endereço local (Modo teste), depois na prévia, e só então publique.

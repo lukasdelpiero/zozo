@@ -98,7 +98,7 @@ npm run build
 $falhou = $LASTEXITCODE -ne 0
 Pop-Location
 if ($falhou) { Parar "Falha ao montar a interface." }
-if (-not (Test-Path "public/_headers") -or (Get-ChildItem -Recurse public -Filter "*mock*")) { Parar "Interface montada sem os cabeçalhos de segurança ou com o modo de demonstração: nada foi publicado." }
+if (-not (Test-Path "public/_headers")) { Parar "Interface montada sem os cabeçalhos de segurança: nada foi publicado." }
 
 if ($Ambiente -eq "producao") {
   Write-Host "4/6 Ponto de restauração do banco (antes das migrações)..." -ForegroundColor Cyan

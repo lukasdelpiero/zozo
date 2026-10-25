@@ -607,8 +607,7 @@
           ZoZo.cambio.SecaoConfig(ctx, cfg),
           h("h3", { class: P.cfgSecao }, "Armazenamento"),
           linhaConfig(
-            ZoZo.bridge.isDemo ? "Modo de demonstração: os dados ficam só neste navegador."
-              : demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
+            demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
               : disponivel ? "Seus dados são criptografados." : ZoZo.messages.FRIENDLY.STORAGE_UNAVAILABLE,
             demo ? "Ao sair ou recarregar a página, novos dados são sorteados." : "Última gravação: " + quando(cfg.ultimaGravacao) + ".",
             icon(disponivel ? "nuvem" : "alerta", { size: 18, class: disponivel ? CF.ok : CF.alerta })),

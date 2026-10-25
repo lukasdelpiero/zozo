@@ -1,23 +1,20 @@
 /* =============================================================
    ZoZo — build da interface (Vite + TypeScript + Tailwind CSS)
    ------------------------------------------------------------
-   npm run dev     → http://127.0.0.1:5173  (?mock=1 = demonstração sem servidor;
-                     sem ?mock, a API vem do servidor local: python api/dev/servidor_local.py)
+   npm run dev     → http://127.0.0.1:5173  (a API vem do servidor local: python api/dev/servidor_local.py;
+                     sem servidor: Modo teste › "Simular cadastro e login sem servidor")
    npm run build   → api/public (o que o Cloudflare publica; substitui o antigo montar_interface.py)
 
    O build:
    • junta tudo em 1 JS + 1 CSS com impressão digital no nome (cache longo);
-   • NUNCA inclui o modo de demonstração (pasta ui/mock);
    • gera api/public/_headers com os cabeçalhos de segurança (api/cabecalhos_ui.json).
    ============================================================= */
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { Script } from "node:vm";
 import { defineConfig, type Plugin } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
 const raiz = (p: string) => fileURLToPath(new URL(p, import.meta.url));
-const MOCK = "virtual:zozo-mock";
 const PASTA_PACOTES = "static";            // JS, CSS e fontes com hash no nome (imutáveis)
 
 function cabecalhosSeguranca(): Record<string, string> {
@@ -25,34 +22,11 @@ function cabecalhosSeguranca(): Record<string, string> {
   return Object.fromEntries(Object.entries(json).filter(([k]) => !k.startsWith("_")));
 }
 
-/** mock/credenciais.local.js (arquivo pessoal, fora do git) com erro de sintaxe não derruba a demonstração */
-function credenciaisValidas(plugin: { warn(m: string): void }): boolean {
-  const arq = raiz("./ui/mock/credenciais.local.js");
-  if (!existsSync(arq)) return false;
-  try {
-    new Script(readFileSync(arq, "utf8"));
-    return true;
-  } catch (e) {
-    plugin.warn("ui/mock/credenciais.local.js tem um erro de sintaxe (" + (e as Error).message + ") e foi ignorado: " +
-      "a conta de prévia fica indisponível até corrigir o arquivo (veja credenciais.exemplo.js).");
-    return false;
-  }
-}
-
 function zozo(): Plugin {
   let comando: "build" | "serve" = "serve";
   return {
     name: "zozo",
     configResolved(c) { comando = c.command; },
-
-    // Demonstração: só no servidor de desenvolvimento. No build vira um módulo vazio.
-    resolveId(id) { return id === MOCK ? "\0" + MOCK : null; },
-    load(id) {
-      if (id !== "\0" + MOCK) return null;
-      if (comando === "build") return "export {};";
-      return (credenciaisValidas(this) ? 'import "/mock/credenciais.local.js";\n' : "") +
-        'import "/mock/mock-data.js";\nimport "/mock/mock-host.js";\n';
-    },
 
     transformIndexHtml: {
       order: "post",
@@ -73,7 +47,6 @@ function zozo(): Plugin {
     // api/public/_headers: segurança em tudo; pacotes com hash = cache de 1 ano; a página sempre revalida
     generateBundle(_opcoes, pacote) {
       if (comando !== "build") return;
-      if (Object.keys(pacote).some((f) => f.includes("mock"))) this.error("o modo de demonstração entrou no build");
       const linhas = ["/*", ...Object.entries(cabecalhosSeguranca()).map(([k, v]) => `  ${k}: ${v}`),
         `/${PASTA_PACOTES}/*`, "  Cache-Control: public, max-age=31536000, immutable",
         "/assets/*", "  Cache-Control: public, max-age=604800",
@@ -95,7 +68,7 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
-    // Sem ?mock=1 a interface fala com a API do servidor local (python api/dev/servidor_local.py)
+    // a interface fala com a API do servidor local (python api/dev/servidor_local.py)
     proxy: { "/api": { target: "http://127.0.0.1:8787", changeOrigin: false } },
   },
   build: {
