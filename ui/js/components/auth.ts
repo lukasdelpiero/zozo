@@ -98,7 +98,9 @@
     const lista = filhos.filter((el): el is HTMLElement => !!el);
     if (a) lista.forEach((el, i) => { const c = a.filhos[Math.min(i, 3)]; if (c) el.classList.add(...c.split(" ")); });
     return h("main", { class: C.raiz }, h("div", { class: C.centro }, h("div", { class: [C.cartao, a && a.cartao] }, lista)),
-      h("nav", { class: C.legal, "aria-label": "Termos e privacidade" },
+      h("nav", { class: C.legal, "aria-label": "Sobre, termos e privacidade" },
+        h("a", { class: C.politica, href: "/sobre", target: "_blank", rel: "noopener" }, "Sobre o ZoZo"),
+        h("span", { "aria-hidden": "true" }, "·"),
         h("a", { class: C.politica, href: "/termos-uso", target: "_blank", rel: "noopener" }, "Termos de uso"),
         h("span", { "aria-hidden": "true" }, "·"),
         h("a", { class: C.politica, href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade")));

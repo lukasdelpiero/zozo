@@ -124,6 +124,7 @@
             ["categorias", "Categorias"], ["recorrencias", "Recorrências"], ["perfil", "Perfis"]] as Array<[string, string]>)
             .map(([rota, rotulo]) => ir(rotulo, () => ctx.router.navigate(rota))),
           ir("Fatura (boleto)", () => ZoZo.boleto.open(ctx, {})),
+          ir("Sobre o ZoZo (página pública)", () => { window.open("/sobre", "_blank", "noopener"); }),
           ir("Termos de uso", () => { window.open("/termos-uso", "_blank", "noopener"); }),
           ir("Política de privacidade", () => { window.open("/politica-privacidade", "_blank", "noopener"); }))),
 

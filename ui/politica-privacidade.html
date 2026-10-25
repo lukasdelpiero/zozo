@@ -66,6 +66,15 @@
       <li><strong>No seu navegador:</strong> o ZoZo guarda, cifrada, a chave para reabrir a sessão sem digitar a senha de novo, e algumas preferências da tela. Tudo isso é apagado quando você sai.</li>
     </ul>
 
+    <h2 id="google">Entrar com o Google</h2>
+    <p>O botão "Continuar com Google" é opcional. Se você usá-lo, o Google pede a sua autorização e envia ao ZoZo apenas:</p>
+    <ul>
+      <li><strong>o seu endereço de e-mail</strong>, já confirmado pelo Google, para criar a sua conta ou encontrar a conta que você já tem;</li>
+      <li><strong>o seu primeiro nome</strong>, para preencher o cadastro (você pode trocá-lo depois).</li>
+    </ul>
+    <p>Pedimos só as permissões básicas de identificação (<code class="tw:text-[14px]">openid</code>, <code class="tw:text-[14px]">email</code> e <code class="tw:text-[14px]">profile</code>). Não acessamos os seus contatos, e-mails, arquivos, agenda nem nenhum outro dado da sua conta Google, e não guardamos a sua foto nem as credenciais de acesso do Google. O e-mail e o nome ficam guardados na sua conta do ZoZo, como num cadastro comum, e são apagados quando você exclui a conta. A senha do ZoZo continua sendo necessária, porque é ela que cifra os seus dados.</p>
+    <p>Não vendemos, não compartilhamos e não usamos os dados recebidos do Google para publicidade nem para treinar inteligência artificial. O uso das informações recebidas das APIs do Google segue a <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado. Você pode remover o acesso do ZoZo a qualquer momento em <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">myaccount.google.com/permissions</a>.</p>
+
     <h2 id="recuperacao">E se eu esquecer a senha?</h2>
     <p>Como a senha é a chave dos seus dados, esquecê-la poderia significar perder tudo. Por isso, <strong>por padrão</strong>, o seu navegador guarda no servidor uma cópia da chave dos dados, trancada com uma chave que só o servidor do ZoZo consegue calcular. Em "Esqueci minha senha", depois de confirmar o e-mail (e o código do 2FA, se estiver ativo), essa cópia é usada para você criar uma senha nova sem perder nada.</p>
     <p>Na prática, isso significa que quem tivesse ao mesmo tempo o banco de dados <strong>e</strong> a chave secreta do servidor conseguiria abrir os dados dessas contas. Guardamos essa chave separada do banco, com acesso restrito.</p>

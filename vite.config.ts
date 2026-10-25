@@ -80,7 +80,8 @@ function zozo(): Plugin {
         "/", "  Cache-Control: no-cache",
         "/index.html", "  Cache-Control: no-cache",
         "/politica-privacidade", "  Cache-Control: no-cache",
-        "/termos-uso", "  Cache-Control: no-cache"];
+        "/termos-uso", "  Cache-Control: no-cache",
+        "/sobre", "  Cache-Control: no-cache"];
       this.emitFile({ type: "asset", fileName: "_headers", source: linhas.join("\n") + "\n" });
     },
   };
@@ -105,7 +106,8 @@ export default defineConfig({
     sourcemap: false,                       // sem mapas do código-fonte no site publicado
     modulePreload: { polyfill: false },     // navegadores atuais; evita código extra
     cssCodeSplit: false,
-    // app + páginas públicas sem JavaScript (usezozo.com.br/politica-privacidade e /termos-uso)
-    rolldownOptions: { input: { app: raiz("./ui/index.html"), politica: raiz("./ui/politica-privacidade.html"), termos: raiz("./ui/termos-uso.html") } },
+    // app + páginas públicas sem JavaScript (usezozo.com.br/sobre, /politica-privacidade e /termos-uso)
+    rolldownOptions: { input: { app: raiz("./ui/index.html"), sobre: raiz("./ui/sobre.html"),
+      politica: raiz("./ui/politica-privacidade.html"), termos: raiz("./ui/termos-uso.html") } },
   },
 });
