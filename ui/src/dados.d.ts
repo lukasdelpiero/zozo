@@ -74,6 +74,9 @@ declare global {
   }
   type CategoriaTela = Categoria & { usada: boolean; gasto: number; reservado: number; reservadoFixo: number; orcamentoPorMes: boolean; coberturaGrupo?: number };
   interface GrupoTela { nome: string; naoAtribuido: number; naoAtribuidoBase: number; naoAtribuidoFixo: number; porMes: boolean; coberto: number; subcategorias: number; total: number }
+  /** Categorias na ordem da lista (categoriasShared.estruturar): soltas ou grupos com os totais */
+  interface BlocoGrupoCategorias { tipo: "grupo"; nome: string; itens: CategoriaTela[]; gasto: number; naoAtribuido: number; reservado: number; quantidade: number }
+  type BlocoCategorias = BlocoGrupoCategorias | { tipo: "categoria"; cat: CategoriaTela };
   type PerfilTela = Perfil & { orcamento: number; arquivado: boolean; gasto: number; quantidade: number };
   /** Ocorrência de uma recorrência num mês (lista de Recorrências) */
   interface ItemRecorrencia {

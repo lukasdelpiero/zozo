@@ -300,7 +300,7 @@
       const contas = C.carregado(state, "contas").contas || [];
       const sel = state.selectedItem && state.selectedItem.tipo === "conta" ? state.selectedItem.id : null;
 
-      const mostrar: Record<string, boolean> = (state.ui.mostrarOcultas as Record<string, boolean>) || {};
+      const mostrar = state.ui.mostrarOcultas || {};
       const secoes = GRUPOS.map((g) => {
         const doGrupo = contas.filter((c) => g.tipos.includes(c.tipo));
         if (!doGrupo.length) return null;

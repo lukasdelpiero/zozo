@@ -85,22 +85,22 @@
   };
 
   /** Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado */
-  function topCategorias(cats: any, state: any, ctx: ContextoApp) {
-    const blocos = ZoZo.categoriasShared.estruturar(cats, ((state.data.dashboard || {}).categorias || {}).grupos)
-      .map((b: any) => (b.tipo === "categoria" ? { ...b, gasto: F.numero(b.cat.gasto) } : b))
-      .sort((a: any, b: any) => F.numero(b.gasto) - F.numero(a.gasto)).slice(0, 5);
+  function topCategorias(cats: CategoriaTela[], grupos: Record<string, GrupoTela>, state: EstadoZoZo, ctx: ContextoApp) {
+    const gastoDe = (b: BlocoCategorias) => F.numero(b.tipo === "categoria" ? b.cat.gasto : b.gasto);
+    const blocos = ZoZo.categoriasShared.estruturar(cats, grupos).sort((a, b) => gastoDe(b) - gastoDe(a)).slice(0, 5);
     const abertos = state.ui.dashGruposAbertos || {};
-    const abrir = (c: any) => ctx.navigate("categorias", { select: { tipo: "categoria", id: c.id } });
-    const linha = (lead: any, icone: any, nome: any, gasto: any, reservado: any, o: any) => h("div", Object.assign({ class: [T.top, o.item && T.topItem] }, o.attrs),
+    const abrir = (c: CategoriaTela) => ctx.navigate("categorias", { select: { tipo: "categoria", id: c.id } });
+    type OpcoesLinha = { item?: boolean; filho?: boolean; attrs?: Record<string, unknown> };
+    const linha = (lead: FilhoDom, icone: FilhoDom, nome: string, gasto: number, reservado: number, o: OpcoesLinha) => h("div", Object.assign({ class: [T.top, o.item && T.topItem] }, o.attrs),
       h("span", { class: T.topLead }, lead), h("span", { class: o.filho ? T.topIconeFilho : T.topIcone }, icone),
       h("span", { class: o.filho ? T.topNomeFilho : T.topNome }, nome),
       h("span", { class: T.topGasto }, F.moeda(gasto)), h("span", { class: T.topReservado }, F.moeda(reservado)));
-    const filho = (c: any, sub: any) => linha(sub ? null : h("span", { class: T.topPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
+    const filho = (c: CategoriaTela, sub: boolean) => linha(sub ? null : h("span", { class: T.topPonto, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
       ZoZo.dom.emoji(c.icone), c.nome, c.gasto, c.reservado,
       { item: true, filho: sub, attrs: { role: "button", tabindex: "0", onClick: () => abrir(c),
-        onKeydown: (e: any) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(c); } } } });
+        onKeydown: (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(c); } } } });
     const out: HTMLElement[] = [];
-    blocos.forEach((b: any) => {
+    blocos.forEach((b) => {
       if (b.tipo === "categoria") { out.push(filho(b.cat, false)); return; }
       const aberto = !!abertos[b.nome];
       const chave = "dash:grp:" + b.nome;
@@ -108,12 +108,12 @@
         onClick: () => UI.alternarArvore(chave, () => ZoZo.store.set({ ui: { dashGruposAbertos: Object.assign({}, ZoZo.store.get().ui.dashGruposAbertos || {}, { [b.nome]: !aberto }) } })) },
         icon(aberto ? "chevron-down" : "chevron-right", { size: 14, stroke: 2.25 })),
         h("span", { class: T.topQtd }, String(b.quantidade)), b.nome, b.gasto, b.reservado, {}));
-      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: ZoZo.pecas.arvoreGrupo }, b.itens.map((c: any) => filho(c, true)))));
+      if (aberto) out.push(UI.corpoArvore(chave, h("div", { class: ZoZo.pecas.arvoreGrupo }, b.itens.map((c) => filho(c, true)))));
     });
     return h("div", { class: T.tops, "data-dash-lista": "" }, out);
   }
 
-  function linkPara(label: any, onClick: any) {
+  function linkPara(label: string, onClick: (() => void) | null) {
     return h("button", { type: "button", class: ZoZo.pecas.cardLink, onClick }, label, icon("chevron-right", { size: 14 }));
   }
   function Card(titulo: string, link: string | null, onClick: (() => void) | null, estica: boolean, ...children: FilhoDom[]) {
@@ -158,7 +158,7 @@
   }
 
   /** Gasto acumulado do mês × ritmo do orçamento (linha tracejada) */
-  function GastoMensal(g: any) {
+  function GastoMensal(g: RespostaDashboard["gastoMensal"]) {
     const acima = g.orcamento > 0 && g.total > g.orcamento;
     const diferenca = Math.abs(g.total - g.orcamento);
     const chart = h("div", { class: T.grafico });
@@ -166,7 +166,7 @@
     const series: SerieGrafico[] = [{ name: "Gasto", color: cs.getPropertyValue(acima ? "--color-progress-over" : "--color-primary").trim(), points: g.dias, area: true }];
     if (g.orcamento > 0 && g.dias.length) {
       series.push({ name: "Orçamento", color: cs.getPropertyValue("--color-text-muted").trim(), tracejado: true,
-        points: g.dias.map((d: any) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
+        points: g.dias.map((d) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
     }
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
@@ -227,23 +227,23 @@
         ZoZo.contasShared.ContasChartCard(d.contas, state.ui, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
           intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
-      const cats = d.categorias ? (d.categorias.categorias || []).filter((c: any) => c.status === "regular") : [];
+      const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
       const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"), false,
-        cats.length ? topCategorias(cats, state, ctx) : UI.EmptyState("Nenhuma categoria cadastrada.", { icon: "categorias", class: T.vazio }));
+        cats.length ? topCategorias(cats, (d.categorias && d.categorias.grupos) || {}, state, ctx) : UI.EmptyState("Nenhuma categoria cadastrada.", { icon: "categorias", class: T.vazio }));
 
-      const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r: any) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
+      const recs = d.recorrencias ? (d.recorrencias.recorrencias || []).filter((r) => !r.pago && r.data >= hojeIso).slice(0, 5) : [];
       const cardRec = Card("Próximas transações", "Recorrências", () => ctx.navigate("recorrencias"), false,
         recs.length
-          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r: any) => L.RecurrenceRow(r, { compacta: true, class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, recs.map((r) => L.RecurrenceRow(r, { compacta: true, class: T.recorrencia, partes: T.recorrenciaPartes, onClick: () => ctx.navigate("recorrencias") })))
           : UI.EmptyState("Nenhuma transação prevista para este mês.", { icon: "recorrencias", class: T.vazio }));
 
       const ultimos = d.ultimosLancamentos || [];
       const cardLanc = Card("Transações recentes", "Transações", () => ctx.navigate("lancamentos"), false,
         ultimos.length
-          ? h("div", { class: T.lista, "data-dash-lista": "" }, ultimos.map((l: any) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
+          ? h("div", { class: T.lista, "data-dash-lista": "" }, ultimos.map((l) => L.LaunchRow(l, { resumo: true, onClick: () => ctx.navigate("lancamentos", { select: { tipo: "lancamento", id: l.id } }) })))
           : UI.EmptyState("Nenhuma transação cadastrada.", { class: T.vazio }));
 
-      // Áreas na ordem da página; a entrada em sequência segue a posição de cada uma (0, 50, 100, 150 ms)
+      // Áreas na ordem da página; a entrada em sequência segue a posição de cada uma (0, 40, 80, 120 ms)
       const lista: Array<[string, HTMLElement | null, boolean?]> = [["gasto", cardGasto, true], ["patrimonio", cardPatrimonio, true], ["recentes", cardLanc], ["top", cardCats], ["proximos", cardRec]];
       const areas = lista.filter((a) => a[1])
         .map(([nome, el, grafico], i) => h("div", { class: [T.area, (T.areas as Record<string, string>)[nome], (grafico ? T.entradaGrafico : T.entrada)[Math.min(i, 3)]] }, el));

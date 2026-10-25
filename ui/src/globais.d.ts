@@ -71,6 +71,9 @@ declare global {
     intervaloPatrimonio: string;
     intervaloInvestimentos: string;
     gruposFechados: Record<string, boolean>;
+    /** grupos de categoria abertos no Dashboard; contas ocultas à mostra (por grupo) em Contas */
+    dashGruposAbertos?: Record<string, boolean>;
+    mostrarOcultas?: Record<string, boolean>;
     [outro: string]: unknown;
   }
   interface EstadoZoZo {
@@ -611,7 +614,7 @@ declare global {
   interface ZoZoCategoriasShared {
     abrirFormCategoria(ctx: ContextoApp, cat: any, preset?: any, voltar?: any): void;
     abrirDetalhe(cat: any, ctx: ContextoApp, opts?: any): void;
-    estruturar(categorias: any, grupos: any): any[];
+    estruturar(categorias: CategoriaTela[], grupos: Record<string, GrupoTela> | null | undefined): BlocoCategorias[];
     abrirGrupo(nome: string, ctx: ContextoApp, opts?: any): void;
   }
   /** Card Ativos × Passivos: compacto/embutido no Dashboard, com o período em ui[chaveIntervalo] */

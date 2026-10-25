@@ -83,25 +83,27 @@
 
   /** Mantém a ordem original: grupos (na 1ª aparição) e categorias soltas.
       infoGrupos (do serviço): "não atribuído" de cada grupo, que entra no orçamento do grupo */
-  function estruturar(categorias: any, infoGrupos: any) {
-    const blocos: any[] = [];
-    const grupos = new Map();
-    categorias.forEach((c: any) => {
+  /** Categorias na ordem da lista: soltas e grupos (com os totais do grupo) na posição da 1ª categoria de cada grupo */
+  function estruturar(categorias: CategoriaTela[], infoGrupos: Record<string, GrupoTela> | null | undefined): BlocoCategorias[] {
+    const blocos: BlocoCategorias[] = [];
+    const grupos = new Map<string, BlocoGrupoCategorias>();
+    categorias.forEach((c) => {
       if (c.grupo) {
-        if (!grupos.has(c.grupo)) {
-          const g = { tipo: "grupo", nome: c.grupo, itens: [] };
+        let g = grupos.get(c.grupo);
+        if (!g) {
+          g = { tipo: "grupo", nome: c.grupo, itens: [], gasto: 0, naoAtribuido: 0, reservado: 0, quantidade: 0 };
           grupos.set(c.grupo, g);
           blocos.push(g);
         }
-        grupos.get(c.grupo).itens.push(c);
+        g.itens.push(c);
       } else blocos.push({ tipo: "categoria", cat: c });
     });
     // Totais do grupo = soma das categorias do grupo (seções 36 e 38)
     grupos.forEach((g) => {
-      g.gasto = g.itens.reduce((s: any, c: any) => s + F.numero(c.gasto), 0);
+      g.gasto = g.itens.reduce((s, c) => s + F.numero(c.gasto), 0);
       const info = (infoGrupos || {})[g.nome];
-      g.naoAtribuido = info && g.itens.some((c: any) => c.status === "regular") ? F.numero(info.naoAtribuido) : 0;
-      g.reservado = g.itens.reduce((s: any, c: any) => s + F.numero(c.reservado), 0) + g.naoAtribuido;
+      g.naoAtribuido = info && g.itens.some((c) => c.status === "regular") ? F.numero(info.naoAtribuido) : 0;
+      g.reservado = g.itens.reduce((s, c) => s + F.numero(c.reservado), 0) + g.naoAtribuido;
       g.quantidade = g.itens.length;
     });
     return blocos;
@@ -507,6 +509,12 @@
           regulares.length ? h("div", { class: T.lista }, linhas(regulares, false, state, ctx)) : UI.EmptyState("Nenhuma categoria regular.", { icon: "categorias" })),
         UI.Section({ key: "cat:excluidas", title: "Categorias excluídas" },
           excluidas.length ? h("div", { class: T.lista }, linhas(excluidas, true, state, ctx)) : UI.EmptyState("Nenhuma categoria excluída.", { icon: "categorias" })));
+    },
+    // vindo de outra tela (ex.: Top categorias do Dashboard): abre o painel da categoria
+    selecionar(sel, ctx) {
+      const dados = ZoZo.store.get().data.categorias;
+      const c = ((dados && dados.categorias) || []).find((x) => x.id === sel.id);
+      if (c) abrirDetalhe(c, ctx);
     },
   };
 })(window.ZoZo);
