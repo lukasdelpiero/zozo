@@ -609,7 +609,6 @@ declare global {
     /** receber: abre já a janela "Registrar pagamento recebido" (painel de testes) */
     open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean }): void;
     close(): void;
-    calcular(st: any): ResumoFatura;
   }
   interface ZoZoCategoriasShared {
     abrirFormCategoria(ctx: ContextoApp, cat: CategoriaPainel | null, preset?: Partial<Categoria> | null, voltar?: () => void): void;

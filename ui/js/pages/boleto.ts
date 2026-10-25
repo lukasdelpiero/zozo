@@ -18,6 +18,18 @@
 
   let atual: { close(): void; carregar(): void } | null = null; // instância aberta
 
+  /** Ajuste na tela: o texto do campo (valorTexto) e o valor lido; inválido bloqueia imprimir e o Pix */
+  interface AjusteTela { id: string; descricao: string; valor: number; valorTexto: string; invalido?: boolean }
+  /** Estado do editor: perfil e mês escolhidos, o que veio do serviço e os ajustes como estão na tela */
+  interface EstadoFatura {
+    perfilId: string; perfil: Perfil | null; mes: number; ano: number; dataFatura: string;
+    lancamentos: LancamentoTela[] | null; carregadoPara: string | null; carregando: boolean; erro: string | null;
+    contribuicoes: AjusteTela[]; descontos: AjusteTela[]; arredondamentos: AjusteTela[];
+    pix: ChavePix | null; pixCodigo: string | null;
+    recebimentos: LancamentoTela[]; saldoAnterior: number; periodos: RespostaFatura["periodos"]; ajustesMudaram?: boolean;
+  }
+  interface ConfigAjustes { chave: string; rotulo: string; adicionar: string; prefixo: string; aceitaNegativo: boolean; onChange: () => void }
+
   /* ---------------- Classes (Tailwind) ----------------
      Ficam como ganchos da impressão (css/print.css): boleto, boleto__header, boleto__editor, boleto__body,
      boleto__preview, paper-scaler, paper, doc, doc__table, doc__block-title, doc__rodape, doc__pix, boleto-summary--doc */
@@ -106,14 +118,14 @@
   };
 
   /* ---------------- Cálculo: o mesmo do serviço (regras em js/config/regras.ts) ---------------- */
-  function sinalDoTipo(tipo: any) {
+  function sinalDoTipo(tipo: string) {
     const s = R().sinalPorTipo[tipo];
     return s === undefined ? 1 : s;
   }
-  const r2 = (n: any) => Math.round(n * 100) / 100;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   /** Resumo da fatura com os ajustes como estão na tela (ainda não gravados), o saldo anterior e o que já foi recebido */
-  function calcular(st: any): ResumoFatura {
-    const recebido = (st.recebimentos || []).reduce((s: number, l: any) => s + Math.round(F.numero(l.valor) * 100), 0) / 100;
+  function calcular(st: EstadoFatura): ResumoFatura {
+    const recebido = (st.recebimentos || []).reduce((s, l) => s + Math.round(F.numero(l.valor) * 100), 0) / 100;
     return ZoZo.servico.calcularFatura({ lancamentos: st.lancamentos || [], contribuicoes: st.contribuicoes, descontos: st.descontos,
       arredondamentos: st.arredondamentos, saldoAnterior: st.saldoAnterior || 0, recebido });
   }
@@ -125,34 +137,34 @@
   }
 
   /** Valor com sinal explícito para o resumo e o documento */
-  function comSinal(n: any) {
+  function comSinal(n: number) {
     const v = F.numero(n);
     return (v < 0 ? "− " : "") + F.moeda(v);
   }
 
   /* ---------------- Formatos da fatura ---------------- */
-  const maiusculas = (t: any) => String(t || "").toLocaleUpperCase("pt-BR");
+  const maiusculas = (t: unknown) => String(t || "").toLocaleUpperCase("pt-BR");
   /** 13 OUT */
-  const diaMes = (iso: any) => maiusculas(F.dataCurta(iso));
+  const diaMes = (iso: string) => maiusculas(F.dataCurta(iso));
   /** 13 OUT 2026 */
-  function diaMesAno(iso: any) {
+  function diaMesAno(iso: string) {
     const d = F.parseData(iso);
     return d ? maiusculas(F.dataCurta(iso) + " " + d.getFullYear()) : "";
   }
-  const parcela = (l: any) => (l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : "");
+  const parcela = (l: LancamentoTela) => (l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : "");
 
   /** Os dados na tela correspondem exatamente ao perfil e ao período escolhidos? (pode imprimir/copiar Pix) */
-  const invalido = (st: any) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x: any) => x.invalido));
-  const pronto = (st: any) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
-  const chaveFiltro = (st: any) => st.perfilId + "|" + st.ano + "-" + st.mes;
+  const invalido = (st: EstadoFatura) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x) => x.invalido));
+  const pronto = (st: EstadoFatura) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
+  const chaveFiltro = (st: EstadoFatura) => st.perfilId + "|" + st.ano + "-" + st.mes;
 
   /* ---------------- Lista de transações (editor) ---------------- */
-  function ListaTransacoes(st: any) {
+  function ListaTransacoes(st: EstadoFatura) {
     if (st.carregando) return UI.Skeleton(4, { short: true });
     if (st.erro) return UI.ErrorState(st.erro, () => { if (atual) atual.carregar(); });
     if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil", class: "tw:min-h-[90px]! tw:p-4!" });
     if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito ou empréstimo deste perfil no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
-    return h("ul", null, st.lancamentos.map((l: any) => h("li", { class: T.item },
+    return h("ul", null, st.lancamentos.map((l) => h("li", { class: T.item },
       h("span", { class: T.itemData }, diaMes(l.data)),
       h("span", { class: T.itemDesc },
         l.ultimos4Digitos ? h("span", { class: T.itemDigitos }, l.ultimos4Digitos) : null,
@@ -163,11 +175,11 @@
 
   /* ---------------- Contribuições / descontos / arredondamentos ---------------- */
   /** Lista editável de ajustes; desenhar() de novo quando a lista muda de fora (ajustes guardados do mês carregados) */
-  function Ajustes(lista: any, cfg: any) {
+  function Ajustes(lista: AjusteTela[], cfg: ConfigAjustes) {
     const wrap = h("div", { class: T.ajustes });
     const desenhar = () => {
       mount(wrap,
-        lista.length ? h("div", { class: T.ajustesLista }, lista.map((item: any, i: any) => {
+        lista.length ? h("div", { class: T.ajustesLista }, lista.map((item, i) => {
           const desc = UI.Input({ value: item.descricao, placeholder: "Nome", maxlength: String(ZoZo.regras.limiteNome) });
           desc.setAttribute("aria-label", cfg.rotulo + " " + (i + 1) + ": nome");
           desc.dataset.fk = cfg.chave + ":d:" + item.id;
@@ -200,10 +212,10 @@
   }
 
   /* ---------------- Resumo (editor e documento) ---------------- */
-  function Resumo(st: any, opts?: any) {
+  function Resumo(st: EstadoFatura, opts?: { doc?: boolean }) {
     const t = calcular(st);
     const o = opts || {};
-    const linha = (rotulo: any, valor: any) => h("div", { class: T.resumoLinha }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
+    const linha = (rotulo: string, valor: number) => h("div", { class: T.resumoLinha }, h("span", null, rotulo), h("span", { class: "money" }, comSinal(valor)));
     // saldo anterior e pagamentos recebidos só aparecem quando existem
     return h("div", { class: o.doc ? T.resumoDoc : T.resumo },
       linha("Total das transações", t.lancamentos),
@@ -219,7 +231,7 @@
      Cada desenho gera um código NOVO (TxID aleatório): muda ao trocar perfil, mês, ano,
      valor, ou ao fechar e abrir de novo. O texto do QR fica em st.pixCodigo (botão "copiar").
      Só existe com os dados prontos: nunca há Pix de um total antigo com um perfil/período novo. */
-  function FaturaPix(st: any) {
+  function FaturaPix(st: EstadoFatura) {
     st.pixCodigo = null;
     const t = calcular(st);
     if (!pronto(st) || !st.pix || !(t.aPagar > 0)) return null;
@@ -232,21 +244,22 @@
   }
 
   /* ---------------- Pré-visualização (documento A4) ---------------- */
-  function Documento(st: any) {
+  function Documento(st: EstadoFatura) {
     const ok = pronto(st);
     // valor(x): como o item entra no total (contribuição/desconto sempre pelo valor absoluto)
-    const ajustes = (titulo: any, lista: any, valor: any) => {
-      const validos = lista.filter((x: any) => x.descricao.trim() || F.numero(x.valor));
+    const ajustes = (titulo: string, lista: AjusteTela[], valor: (x: AjusteTela) => number) => {
+      const validos = lista.filter((x) => x.descricao.trim() || F.numero(x.valor));
       if (!validos.length) return null;
       return h("section", null,
         h("h3", { class: T.docBlocoTitulo }, titulo),
-        h("table", { class: T.docTabelaAjuste }, h("tbody", null, validos.map((x: any) => h("tr", null,
+        h("table", { class: T.docTabelaAjuste }, h("tbody", null, validos.map((x) => h("tr", null,
           h("td", null, x.descricao.trim() || titulo.replace(/ões$/, "ão").replace(/s$/, "")),
           h("td", { class: T.docNum }, comSinal(valor(x))))))));
     };
-    const transacoes = ok && st.lancamentos.length
+    const lancs = st.lancamentos || [];
+    const transacoes = ok && lancs.length
       ? h("table", { class: T.docTabelaTransacoes },
-        h("tbody", null, st.lancamentos.map((l: any) => h("tr", null,
+        h("tbody", null, lancs.map((l) => h("tr", null,
           h("td", { class: T.docData }, diaMes(l.data)),
           h("td", { class: T.docDesc },
             l.ultimos4Digitos ? h("span", { class: T.docDigitos }, l.ultimos4Digitos) : null,
@@ -263,12 +276,12 @@
           h("p", { class: T.docFatura }, h("span", { class: T.docFaturaRotulo }, "FATURA"), " ", h("span", { class: T.docFaturaData }, diaMesAno(st.dataFatura)),
             ok && (situacao(calcular(st)) || { texto: "" }).texto === "Paga" ? [" · ", h("span", { class: T.docSelo }, "PAGA")] : null))),
       h("section", null, h("h3", { class: T.docBlocoTitulo }, "Transações"), transacoes),
-      ajustes("Contribuições", st.contribuicoes, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalContribuicao),
-      ajustes("Descontos", st.descontos, (x: any) => Math.abs(F.numero(x.valor)) * R().sinalDesconto),
-      ajustes("Arredondamentos", st.arredondamentos, (x: any) => F.numero(x.valor) * R().sinalArredondamento),
+      ajustes("Contribuições", st.contribuicoes, (x) => Math.abs(F.numero(x.valor)) * R().sinalContribuicao),
+      ajustes("Descontos", st.descontos, (x) => Math.abs(F.numero(x.valor)) * R().sinalDesconto),
+      ajustes("Arredondamentos", st.arredondamentos, (x) => F.numero(x.valor) * R().sinalArredondamento),
       ok && st.recebimentos.length ? h("section", null,
         h("h3", { class: T.docBlocoTitulo }, "Pagamentos recebidos"),
-        h("table", { class: T.docTabelaAjuste }, h("tbody", null, st.recebimentos.map((l: any) => h("tr", null,
+        h("table", { class: T.docTabelaAjuste }, h("tbody", null, st.recebimentos.map((l) => h("tr", null,
           h("td", null, diaMesAno(l.data)),
           h("td", { class: T.docNum }, comSinal(-F.numero(l.valor)))))))) : null,
       h("div", { class: T.docRodape }, FaturaPix(st), Resumo(st, { doc: true })));
@@ -281,7 +294,7 @@
      não correspondem ao perfil/período escolhidos, o documento não é impresso
      (nem pelo Ctrl+P: veja print.css, .doc[aria-busy="true"]).
      O título da página vira o nome sugerido do arquivo (sem caracteres inválidos). */
-  function imprimirDocumento(st: any) {
+  function imprimirDocumento(st: EstadoFatura) {
     const titulo = ("Fatura " + (st.perfil ? st.perfil.nome : "") + " " + F.mesNome(st.mes - 1) + " " + st.ano)
       .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
     const tituloAnterior = document.title;
@@ -297,13 +310,13 @@
   }
 
   /* ---------------- Editor (janela em tela cheia) ---------------- */
-  function open(ctx: ContextoApp, opts: any) {
+  function open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean }) {
     if (atual) return;
     // Fatura: só contas com o recurso (o serviço de dados também recusa os dados da fatura)
     if (!ZoZo.recursos.boleto() || !ZoZo.recursos.perfis()) { ctx.toast(ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE, { tone: "error" }); return; }
     const o = opts || {};
     const hoje = new Date();
-    const st: any = {
+    const st: EstadoFatura = {
       perfilId: o.perfilId || "", perfil: null, mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), dataFatura: F.iso(hoje),
       lancamentos: null, carregadoPara: null, carregando: false, erro: null,
       contribuicoes: [], descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
@@ -339,10 +352,10 @@
       contadorEl.textContent = st.lancamentos && !st.carregando ? String(st.lancamentos.length) : "";
       mount(listaEl, ListaTransacoes(st));
       const ok = pronto(st);
-      mount(periodosEl, ok ? st.periodos.map((p: any) => h("li", null,
+      mount(periodosEl, ok ? st.periodos.map((p) => h("li", null,
         p.nome + (p.ultimos4Digitos ? " " + p.ultimos4Digitos : "") + (p.semFechamento ? ": mês inteiro (cadastre o fechamento no cartão para usar o ciclo)"
         : ": compras de " + F.dataCurta(p.inicio) + " a " + F.dataCurta(p.fim)))) : null);
-      mount(recebidosEl, ok ? st.recebimentos.map((l: any) => h("li", { class: T.recebido },
+      mount(recebidosEl, ok ? st.recebimentos.map((l) => h("li", { class: T.recebido },
         h("span", { class: T.itemData }, diaMes(l.data)),
         h("span", { class: T.itemNome }, l.nomeConta || "Conta"),
         h("span", { class: "money money--income" }, F.moeda(l.valor)))) : null);
@@ -355,10 +368,10 @@
       if (espera) { clearTimeout(espera); espera = null; }
       if (!pronto(st) || !st.ajustesMudaram) return;
       st.ajustesMudaram = false;
-      const lista = (l: any[]) => l.map((x) => ({ descricao: x.descricao, valor: x.valor }));
+      const lista = (l: AjusteTela[]) => l.map((x) => ({ descricao: x.descricao, valor: x.valor }));
       ctx.bridge.request(A.salvarFatura, { perfilId: st.perfilId, mes: st.mes, ano: st.ano,
         contribuicoes: lista(st.contribuicoes), descontos: lista(st.descontos), arredondamentos: lista(st.arredondamentos) })
-        .catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
+        .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
     }
     function ajustesMudaram() {
       if (pronto(st)) st.ajustesMudaram = true;
@@ -367,7 +380,7 @@
       atualizarResumo();
     }
     /** Lista de ajustes da tela = a guardada (troca o conteúdo: os editores continuam ligados ao mesmo array) */
-    const repor = (alvo: any[], guardados: any[]) => alvo.splice(0, alvo.length, ...(guardados || []).map((x: any) => ({
+    const repor = (alvo: AjusteTela[], guardados: AjusteFatura[]) => alvo.splice(0, alvo.length, ...(guardados || []).map((x) => ({
       id: crypto.randomUUID(), descricao: x.descricao, valor: x.valor, valorTexto: x.valor ? F.numero(x.valor).toFixed(2).replace(".", ",") : "" })));
     function carregar() {
       gravarAjustes();                                  // ajustes do perfil/mês anterior não se perdem
@@ -377,7 +390,7 @@
       if (!st.perfilId) { st.perfil = null; st.erro = null; st.carregando = false; atualizarLista(); return; }
       const chave = chaveFiltro(st);
       st.carregando = true; st.erro = null; atualizarLista();
-      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, mes: st.mes, ano: st.ano }).then((d: any) => {
+      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, mes: st.mes, ano: st.ano }).then((d) => {
         if (meu !== token || chave !== chaveFiltro(st)) return;
         st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || st.perfil; st.pix = d.pix || null;
         st.recebimentos = d.recebimentos || []; st.saldoAnterior = F.numero(d.saldoAnterior) || 0; st.periodos = d.periodos || [];
@@ -388,7 +401,7 @@
         st.carregadoPara = chave;
         atualizarLista();
         if (o.receber && !receberAberto) { receberAberto = true; registrarPagamento(); }
-      }).catch((e: any) => {
+      }).catch((e: ErroPonte) => {
         if (meu !== token) return;
         st.carregando = false; st.erro = e.friendly; st.lancamentos = null; atualizarLista();
       });
@@ -397,17 +410,17 @@
     // Campos Perfil, Período e Data da fatura
     const perfisData = ZoZo.store.get().data.perfis;
     const perfilSel = UI.Select([], { name: "perfil" });
-    const preencherPerfis = (lista: any) => {
+    const preencherPerfis = (lista: PerfilTela[]) => {
       clear(perfilSel);
       perfilSel.appendChild(h("option", { value: "" }, "Selecione o perfil"));
-      lista.forEach((p: any) => perfilSel.appendChild(h("option", { value: p.id }, p.nome)));
+      lista.forEach((p) => perfilSel.appendChild(h("option", { value: p.id }, p.nome)));
       perfilSel.value = st.perfilId;
-      st.perfil = lista.find((p: any) => p.id === st.perfilId) || null;
+      st.perfil = lista.find((p) => p.id === st.perfilId) || null;
     };
     let perfis = (perfisData && perfisData.perfis) || [];
     preencherPerfis(perfis);
-    if (!perfisData) ctx.loadData("perfis", A.getPerfis).then((d: any) => { perfis = d.perfis || []; preencherPerfis(perfis); carregar(); }).catch(() => null);
-    perfilSel.addEventListener("change", () => { st.perfilId = perfilSel.value; st.perfil = perfis.find((p: any) => p.id === st.perfilId) || null; carregar(); });
+    if (!perfisData) ctx.loadData("perfis", A.getPerfis).then((d) => { perfis = d.perfis || []; preencherPerfis(perfis); carregar(); }).catch(() => null);
+    perfilSel.addEventListener("change", () => { st.perfilId = perfilSel.value; st.perfil = perfis.find((p) => p.id === st.perfilId) || null; carregar(); });
 
     const mesSel = UI.Select(F.MESES.map((m, i) => ({ value: String(i + 1), label: m })), { value: String(st.mes), ariaLabel: "Mês" });
     const anos = [];
@@ -428,7 +441,7 @@
     }
 
     const editoresAjuste: Array<{ desenhar(): void }> = [];
-    const secaoAjuste = (titulo: any, lista: any, cfg: any) => {
+    const secaoAjuste = (titulo: string, lista: AjusteTela[], cfg: Omit<ConfigAjustes, "onChange">) => {
       const ed = Ajustes(lista, Object.assign({ onChange: ajustesMudaram }, cfg));
       editoresAjuste.push(ed);
       return h("section", { class: T.secao }, h("h3", { class: T.secaoTitulo }, titulo), ed.el);
@@ -483,7 +496,7 @@
     });
     ro.observe(preview);
 
-    const tecla = (e: any) => {
+    const tecla = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !document.querySelector(".modal-overlay, .menu, .emoji-pop.is-aberto")) { e.preventDefault(); close(); }
     };
     document.addEventListener("keydown", tecla);
@@ -519,5 +532,5 @@
     logoPronto.src = LOGO_FATURA;
   });
 
-  ZoZo.boleto = { open, close, calcular };
+  ZoZo.boleto = { open, close };
 })(window.ZoZo);
