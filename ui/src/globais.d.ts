@@ -345,7 +345,7 @@ declare global {
   interface ZoZoDetailPanel { create(workspaceEl: HTMLElement, panelEl: HTMLElement): PainelInformacoes }
 
   /** js/components/dividir.ts — dividir uma transação entre perfis */
-  interface ZoZoDividir { abrir(original: any, ctx: ContextoApp, aoTerminar?: (id: string) => void): void }
+  interface ZoZoDividir { abrir(original: LancamentoTela, ctx: ContextoApp, aoTerminar?: (id: string) => void): void }
 
   /** js/components/menu.ts — menu suspenso com submenus */
   interface ApiMenu { fechar(): void; atualizar(): void; voltar(): void }
@@ -381,8 +381,8 @@ declare global {
     /** Menu de contas (o mesmo do painel da transação e da fatura) */
     contas(anchor: HTMLElement, o: OpcoesMenuConta): void;
   }
-  interface OpcoesMenuPerfil { perfis: unknown[]; atual?: string | null; aoEscolher(p: any): void; aoCriar?(p: any): void; posicao?: "direita" | "esquerda" | "acima" }
-  interface OpcoesMenuConta { contas: unknown[]; atual?: string | null; aoEscolher(c: any): void; vazio?: string; rodape?: ItemMenu[]; posicao?: "direita" | "esquerda" | "acima" }
+  interface OpcoesMenuPerfil { perfis: Perfil[]; atual?: string | null; aoEscolher(p: Perfil): void; aoCriar?(p: Perfil): void; posicao?: "direita" | "esquerda" | "acima" }
+  interface OpcoesMenuConta { contas: ContaTela[]; atual?: string | null; aoEscolher(c: ContaTela): void; vazio?: string; rodape?: ItemMenu[]; posicao?: "direita" | "esquerda" | "acima" }
 
   /** js/components/sidebar.ts — menu lateral */
   interface ItemNavegacao { id: string; label: string; icon: string; recurso?: keyof ZoZoRecursos }
@@ -537,11 +537,25 @@ declare global {
     seletorIcone(valor: string | null | undefined, aoMudar: (emoji: string) => void): HTMLElement;
     Interruptor(rotulo: string, ligado: boolean, aoMudar: (ligado: boolean) => void, nomeAcessivel?: string): HTMLElement;
     /** Pagar a fatura do cartão (débito na conta escolhida + receita no cartão) */
-    pagarFatura(ctx: ContextoApp, cartao: any, aoPagar?: () => void): void;
+    pagarFatura(ctx: ContextoApp, cartao: ContaTela, aoPagar?: () => void): void;
     receberFatura(ctx: ContextoApp, cfg: { perfil: { id: string; nome: string }; mes: number; ano: number; aPagar: number; aoReceber?: () => void }): void;
-    /** criar perfil, categoria, grupo, conta e recorrência; confirmar com senha */
-    [acao: string]: any;
+    novaCategoria(ctx: ContextoApp, opts?: OpcoesNovaCategoria): void;
+    novoPerfil(ctx: ContextoApp, opts?: OpcoesNovoPerfil): void;
+    criarGrupo(aoCriar: (nome: string) => void): void;
+    novaConta(ctx: ContextoApp, tipoInicial?: string, opts?: OpcoesNovaConta): void;
+    novaRecorrencia(ctx: ContextoApp): void;
+    /** frequência de uma transação (lancamentoId) ou só a escolha (aoEscolher, transação ainda não criada) */
+    frequencia(ctx: ContextoApp, lancamentoId: Id | null, opts?: OpcoesFrequencia): void;
+    /** a senha digitada, ou null se a janela fechou sem confirmar */
+    confirmarComSenha(cfg: ConfigConfirmarSenha): Promise<string | null>;
   }
+  interface OpcoesNovaCategoria { icone?: string; nome?: string; grupo?: string | null; aoCriar?: (c: Categoria) => void }
+  interface OpcoesNovoPerfil { aoCriar?: (p: Perfil) => void }
+  interface OpcoesNovaConta { aoCriar?: (c: ContaTela) => void }
+  /** Frequência escolhida (parcelada: parcela atual, total e o valor da compra) */
+  interface DadosFrequencia { recorrencia: string; parcelaAtual?: number; parcelaTotal?: number; valorTotal?: number }
+  interface OpcoesFrequencia { valor?: number; aoEscolher?: (dados: DadosFrequencia) => void; aoTerminar?: () => void }
+  interface ConfigConfirmarSenha { titulo: string; mensagem: string; botao?: string }
   /** js/components/cambio.ts — multicâmbio (Real, Euro, Dólar: só o símbolo muda, nunca os números) */
   interface ZoZoCambio {
     MOEDAS: Array<{ codigo: CodigoMoeda; nome: string; simbolo: string }>;

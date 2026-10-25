@@ -242,17 +242,17 @@
   /* ---------- Menus de perfil e de conta: os MESMOS no painel da transação, na divisão e na fatura ---------- */
   /** Perfis em pílula (caixa alta) + "Novo perfil" (o novo já vem escolhido) */
   function perfis(anchor: HTMLElement, ctx: ContextoApp, o: OpcoesMenuPerfil): void {
-    abrir(anchor, (o.perfis as any[]).map((p): ItemMenu => ({
+    abrir(anchor, o.perfis.map((p): ItemMenu => ({
       render: (api) => h("button", { type: "button", class: [E.menuItem, p.id === o.atual && "is-checked"], onClick: () => { api.fechar(); o.aoEscolher(p); } },
         ZoZo.ui.Tag(p.nome, p.cor, { class: "tag--upper" })),
     })).concat([
       { separador: true },
-      { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np: any) => (o.aoCriar || o.aoEscolher)(np) }) },
+      { icone: "mais", label: "Novo perfil", onClick: () => ZoZo.modais.novoPerfil(ctx, { aoCriar: (np) => (o.aoCriar || o.aoEscolher)(np) }) },
     ]), { posicao: o.posicao || "esquerda", label: "Perfil", largura: 240 });
   }
   /** Contas pelo nome + 4 últimos dígitos (marcada a atual); rodapé opcional (ex.: "Nova conta") */
   function contas(anchor: HTMLElement, o: OpcoesMenuConta): void {
-    const lista = o.contas as any[];
+    const lista = o.contas;
     abrir(anchor, lista.map((c): ItemMenu => ({
       label: c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""), check: c.id === o.atual, onClick: () => o.aoEscolher(c),
     })).concat(lista.length ? [] : [{ label: o.vazio || "Nenhuma conta cadastrada", desabilitado: true }],

@@ -66,7 +66,7 @@
   }
 
   /* ---------------- Nova categoria ---------------- */
-  function novaCategoria(ctx: ContextoApp, opts: any) {
+  function novaCategoria(ctx: ContextoApp, opts?: OpcoesNovaCategoria) {
     const o = opts || {};
     const config = store.get().data.config;
     const orcamentoAtivo = !(config && config.orcamentoAtivo === false);
@@ -74,7 +74,7 @@
     janela({
       titulo: "Nova categoria",
       classe: "modal--nova-categoria",
-      passo: (api: any) => {
+      passo: (api) => {
         const nome = UI.Input({ value: d.nome, placeholder: "Nome da categoria", class: ZoZo.estrutura.janelaNome });
         nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const orc = campoDinheiro(0);
@@ -92,43 +92,43 @@
           if (criar) criar.disabled = true;
           ctx.bridge.request(A.createCategoria, { categoria: { nome: d.nome, icone: d.icone, cor: d.cor, grupo: o.grupo || null,
             status: d.incluir ? "regular" : "excluida", reservado: Number.isFinite(reservado) && reservado > 0 ? reservado : 0 } })
-            .then((r: any) => { api.fechar(); ctx.toast("Categoria criada."); return ctx.recarregarTudo().then(() => o.aoCriar && o.aoCriar(r.categoria)); })
-            .catch((e: any) => { erro.textContent = e.friendly; if (criar) criar.disabled = false; });
+            .then((r: { categoria: Categoria }) => { api.fechar(); ctx.toast("Categoria criada."); return ctx.recarregarTudo().then(() => o.aoCriar && o.aoCriar(r.categoria)); })
+            .catch((e: ErroPonte) => { erro.textContent = e.friendly; if (criar) criar.disabled = false; });
         };
         nome.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); enviar(); } });
         return {
           corpo: h("div", { class: ZoZo.estrutura.janelaForm },
-            h("div", { class: ZoZo.estrutura.janelaLinha }, seletorIcone(d.icone, (e: any) => { d.icone = e; }), nome),
+            h("div", { class: ZoZo.estrutura.janelaLinha }, seletorIcone(d.icone, (e) => { d.icone = e; }), nome),
             cores,
             Interruptor("Incluir no total e orçamento", d.incluir, (v) => { d.incluir = v; linhaOrc.hidden = !v || !orcamentoAtivo; }),
             linhaOrc, erro),
-          botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: "Criar", primario: true, onClick: enviar, ref: (b: any) => { criar = b; } }],
+          botoes: [{ label: "Cancelar", onClick: () => api.fechar() }, { label: "Criar", primario: true, onClick: enviar, ref: (b) => { criar = b; } }],
         };
       },
     });
   }
 
   /* ---------------- Novo perfil ---------------- */
-  function novoPerfil(ctx: ContextoApp, opts: any) {
+  function novoPerfil(ctx: ContextoApp, opts?: OpcoesNovoPerfil) {
     const o = opts || {};
     const d = { cor: ZoZo.regras.corSugerida() };
     janela({
       titulo: "Novo perfil",
       classe: "modal--novo-perfil",
-      passo: (api: any) => {
+      passo: (api) => {
         const nome = UI.Input({ placeholder: "Nome do perfil", class: ZoZo.estrutura.janelaNome });
         nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
         const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor do perfil", cheio: true, altura: 36 }));
         desenharCores();
-        const enviar = (btn: any) => {
+        const enviar = (btn: HTMLButtonElement | null) => {
           const v = nome.value.trim();
           if (!v) { erro.textContent = "Informe o nome do perfil."; nome.focus(); return; }
           if (btn) btn.disabled = true;
           ctx.bridge.request(A.createPerfil, { perfil: { nome: v, cor: d.cor, orcamento: 0 } })
-            .then((r: any) => { api.fechar(); ctx.toast("Perfil criado."); return ctx.recarregarTudo().then(() => o.aoCriar && o.aoCriar(r.perfil)); })
-            .catch((e: any) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
+            .then((r: { perfil: Perfil }) => { api.fechar(); ctx.toast("Perfil criado."); return ctx.recarregarTudo().then(() => o.aoCriar && o.aoCriar(r.perfil)); })
+            .catch((e: ErroPonte) => { erro.textContent = e.friendly; if (btn) btn.disabled = false; });
         };
         nome.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); enviar(null); } });
         return {
@@ -140,10 +140,10 @@
   }
 
   /* ---------------- Criar novo grupo ---------------- */
-  function criarGrupo(aoCriar: any) {
+  function criarGrupo(aoCriar: (nome: string) => void) {
     janela({
       titulo: "Criar novo grupo",
-      passo: (api: any) => {
+      passo: (api) => {
         const nome = UI.Input({ placeholder: "Ex.: Moradia" });
         nome.maxLength = 60; nome.dataset.autofocus = "";
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
@@ -166,16 +166,18 @@
 
   /** Nova conta. Cartão de crédito tem janela própria (sem troca de tipo); poupança e corrente dividem a
       mesma janela, alternando entre as duas. opts.aoCriar(conta): ex.: já escolher a conta numa transação */
-  function novaConta(ctx: ContextoApp, tipoInicial: any, opts: any) {
+  function novaConta(ctx: ContextoApp, tipoInicial?: string, opts?: OpcoesNovaConta) {
     const o = opts || {};
     const bancos = ["poupanca", "corrente"].includes(tipoInicial || "corrente");
     const d = { tipo: tipoInicial || "corrente", cor: ZoZo.regras.corSugerida(), tipoInvestimento: ZoZo.regras.tiposInvestimento[0] };
     janela({
       titulo: TITULOS_CONTA[d.tipo],
       classe: "modal--nova-conta",
-      passo: function passo(api: any) {
-        const campos: Record<string, any> = {};
-        const add = (chave: string, rotulo: string, input: any, dica?: string) => { campos[chave] = input; return UI.Field(rotulo, input.el || input, { hint: dica }); };
+      passo: function passo(api: ApiJanela) {
+        // campos do formulário: texto/seleção (value) ou dinheiro (ler)
+        type CampoConta = HTMLInputElement | HTMLSelectElement | ReturnType<typeof campoDinheiro>;
+        const campos: Record<string, CampoConta> = {};
+        const add = (chave: string, rotulo: string, input: CampoConta, dica?: string) => { campos[chave] = input; return UI.Field(rotulo, "el" in input ? input.el : input, { hint: dica }); };
         const texto = (ph: string, max?: number) => { const i = UI.Input({ placeholder: ph }); i.maxLength = max || ZoZo.regras.limiteNome; return i; };   // a instituição pode virar o nome da conta
         const diaInput = () => { const i = UI.Input({ type: "number", placeholder: "1 a 31", inputmode: "numeric" }); i.min = "1"; i.max = "31"; return i; };
         const saldo = campoDinheiro(0); campos.saldo = saldo;
@@ -198,7 +200,7 @@
           const valorParcela = UI.Input({ inputmode: "decimal", placeholder: "0,00" });
           const valorDevido = UI.Input({ inputmode: "decimal", placeholder: "0,00" });
           const resumo = h("p", { class: ZoZo.pecas.campoDica, "aria-live": "polite" });
-          const num = (i: any) => { const n = F.parseMoeda(i.value); return Number.isFinite(n) && n >= 0 ? n : 0; };
+          const num = (i: HTMLInputElement) => { const n = F.parseMoeda(i.value); return Number.isFinite(n) && n >= 0 ? n : 0; };
           const qtd = () => (/^\d+$/.test(parcelas.value.trim()) ? Number(parcelas.value) : 0);
           // um valor puxa o outro: parcela × parcelas = devido (o último editado manda)
           let manda = "parcela";
@@ -253,8 +255,9 @@
             UI.Field("Saldo", saldo.el),
           ];
         }
-        const enviar = (btn: any) => {
-          const v = (k: any) => (campos[k] ? (campos[k].ler ? campos[k].ler() : campos[k].value.trim()) : "");
+        const enviar = (btn: HTMLButtonElement) => {
+          const v = (k: string): string => { const c = campos[k]; return !c ? "" : "ler" in c ? String(c.ler()) : c.value.trim(); };
+          const limite = campos.limite && "ler" in campos.limite ? campos.limite.ler() : null;
           const inst = v("instituicao");
           const nome = d.tipo === "cartao" ? (v("nome") || inst) : (d.tipo === "poupanca" || d.tipo === "corrente") ? inst : v("nome");
           const dig = v("digitos");
@@ -268,11 +271,11 @@
           btn.disabled = true;
           ctx.bridge.request(A.createConta, { conta: {
             nome, tipo: d.tipo, ultimos4Digitos: dig, saldo: Number.isFinite(s) ? s : 0, cor: d.cor, instituicao: inst,
-            limite: campos.limite ? campos.limite.ler() : null, fechamento: v("fechamento") || null, vencimento: v("vencimento") || null,
-            tipoInvestimento: campos.tipoInvestimento ? campos.tipoInvestimento.value : null,
+            limite, fechamento: v("fechamento") || null, vencimento: v("vencimento") || null,
+            tipoInvestimento: campos.tipoInvestimento ? v("tipoInvestimento") : null,
             emprestimo: emp ? emp.emprestimo : null,
-          } }).then((r: any) => { api.fechar(); ctx.toast("Conta criada."); return ctx.recarregarTudo().then(() => { if (o.aoCriar && r && r.conta) o.aoCriar(r.conta); }); })
-            .catch((e: any) => { erro.textContent = e.friendly; btn.disabled = false; });
+          } }).then((r: { conta: ContaTela }) => { api.fechar(); ctx.toast("Conta criada."); return ctx.recarregarTudo().then(() => { if (o.aoCriar && r && r.conta) o.aoCriar(r.conta); }); })
+            .catch((e: ErroPonte) => { erro.textContent = e.friendly; btn.disabled = false; });
         };
         return {
           titulo: TITULOS_CONTA[d.tipo],
@@ -291,16 +294,16 @@
      debitar (corrente, poupança ou outros, com saldo). O serviço cria o Débito na conta e a Receita no cartão juntos
      e confere tudo de novo (js/data/servico.ts → pagarFatura). */
   const CONTAS_PAGAMENTO = ["corrente", "poupanca", "outros"];
-  function pagarFatura(ctx: ContextoApp, cartao: any, aoPagar?: () => void) {
+  function pagarFatura(ctx: ContextoApp, cartao: ContaTela, aoPagar?: () => void) {
     const comPerfis = ZoZo.recursos.perfis();
-    Promise.all([ctx.loadData("contas", A.getContas), comPerfis ? ctx.loadData("perfis", A.getPerfis) : null]).then(([dc, dp]: any[]) => {
+    Promise.all([ctx.loadData("contas", A.getContas), comPerfis ? ctx.loadData("perfis", A.getPerfis) : null]).then(([dc, dp]) => {
       const fatura = Math.max(0, F.numero(cartao.valor));
-      const contas = ((dc && dc.contas) || []).filter((c: any) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
-      const perfis = ((dp && dp.perfis) || []).filter((p: any) => !p.arquivado);
+      const contas: ContaTela[] = ((dc && dc.contas) || []).filter((c) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
+      const perfis: Perfil[] = ((dp && dp.perfis) || []).filter((p) => !p.arquivado);
       const centavos = (v: number) => Math.round(v * 100);
       const P = ZoZo.pecas;
       const FR = ZoZo.messages.FRIENDLY;
-      let perfil: any = null, conta: any = null;
+      let perfil: Perfil | null = null, conta: ContaTela | null = null;
       janela({
         titulo: "Pagar fatura",
         classe: "modal--nova-conta modal--titulo-central",
@@ -331,8 +334,8 @@
           };
           if (perfilBtn) perfilBtn.addEventListener("click", () => ZoZo.menu.perfis(perfilBtn, ctx, {
             perfis, atual: perfil && perfil.id,
-            aoEscolher: (p: any) => { perfil = p; desenharPerfil(); },
-            aoCriar: (np: any) => { perfis.push(np); perfil = np; desenharPerfil(); },
+            aoEscolher: (p) => { perfil = p; desenharPerfil(); },
+            aoCriar: (np) => { perfis.push(np); perfil = np; desenharPerfil(); },
           }));
           const contaBtn = campoMenu();
           const saldoConta = h("span");
@@ -346,10 +349,10 @@
           };
           contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
             contas, atual: conta && conta.id, vazio: "Nenhuma conta corrente, poupança ou outros",
-            aoEscolher: (c: any) => { conta = c; desenharConta(); },
-            rodape: [{ icone: "mais", label: "Nova conta", onClick: () => novaConta(ctx, "corrente", { aoCriar: (nc: any) => {
-              ctx.loadData("contas", A.getContas, null, { force: true }).then((r: any) => {
-                const criada = ((r && r.contas) || []).find((x: any) => x.id === nc.id);
+            aoEscolher: (c) => { conta = c; desenharConta(); },
+            rodape: [{ icone: "mais", label: "Nova conta", onClick: () => novaConta(ctx, "corrente", { aoCriar: (nc) => {
+              ctx.loadData("contas", A.getContas, null, { force: true }).then((r) => {
+                const criada = ((r && r.contas) || []).find((x) => x.id === nc.id);
                 if (criada && CONTAS_PAGAMENTO.includes(criada.tipo)) { contas.push(criada); conta = criada; desenharConta(); }
               }).catch(() => null);
             } }) }],
@@ -364,7 +367,7 @@
               : perfilBtn && perfis.length && !perfil ? FR.PROFILE_REQUIRED
               : !conta ? FR.PAYMENT_ACCOUNT
               : centavos(v) > centavos(F.numero(conta.valor)) ? FR.INSUFFICIENT_FUNDS : "";
-            if (problema) { erro.textContent = problema; return; }
+            if (problema || !conta) { erro.textContent = problema || FR.PAYMENT_ACCOUNT; return; }
             erro.textContent = "";
             btn.disabled = true;
             ctx.bridge.request(A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: v, perfilId: perfil ? perfil.id : null })
@@ -397,11 +400,11 @@
      perfil e a categoria "Reembolso", e abate da fatura do mês. O valor começa com o que falta pagar (pode ser uma
      parte ou a mais). O serviço confere tudo de novo (js/data/servico.ts → receberFatura). */
   function receberFatura(ctx: ContextoApp, cfg: { perfil: { id: string; nome: string }; mes: number; ano: number; aPagar: number; aoReceber?: () => void }) {
-    ctx.loadData("contas", A.getContas).then((dc: any) => {
-      const contas = ((dc && dc.contas) || []).filter((c: any) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
+    ctx.loadData("contas", A.getContas).then((dc) => {
+      const contas = ((dc && dc.contas) || []).filter((c) => CONTAS_PAGAMENTO.includes(c.tipo) && !c.oculta);
       const P = ZoZo.pecas;
       const FR = ZoZo.messages.FRIENDLY;
-      let conta: any = contas.length === 1 ? contas[0] : null;
+      let conta: ContaTela | null = contas.length === 1 ? contas[0] : null;
       let data = F.iso(new Date());
       janela({
         titulo: "Registrar pagamento recebido",
@@ -420,7 +423,7 @@
           };
           contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
             contas, atual: conta && conta.id, vazio: "Nenhuma conta corrente, poupança ou outros",
-            aoEscolher: (c: any) => { conta = c; desenharConta(); },
+            aoEscolher: (c) => { conta = c; desenharConta(); },
           }));
           desenharConta();
           const dataCampo = ZoZo.calendario.Campo({ valor: data, rotulo: "data do pagamento", aoMudar: (v) => { if (F.parseData(v)) data = v; } });
@@ -428,7 +431,7 @@
           const enviar = (btn: HTMLButtonElement) => {
             const v = valor.ler();
             const problema = !(Number.isFinite(v) && Math.round(v * 100) > 0) ? FR.PAYMENT_INVALID : !conta ? FR.RECEIPT_ACCOUNT : "";
-            if (problema) { erro.textContent = problema; return; }
+            if (problema || !conta) { erro.textContent = problema || FR.RECEIPT_ACCOUNT; return; }
             erro.textContent = "";
             btn.disabled = true;
             ctx.bridge.request(A.receberFatura, { perfilId: cfg.perfil.id, mes: cfg.mes, ano: cfg.ano, contaId: conta.id, valor: v, data })
@@ -459,9 +462,10 @@
   ];
 
   /** Passo "Confirmar frequência" (e, se parcelado, "Parcelas"). aoConfirmar({recorrencia, parcelaAtual, parcelaTotal}) */
-  function passoFrequencia(aoConfirmar: any, voltar: any, valorInicial: any) {
+  type ConfirmarFrequencia = (dados: DadosFrequencia, api: ApiJanela, btn: HTMLButtonElement) => void;
+  function passoFrequencia(aoConfirmar: ConfirmarFrequencia, voltar: ((api: ApiJanela) => void) | null, valorInicial: number | undefined) {
     let escolha = "mensal";
-    return function passo(api: any) {
+    return function passo(api: ApiJanela): ReturnType<PassoJanela> {
       const lista = h("div", { class: ZoZo.pecas.freqLista, role: "radiogroup", "aria-label": "Frequência" },
         FREQ_OPCOES.map(([v, t]) => {
           const input = h("input", { type: "radio", name: "zz-freq", value: v, class: ZoZo.pecas.freqRadio }) as HTMLInputElement;
@@ -480,15 +484,15 @@
         corpo: lista,
         botoes: [
           { label: voltar ? "Voltar" : "Cancelar", onClick: () => (voltar ? voltar(api) : api.fechar()) },
-          { label: escolha === "parcelada" ? "Próximo" : "Criar", primario: true, ref: (b: any) => { botaoAvancar = b; },
-            onClick: (btn: any) => (escolha === "parcelada" ? api.ir(passoParcelas(aoConfirmar, () => api.ir(passo), valorInicial)) : aoConfirmar({ recorrencia: escolha }, api, btn)) },
+          { label: escolha === "parcelada" ? "Próximo" : "Criar", primario: true, ref: (b) => { botaoAvancar = b; },
+            onClick: (btn) => (escolha === "parcelada" ? api.ir(passoParcelas(aoConfirmar, () => api.ir(passo), valorInicial)) : aoConfirmar({ recorrencia: escolha }, api, btn)) },
         ],
       };
     };
   }
 
   /** Mesma divisão do serviço de dados: a 1ª parcela leva a sobra dos centavos; da 2ª em diante, todas iguais */
-  function previaParcelas(total: any, atual: any, qtd: any) {
+  function previaParcelas(total: number, atual: number, qtd: number) {
     const c = Math.round(total * 100), base = Math.floor(c / qtd);
     if (!(base > 0)) return null;
     const primeira = atual === 1 ? c - base * (qtd - 1) : base;
@@ -497,10 +501,10 @@
     return "1ª parcela " + F.moeda(primeira / 100) + " + " + (qtd - 1) + " × " + F.moeda(base / 100);
   }
 
-  function passoParcelas(aoConfirmar: any, voltar: any, valorInicial: any) {
-    return (api: any) => {
+  function passoParcelas(aoConfirmar: ConfirmarFrequencia, voltar: () => void, valorInicial: number | undefined): PassoJanela {
+    return (api) => {
       // Valor total = o valor da transação (não se edita aqui: muda-se no próprio painel)
-      const total = UI.Input({ inputmode: "decimal", placeholder: "0,00", value: valorInicial > 0 ? F.moedaEditavel(valorInicial) : "" });
+      const total = UI.Input({ inputmode: "decimal", placeholder: "0,00", value: valorInicial && valorInicial > 0 ? F.moedaEditavel(valorInicial) : "" });
       total.readOnly = true;
       total.tabIndex = -1;
       total.classList.add(...ZoZo.pecas.entradaLeitura.split(" "));   // só leitura: é o valor da transação
@@ -525,7 +529,7 @@
           erro),
         botoes: [
           { label: "Voltar", onClick: () => voltar() },
-          { label: "Criar", primario: true, onClick: (btn: any) => {
+          { label: "Criar", primario: true, onClick: (btn) => {
             const { v, a, b } = ler();
             if (!(v > 0 && v < 1e12)) { erro.textContent = "Informe o valor da transação antes de parcelar."; return; }
             if (!(Number.isInteger(a) && Number.isInteger(b) && a >= 1 && b >= 2 && a <= b && b <= 999)) { erro.textContent = "Use números inteiros: parcela atual a partir de 1 e total maior ou igual à atual."; return; }
@@ -538,37 +542,37 @@
   }
 
   /** Executa "tornar recorrente" para um lançamento existente */
-  function tornarRecorrente(ctx: ContextoApp, lancamentoId: any, aoTerminar: any) {
-    return (dados: any, api: any, btn: any) => {
+  function tornarRecorrente(ctx: ContextoApp, lancamentoId: Id | null, aoTerminar?: () => void): ConfirmarFrequencia {
+    return (dados, api, btn) => {
       if (btn) btn.disabled = true;
       ctx.bridge.request(A.tornarRecorrente, Object.assign({ id: lancamentoId }, dados))
         .then(() => { api.fechar(); ctx.toast("Recorrência criada."); return ctx.recarregarTudo().then(() => aoTerminar && aoTerminar()); })
-        .catch((e: any) => { ctx.toast(e.friendly, { tone: "error" }); if (btn) btn.disabled = false; });
+        .catch((e: ErroPonte) => { ctx.toast(e.friendly, { tone: "error" }); if (btn) btn.disabled = false; });
     };
   }
 
   /** Só a escolha de frequência (ex.: lançamento aberto no painel). aoEscolher(dados) evita gravar (lançamento ainda não criado). */
-  function frequencia(ctx: ContextoApp, lancamentoId: any, opts: any) {
+  function frequencia(ctx: ContextoApp, lancamentoId: Id | null, opts?: OpcoesFrequencia) {
     const o = opts || {};
     janela({
       titulo: "Confirmar frequência",
       classe: "modal--recorrencia",
-      passo: passoFrequencia(o.aoEscolher ? (dados: any, api: any) => { api.fechar(); o.aoEscolher(dados); } : tornarRecorrente(ctx, lancamentoId, o.aoTerminar), null, o.valor),
+      passo: passoFrequencia(o.aoEscolher ? (dados, api) => { api.fechar(); if (o.aoEscolher) o.aoEscolher(dados); } : tornarRecorrente(ctx, lancamentoId, o.aoTerminar), null, o.valor),
     });
   }
 
   function novaRecorrencia(ctx: ContextoApp) {
-    ctx.loadData("lancamentos", A.getLancamentos).then((dados: any) => {
-      const candidatos = (dados.lancamentos || []).filter((l: any) => l.tipo !== "recorrente" || String(l.serieId || "").startsWith("removida:")).slice(0, 300);
-      const passoLista = (api: any) => {
+    ctx.loadData("lancamentos", A.getLancamentos).then((dados) => {
+      const candidatos = (dados.lancamentos || []).filter((l) => l.tipo !== "recorrente" || String(l.serieId || "").startsWith("removida:")).slice(0, 300);
+      const passoLista = (api: ApiJanela): ReturnType<PassoJanela> => {
         let termo = "";
-        const norm = (t: any) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         const busca = h("input", { type: "search", class: ZoZo.estrutura.janelaPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar transações" }) as HTMLInputElement;
         busca.dataset.autofocus = "";
         const lista = h("div", { class: ZoZo.estrutura.janelaLista });
         const desenhar = () => {
-          const itens = candidatos.filter((l: any) => !termo || norm(l.descricao).includes(termo) || norm(l.categoria && l.categoria.nome).includes(termo));
-          mount(lista, itens.length ? itens.map((l: any) => {
+          const itens = candidatos.filter((l) => !termo || norm(l.descricao).includes(termo) || norm(l.categoria && l.categoria.nome).includes(termo));
+          mount(lista, itens.length ? itens.map((l) => {
             const marca = l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : null;
             const verde = l.tipo === "receita" || l.tipo === "estorno" || (l.tipo === "interno" && l.sentido === "entrada");
             return h("button", { type: "button", class: ZoZo.estrutura.janelaLanc, onClick: () => api.ir(passoFrequencia(tornarRecorrente(ctx, l.id, () => ctx.navigate("recorrencias")), () => api.ir(passoLista), l.valor)) },
@@ -587,18 +591,19 @@
         };
       };
       janela({ titulo: "Nova recorrência", classe: "modal--recorrencia", passo: passoLista });
-    }).catch((e: any) => ctx.toast(e.friendly, { tone: "error" }));
+    }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
   }
 
   /* ---------------- Confirmar com senha ---------------- */
-  function confirmarComSenha(cfg: any) {
+  /** A senha digitada, ou null se a janela fechou sem confirmar */
+  function confirmarComSenha(cfg: ConfigConfirmarSenha): Promise<string | null> {
     return new Promise((resolve) => {
       let resolvido = false;
-      const fim = (v: any) => { if (!resolvido) { resolvido = true; resolve(v); } };
+      const fim = (v: string | null) => { if (!resolvido) { resolvido = true; resolve(v); } };
       janela({
         titulo: cfg.titulo,
         onClose: () => fim(null),
-        passo: (api: any) => {
+        passo: (api) => {
           const senha = UI.Input({ type: "password", name: "password", autocomplete: "current-password", placeholder: "Sua senha" });
           senha.dataset.autofocus = "";
           const campoSenha = ZoZo.verificacao.ComRevelar(senha);              // oculta, com "mostrar" e sem copiar

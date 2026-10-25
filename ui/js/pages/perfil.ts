@@ -688,8 +688,11 @@
         UI.Button("Sair", { onClick: () => ctx.logout() }),
         demo ? null : h("button", { type: "button", class: CF.excluirConta, onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
           mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." })
-          .then((senha: string | null) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
-            .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }))) }, "Excluir conta")) : null;
+          .then((senha) => {
+            if (!senha) return;
+            return depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
+              .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+          }) }, "Excluir conta")) : null;
       return h("div", { class: [CF.raiz, P.ctxConfig] }, nav, h("div", { class: CF.principal }, h("div", { class: CF.conteudo }, conteudo), rodape));
     },
   };

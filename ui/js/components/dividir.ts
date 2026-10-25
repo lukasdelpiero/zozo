@@ -57,18 +57,27 @@
     acoes: "tw:flex tw:gap-2",
   };
 
-  function abrir(original: any, ctx: ContextoApp, aoTerminar?: (id: string) => void): void {
+  function abrir(original: LancamentoTela, ctx: ContextoApp, aoTerminar?: (id: string) => void): void {
+    // categorias e perfis das pílulas e dos menus: carregados antes (a divisão pode abrir de qualquer tela)
+    const dados = store.get().data;
+    if (!dados.categorias || !dados.perfis) {
+      Promise.all([ctx.loadData("categorias", A.getCategorias), ctx.loadData("perfis", A.getPerfis)])
+        .then(() => abrir(original, ctx, aoTerminar)).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+      return;
+    }
     const st = store.get();
     const todos = (st.data.lancamentos && st.data.lancamentos.lancamentos) || [];
-    const cats = ((st.data.categorias && st.data.categorias.categorias) || []);
-    const perfis: any[] = ((st.data.perfis && st.data.perfis.perfis) || []).filter((p: any) => !p.arquivado);
-    const membros: any[] = original.divisao ? todos.filter((l: any) => l.divisao && l.divisao.id === original.divisao.id) : [original];
+    // categorias e perfis lidos do estado na hora: uma categoria ou um perfil criado no meio da divisão já aparece
+    const catsAtuais = () => { const d = store.get().data.categorias; return (d && d.categorias) || []; };
+    const perfisAtuais = () => { const d = store.get().data.perfis; return (d && d.perfis) || []; };
+    const divisao = original.divisao;
+    const membros: LancamentoTela[] = divisao ? todos.filter((l) => l.divisao && l.divisao.id === divisao.id) : [original];
     const base = membros.find((l) => l.id === original.id) || original;
-    const total = Math.round((original.divisao ? original.divisao.total : original.valor) * 100);   // em centavos
+    const total = Math.round((divisao ? divisao.total : original.valor) * 100);   // em centavos
     const data = base.data;
 
     // Estado: partes e modo (igual | personalizado)
-    let partes: Parte[] = membros.map((l) => ({ descricao: l.descricao, data: l.data, categoriaId: l.categoriaId, perfilId: l.perfilId, c: Math.round(l.valor * 100), cP: Math.round(l.valor * 100) }));
+    let partes: Parte[] = membros.map((l) => ({ descricao: l.descricao, data: l.data, categoriaId: l.categoriaId || null, perfilId: l.perfilId || null, c: Math.round(l.valor * 100), cP: Math.round(l.valor * 100) }));
     if (partes.length < 2) partes.push(Object.assign({}, partes[0]));          // começa com duas partes (perfil repetido)
     let modo: Modo = membros.length > 1 && !partes.every((p) => Math.abs(p.c - partes[0].c) <= 1) ? "personalizado" : "igual";
     const igualar = () => {
@@ -83,15 +92,15 @@
     const restanteEl = h("span", { class: T.restanteValor });
     let alternar: HTMLElement | undefined;
 
-    const pillCategoria = (id: string | null) => { const c = cats.find((x: any) => x.id === id); return c ? UI.CategoryLabel(c, { pill: true }) : h("span", { class: T.faltando }, "Categoria"); };
-    const pillPerfil = (id: string | null) => { const p = perfis.find((x) => x.id === id) || ((st.data.perfis && st.data.perfis.perfis) || []).find((x: any) => x.id === id); return p ? UI.Tag(p.nome, p.cor, { class: "tag--upper" }) : h("span", { class: T.faltando }, "Perfil"); };
+    const pillCategoria = (id: string | null) => { const c = catsAtuais().find((x) => x.id === id); return c ? UI.CategoryLabel(c, { pill: true }) : h("span", { class: T.faltando }, "Categoria"); };
+    const pillPerfil = (id: string | null) => { const p = perfisAtuais().find((x) => x.id === id); return p ? UI.Tag(p.nome, p.cor, { class: "tag--upper" }) : h("span", { class: T.faltando }, "Perfil"); };
 
     /* Menus iguais aos do painel do lançamento: pesquisa, lista com altura limitada e "+ Nova…" */
     const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     function menuCategoria(btn: HTMLElement, parte: Parte) {
       ZoZo.menu.abrir(btn, { largura: 280, render(el: HTMLElement, api: { fechar(): void }) {
         let termo = "";
-        const lista = (): any[] => ((store.get().data.categorias || {}).categorias || []);
+        const lista = catsAtuais;
         const busca = h("input", { type: "search", class: ZoZo.estrutura.menuPesquisaCampo, placeholder: "Pesquisar", "aria-label": "Pesquisar categoria" }) as HTMLInputElement;
         const caixa = h("div", { class: ZoZo.estrutura.menuListaRolagem });
         const escolher = (id: string) => { api.fechar(); parte.categoriaId = id; desenhar(); };
@@ -99,7 +108,7 @@
           h("button", { type: "button", class: [ZoZo.estrutura.menuItem, c.id === parte.categoriaId && "is-checked"], onClick: () => escolher(c.id) }, UI.CategoryLabel(c, { pill: true }))));
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); pintar(); });
         mount(el, h("div", { class: ZoZo.estrutura.menuPesquisa }, icon("pesquisar", { size: 14 }), busca), caixa, h("div", { class: ZoZo.estrutura.menuSeparador }),
-          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c: any) => { cats.push(c); escolher(c.id); } }); } },
+          h("button", { type: "button", class: ZoZo.estrutura.menuItem, onClick: () => { api.fechar(); ZoZo.modais.novaCategoria(ctx, { nome: termo ? busca.value.trim() : "", aoCriar: (c) => escolher(c.id) }); } },
             icon("mais", { size: 16, class: ZoZo.estrutura.menuIcone }), h("span", { class: ZoZo.estrutura.menuRotulo }, "Nova categoria")));
         pintar();
         requestAnimationFrame(() => busca.focus());
@@ -107,9 +116,9 @@
     }
     function menuPerfil(btn: HTMLElement, parte: Parte) {
       ZoZo.menu.perfis(btn, ctx, {
-        perfis: ((store.get().data.perfis || {}).perfis || []).filter((p: any) => !p.arquivado), atual: parte.perfilId, posicao: "direita",
-        aoEscolher: (p: any) => { parte.perfilId = p.id; desenhar(); },
-        aoCriar: (np: any) => { perfis.push(np); parte.perfilId = np.id; desenhar(); },
+        perfis: perfisAtuais().filter((p) => !p.arquivado), atual: parte.perfilId, posicao: "direita",
+        aoEscolher: (p) => { parte.perfilId = p.id; desenhar(); },
+        aoCriar: (np) => { parte.perfilId = np.id; desenhar(); },
       });
     }
 
@@ -212,7 +221,7 @@
 
     const card = h("div", { class: T.cartao },
       h("div", { class: T.cartaoEsquerda },
-        h("div", { class: [T.cartaoPilulas, ZoZo.pecas.ctxPilulasDivisao] }, pillCategoria(base.categoriaId), pillPerfil(base.perfilId)),
+        h("div", { class: [T.cartaoPilulas, ZoZo.pecas.ctxPilulasDivisao] }, pillCategoria(base.categoriaId || null), pillPerfil(base.perfilId || null)),
         h("span", { class: T.cartaoNome }, base.descricao)),
       h("div", { class: T.cartaoDireita },
         h("span", { class: T.cartaoData }, dataCurta(data)),
