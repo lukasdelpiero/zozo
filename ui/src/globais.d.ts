@@ -78,7 +78,7 @@ declare global {
     currentPage: string;
     selectedItem: { tipo: string; id: string } | null;
     detailPanelOpen: boolean;
-    data: Record<string, any>;
+    data: DadosNoEstado;
     loading: Record<string, boolean>;
     errors: Record<string, string | null>;
     stale: Record<string, boolean>;
@@ -210,9 +210,11 @@ declare global {
     type: "response"; action: string; requestId: string; success: boolean;
     data?: unknown; error?: { code: string; message?: string; espera?: number; captcha?: boolean };
   }
+  /** ACTIONS: cada nome de ação é o próprio valor (ACTIONS.getContas === "getContas"), com o tipo literal */
+  type AcoesPonte = { readonly [K in NomeAcao]: K };
   interface ErroPonte extends Error { code: string; friendly: string; espera?: number; captcha?: boolean }
   interface ZoZoMessages {
-    ACTIONS: Readonly<Record<string, string>>;
+    ACTIONS: AcoesPonte;
     SENSITIVE: ReadonlySet<string>;
     FRIENDLY: Readonly<Record<string, string>>;
     createRequest(action: string, data?: unknown): PedidoPonte;
@@ -227,11 +229,11 @@ declare global {
   interface OpcoesPedido { timeout?: number }
   interface ZoZoBridge {
     /** Promise com os dados da resposta; rejeita sempre com ErroPonte (texto amigável) */
-    request(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any>;
+    request<K extends NomeAcao>(action: K, data?: unknown, opts?: OpcoesPedido): Promise<RespostaDe<K>>;
     requestHost(action: string, data?: unknown, opts?: OpcoesPedido): Promise<any>;
     mode: ModoPonte;
     isDemo: boolean;
-    ACTIONS: Readonly<Record<string, string>>;
+    ACTIONS: AcoesPonte;
   }
 
   /** js/components/topbar.ts */
@@ -262,7 +264,8 @@ declare global {
     tituloProgresso?: string;
   }
   interface ZoZoPagesComum {
-    estadoCarregamento(state: EstadoZoZo, keys: string[], onRetry: () => void, opts?: { skeleton?: HTMLElement }): HTMLElement | null;
+    estadoCarregamento(state: EstadoZoZo, keys: ChaveDados[], onRetry: () => void, opts?: { skeleton?: HTMLElement }): HTMLElement | null;
+    carregado<K extends ChaveDados>(state: EstadoZoZo, chave: K): DadosEstado[K];
     pagina(cls: string, ...children: FilhoDom[]): HTMLElement;
     valorResumo(valor: unknown, subtitulo: string, align: "left" | "right"): HTMLElement;
     cardResumoDonut(cfg: CardResumo): HTMLElement;
@@ -359,7 +362,7 @@ declare global {
     papel?: "menu" | "dialog";      // calendário e outros painéis que não são lista de opções: "dialog"
   }
   interface ConfigListaMarcavel {
-    itens: Array<{ value: string; label: string; cor?: string; icone?: string }>;
+    itens: Array<{ value: string; label: string; cor?: string | null; icone?: string }>;
     marcados(): string[];
     alternar(value: string): void;
     topo?(redesenhar: () => void): Node;
@@ -540,7 +543,7 @@ declare global {
   interface ZoZoCambio {
     MOEDAS: Array<{ codigo: CodigoMoeda; nome: string; simbolo: string }>;
     aplicarMoeda(ctx: ContextoApp, codigo: string): Promise<unknown>;
-    trocar(ctx: ContextoApp, codigo: string): Promise<unknown>;
+    trocar(ctx: ContextoApp, codigo: CodigoMoeda): Promise<unknown>;
     disponivelTransferir(): boolean;
     abrirTransferencia(ctx: ContextoApp): void;
     Seletor(ctx: ContextoApp): HTMLElement | null;
@@ -551,7 +554,8 @@ declare global {
   interface ContextoApp {
     bridge: ZoZoBridge;
     toast(mensagem: string, opts?: OpcoesAviso): void;
-    loadData(key: string, action: string, payload?: unknown, opts?: { force?: boolean }): Promise<any>;
+    /** Lê pelo estado (store.data[key]) ou pela ação que preenche a chave; o tipo vem de DadosEstado */
+    loadData<K extends ChaveDados>(key: K, action: LeituraDaChave[K], payload?: unknown, opts?: { force?: boolean }): Promise<DadosEstado[K]>;
     invalidate(keys: string[]): void;
     navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
     abrirConfiguracoes(aba?: string): void;
@@ -614,10 +618,12 @@ declare global {
     ContasChartCard(state: { data: any; ui: EstadoZoZo["ui"] }, ctx: ContextoApp, opts?: any): HTMLElement;
     abrirDetalheConta(conta: any, ctx: ContextoApp, origem?: any, opts?: any): void;
   }
-  interface ZoZoLancamentoPainel { abrir(l: any, ctx: ContextoApp, opts?: any): void }
+  /** Painel da transação: preset = campos já preenchidos numa nova; recemCriada = entrada animada; voltar = seta "voltar" */
+  interface OpcoesPainelLancamento { preset?: Partial<Lancamento>; recemCriada?: boolean; voltar?: () => void }
+  interface ZoZoLancamentoPainel { abrir(l: { id: Id } | null, ctx: ContextoApp, opts?: OpcoesPainelLancamento): Promise<void> }
   interface ZoZoLancamentosShared {
-    abrirFormulario(l: any, ctx: ContextoApp, preset?: any): void;
-    abrirVisualizacao(l: any, ctx: ContextoApp, opts?: any): void;
+    abrirFormulario(l: LancamentoTela | null, ctx: ContextoApp, preset?: Partial<Lancamento>): Promise<void>;
+    abrirVisualizacao(l: LancamentoTela, ctx: ContextoApp, opts?: OpcoesPainelLancamento): Promise<void>;
     setFiltros(patch: Partial<FiltrosLancamentos>, ctx?: ContextoApp): void;
     FILTROS_VAZIOS(): FiltrosLancamentos;
   }

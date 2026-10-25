@@ -12,12 +12,22 @@
    * Retorna um nó de loading/erro enquanto as chaves não estão prontas,
    * ou null quando todas estão carregadas.
    */
-  function estadoCarregamento(state: EstadoZoZo, keys: string[], onRetry: () => void, opts?: { skeleton?: HTMLElement }): HTMLElement | null {
+  function estadoCarregamento(state: EstadoZoZo, keys: ChaveDados[], onRetry: () => void, opts?: { skeleton?: HTMLElement }): HTMLElement | null {
     const erro = keys.map((k) => state.errors[k]).find(Boolean);
     const faltando = keys.some((k) => !state.data[k]);
     if (!faltando) return null;
     if (erro) return UI.ErrorState(erro, onRetry);
     return (opts && opts.skeleton) || UI.Skeleton(6);
+  }
+
+  /**
+   * Dados de uma chave já conferida por estadoCarregamento (render só chega aqui com elas carregadas):
+   * devolve com o tipo certo, sem o "pode ser null". Faltando, é erro de programação.
+   */
+  function carregado<K extends ChaveDados>(state: EstadoZoZo, chave: K): DadosEstado[K] {
+    const v = state.data[chave];
+    if (!v) throw new Error("dados não carregados: " + chave);
+    return v as DadosEstado[K];
   }
 
   function pagina(cls: string, ...children: FilhoDom[]): HTMLElement {
@@ -63,6 +73,6 @@
     return h("section", { class: ZoZo.pecas.painelSecao }, titulo ? h("h3", { class: ZoZo.pecas.painelSecaoTitulo }, titulo) : null, ...children);
   }
 
-  const api: ZoZoPagesComum = { estadoCarregamento, pagina, valorResumo, cardResumoDonut, segmentosPorCategoria, detalheLinha, detalheSecao };
+  const api: ZoZoPagesComum = { estadoCarregamento, carregado, pagina, valorResumo, cardResumoDonut, segmentosPorCategoria, detalheLinha, detalheSecao };
   ZoZo.pagesComum = api;
 })(window.ZoZo);

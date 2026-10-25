@@ -57,15 +57,11 @@
   }
 
   /* ---------- dados de exemplo (da conta aberta) ---------- */
-  async function lista(ctx: ContextoApp, chave: string, acao: string, campo: string): Promise<any[]> {
-    const d = await ctx.loadData(chave, acao);
-    return (d && d[campo]) || [];
-  }
-  const lancamentos = (ctx: ContextoApp) => lista(ctx, "lancamentos", A.getLancamentos, "lancamentos");
-  const contas = (ctx: ContextoApp) => lista(ctx, "contas", A.getContas, "contas");
-  const categorias = (ctx: ContextoApp) => lista(ctx, "categorias", A.getCategorias, "categorias");
-  const perfis = (ctx: ContextoApp) => lista(ctx, "perfis", A.getPerfis, "perfis");
-  const recorrencias = (ctx: ContextoApp) => lista(ctx, "recorrencias", A.getRecorrencias, "recorrencias");
+  const lancamentos = async (ctx: ContextoApp) => (await ctx.loadData("lancamentos", A.getLancamentos)).lancamentos;
+  const contas = async (ctx: ContextoApp) => (await ctx.loadData("contas", A.getContas)).contas;
+  const categorias = async (ctx: ContextoApp) => (await ctx.loadData("categorias", A.getCategorias)).categorias;
+  const perfis = async (ctx: ContextoApp) => (await ctx.loadData("perfis", A.getPerfis)).perfis;
+  const recorrencias = async (ctx: ContextoApp) => (await ctx.loadData("recorrencias", A.getRecorrencias)).recorrencias;
 
   function abrir(ctx: ContextoApp, app: AcoesApp) {
     const area = h("div", { class: C.corpo });
@@ -160,8 +156,8 @@
             ir("Categoria: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(
               achar(await categorias(ctx), (c: any) => c.status === "regular", "categoria regular"), ctx, { editandoOrcamento: true }))),
             ir("Categoria: editar (formulário)", naPagina("categorias", async () => ZoZo.categoriasShared.abrirFormCategoria(ctx, await primeira(() => categorias(ctx), "categoria")))),
-            ir("Grupo de categorias", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo, ctx))),
-            ir("Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo, ctx, { editando: true }))),
+            ir("Grupo de categorias", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo!, ctx))),
+            ir("Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c: any) => !!c.grupo, "grupo").grupo!, ctx, { editando: true }))),
             ir("Recorrência", naPagina("recorrencias", async () => ZoZo.recorrenciasShared.abrirDetalhe(await primeira(() => recorrencias(ctx), "recorrência"), ctx))),
             ir("Perfil", naPagina("perfil", async () => ZoZo.perfilShared.abrirDetalhe(await primeira(() => perfis(ctx), "perfil"), ctx))),
             ir("Perfil: editar (formulário)", naPagina("perfil", async () => ZoZo.perfilShared.abrirFormPerfil(ctx, await primeira(() => perfis(ctx), "perfil"), null))))),

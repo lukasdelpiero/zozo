@@ -296,7 +296,7 @@
         skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCard }), UI.Skeleton(6)),
       });
       if (espera) return C.pagina("page--contas", espera);
-      const contas = state.data.contas.contas || [];
+      const contas = C.carregado(state, "contas").contas || [];
       const sel = state.selectedItem && state.selectedItem.tipo === "conta" ? state.selectedItem.id : null;
 
       const mostrar: Record<string, boolean> = (state.ui.mostrarOcultas as Record<string, boolean>) || {};
@@ -326,7 +326,8 @@
           : UI.EmptyState("Nenhuma conta cadastrada.", { icon: "contas", action: { label: "Nova conta", icon: "mais", onClick: () => ZoZo.modais.novaConta(ctx, "corrente") } }));
     },
     selecionar(sel, ctx) {
-      const c = (ZoZo.store.get().data.contas.contas || []).find((x: any) => x.id === sel.id);
+      const dados = ZoZo.store.get().data.contas;
+      const c = ((dados && dados.contas) || []).find((x) => x.id === sel.id);
       if (c) abrirDetalheConta(c, ctx, "contas");
     },
   };

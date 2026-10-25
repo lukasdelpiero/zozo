@@ -8,7 +8,7 @@
 (function (ZoZo: ZoZoGlobal) {
   "use strict";
 
-  const ACTIONS: Readonly<Record<string, string>> = Object.freeze({
+  const ACTIONS: AcoesPonte = Object.freeze({
     // Sessão / armazenamento
     getSession: "getSession",
     registerUser: "registerUser",

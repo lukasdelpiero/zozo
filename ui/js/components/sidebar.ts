@@ -56,7 +56,7 @@
       const contas = state.data.contas && state.data.contas.contas;
       const usuario: UsuarioSessao = state.session.user || {};
       const foto = state.data.config && state.data.config.foto;
-      const cfg = state.data.config || {};
+      const cfg: Partial<RespostaConfig> = state.data.config || {};
       const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto, String(!!cfg.multicambio), String(cfg.moeda)].map((x) => (typeof x === "object" ? x : String(x)));
       const antes = assinatura;
       if (antes && sig.every((v, i) => v === antes[i])) return;
@@ -81,7 +81,7 @@
           : h("p", { class: E.nota }, "Nenhuma conta cadastrada."));
       }
 
-      const avatar = ZoZo.usuario.Avatar(foto, usuario.nomeUsuario || "", 28);
+      const avatar = ZoZo.usuario.Avatar(foto || null, usuario.nomeUsuario || "", 28);
       avatar.classList.add("tw:flex-none", "tw:bg-[rgba(255,255,255,0.92)]", "tw:text-zz-primary");   // foto/inicial clara sobre o roxo
       mount(footerEl,
         h("button", { type: "button", class: E.usuario, title: "Minha conta", "aria-haspopup": "dialog", onClick: () => ctx.abrirConfiguracoes("conta") },

@@ -62,7 +62,7 @@
       ...[[2, 2], [4.3, 2], [6.6, 2], [3.1, 3.9], [5.4, 3.9], [2, 5.7], [4.3, 5.7], [6.6, 5.7]].map(([x, y]) => s("circle", { cx: String(x), cy: String(y), r: "0.55", fill: "#fff" }))),
   };
 
-  const config = () => store.get().data.config || {};
+  const config = (): Partial<RespostaConfig> => store.get().data.config || {};
   const ligado = () => !!config().multicambio;
 
   /** Aplica o símbolo da moeda e redesenha tudo (os números não mudam) */
@@ -76,7 +76,7 @@
   }
 
   /** Troca a moeda. Na 1ª vez numa moeda (≠ Real), oferece levar transações da moeda anterior para ela. */
-  function trocar(ctx: ContextoApp, codigo: string): Promise<unknown> {
+  function trocar(ctx: ContextoApp, codigo: CodigoMoeda): Promise<unknown> {
     const cfg = config();
     if (!cfg.multicambio || cfg.moeda === codigo) return Promise.resolve();
     const primeiraVez = codigo !== "BRL" && !(cfg.moedasIniciadas || ["BRL"]).includes(codigo);

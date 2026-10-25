@@ -126,7 +126,8 @@
 
   function abrirFormCategoria(ctx: ContextoApp, cat: any, preset: any, voltar: any) {
     const novo = !cat;
-    const todas = (ZoZo.store.get().data.categorias && ZoZo.store.get().data.categorias.categorias) || [];
+    const dadosCats = ZoZo.store.get().data.categorias;
+    const todas = (dadosCats && dadosCats.categorias) || [];
     const grupos = Array.from(new Set(todas.map((c: any) => c.grupo).filter(Boolean)));
     ZoZo.forms.abrir(ctx, {
       titulo: novo ? "Nova categoria" : "Editar categoria",
@@ -172,7 +173,7 @@
     return h("span", { class: dif > 0 ? ZoZo.pecas.painelTopoDicaAcima : ZoZo.pecas.painelTopoDica }, F.moeda(Math.abs(dif)) + (dif > 0 ? " acima" : " disponíveis"));
   }
 
-  const orcamentoAtivo = () => !(ZoZo.store.get().data.config && ZoZo.store.get().data.config.orcamentoAtivo === false);
+  const orcamentoAtivo = () => { const cfg = ZoZo.store.get().data.config; return !(cfg && cfg.orcamentoAtivo === false); };
 
   function abrirDetalhe(cat: any, ctx: ContextoApp, opts?: any) {
     const mes = (ZoZo.store.get().data.categorias || {}).mes || F.iso(new Date()).slice(0, 7);   // aberto de outro painel antes de carregar Categorias
@@ -292,7 +293,7 @@
      Ao salvar o não atribuído, o que falta para uma categoria do grupo sair do vermelho no mês sai dele. */
   function abrirGrupo(nome: any, ctx: ContextoApp, opts?: any) {
     const o = opts || {};
-    const d = ZoZo.store.get().data.categorias || {};
+    const d: Partial<RespostaCategorias> = ZoZo.store.get().data.categorias || {};
     const mes = d.mes || F.iso(new Date()).slice(0, 7);
     const cats = (d.categorias || []).filter((c: any) => c.grupo === nome);
     if (!cats.length) { ctx.detail.close({ silencioso: true }); return; }
@@ -392,7 +393,7 @@
 
   /** Painel "Todas as categorias regulares" (ao clicar no gráfico) */
   function abrirTodas(ctx: ContextoApp) {
-    const d = ZoZo.store.get().data.categorias;
+    const d = C.carregado(ZoZo.store.get(), "categorias");
     const regulares = (d.categorias || []).filter((c: any) => c.status === "regular");
     ctx.detail.open({
       title: "Categorias regulares",
@@ -475,7 +476,7 @@
         skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCardBaixo }), UI.Skeleton(8)),
       });
       if (espera) return C.pagina("page--categorias", espera);
-      const d = state.data.categorias;
+      const d = C.carregado(state, "categorias");
       const todas = d.categorias || [];
       const regulares = todas.filter((c: any) => c.status === "regular");
       const excluidas = todas.filter((c: any) => c.status === "excluida");

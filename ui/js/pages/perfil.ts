@@ -209,7 +209,7 @@
     render(state, ctx) {
       const espera = C.estadoCarregamento(state, ["perfis"], () => this.carregar(ctx, true), { skeleton: UI.Skeleton(4) });
       if (espera) return C.pagina("page--perfil", espera);
-      const d = state.data.perfis;
+      const d = C.carregado(state, "perfis");
       const perfis = d.perfis || [];
       const ativos = perfis.filter((p: any) => !p.arquivado);
       const arquivados = perfis.filter((p: any) => p.arquivado);
@@ -313,8 +313,8 @@
     botao.setAttribute("aria-busy", "true");
     const minimo = new Promise((r) => setTimeout(r, 600));
     ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d: any) => {
-      const cfg = store.get().data.config || {};
-      const moeda = cfg.multicambio ? (["BRL", "EUR", "USD"].includes(cfg.moeda) ? cfg.moeda : "BRL") : null;
+      const cfg: Partial<RespostaConfig> = store.get().data.config || {};
+      const moeda = cfg.multicambio ? cfg.moeda || "BRL" : null;            // o serviço só devolve moeda válida
       const conteudo = gerarCsv(d.lancamentos || [], moeda);
       const nome = "ZoZo-transacoes-" + (moeda ? moeda + "-" : "") + F.iso(new Date()) + ".csv";
       const url = URL.createObjectURL(new Blob([conteudo], { type: "text/csv;charset=utf-8" }));
@@ -565,7 +565,7 @@
     deps: (s) => [s.session.user, s.session.storageAvailable, s.data.config],
     render(state, ctx) {
       const u = state.session.user || {};
-      const cfg = state.data.config || {};
+      const cfg: Partial<RespostaConfig> = state.data.config || {};
       const disponivel = state.session.storageAvailable !== false;
       const demo = ZoZo.recursos.demo();       // conta de demonstração: nome, senha, 2FA, apagar e excluir não existem
       const redesenhar = ctx.redesenharConfig || (() => {});
@@ -673,7 +673,7 @@
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
           demo ? null : linhaProtecao(ctx),
           h("h3", { class: P.cfgSecao }, "Ações"),
-          linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda] || "Real") : "Exportar todas as transações",
+          linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda || "BRL"] || "Real") : "Exportar todas as transações",
             "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : "") + ". O arquivo não é cifrado: guarde-o em local seguro.", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget) })),
           demo ? null : linhaConfig("Apagar todos os dados", "Mantém o login e remove transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : ""),
             UI.Button("Apagar", { size: "sm", variant: "danger-ghost", onClick: apagarDados })),

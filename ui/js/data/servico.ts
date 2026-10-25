@@ -23,67 +23,12 @@
   const M = ZoZo.messages;
   const R = () => ZoZo.regras;
 
-  /* ---------------- tipos do documento (o que fica cifrado no servidor) ---------------- */
-  type Id = string;
-  type Moeda = "BRL" | "EUR" | "USD";
-  type Sentido = "entrada" | "saida";
+  /* Tipos do documento e das respostas: ui/src/dados.d.ts (as telas usam os mesmos) */
   /** Dados que a interface manda numa ação: não confiáveis, cada campo é conferido aqui */
   type Dados = Record<string, any>;
-  interface PontoSaldo { data: string; saldo: number }
-  interface CicloCartao { fechamento: number | null; vencimento: number | null }
-  interface ContratoEmprestimo { valorContratado: number | null; primeiroVencimento: string | null; parcelas: number | null; valorParcela: number | null }
-  interface Conta {
-    id: Id; nome: string; tipo: string; historico: PontoSaldo[]; ultimos4Digitos?: string; cor?: string | null; tipoInvestimento?: string;
-    instituicao?: string; limite?: number | null; fechamento?: number | null; vencimento?: number | null; ciclos?: Record<string, CicloCartao>;
-    emprestimo?: ContratoEmprestimo | null; oculta?: boolean; moeda?: Moeda;
-  }
-  interface Categoria {
-    id: Id; nome: string; icone: string; cor: string | null; grupo: string | null; reservado: number; status: string;
-    orcamentos?: Record<string, number>; moeda?: Moeda;
-  }
-  interface Perfil { id: Id; nome: string; cor: string | null; orcamento: number; arquivado?: boolean; moeda?: Moeda }
-  interface Divisao { id: Id; total: number; partes: number }
-  /** Efeito já aplicado no saldo de uma conta (conciliado em sincronizarSaldos: nunca em dobro) */
-  interface Efeito { contaId: Id; delta: number }
-  interface Lancamento {
-    id: Id; data: string; descricao: string; valor: number; tipo: string;
-    contaId?: Id | null; categoriaId?: Id | null; perfilId?: Id | null; notas?: string;
-    recorrencia?: string | null; parcelaAtual?: number | null; parcelaTotal?: number | null;
-    sentido?: Sentido | null; direcao?: Sentido | null; serieId?: string | null; competencia?: string; encerradaEm?: string | null;
-    moeda?: Moeda; debito?: boolean; valorParcela?: number; valorTotal?: number; efeito?: Efeito; divisao?: Divisao | null;
-    automatico?: boolean; editado?: boolean; ignorados?: string[]; ocorrencia?: string; valorInvalido?: boolean;
-    debitado?: { contaId: Id; valor: number };          // formato anterior (2.8–3.1)
-    /** "Pagar fatura": o par débito (conta) + receita (cartão) do pagamento do CARTÃO ao banco (não é cobrança de perfil) */
-    pagamentoCartao?: boolean;
-    /** Receita que quita a fatura de um perfil: o mês ("AAAA-MM") da fatura paga (o perfil é o do lançamento) */
-    faturaPerfil?: string;
-  }
-  /** Ajuste da fatura de um perfil (contribuição, desconto ou arredondamento) */
-  interface AjusteFatura { descricao: string; valor: number }
-  /** Ajustes guardados de uma fatura (chave "perfilId|AAAA-MM") */
-  interface FaturaGuardada { contribuicoes: AjusteFatura[]; descontos: AjusteFatura[]; arredondamentos: AjusteFatura[] }
-  interface GrupoOrcamento { naoAtribuido: number; orcamentos: Record<string, number> }
-  interface ConfigDoc {
-    foto?: string; orcamentoAtivo?: boolean; pix?: { chave: string; nome: string; cidade: string };
-    multicambio?: boolean; moeda?: Moeda; moedasIniciadas?: Moeda[];
-  }
-  interface Documento {
-    versao: number; perfis: Perfil[]; contas: Conta[]; categorias: Categoria[]; lancamentos: Lancamento[];
-    grupos: Record<string, GrupoOrcamento>; config: ConfigDoc; meta: { ultimaGravacao?: string; saldoPorTransacao?: number };
-    faturas: Record<string, FaturaGuardada>;
-  }
   interface Frequencia { dias?: number; meses?: number; rotulo: string; texto: string }
   /** Data de uma série dentro de um mês (parcela: só nas parceladas) */
   interface DataSerie { data: string; chave: string; k: number; parcela?: number }
-  type ResumoCategoria = { nome: string; icone: string; cor: string | null };
-  /** Ocorrência de uma recorrência num mês (lista de Recorrências) */
-  interface ItemRecorrencia {
-    id: string; serieId: Id; mes: string; chave: string; data: string; descricao: string; tipoRecorrencia: string;
-    recorrencia?: string | null; parcela: number | null | undefined; parcelaTotal?: number | null; categoriaId?: Id | null;
-    categoria: ResumoCategoria | null; valor: number; pago: boolean; lancamentoId: Id | null; encerrada: boolean; proxima?: boolean;
-  }
-  /** Lançamento como a interface o recebe: com nome da conta, categoria e perfil */
-  type LancamentoTela = Lancamento & { nomeConta: string; ultimos4Digitos: string; categoria: { nome: string; icone: string; cor: string | null } | null; perfil: { nome: string; cor: string | null } | null };
 
   const VERSAO = 1;
   const TIPOS_LANCAMENTO: readonly string[] = ["regular", "recorrente", "interno", "receita", "estorno", "debito"];
@@ -375,7 +320,7 @@
     return m ? { fechamento: m.fechamento, vencimento: m.vencimento, soEsteMes: true }
       : { fechamento: c.fechamento || null, vencimento: c.vencimento || null, soEsteMes: false };
   }
-  function contaPublica(c: Conta) {
+  function contaPublica(c: Conta): ContaTela {
     return {
       id: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", tipo: c.tipo, tipoInvestimento: c.tipoInvestimento || "", oculta: !!c.oculta,
       cor: c.cor, instituicao: c.instituicao || "", limite: c.limite || null, fechamento: c.fechamento || null, vencimento: c.vencimento || null,
@@ -400,7 +345,7 @@
     return serie;
   }
 
-  function getContas() {
+  function getContas(): RespostaContas {
     const ativas = doc.contas.filter((c) => !c.oculta);   // conta oculta não entra nos totais
     const somar = (tipos: readonly string[], data?: string) => r2(ativas.filter((c) => tipos.includes(c.tipo)).reduce((s, c) => s + (data ? (saldoEm(c, data) || 0) : saldoAtual(c)), 0));
     const ativos = somar(ATIVOS), passivos = somar(PASSIVOS);
@@ -415,7 +360,7 @@
     };
   }
 
-  function getInvestimentos(d?: Dados) {
+  function getInvestimentos(d?: Dados): RespostaInvestimentos {
     const excluir = d && Array.isArray(d.excluir) ? d.excluir : [];
     const todas = doc.contas.filter((c) => c.tipo === "investimento");
     const inv = todas.filter((c) => !excluir.includes(c.id) && !c.oculta);
@@ -450,7 +395,7 @@
       perfil: perfil ? { nome: perfil.nome, cor: perfil.cor } : null,
     });
   }
-  function getLancamentos() {
+  function getLancamentos(): RespostaLancamentos {
     return { lancamentos: doc.lancamentos.map(enriquecer).sort((a, b) => b.data.localeCompare(a.data) || b.id.localeCompare(a.id)) };
   }
 
@@ -708,7 +653,7 @@
     return out.sort((a, b) => a.data.localeCompare(b.data));
   }
 
-  function getRecorrencias(d?: Dados) {
+  function getRecorrencias(d?: Dados): RespostaRecorrencias {
     const mes = d && /^\d{4}-\d{2}$/.test(d.mes || "") ? d.mes : mesAtual();
     const lista = ocorrencias(mes);
     return {
@@ -785,10 +730,9 @@
       coberto: r2((base - restante) / 100), cobertura, subcategorias, total: r2(subcategorias + restante / 100) };
   }
 
-  function getCategorias(d?: Dados) {
+  function getCategorias(d?: Dados): RespostaCategorias {
     const mes = d && /^\d{4}-\d{2}$/.test(d.mes || "") ? d.mes : mesAtual();
     const usadas = new Set(doc.lancamentos.map((l) => l.categoriaId).filter(Boolean));
-    type CategoriaTela = Categoria & { usada: boolean; gasto: number; reservado: number; reservadoFixo: number; orcamentoPorMes: boolean; coberturaGrupo?: number };
     const categorias: CategoriaTela[] = doc.categorias.map((c) => Object.assign({}, c, {
       usada: usadas.has(c.id),                                                   // tem transação (não pode sair do orçamento)
       gasto: r2(Math.max(gastoNoMes(c.id, mes), 0)),
@@ -887,7 +831,8 @@
   /* ---------------- ações ---------------- */
   const A = M.ACTIONS;
   type Acao = (d: Dados) => unknown;
-  const LEITURAS: Record<string, Acao> = {
+  // cada leitura devolve exatamente o tipo de ui/src/dados.d.ts (RespostasLeitura): o compilador confere
+  const LEITURAS: { readonly [K in NomeLeitura]: (d: Dados) => RespostasLeitura[K] } = {
     [A.getLancamentos]: getLancamentos,
     /** Multicâmbio: transações das OUTRAS moedas, para trazer para a moeda escolhida (lê o documento inteiro) */
     [A.getLancamentosOutrasMoedas]: () => {
@@ -1671,7 +1616,7 @@
   };
 
   // Só as ações da própria tabela: "in" também acharia nomes herdados de Object (constructor, toString…)
-  const ehLeitura = (action: string) => Object.hasOwn(LEITURAS, action);
+  const ehLeitura = (action: string): action is NomeLeitura => Object.hasOwn(LEITURAS, action);
   const ehEscrita = (action: string) => Object.hasOwn(ESCRITAS, action);
   function atende(action: string) { return ehLeitura(action) || ehEscrita(action); }
 
@@ -1690,7 +1635,7 @@
       perfis: daMoeda(real.perfis), contas: daMoeda(real.contas), categorias: daMoeda(real.categorias), lancamentos: daMoeda(real.lancamentos),
     });
   }
-  function lerNaMoeda(action: string, d: Dados) {
+  function lerNaMoeda(action: NomeLeitura, d: Dados) {
     const real = doc;
     doc = visao(real);
     try { return clone(LEITURAS[action](d)); } finally { doc = real; }

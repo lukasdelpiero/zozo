@@ -31,6 +31,7 @@
     ZoZo.menu.abrir(btn, { largura: 290, render(el) {
       const desenhar = () => {
         const inv = ZoZo.store.get().data.investimentos;
+        if (!inv) return;
         const excluidas = ZoZo.store.get().ui.invExcluidas || [];
         ZoZo.dom.mount(el, h("div", { class: ZoZo.estrutura.menuSecao }, "Contas incluídas"),
           (inv.contas || []).map((c: any) => h("div", { class: ZoZo.estrutura.menuInterruptor },
@@ -48,7 +49,7 @@
   }
 
   function EvolucaoCard(state: EstadoZoZo, ctx: ContextoApp) {
-    const resumo = state.data.investimentos.resumo;
+    const resumo = C.carregado(state, "investimentos").resumo;
     const intervalo = state.ui.intervaloInvestimentos;
     const serie = UI.recortarSerie(resumo.serie, intervalo);
     const chart = h("div", { class: T.grafico });
@@ -81,7 +82,7 @@
         skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCard }), UI.Skeleton(4)),
       });
       if (espera) return C.pagina("page--investimentos", espera);
-      const inv = state.data.investimentos;
+      const inv = C.carregado(state, "investimentos");
       const sel = state.selectedItem && state.selectedItem.tipo === "conta" ? state.selectedItem.id : null;
 
       return C.pagina("page--investimentos",
@@ -99,7 +100,8 @@
             : UI.EmptyState("Nenhuma alocação para exibir.", { icon: "categorias" })));
     },
     selecionar(sel, ctx) {
-      const c = (ZoZo.store.get().data.investimentos.contas || []).find((x: any) => x.id === sel.id);
+      const dados = ZoZo.store.get().data.investimentos;
+      const c = ((dados && dados.contas) || []).find((x) => x.id === sel.id);
       if (c) ZoZo.contasShared.abrirDetalheConta(c, ctx, "investimentos");
     },
   };

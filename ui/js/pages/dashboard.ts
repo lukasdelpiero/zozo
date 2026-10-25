@@ -215,7 +215,7 @@
       });
       if (espera) return C.pagina(T.pagina, saudacao, espera);
 
-      const d = state.data.dashboard;
+      const d = C.carregado(state, "dashboard");
       const hojeIso = F.iso(new Date());
 
       // Orçamento desligado: o card mostra só o gasto (sem mexer nos dados guardados — religar o orçamento volta na hora)

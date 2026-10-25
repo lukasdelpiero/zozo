@@ -68,7 +68,8 @@
   /* ---------------- Nova categoria ---------------- */
   function novaCategoria(ctx: ContextoApp, opts: any) {
     const o = opts || {};
-    const orcamentoAtivo = !(store.get().data.config && store.get().data.config.orcamentoAtivo === false);
+    const config = store.get().data.config;
+    const orcamentoAtivo = !(config && config.orcamentoAtivo === false);
     const d = { icone: o.icone || "📦", nome: o.nome || "", cor: ZoZo.regras.corSugerida(), incluir: true };
     janela({
       titulo: "Nova categoria",

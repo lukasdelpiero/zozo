@@ -15,7 +15,7 @@
   const raizApp = () => document.getElementById("app") as HTMLElement;
 
   /* ---------------- Contexto compartilhado com as páginas ---------------- */
-  const inflight: Partial<Record<string, Promise<any>>> = {};
+  const inflight: Partial<Record<ChaveDados, Promise<unknown>>> = {};
   let geracao = 0;          // muda a cada entrada/saída: resposta de uma sessão anterior é descartada
   const ordem: Record<string, number> = {};         // número da carga mais recente de cada coleção (respostas fora de ordem são ignoradas)
   // router, detail, refreshTopbar, encerrarSessao e logout entram logo abaixo, ao montar a interface
@@ -24,23 +24,26 @@
     toast: (mensagem: string, opts?: OpcoesAviso) => ZoZo.feedback.toast(mensagem, opts),
 
     /** Carrega uma coleção para state.data[key] (com loading e erro amigável) */
-    loadData(key: string, action: string, payload?: unknown, opts?: { force?: boolean }): Promise<any> {
+    loadData<K extends ChaveDados>(key: K, action: LeituraDaChave[K], payload?: unknown, opts?: { force?: boolean }): Promise<DadosEstado[K]> {
+      type Dado = DadosEstado[K];
       const o = opts || {};
       const st = store.get();
-      if (!o.force && st.data[key] && !st.stale[key]) return Promise.resolve(st.data[key]);
-      if (inflight[key] && !o.force) return inflight[key];
+      const guardado = st.data[key] as Dado | null | undefined;
+      if (!o.force && guardado && !st.stale[key]) return Promise.resolve(guardado);
+      const emCurso = inflight[key] as Promise<Dado> | undefined;
+      if (emCurso && !o.force) return emCurso;
       const minha = geracao;
       const pedido = (ordem[key] = (ordem[key] || 0) + 1);
       store.set(() => ({ loading: { [key]: true }, errors: { [key]: null } }));
-      const p = bridge.request(action, payload).then((data) => {
+      const p = (bridge.request(action, payload) as Promise<Dado>).then((data): Dado => {
         if (minha !== geracao) throw new ZoZo.messages.BridgeError("SESSION_EXPIRED", FR.SESSION_EXPIRED);   // outra sessão
-        if (pedido !== ordem[key]) return store.get().data[key];                                               // chegou uma mais nova
+        if (pedido !== ordem[key]) return store.get().data[key] as Dado;                                       // chegou uma mais nova
         const stale = Object.assign({}, store.get().stale); delete stale[key];
         // Mesmo conteúdo: mantém o objeto atual (não redesenha nem interrompe animações)
-        const atual = store.get().data[key];
-        const igual = atual && JSON.stringify(atual) === JSON.stringify(data);
-        store.set({ data: igual ? {} : { [key]: data }, loading: { [key]: false }, stale });
-        return igual ? atual : data;
+        const atual = store.get().data[key] as Dado | null | undefined;
+        const igual = !!atual && JSON.stringify(atual) === JSON.stringify(data);
+        store.set({ data: igual ? {} : ({ [key]: data } as DadosNoEstado), loading: { [key]: false }, stale });
+        return igual && atual ? atual : data;
       }).catch((err) => {
         if (minha !== geracao) throw err;
         // Falha de um pedido ANTIGO (já existe um mais novo): não mexe no estado nem avisa — quem chamou recebe o erro

@@ -143,7 +143,7 @@
         skeleton: h("div", null, h("div", { class: ZoZo.pecas.esqueletoCardBaixo }), UI.Skeleton(8)),
       });
       if (espera) return C.pagina("page--recorrencias", espera);
-      const d = state.data.recorrencias;
+      const d = C.carregado(state, "recorrencias");
       const itens = d.recorrencias || [];
       const sel = state.selectedItem && state.selectedItem.tipo === "recorrencia" ? state.selectedItem.id : null;
 
