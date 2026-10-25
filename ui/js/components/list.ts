@@ -55,14 +55,15 @@
     },
     resumo: {
       linha: "tw:w-full tw:px-2 tw:gap-2 tw:rounded-lg",
-      // colunas de largura fixa: as pílulas de categoria e perfil ficam alinhadas de uma linha para a outra
-      grade: "tw:grid-cols-[minmax(110px,1fr)_120px_120px_96px] "
-        + "tw:area460:grid-cols-[minmax(0,1fr)_96px_96px] tw:area340:grid-cols-[minmax(0,1fr)_96px]",
-      gradeSemPerfil: "tw:grid-cols-[minmax(110px,1fr)_120px_96px] "
-        + "tw:area460:grid-cols-[minmax(0,1fr)_96px_96px] tw:area340:grid-cols-[minmax(0,1fr)_96px]",
+      // como em Transações: pílulas do tamanho delas, encostadas à direita (perfil junto do valor, categoria junto
+      // do perfil); o valor numa coluna fixa, então o perfil termina sempre no mesmo ponto
+      grade: "tw:grid-cols-[minmax(110px,1fr)_minmax(0,max-content)_minmax(0,max-content)_96px] "
+        + "tw:area460:grid-cols-[minmax(0,1fr)_minmax(0,max-content)_96px] tw:area340:grid-cols-[minmax(0,1fr)_96px]",
+      gradeSemPerfil: "tw:grid-cols-[minmax(110px,1fr)_minmax(0,max-content)_96px] "
+        + "tw:area460:grid-cols-[minmax(0,1fr)_minmax(0,max-content)_96px] tw:area340:grid-cols-[minmax(0,1fr)_96px]",
       data: "tw:min-w-[44px] tw:text-[15px] tw:font-[450] tw:text-zz-cinza",
-      categoria: "tw:justify-self-start tw:overflow-hidden tw:max-w-[120px] tw:area460:max-w-[96px] tw:area340:hidden",
-      perfil: "tw:justify-self-start tw:max-w-[120px] tw:area460:hidden",
+      categoria: "tw:justify-self-end tw:overflow-hidden tw:max-w-[120px] tw:area460:max-w-[96px] tw:area340:hidden",
+      perfil: "tw:justify-self-end tw:max-w-[120px] tw:area460:hidden",
     },
     // fundo conforme o estado: normal (realce ao passar o mouse), clicada (fina linha roxa junto ao menu),
     // marcada (roxo claro) e marcada + clicada
@@ -249,9 +250,9 @@
     linha: "recurrence-row tw:base:grid tw:base:items-center tw:base:gap-3 tw:base:w-full tw:base:min-h-(--row-height) tw:base:px-4 tw:base:py-0 tw:[border:0] "
       + "tw:base:rounded-lg tw:text-inherit tw:text-left tw:text-[15px] tw:focus-visible:outline-offset-[-2px]",
     // página: a categoria não reserva largura mínima (o nome nunca some); com o ícone no lugar da data (arquivadas), 22 px
-    // categoria numa coluna de largura fixa: as pílulas ficam alinhadas à esquerda, uma embaixo da outra
-    colunas: "tw:grid-cols-[52px_minmax(0,1fr)_180px_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
-    colunasIcone: "tw:grid-cols-[22px_minmax(0,1fr)_180px_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
+    // categoria do tamanho da pílula, encostada à direita (junto do valor, que tem coluna fixa)
+    colunas: "tw:grid-cols-[52px_minmax(0,1fr)_minmax(0,max-content)_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
+    colunasIcone: "tw:grid-cols-[22px_minmax(0,1fr)_minmax(0,max-content)_120px] tw:area620:grid-cols-[52px_minmax(0,1fr)_110px]",
     interativa: "tw:cursor-pointer tw:[transition:background_var(--duration-fast)_var(--easing),box-shadow_var(--duration-fast)_var(--easing)]",
     normal: "tw:bg-transparent tw:hover:bg-zz-surface-hover",
     selecionada: "tw:bg-zz-primary-soft",
@@ -260,7 +261,7 @@
     desc: "tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:whitespace-nowrap tw:overflow-hidden",
     titulo: "tw:base:overflow-hidden tw:base:text-ellipsis tw:base:text-[15px] tw:base:font-[450]",
     tipo: "tw:flex-none tw:text-zz-muted tw:text-[15px] tw:font-[450] tw:area420:hidden",
-    categoria: "tw:base:min-w-0 tw:base:flex tw:base:justify-self-start tw:base:max-w-[180px] tw:*:min-w-0 tw:*:max-w-full",
+    categoria: "tw:base:min-w-0 tw:base:flex tw:base:justify-self-end tw:base:max-w-[180px] tw:*:min-w-0 tw:*:max-w-full",
     categoriaPagina: "tw:area620:hidden",
     valor: "money tw:[justify-self:end] tw:inline-flex tw:items-center tw:gap-1.5 tw:base:text-[15px] tw:base:font-[620]",
     // check de pago na cor da categoria; vazio com a mesma largura (os valores ficam alinhados)

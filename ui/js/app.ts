@@ -232,6 +232,19 @@
         novaSenhaRecomecar: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: false, onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
         carregando: () => { ZoZo.auth.carregando(authRoot, "Entrando no ZoZo"); setTimeout(() => { if (!store.get().session.authenticated) voltarEntrada(); }, 4000); },
       };
+      // etapas do próprio formulário de entrada (login, cadastro e o código do 2FA)
+      const etapas: Record<string, [string, "login" | "register", number]> = {
+        entrarInicio: ["login", "login", 0], entrarEmail: ["login", "login", 1], entrarSenha: ["login", "login", 2],
+        cadastroNome: ["register", "register", 1], cadastroSenha: ["register", "register", 2], doisFatores: ["2fa", "login", 2],
+      };
+      const etapa = etapas[nome];
+      if (etapa) {
+        authErro = null; authAviso = null; authEmail = em;
+        ZoZo.auth.irPara(etapa[1], etapa[2], em);
+        store.set({ session: { status: etapa[0] as SessaoEstado["status"] } });
+        renderAuth();
+        return;
+      }
       store.set({ session: { status: "login" } });
       (telas[nome] || voltarEntrada)();
     };
@@ -575,6 +588,11 @@
     tela: telaTeste,
     entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
     sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
+    // conta simulada com dados de exemplo (sem servidor): o painel precisa de dados para abrir painéis e janelas
+    entrarSimulado: () => {
+      if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
+      return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r: any) => entrar(r));
+    },
   });
 
   boot();

@@ -69,7 +69,8 @@
     ["🛡️", "Seguros", "#6078a9", null, 250, "Seguro do carro", 180, 260, 15, "mensal"],
   ];
 
-  function documento(hoje0: Date): any {
+  /** completo = modo teste: TODOS os tipos (contas, débito, estorno, parcelada, divisão), para conferir cada tela */
+  function documento(hoje0: Date, completo = false): any {
     const s = sorteador();
     const hoje = new Date(hoje0.getFullYear(), hoje0.getMonth(), hoje0.getDate());
     let seq = 0;
@@ -79,8 +80,10 @@
     const perfis = s.alguns(PERFIS, s.entre(3, 5)).map(([nome, cor]: any[]) => ({ id: id("p"), nome, cor, orcamento: 0 }));
 
     /* Contas: 1–3 cartões, 1–2 bancos, 1–3 investimentos, às vezes empréstimo e carteira */
-    const escolhidas = ([] as any[][]).concat(s.alguns(CARTOES, s.entre(1, 3)), s.alguns(BANCOS, s.entre(1, 2)), s.alguns(INVESTIMENTOS, s.entre(1, 3)),
-      OUTRAS.filter(() => s.r() < 0.5));
+    const escolhidas = completo
+      ? ([] as any[][]).concat(CARTOES.slice(0, 2), BANCOS, INVESTIMENTOS.slice(0, 2), OUTRAS)
+      : ([] as any[][]).concat(s.alguns(CARTOES, s.entre(1, 3)), s.alguns(BANCOS, s.entre(1, 2)), s.alguns(INVESTIMENTOS, s.entre(1, 3)),
+        OUTRAS.filter(() => s.r() < 0.5));
     const contas = escolhidas.map(([nome, dig, tipo, min, max, cor, ti]) => {
       const saldo = s.valor(min, max);
       const historico: Array<{ data: string; saldo: number }> = [];
@@ -146,7 +149,7 @@
       }
 
       // Um estorno de vez em quando, transferência para a poupança e pagamento da fatura
-      if (s.r() < 0.5) {
+      if (completo || s.r() < 0.5) {
         const d = dia(s.entre(1, ultimo));
         const { cat, compras } = s.um(catConsumo);
         const [descricao, min, max] = s.um(compras);
@@ -159,7 +162,7 @@
     }
 
     // Compra parcelada (às vezes): a parcela atual fica no mês de hoje e o serviço gera as próximas
-    if (cartoes.length && s.r() < 0.7) {
+    if (cartoes.length && (completo || s.r() < 0.7)) {
       const total = s.um([6, 10, 12]);
       const atual = s.entre(1, 3);
       const d = new Date(hoje.getFullYear(), hoje.getMonth(), Math.min(s.entre(1, 28), hoje.getDate()));
@@ -169,6 +172,19 @@
         { recorrencia: "parcelada", parcelaAtual: atual, parcelaTotal: total });
       l.serieId = l.id;
       lancamentos.push(l);
+    }
+
+    if (completo && principal && catConsumo.length) {
+      // débito em conta (sai direto do banco) e uma compra dividida em duas partes
+      const { cat } = catConsumo[0];
+      const dDeb = new Date(hoje.getFullYear(), hoje.getMonth(), Math.max(1, hoje.getDate() - 2));
+      lancamentos.push(base(dDeb, "Conta de água", principal.id, cat.id, s.valor(60, 140), "debito"));
+      const dDiv = new Date(hoje.getFullYear(), hoje.getMonth(), Math.max(1, hoje.getDate() - 1));
+      const partes = [s.valor(80, 160), s.valor(40, 120)];
+      const total = Math.round((partes[0] + partes[1]) * 100) / 100;
+      const grupo = id("dv");
+      partes.forEach((v, i) => lancamentos.push(base(dDiv, "Jantar dividido", (cartoes[0] || principal).id, catConsumo[i % catConsumo.length].cat.id, v, "regular",
+        { divisao: { id: grupo, total, partes: 2 } })));
     }
 
     return { versao: 1, perfis, contas, categorias, lancamentos, config: {}, meta: {} };

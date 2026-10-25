@@ -582,6 +582,7 @@ declare global {
     prepararGoogle(dados: any): void;
     carregando(root: HTMLElement, texto: string): void;
     prepararLogin(email: string): void;
+    irPara(modo: "login" | "register", etapa: number, email: string): void;
     aguardandoEmail(root: HTMLElement, email: string, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }): void;
     pedirRecuperacao(root: HTMLElement, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }): void;
     codigoRecuperacao(root: HTMLElement, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }): void;
@@ -590,7 +591,7 @@ declare global {
     A: Readonly<Record<string, string>>;
   }
   /** js/data/demo.ts — documento fictício da conta de demonstração */
-  interface ZoZoDemo { documento(hoje: Date): any }
+  interface ZoZoDemo { documento(hoje: Date, completo?: boolean): any }
   /** js/pages/boleto.ts — criação de fatura */
   interface ZoZoBoleto {
     open(ctx: ContextoApp, opts?: { perfilId?: string | null }): void;
@@ -669,7 +670,7 @@ declare global {
     /** js/core/simbolos.ts — "R$" e "%" menores e no alto do número */
     simbolos?: { realcar(raiz: Node): void };
     /** js/components/teste.ts — painel de testes (só existe com testeHost) */
-    teste?: { iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void }): void };
+    teste?: { iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void; entrarSimulado(): Promise<unknown> }): void };
     servico: ZoZoServico;
     auth: ZoZoAuth;
     demo: ZoZoDemo;

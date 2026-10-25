@@ -302,6 +302,9 @@
   /** Volta à primeira etapa (ex.: depois de sair da conta) */
   function reiniciar() { estado = { modo: null, etapa: 0, email: "", nome: "", google: false }; }
 
+  /** Modo teste: abre uma etapa qualquer do login/cadastro (0 início · 1 e-mail ou nome · 2 senha) */
+  function irPara(modo: "login" | "register", etapa: number, email: string) { estado = { modo, etapa, email, nome: "Teste", google: false }; }
+
   /** Link do e-mail conferido: o login abre direto na senha da conta do link */
   function prepararLogin(email: string) { estado = { modo: "login", etapa: 2, email, nome: "", google: false }; }
 
@@ -420,5 +423,5 @@
     requestAnimationFrame(() => { const b = voltar.querySelector("button"); if (b) b.focus(); });
   }
 
-  ZoZo.auth = { render, reiniciar, prepararGoogle, prepararLogin, carregando, aguardandoEmail, linkInvalido, pedirRecuperacao, codigoRecuperacao, novaSenha, A };
+  ZoZo.auth = { render, reiniciar, prepararGoogle, prepararLogin, irPara, carregando, aguardandoEmail, linkInvalido, pedirRecuperacao, codigoRecuperacao, novaSenha, A };
 })(window.ZoZo);

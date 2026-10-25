@@ -41,6 +41,8 @@
   --color-pilula-igual: #7f8ba4; --color-pilula-igual-fundo: #7f8ba414;
   /* Itens de menu perigosos (Excluir…): texto vermelho e realce claro */
   --color-menu-perigo: #e51300;  --color-menu-perigo-fundo: #ff443314;
+  /* Avisos no rodapé (toast) */
+  --color-aviso-erro: #ff1a1a;
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
   --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */

@@ -491,7 +491,7 @@
       const email = normalizarEmail(d.email);
       if (TESTE && teste.simular) {                // simulação: sem servidor; a mesma conta simulada desta aba ou dados de exemplo
         if (!d.senha) throw erro("WRONG_PASSWORD");
-        const exemplo = ZoZo.demo ? ZoZo.demo.documento(new Date()) : null;
+        const exemplo = ZoZo.demo ? ZoZo.demo.documento(new Date(), true) : null;     // todos os tipos, para conferir cada tela
         return sessaoSimulada(email, email.split("@")[0], email === teste.emailSimulado ? teste.docSimulado : exemplo);
       }
       const par = await parametros(email);
@@ -821,7 +821,7 @@
     /** Dados de exemplo na conta simulada (a demo já sorteia os dela a cada leitura) */
     carregarExemplo() {
       if (!sessao || !sessao.simulada || !ZoZo.demo) return false;
-      teste.docSimulado = ZoZo.demo.documento(new Date());
+      teste.docSimulado = ZoZo.demo.documento(new Date(), true);
       return true;
     },
     estado: () => ({ endereco: hostAtual, simulacao: teste.simular, falha: teste.falha,
