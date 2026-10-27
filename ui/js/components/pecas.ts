@@ -368,8 +368,10 @@
     dvNome: "tw:text-[15px] tw:font-[450]",
     dvValor: "tw:text-[15px] tw:font-[550] tw:text-right tw:m-0",
     dvPct: "tw:text-[15px] tw:font-[550] tw:text-left tw:w-[72px] tw:m-0",
-    pontoCor: "ponto-cor tw:size-3.5 tw:rounded-[50%] tw:[border:0] tw:p-0 tw:bg-(--dot) tw:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-border)] tw:flex-none tw:cursor-pointer "
-      + "tw:hover:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-primary)]",
+    // a área de toque passa do ponto (14 px → 24 px, WCAG 2.5.8) sem mudar o desenho: ::before invisível em volta;
+    // 3 px a mais à direita para a área não invadir o campo ao lado (o nome do perfil ficava a 3 px)
+    pontoCor: "ponto-cor tw:relative tw:size-3.5 tw:rounded-[50%] tw:[border:0] tw:p-0 tw:bg-(--dot) tw:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-border)] tw:flex-none tw:mr-[3px] tw:cursor-pointer "
+      + "tw:hover:[box-shadow:0_0_0_3px_#fff,0_0_0_4px_var(--color-primary)] tw:before:absolute tw:before:-inset-[5px] tw:before:rounded-[50%] tw:before:content-['']",
     pontoCorMenu: "tw:p-1",
     iconeEscolha: "icon-pick tw:base:size-11 tw:base:grid tw:base:place-items-center tw:base:border tw:base:border-zz-border tw:base:rounded-lg tw:base:bg-(--color-background) "
       + "tw:base:text-[22px] tw:base:p-0 tw:base:leading-none tw:base:[font-family:'Segoe_UI_Emoji','Apple_Color_Emoji','Noto_Color_Emoji',var(--font-family)] "

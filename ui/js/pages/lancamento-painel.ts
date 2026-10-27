@@ -418,8 +418,9 @@
           // Divisão entre perfis: rachada → resumo; senão o "+" (igual ao da recorrência; também em recorrentes já criadas)
           podeDividir ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Divisão"),
             d.divisao
-              ? h("button", { type: "button", class: ZoZo.pecas.lpRec, onClick: abrirDivisao },
-                icon("dividir", { size: 12 }), F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes")
+              // texto longo encolhe com "…" em telas estreitas (antes passava da borda do painel); inteiro no title
+              ? h("button", { type: "button", class: ZoZo.pecas.lpRec, onClick: abrirDivisao, title: F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes" },
+                icon("dividir", { size: 12 }), h("span", { class: "tw:min-w-0 tw:overflow-hidden tw:text-ellipsis" }, F.moeda(d.divisao.total) + " dividido em " + d.divisao.partes + " partes"))
               : h("button", { type: "button", class: ZoZo.pecas.lpMais, "aria-label": "Adicionar divisão", title: "Adicionar divisão", onClick: abrirDivisao }, icon("mais", { size: 14 }))) : null),
         h("section", { class: ZoZo.pecas.lpNotasArea }, campoNotas()),
         statusEl,
@@ -469,7 +470,7 @@
       selected: novo ? null : { tipo: "lancamento", id: gravada.id },
       voltar: opts.voltar,
       botoes: novo ? [{ label: "Criar", icone: "check", primario: true, onClick: (e: MouseEvent) => criar(e.currentTarget as HTMLButtonElement) }]
-        : podeDividir && d.divisao ? [{ label: "Editar divisão", icone: "dividir", onClick: abrirDivisao }] : [],
+        : podeDividir && d.divisao ? [{ label: "Editar divisão", rotuloCurto: "Divisão", icone: "dividir", onClick: abrirDivisao }] : [],
       menu: novo ? undefined : [{ label: "Excluir transação", perigo: true, onClick: excluir }],
       render(body: HTMLElement) { desenhar(); mount(body, corpo); },
     });

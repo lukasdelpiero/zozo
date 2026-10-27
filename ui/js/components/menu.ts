@@ -243,7 +243,9 @@
   /** Perfis em pílula (caixa alta) + "Novo perfil" (o novo já vem escolhido) */
   function perfis(anchor: HTMLElement, ctx: ContextoApp, o: OpcoesMenuPerfil): void {
     abrir(anchor, o.perfis.map((p): ItemMenu => ({
-      render: (api) => h("button", { type: "button", class: [E.menuItem, p.id === o.atual && "is-checked"], onClick: () => { api.fechar(); o.aoEscolher(p); } },
+      // item de menu escolhível, como nas contas (um botão comum dentro de role="menu" não é anunciado como item)
+      render: (api) => h("button", { type: "button", role: "menuitemradio", "aria-checked": String(p.id === o.atual), class: [E.menuItem, p.id === o.atual && "is-checked"],
+        onClick: () => { api.fechar(); o.aoEscolher(p); } },
         ZoZo.ui.Tag(p.nome, p.cor, { class: "tag--upper" })),
     })).concat([
       { separador: true },

@@ -27,6 +27,7 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 - **Desempenho:** o QR code e o painel de testes carregam só quando usados (pacote principal menor). Entrada das páginas no mesmo ritmo em todas as telas.
 - **Segurança:** etapas da recuperação de senha limitadas por IP. TypeScript recusa código não usado.
 - **Back-end:** tipos conferidos com **mypy** (modo estrito) em todo `api/src`; a sessão de uma conta que não existe mais é encerrada (antes: erro 500). **FastAPI + Pydantic** vão no pacote do Worker (Pydantic 2.12.5, a versão compilada para o Pyodide; ~2,2 MB comprimido) e ficam **ligados na prévia**: todo JSON é validado com modelos estritos antes das regras de sempre. Produção continua no caminho direto até a prévia ser aprovada.
+- **Auditoria do frontend** ([docs/AUDITORIA-FRONTEND.md](docs/AUDITORIA-FRONTEND.md)): Transações sem travar com milhares de itens (abrir uma transação ~175 → 29 ms; marcar caixa ~775 → 40 ms); foco não se perde ao abrir uma linha pelo teclado; menu do celular fechado fora do Tab; prévia da fatura rolável pelo teclado; cabeçalho do painel sem sobreposição em 320 px; menu de perfis, esqueleto e títulos da fatura com a semântica certa; aviso laranja do câmbio legível; área de toque do ponto de cor com 24 px.
 - **Interface:** sem o modo `?mock=1` (a demonstração e o Modo teste cobrem o uso sem servidor); nenhuma resposta da API sem tipo.
 
 ## Novidades da versão 3.17.0

@@ -444,7 +444,7 @@
     const secaoAjuste = (titulo: string, lista: AjusteTela[], cfg: Omit<ConfigAjustes, "onChange">) => {
       const ed = Ajustes(lista, Object.assign({ onChange: ajustesMudaram }, cfg));
       editoresAjuste.push(ed);
-      return h("section", { class: T.secao }, h("h3", { class: T.secaoTitulo }, titulo), ed.el);
+      return h("section", { class: T.secao }, h("h2", { class: T.secaoTitulo }, titulo), ed.el);
     };
 
     /* Pagamento recebido do perfil: entra como Receita na conta escolhida e abate desta fatura */
@@ -464,15 +464,16 @@
         h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Fatura de"), h("div", { class: T.periodo }, mesSel, anoSel), periodosEl),
         UI.Field("Data da fatura", dataInput)),
       h("section", { class: T.secao },
-        h("h3", { class: T.secaoTitulo }, "Transações", contadorEl),
+        h("h2", { class: T.secaoTitulo }, "Transações", contadorEl),
         listaEl),
       secaoAjuste("Contribuições", st.contribuicoes, { chave: "contrib", rotulo: "Contribuição", adicionar: "Adicionar contribuição", prefixo: F.simbolo(), aceitaNegativo: false }),
       secaoAjuste("Descontos", st.descontos, { chave: "desc", rotulo: "Desconto", adicionar: "Adicionar desconto", prefixo: "− " + F.simbolo(), aceitaNegativo: false }),
       secaoAjuste("Arredondamentos", st.arredondamentos, { chave: "arr", rotulo: "Arredondamento", adicionar: "Adicionar arredondamento", prefixo: F.simbolo(), aceitaNegativo: R().arredondamentoAceitaNegativo }),
-      h("section", { class: T.secao + " tw:gap-3" }, h("h3", { class: T.secaoTitulo }, "Pagamentos recebidos"), recebidosEl, receberBtn),
+      h("section", { class: T.secao + " tw:gap-3" }, h("h2", { class: T.secaoTitulo }, "Pagamentos recebidos"), recebidosEl, receberBtn),
       h("section", { class: T.secaoResumo }, seloEl, resumoEl, avisoPix, copiarPix, imprimirBtn));
 
-    const preview = h("div", { class: T.previa }, h("div", { class: T.escala }, docEl));
+    // área com rolagem própria: focável (Tab) e com nome, para rolar pelo teclado (WCAG 2.1.1)
+    const preview = h("div", { class: T.previa, tabindex: "0", role: "region", "aria-label": "Prévia da fatura" }, h("div", { class: T.escala }, docEl));
 
     const el = h("div", { class: T.janela, role: "dialog", "aria-modal": "true", "aria-labelledby": "boleto-titulo" },
       h("header", { class: [T.cabecalho, ZoZo.pecas.ctxCabecalhoFatura] },

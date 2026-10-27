@@ -38,8 +38,8 @@
     bandeira: "tw:block tw:rounded-[2px] tw:[box-shadow:0_0_0_1px_rgba(0,0,0,.12)]",
     // janelas de transferência
     aviso: "tw:mt-0 tw:mx-0 tw:mb-3",
-    avisoLaranja: "tw:flex tw:items-start tw:gap-2 tw:mt-0 tw:mx-0 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-(--color-alerta-soft) tw:text-(--color-alerta) "
-      + "tw:text-[13px] tw:font-[550] tw:leading-[1.4] tw:[&_.icon]:flex-none tw:[&_.icon]:mt-px",
+    avisoLaranja: "tw:flex tw:items-start tw:gap-2 tw:mt-0 tw:mx-0 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-(--color-alerta-soft) tw:text-(--color-warning-text) "
+      + "tw:text-[13px] tw:font-[550] tw:leading-[1.4] tw:[&_.icon]:flex-none tw:[&_.icon]:mt-px tw:[&_.icon]:text-(--color-alerta)",
     modo: "tw:flex tw:justify-center tw:mb-3",
     moeda: "tw:inline-flex tw:items-center tw:gap-1.5",
     marcar: "tw:size-4 tw:[accent-color:var(--color-primary)]",

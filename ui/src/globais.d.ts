@@ -293,6 +293,10 @@ declare global {
     topbar?(ctx: ContextoApp): FilhoDom;
     prefixo?(ctx: ContextoApp): FilhoDom;
     selecionar?(sel: { tipo: string; id: string }, ctx: ContextoApp): void;
+    /** Partes do estado que só mudam algumas linhas (ex.: item aberto no painel, caixas marcadas) */
+    depsLinhas?(state: EstadoZoZo): unknown[];
+    /** Mudou só depsLinhas: troca no lugar as linhas afetadas. false = não deu (a página é redesenhada inteira) */
+    atualizarLinhas?(state: EstadoZoZo, ctx: ContextoApp): boolean;
   }
   interface Roteador {
     navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;

@@ -27,6 +27,7 @@
     function vazio() {
       chaveAtual = null;
       tituloEl.textContent = "";
+      tituloEl.hidden = true;            // sem item aberto: nenhum título vazio para o leitor de tela
       mount(voltarEl);
       mount(acoesEl);
       mount(corpo, h("div", { class: E.painelVazio },
@@ -52,14 +53,18 @@
     function open(cfg: ConfigPainel): ApiPainel {
       atual = { onClose: cfg.onClose };
       workspaceEl.dataset.conteudo = "sim";
+      tituloEl.hidden = false;
       // Título: texto ou elemento (ex.: seletor do tipo de lançamento)
       if (cfg.tituloNode) mount(tituloEl, cfg.tituloNode); else tituloEl.textContent = cfg.title || "";
       // Seta "voltar": retorna ao conteúdo anterior sem trocar de página
       mount(voltarEl, cfg.voltar ? [UI.IconButton("seta-voltar", "Voltar", { onClick: cfg.voltar }), h("span", { class: E.divisorVoltar, "aria-hidden": "true" })] : null);
+      // celular: rótulo curto; ≤ 360 px, com ícone, só o ícone (em 320 px o título e o botão se sobrepunham).
+      // O nome acessível e o title continuam com o texto inteiro.
       const botoes: HTMLElement[] = (cfg.botoes || []).map((b) => h("button", { type: "button", class: b.primario ? E.botaoTextoPrimario : E.botaoTexto, onClick: b.onClick, disabled: b.desabilitado,
-        "aria-label": b.rotuloCurto ? b.label : undefined },
+        "aria-label": b.rotuloCurto ? b.label : undefined, title: b.rotuloCurto && b.icone ? b.label : undefined },
         b.icone ? icon(b.icone, { size: 14, stroke: 2.25 }) : null,
-        b.rotuloCurto ? [h("span", { class: "tw:celular:hidden" }, b.label), h("span", { class: "tw:hidden tw:celular:inline", "aria-hidden": "true" }, b.rotuloCurto)] : b.label));
+        b.rotuloCurto ? [h("span", { class: "tw:celular:hidden" }, b.label),
+          h("span", { class: b.icone ? "tw:hidden tw:celular:min-[361px]:inline" : "tw:hidden tw:celular:inline", "aria-hidden": "true" }, b.rotuloCurto)] : b.label));
       (cfg.acoes || []).forEach((a) => botoes.push(UI.IconButton(a.icone, a.rotulo, { class: a.perigo ? "icon-btn--danger" : null, onClick: a.onClick })));
       const itensMenu = (cfg.menu || []).filter((x): x is ItemMenu => !!x);
       if (itensMenu && itensMenu.length) {

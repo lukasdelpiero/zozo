@@ -53,6 +53,10 @@
     adicionar: "tw:inline-flex tw:items-center tw:gap-1.5 tw:h-7 tw:px-3 tw:py-0 tw:border tw:border-dashed tw:border-zz-border-strong "
       + "tw:rounded-(--radius-pill) tw:bg-transparent tw:text-zz-secondary tw:text-[13px] tw:hover:text-zz-primary tw:hover:border-zz-primary",
     mesSeguinte: "tw:mt-4",
+    // cada mês: o navegador só calcula e desenha os meses que estão na tela (com milhares de transações, abrir a
+    // página levava ~0,6 s só em estilo e layout). A folga lateral igual à das linhas (-mx/px) evita cortar o realce
+    // delas, que vai até a borda da página (content-visibility também recorta a pintura na caixa da seção)
+    mes: "tw:-mx-(--page-gutter) tw:px-(--page-gutter) tw:[content-visibility:auto] tw:[contain-intrinsic-size:auto_900px]",
     mesCab: "tw:flex tw:items-baseline tw:justify-between tw:gap-4 tw:pt-2",
     mesTitulo: "tw:p-0 " + TITULO_MES,
     mesTituloSolto: "tw:pt-2 tw:px-4 tw:pb-1 " + TITULO_MES,          // "Ordenado por valor" (sem total ao lado)
@@ -338,6 +342,14 @@
   function abrirFormulario(l: LancamentoTela | null, ctx: ContextoApp, preset?: Partial<Lancamento>) { return ZoZo.lancamentoPainel.abrir(l, ctx, l ? {} : { preset }); }
 
   /* ---------------- Barra de seleção (ações em lote) ---------------- */
+  /** Caixa "selecionar todas" do topo: marcada, meio marcada ou vazia conforme as transações visíveis */
+  function marcarTodos(itens: LancamentoTela[], marcados: Set<Id>) {
+    if (!checkTodos) return;
+    const todosMarcados = itens.length > 0 && itens.every((l) => marcados.has(l.id));
+    checkTodos.checked = todosMarcados;
+    checkTodos.indeterminate = !todosMarcados && itens.some((l) => marcados.has(l.id));
+  }
+
   function barraSelecao(st: EstadoZoZo, ctx: ContextoApp, visiveis: LancamentoTela[]) {
     const sel = st.ui.selecionados || [];
     if (!sel.length) return null;
@@ -473,6 +485,12 @@
 
   /* Checkbox ao lado do título: seleciona todos os lançamentos visíveis */
   let checkTodos: HTMLInputElement | null = null;
+  // Lista desenhada (para trocar no lugar só as linhas que mudam ao abrir uma transação ou marcar caixas)
+  let vista: {
+    linhas: Map<Id, { el: HTMLElement; l: LancamentoTela; comData: boolean }[]>;
+    selId: Id | null; marcados: Set<Id>; itens: LancamentoTela[]; barra: HTMLElement;
+    criar(l: LancamentoTela, comData: boolean, selId: Id | null, marcados: Set<Id>): HTMLElement;
+  } | null = null;
   function prefixo() {
     const box = UI.Checkbox(false, (marcar) => {
       const st = store.get();
@@ -497,8 +515,32 @@
         ctx.loadData("recorrencias", A.getRecorrencias, null, { force }).catch(() => null),
       ]).then(() => ctx.refreshTopbar());
     },
-    deps: (s) => [s.data.lancamentos, s.data.perfis, s.data.categorias, s.errors.lancamentos, s.errors.perfis, s.ui.filtros, s.ui.busca, s.ui.selecionados, s.selectedItem],
+    deps: (s) => [s.data.lancamentos, s.data.perfis, s.data.categorias, s.errors.lancamentos, s.errors.perfis, s.ui.filtros, s.ui.busca],
+    depsLinhas: (s) => [s.ui.selecionados, s.selectedItem],
+    atualizarLinhas(state, ctx) {
+      const v = vista;
+      if (!v || !v.barra.isConnected) return false;
+      const selId = state.selectedItem && state.selectedItem.tipo === "lancamento" ? state.selectedItem.id : null;
+      const marcados = new Set(state.ui.selecionados || []);
+      const mudaram = new Set<Id>();
+      if (selId !== v.selId) { if (v.selId) mudaram.add(v.selId); if (selId) mudaram.add(selId); }
+      marcados.forEach((id) => { if (!v.marcados.has(id)) mudaram.add(id); });
+      v.marcados.forEach((id) => { if (!marcados.has(id)) mudaram.add(id); });
+      mudaram.forEach((id) => (v.linhas.get(id) || []).forEach((x) => {
+        const ativo = document.activeElement;
+        const focado = ativo && x.el.contains(ativo) ? (ativo.tagName === "INPUT" ? "input" : "button") : null;
+        const novo = v.criar(x.l, x.comData, selId, marcados);
+        x.el.replaceWith(novo);
+        x.el = novo;
+        if (focado) (novo.matches(focado) ? novo : novo.querySelector<HTMLElement>(focado))?.focus();
+      }));
+      v.selId = selId; v.marcados = marcados;
+      marcarTodos(v.itens, marcados);
+      mount(v.barra, barraSelecao(state, ctx, v.itens));
+      return true;
+    },
     render(state, ctx) {
+      vista = null;
       const espera = C.estadoCarregamento(state, ["lancamentos", "perfis"], () => this.carregar(ctx, true), { skeleton: UI.Skeleton(10) });
       if (espera) return C.pagina(T.pagina, espera);
 
@@ -511,11 +553,7 @@
       const filtrando = temFiltro(state);
       const selId = state.selectedItem && state.selectedItem.tipo === "lancamento" ? state.selectedItem.id : null;
       const marcados = new Set(state.ui.selecionados || []);
-      if (checkTodos) {
-        const todosMarcados = itens.length > 0 && itens.every((l) => marcados.has(l.id));
-        checkTodos.checked = todosMarcados;
-        checkTodos.indeterminate = !todosMarcados && itens.some((l) => marcados.has(l.id));
-      }
+      marcarTodos(itens, marcados);
       const alternarMarca = (id: Id, v: boolean) => {
         const atual = new Set(store.get().ui.selecionados || []);
         if (v) atual.add(id); else atual.delete(id);
@@ -532,14 +570,21 @@
 
       const termosBusca = termoAtual ? ZoZo.busca.consulta(state.ui.busca).termos : [];
       const destacar = termosBusca.length ? (t: string) => ZoZo.busca.destacar(t, termosBusca) : null;
-      const linha = (l: LancamentoTela, comData: boolean) => L.LaunchRow(l, {
+      const criar = (l: LancamentoTela, comData: boolean, sel: Id | null, marc: Set<Id>) => L.LaunchRow(l, {
         destacar,
-        selected: l.id === selId,
-        marcado: marcados.has(l.id),
+        selected: l.id === sel,
+        marcado: marc.has(l.id),
         onMarcar: (v: boolean) => alternarMarca(l.id, v),
         mostrarData: comData,
         onClick: () => abrirVisualizacao(l, ctx),
       });
+      const linhas = new Map<Id, { el: HTMLElement; l: LancamentoTela; comData: boolean }[]>();
+      const linha = (l: LancamentoTela, comData: boolean) => {
+        const el = criar(l, comData, selId, marcados);
+        const doItem = linhas.get(l.id);
+        if (doItem) doItem.push({ el, l, comData }); else linhas.set(l.id, [{ el, l, comData }]);
+        return el;
+      };
 
       const blocos: HTMLElement[] = [];
       if (filtros().ordem.startsWith("valor")) {
@@ -561,7 +606,7 @@
             const doMes = porMes.get(mes) || [];
             // "Mês Ano" e o total só nos meses passados; no mês atual, o título fica só para o leitor de tela
             const passado = mes < mesHoje;
-            secao = h("section", { class: [blocos.length && T.mesSeguinte, anim(blocos.length)] },
+            secao = h("section", { class: [T.mes, blocos.length && T.mesSeguinte, anim(blocos.length)] },
               mes === mesHoje ? h("h2", { class: "tw:sr-only" }, F.mesAno(mes + "-01"))
                 : h("header", { class: T.mesCab },
                   h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),
@@ -578,7 +623,10 @@
         });
       }
 
-      return C.pagina(T.pagina, topo, blocos, barraSelecao(state, ctx, itens));
+      // a barra de seleção fica num envoltório fixo (display: contents) para ser trocada sem redesenhar a lista
+      const barra = h("div", { class: "tw:contents" }, barraSelecao(state, ctx, itens));
+      vista = { linhas, selId, marcados, itens, barra, criar };
+      return C.pagina(T.pagina, topo, blocos, barra);
     },
     selecionar(sel, ctx) {
       const dados = store.get().data.lancamentos;

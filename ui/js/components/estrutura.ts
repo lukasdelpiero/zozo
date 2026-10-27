@@ -48,9 +48,12 @@
       + "tw:computador:group-data-[menu=recolhido]/shell:[transition:transform_var(--duration-medium)_var(--easing),visibility_0s_linear_var(--duration-medium)] "
       + "tw:estreito:justify-start "
       // celular: gaveta fixa que entra da esquerda
-      + "tw:gaveta:fixed tw:gaveta:top-0 tw:gaveta:bottom-0 tw:gaveta:left-0 tw:gaveta:z-60 tw:gaveta:w-[min(280px,84vw)] tw:gaveta:visible "
-      + "tw:gaveta:group-data-[menu=recolhido]/shell:visible tw:gaveta:[transform:translateX(-100%)] "
-      + "tw:gaveta:[transition:transform_280ms_var(--easing,ease),box-shadow_280ms] tw:gaveta:group-data-[gaveta=aberta]/shell:[transform:none] "
+      // fechada, fica invisível (fora do Tab e do leitor de tela) só depois de terminar de sair; aberta, aparece na hora
+      + "tw:gaveta:fixed tw:gaveta:top-0 tw:gaveta:bottom-0 tw:gaveta:left-0 tw:gaveta:z-60 tw:gaveta:w-[min(280px,84vw)] tw:gaveta:invisible "
+      + "tw:gaveta:group-data-[gaveta=aberta]/shell:visible tw:gaveta:[transform:translateX(-100%)] "
+      + "tw:gaveta:[transition:transform_280ms_var(--easing,ease),box-shadow_280ms,visibility_0s_linear_280ms] "
+      + "tw:gaveta:group-data-[gaveta=aberta]/shell:[transition:transform_280ms_var(--easing,ease),box-shadow_280ms,visibility_0s_linear_0s] "
+      + "tw:gaveta:group-data-[gaveta=aberta]/shell:[transform:none] "
       + "tw:gaveta:group-data-[gaveta=aberta]/shell:[box-shadow:8px_0_32px_rgba(15,39,66,0.28)] tw:motion-reduce:transition-none!",
     menuTopo: "tw:h-(--topbar-height) tw:flex-none tw:flex tw:items-center tw:justify-start tw:pt-0 tw:pr-3 tw:pb-0 tw:pl-[14px]",
     logo: "tw:size-7 tw:rounded-[5px] tw:flex-none tw:[box-shadow:0_1px_3px_rgba(15,39,66,0.25)] tw:estreito:hidden tw:gaveta:block",
@@ -68,7 +71,8 @@
       + "tw:gaveta:static tw:gaveta:w-auto tw:gaveta:h-auto tw:gaveta:overflow-visible tw:gaveta:[clip:auto]",
     contas: "tw:flex-auto tw:min-h-0 tw:overflow-y-auto tw:pt-3 tw:px-3 tw:pb-4 tw:estreito:hidden tw:gaveta:block",
     nota: "tw:text-(--sidebar-fg-muted) tw:text-[13px] tw:py-2 tw:px-2.5",
-    demo: "tw:flex tw:gap-1.5 tw:items-start tw:mt-0 tw:mx-3 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-(--color-alerta-soft) tw:text-(--color-alerta) "
+    // texto do aviso com o token de texto de aviso (o laranja #e8730c dava 2,7:1); o ícone continua laranja
+    demo: "tw:flex tw:gap-1.5 tw:items-start tw:mt-0 tw:mx-3 tw:mb-3 tw:py-2 tw:px-3 tw:rounded-lg tw:bg-(--color-alerta-soft) tw:text-(--color-warning-text) "
       + "tw:text-[11.5px] tw:font-[550] tw:leading-[1.4] tw:estreito:hidden tw:gaveta:flex",
     demoIcone: "tw:mt-px tw:text-(--color-alerta)",
     cambio: "tw:empty:hidden tw:py-2 tw:px-3 tw:border-t tw:border-t-(--sidebar-divider) tw:estreito:p-2",

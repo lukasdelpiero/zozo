@@ -401,7 +401,15 @@
       toggleMenu.title = texto;
       toggleMenu.setAttribute("aria-expanded", String(aberto));
     };
-    const gaveta = (abrir: boolean) => { shellRoot.dataset.gaveta = abrir ? "aberta" : ""; rotularToggle(); };
+    const gaveta = (abrir: boolean) => {
+      const estava = shellRoot.dataset.gaveta === "aberta";
+      shellRoot.dataset.gaveta = abrir ? "aberta" : "";
+      rotularToggle();
+      if (!celular.matches || abrir === estava) return;
+      // fechada, a gaveta fica invisível: o foco que estava nela volta ao botão; aberta, o foco entra nela
+      if (abrir) sidebarEl.querySelector<HTMLElement>("button:not([disabled]), a[href]")?.focus();
+      else if (sidebarEl.contains(document.activeElement)) toggleMenu.focus();
+    };
     toggleMenu.addEventListener("click", () => {
       if (celular.matches) { gaveta(shellRoot.dataset.gaveta !== "aberta"); return; }
       const fechar = shellRoot.dataset.menu !== "recolhido";

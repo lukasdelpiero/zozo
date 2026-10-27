@@ -343,7 +343,7 @@
   /* ---------- Loading / Vazio ---------- */
   function Skeleton(linhas?: number, opts?: { class?: string; short?: boolean }): HTMLElement {
     const o = opts || {};
-    const wrap = h("div", { class: [P.esqueleto, o.class], "aria-busy": "true", "aria-label": "Carregando" });
+    const wrap = h("div", { class: [P.esqueleto, o.class], role: "status", "aria-busy": "true", "aria-label": "Carregando" });
     for (let i = 0; i < (linhas || 4); i++) {
       wrap.appendChild(h("div", { class: P.esqueletoLinha },
         h("span", { class: P.esqueletoBloco, style: { width: (o.short ? 18 : 30 + ((i * 17) % 40)) + "%" } }),
