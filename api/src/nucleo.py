@@ -279,7 +279,9 @@ def _conteudo(valor: object) -> str:
 
 
 def _nome(valor: object) -> str:
-    texto = unicodedata.normalize("NFC", str(valor if valor is not None else ""))
+    if valor is not None and not isinstance(valor, str):     # objeto ou lista não vira texto ("{'x': 1}")
+        raise Falha(400, "INVALID_REQUEST")
+    texto = unicodedata.normalize("NFC", valor or "")
     texto = "".join(c for c in texto if unicodedata.category(c) not in ("Cc", "Cf", "Cs", "Co", "Cn"))
     return texto.strip()[:80]
 
@@ -298,7 +300,7 @@ def _json(pedido: Pedido) -> Json:
         raise Falha(413, "DOCUMENT_TOO_LARGE")
     try:
         dados = json.loads(pedido.corpo or "{}")
-    except ValueError as ex:
+    except (ValueError, RecursionError) as ex:            # RecursionError: JSON aninhado demais ("[[[[…")
         raise Falha(400, "INVALID_REQUEST") from ex
     if not isinstance(dados, dict):
         raise Falha(400, "INVALID_REQUEST")

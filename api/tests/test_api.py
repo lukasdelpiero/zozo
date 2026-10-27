@@ -1324,6 +1324,27 @@ class TesteAuditoria30(Base):
             self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
         self.assertEqual(self.con.execute("SELECT nome FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "Ana")
 
+    def test_nome_precisa_ser_texto(self):
+        # um objeto ou lista virava texto ("{'x': 1}") e era gravado como nome
+        for ruim in ({"x": 1}, ["Ana", "Bia"], 123, True):
+            st, r = self.api("PUT", "/api/conta/nome", {"nome": ruim}, prova=self.prova)
+            self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
+            cli = Cliente(self.banco, ip="198.51.100.95")
+            st, r = self.cadastrar(cli, OUTRO, prova(), nome=ruim)
+            self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
+        self.assertEqual(self.con.execute("SELECT nome FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "Ana")
+        self.assertIsNone(self.con.execute("SELECT 1 FROM contas WHERE email = ?", (OUTRO,)).fetchone())
+
+    def test_json_aninhado_demais_e_recusado_sem_erro_interno(self):
+        # 100 mil colchetes estouravam a recursão do leitor de JSON: erro 500 (sem login, nas rotas públicas)
+        fundo = "[" * 100_000 + "]" * 100_000
+        anonimo = Cliente(self.banco, ip="198.51.100.96")
+        for cli, metodo, rota, pv in ((anonimo, "POST", "/api/sessao", None), (anonimo, "POST", "/api/conta", None),
+                                      (self.api, "PUT", "/api/documento", self.prova)):
+            st, r = cli(metodo, rota, fundo, prova=pv)
+            self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), rota)
+            self.assertFalse(any("falha_no_servidor" in x for x in cli.logs), rota)
+
 
 class TesteKdf(Base):
     def test_kdf_argon2_no_cadastro_e_nos_parametros(self):
