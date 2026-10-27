@@ -102,6 +102,7 @@ COTA_DADOS, COTA_JANELA_S = 600, 600                 # pedidos às rotas de dado
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+FRASE_EXCLUIR = "EXCLUIR CONTA"   # excluir a conta: a pessoa digita isto (no lugar da senha); a sessão e a prova continuam exigidas
 
 # Conta de demonstração pública (criada pela migração 0003_conta_demo.sql)
 DEMO_EMAIL = "demo@usezozo.com.br"
@@ -533,6 +534,31 @@ async def _conferir_prova(ctx: Contexto, email: str) -> Linha:
     if linha:
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
     return conta
+
+
+async def _exigir_codigo_atual(ctx: Contexto, email: str, conta: Linha, codigo: object) -> None:
+    """
+    Conta com 2FA: ações que não têm volta (excluir a conta, trocar a senha, desligar a proteção avançada) pedem um
+    código ATUAL do aplicativo — a sessão e a prova guardadas no navegador não bastam. Mesmo bloqueio do código no
+    login (5 erros → 15 min) e o código usado não serve de novo. Conta sem 2FA: nada a conferir.
+    """
+    if not conta["totp_segredo"]:
+        return
+    if codigo is None:
+        raise Falha(401, "CODE_REQUIRED")
+    chave = f"2fa|{ctx.h(email)}"
+    r = await _reservar(ctx, chave)
+    if not r:
+        raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
+    segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo)
+    passo = totp.conferir(segredo, codigo, ctx.agora, conta["totp_ultimo_passo"]) if segredo else None
+    if passo is not None:
+        n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?", passo, email, passo)
+        passo = passo if n == 1 else None
+    if passo is None:
+        ctx.evento("2fa_acao_recusada", email, tentativa=r["falhas"])
+        raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
+    await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
 
 
 def _gravar_documento(email: str, versao_anterior: int, conteudo: str) -> Comando:
@@ -1219,7 +1245,7 @@ async def _rota(ctx: Contexto) -> Resposta:
         ctx.evento("cota_excedida", email)
         raise Falha(429, "TOO_MANY_ATTEMPTS", {"espera": COTA_JANELA_S})
     # Corpo validado ANTES da prova: pedido malformado não consome tentativa
-    b = _json(p) if m in ("POST", "PUT") and c not in _SEM_CORPO else {}
+    b = _json(p) if m in ("POST", "PUT", "DELETE") and c not in _SEM_CORPO else {}
     conta = await _conferir_prova(ctx, email)
 
     if c == "/api/conta/nome":
@@ -1233,6 +1259,7 @@ async def _rota(ctx: Contexto) -> Resposta:
         # Novo sal + nova prova + documento recifrado, tudo na mesma transação
         sal, it, kdf = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _kdf(b.get("kdf"))
         nova_prova, conteudo, va = _prova(b.get("prova")), _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
+        await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
         await _lote_atomico(ctx.banco, [
             _gravar_documento(email, va, conteudo), _GUARDA,
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ?",
@@ -1292,6 +1319,10 @@ async def _rota(ctx: Contexto) -> Resposta:
         return Resposta(200, {"versao": va + 1})
 
     if m == "DELETE" and c == "/api/conta":
+        # no lugar da senha, a frase digitada; com 2FA, também um código atual
+        if set(b) - {"confirmacao", "codigo"} or b.get("confirmacao") != FRASE_EXCLUIR:
+            raise Falha(400, "CONFIRMATION_REQUIRED")
+        await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
         await ctx.banco.lote([
             ("DELETE FROM historico WHERE email = ?", (email,)),
             ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
@@ -1304,6 +1335,7 @@ async def _rota(ctx: Contexto) -> Resposta:
         await _limpar_login(ctx, email)
         _definir_cookie(ctx)
         ctx.evento("conta_excluida", email)
+        await _avisar(ctx, email, emails.conta_excluida(conta["nome"], ctx.agora), "email_aviso_exclusao")
         return Resposta(204)
 
     if m == "GET" and c == "/api/documento":
@@ -1350,8 +1382,10 @@ async def _rota(ctx: Contexto) -> Resposta:
 
     if c == "/api/conta/protecao":
         avancada = b.get("avancada")
-        if set(b) != {"avancada"} or not isinstance(avancada, bool):
+        if set(b) - {"codigo"} != {"avancada"} or not isinstance(avancada, bool):
             raise Falha(400, "INVALID_REQUEST")
+        if not avancada:                    # desligar volta a guardar a cópia da chave no servidor: código atual
+            await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
         await ctx.banco.lote([
             ("UPDATE contas SET protecao_avancada = ? WHERE email = ?", (1 if avancada else 0, email)),
             *([("DELETE FROM custodia WHERE email = ?", (email,)), ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,))]

@@ -553,6 +553,8 @@ declare global {
     frequencia(ctx: ContextoApp, lancamentoId: Id | null, opts?: OpcoesFrequencia): void;
     /** a senha digitada, ou null se a janela fechou sem confirmar */
     confirmarComSenha(cfg: ConfigConfirmarSenha): Promise<string | null>;
+    /** Ação sem volta: frase, senha e/ou código do 2FA; a janela só fecha quando executar() deu certo (true) */
+    confirmarSeguro(cfg: ConfigConfirmarSeguro): Promise<boolean>;
   }
   interface OpcoesNovaCategoria { icone?: string; nome?: string; grupo?: string | null; aoCriar?: (c: Categoria) => void }
   interface OpcoesNovoPerfil { aoCriar?: (p: Perfil) => void }
@@ -561,6 +563,15 @@ declare global {
   interface DadosFrequencia { recorrencia: string; parcelaAtual?: number; parcelaTotal?: number; valorTotal?: number }
   interface OpcoesFrequencia { valor?: number; aoEscolher?: (dados: DadosFrequencia) => void; aoTerminar?: () => void }
   interface ConfigConfirmarSenha { titulo: string; mensagem: string; botao?: string }
+  interface ConfigConfirmarSeguro {
+    titulo: string; mensagem: string; botao: string;
+    /** a pessoa digita esta frase (sem diferenciar maiúsculas) */
+    frase?: string;
+    senha?: boolean;
+    /** conta com 2FA: o código atual do aplicativo */
+    codigo2FA?: boolean;
+    executar(d: { senha?: string; codigo?: string }): Promise<unknown>;
+  }
   /** js/components/cambio.ts — multicâmbio (Real, Euro, Dólar: só o símbolo muda, nunca os números) */
   interface ZoZoCambio {
     MOEDAS: Array<{ codigo: CodigoMoeda; nome: string; simbolo: string }>;

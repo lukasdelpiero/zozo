@@ -530,6 +530,7 @@
   }
 
   /* ---------------- Configurações: Geral | Conta ---------------- */
+  const FRASE_EXCLUIR = "EXCLUIR CONTA";        // o servidor exige exatamente esta frase para excluir a conta
   let abaConfig = "geral";
 
   /**
@@ -538,17 +539,19 @@
    */
   function linhaProtecao(ctx: ContextoApp) {
     const interruptor = ZoZo.modais.Interruptor("", false, (ligar) => {
-      ZoZo.modais.confirmarComSenha(ligar
-        ? { titulo: "Ativar proteção avançada?", botao: "Ativar", mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar." }
-        : { titulo: "Desativar proteção avançada?", botao: "Desativar", mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha para confirmar." })
-        .then((senha: string | null) => {
-          if (!senha) { entrada.checked = !ligar; return; }
-          entrada.disabled = true;
-          return ctx.bridge.request(A.setProtecao, { avancada: ligar, senha }, { timeout: 120000 })
-            .then((r: { avancada: boolean }) => { entrada.checked = !!r.avancada; })
-            .catch((e: ErroPonte) => { entrada.checked = !ligar; ctx.toast(e.friendly, { tone: "error" }); })
-            .finally(() => { entrada.disabled = false; });
-        });
+      // desligar volta a guardar a cópia da chave no servidor: com 2FA, também o código atual
+      const com2FA = !ligar && !!(store.get().session.user || {}).doisFatores;
+      entrada.disabled = true;
+      ZoZo.modais.confirmarSeguro(ligar
+        ? { titulo: "Ativar proteção avançada?", botao: "Ativar", senha: true,
+          mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar.",
+          executar: ({ senha }) => ctx.bridge.request(A.setProtecao, { avancada: true, senha }, { timeout: 120000 }) }
+        : { titulo: "Desativar proteção avançada?", botao: "Desativar", senha: true, codigo2FA: com2FA,
+          mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha"
+            + (com2FA ? " e o código do seu aplicativo 2FA" : "") + " para confirmar.",
+          executar: ({ senha, codigo }) => ctx.bridge.request(A.setProtecao, { avancada: false, senha, codigo }, { timeout: 120000 }) })
+        .then((feito) => { entrada.checked = feito ? ligar : !ligar; })
+        .finally(() => { entrada.disabled = false; });
     }, "Proteção avançada");
     const entrada = interruptor.querySelector("input") as HTMLInputElement;
     entrada.disabled = true;                            // até saber o estado atual
@@ -633,8 +636,18 @@
           if (novaSenha.value.length < 8) { ctx.toast("Use uma nova senha com pelo menos 8 caracteres.", { tone: "error" }); novaSenha.focus(); return; }
           btn.disabled = true;
           const dados = { senhaAtual: senhaAtual.value, novaSenha: novaSenha.value };
+          const alterou = () => { senhaAtual.value = ""; novaSenha.value = ""; ctx.toast("Senha alterada.", { tone: "success", importante: true }); };
+          if (u.doisFatores) {
+            // com 2FA, trocar a senha pede o código atual do aplicativo (o servidor confere)
+            ZoZo.modais.confirmarSeguro({ titulo: "Trocar a senha?", botao: "Trocar senha", codigo2FA: true,
+              mensagem: "Para trocar a senha, digite o código atual do seu aplicativo 2FA.",
+              executar: ({ codigo }) => depoisDasGravacoes(() => ctx.bridge.request(A.changePassword, Object.assign({ codigo }, dados), { timeout: 120000 })) })
+              .then((feito) => { if (feito) alterou(); })
+              .finally(() => { btn.disabled = false; });
+            return;
+          }
           depoisDasGravacoes(() => ctx.bridge.request(A.changePassword, dados, { timeout: 120000 }))
-            .then(() => { senhaAtual.value = ""; novaSenha.value = ""; ctx.toast("Senha alterada.", { tone: "success", importante: true }); })
+            .then(alterou)
             .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }))
             .finally(() => { btn.disabled = false; });
         };
@@ -686,13 +699,12 @@
       // Sair e Excluir conta ficam fixos no rodapé da janela (aba Conta)
       const rodape = abaConfig === "conta" ? h("div", { class: CF.rodape },
         UI.Button("Sair", { onClick: () => ctx.logout() }),
-        demo ? null : h("button", { type: "button", class: CF.excluirConta, onClick: () => ZoZo.modais.confirmarComSenha({ titulo: "Excluir conta?", botao: "Excluir conta",
-          mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." })
-          .then((senha) => {
-            if (!senha) return;
-            return depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { senha })).then(() => { ctx.toast("Conta excluída."); ctx.encerrarSessao(); })
-              .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
-          }) }, "Excluir conta")) : null;
+        // no lugar da senha, a frase EXCLUIR CONTA; com 2FA, também o código atual do aplicativo
+        demo ? null : h("button", { type: "button", class: CF.excluirConta, onClick: () => ZoZo.modais.confirmarSeguro({ titulo: "Excluir conta?", botao: "Excluir conta",
+          frase: FRASE_EXCLUIR, codigo2FA: !!u.doisFatores,
+          mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita.",
+          executar: ({ codigo }) => depoisDasGravacoes(() => ctx.bridge.request(A.deleteUser, { confirmacao: FRASE_EXCLUIR, codigo })) })
+          .then((feito) => { if (feito) { ctx.toast("Conta excluída.", { tone: "success", importante: true }); ctx.encerrarSessao(); } }) }, "Excluir conta")) : null;
       return h("div", { class: [CF.raiz, P.ctxConfig] }, nav, h("div", { class: CF.principal }, h("div", { class: CF.conteudo }, conteudo), rodape));
     },
   };

@@ -51,7 +51,7 @@ Referência: OWASP ASVS 5.0, nível 2 (requisitos aplicáveis). **Não é uma de
 
 ### Média
 
-**M1 — Ações destrutivas sem fator recente para quem tem 2FA** (decisão de produto; não alterado)
+**M1 — Ações destrutivas sem fator recente para quem tem 2FA** (corrigido depois da auditoria, por decisão do produto: código atual do 2FA nas três ações; excluir a conta pede a frase EXCLUIR CONTA no lugar da senha e manda e-mail de aviso — testes em `Teste2FA` e `TesteDocumento`)
 - `DELETE /api/conta` (`api/src/nucleo.py:1294`), `PUT /api/conta/protecao` desligando a proteção avançada (`:1351`) e `PUT /api/conta/senha` (`:1232`) exigem sessão + prova da senha, mas **não** um código atual do 2FA — ao contrário de `POST /api/2fa/desativar`, que já exige.
 - Condição: alguém com a sessão aberta e a prova em memória (aparelho destravado, extensão maliciosa, XSS) exclui a conta de forma irreversível ou religa a cópia da chave no servidor. A prova não é "reautenticação" nesse cenário, porque o navegador a guarda.
 - Recomendação: pedir o código do 2FA (quando ativo) nessas três ações, como em desativar o 2FA, e mandar aviso por e-mail ao excluir a conta. Muda telas e fluxo: precisa de decisão.

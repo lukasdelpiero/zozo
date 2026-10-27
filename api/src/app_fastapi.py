@@ -83,6 +83,7 @@ class NovaSenha(Documento):
     iteracoes: Iteracoes
     prova: Prova
     kdf: Kdf | None = None
+    codigo: Codigo | None = None                  # conta com 2FA: código atual
 
 
 class VersaoCifrada(Modelo):
@@ -113,6 +114,13 @@ class Custodia(Modelo):
 
 class Protecao(Modelo):
     avancada: bool
+    codigo: Codigo | None = None                  # desligar, com 2FA: código atual
+
+
+class ExcluirConta(Modelo):
+    """Excluir a conta: a frase digitada (no lugar da senha) e, com 2FA, um código atual."""
+    confirmacao: Literal["EXCLUIR CONTA"]
+    codigo: Codigo | None = None
 
 
 class PedirRecuperacao(Modelo):
@@ -157,6 +165,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/conta/kdf/historico"): KdfEtapa,
     ("PUT", "/api/custodia"): Custodia,
     ("PUT", "/api/conta/protecao"): Protecao,
+    ("DELETE", "/api/conta"): ExcluirConta,
     ("POST", "/api/recuperacao/pedir"): PedirRecuperacao,
     ("POST", "/api/recuperacao/abrir"): AbrirRecuperacao,
     ("PUT", "/api/recuperacao/historico"): EtapaRecuperacao,
@@ -190,7 +199,7 @@ async def _ler_corpo(request: Request) -> str | Response:
     blocos e para assim que passar do tamanho DECLARADO (um corpo maior que o anunciado não é acumulado
     na memória); texto que não é UTF-8 válido é recusado (nada de "consertar" bytes em silêncio).
     """
-    if request.method not in ("POST", "PUT"):
+    if request.method not in ("POST", "PUT", "DELETE"):
         return ""
     declarado = request.headers.get("content-length")
     if declarado is None:

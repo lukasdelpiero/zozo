@@ -189,6 +189,12 @@ function servidorFalso() {
       return json(200, { ok: true });
     }
     if (metodo === "GET" && caminho === "/custodia") return json(200, { avancada: !!c.avancada, ativa: !!(c.custodia && c.custodia.prova === c.provaHash) });
+    if (metodo === "DELETE" && caminho === "/conta") {
+      const falta = comProva(); if (falta) return falta;
+      if (!corpo || corpo.confirmacao !== "EXCLUIR CONTA") return json(400, { erro: "CONFIRMATION_REQUIRED" });
+      contas.delete(s.logado); s.logado = null; s.envelope = null;
+      return new Response(null, { status: 204 });
+    }
     if (metodo === "PUT" && caminho === "/conta/protecao") {
       c.avancada = corpo.avancada === true;
       if (c.avancada) c.custodia = null;
@@ -528,6 +534,36 @@ test("conta de demonstração: nada é gravado no servidor e ações de conta s�
   for (const acao of ["changePassword", "updateUser", "wipeUserData", "deleteUser", "iniciar2FA"]) {
     await assert.rejects(h.chamar(acao, { senha, senhaAtual: senha, novaSenha: novaSenha(), nomeUsuario: "X" }), codigo("DEMO_READ_ONLY"), acao);
   }
+});
+
+test("excluir a conta: a frase EXCLUIR CONTA (não a senha), a prova da sessão e o código do 2FA", async () => {
+  const srv = servidorFalso();
+  const h = await cadastrar(srv, "ana@exemplo.test", novaSenha());
+  const antes = srv.pedidos.length;
+  for (const confirmacao of [undefined, "", "excluir", "EXCLUIR"]) {
+    await assert.rejects(h.chamar("deleteUser", { confirmacao }), codigo("CONFIRMATION_REQUIRED"), String(confirmacao));
+  }
+  assert.equal(srv.pedidos.length, antes, "sem a frase, nada sai do navegador");
+  assert.deepEqual(await h.chamar("deleteUser", { confirmacao: "EXCLUIR CONTA", codigo: "123456" }), { excluido: true });
+  const novos = srv.pedidos.slice(antes);
+  const p = novos.find((x) => x.metodo === "DELETE" && x.caminho === "/api/conta");
+  assert.deepEqual(JSON.parse(p.corpo), { confirmacao: "EXCLUIR CONTA", codigo: "123456" });
+  assert.ok(p.prova, "prova da sessão");
+  assert.ok(!novos.some((x) => x.caminho.startsWith("/api/conta/parametros")), "a senha não é pedida nem derivada");
+  assert.equal(srv.contas.has("ana@exemplo.test"), false);
+});
+
+test("trocar a senha e desligar a proteção avançada levam o código do 2FA; ligar não leva", async () => {
+  const srv = servidorFalso();
+  const senha = novaSenha(), nova = novaSenha();
+  const h = await cadastrar(srv, "ana@exemplo.test", senha);
+  const corpoDe = (metodo, caminho) => JSON.parse(srv.pedidos.filter((x) => x.metodo === metodo && x.caminho === caminho).at(-1).corpo);
+  await h.chamar("changePassword", { senhaAtual: senha, novaSenha: nova, codigo: "654321" });
+  assert.equal(corpoDe("PUT", "/api/conta/senha").codigo, "654321");
+  await h.chamar("setProtecao", { avancada: true, senha: nova, codigo: "111111" });
+  assert.equal("codigo" in corpoDe("PUT", "/api/conta/protecao"), false);
+  await h.chamar("setProtecao", { avancada: false, senha: nova, codigo: "222222" });
+  assert.equal(corpoDe("PUT", "/api/conta/protecao").codigo, "222222");
 });
 
 test("ação desconhecida ou herdada de Object: NOT_IMPLEMENTED", async () => {

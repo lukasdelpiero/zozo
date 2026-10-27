@@ -138,6 +138,7 @@
     EMAIL_NOT_CONFIRMED: "Confirme seu e-mail antes de entrar: abra o link que enviamos para a sua caixa de entrada.",
     TOKEN_INVALID: "O link que clicou expirou ou é inválido.",
     CODE_REQUIRED: "Digite o código de 6 dígitos do seu aplicativo 2FA.",
+    CONFIRMATION_REQUIRED: "Digite EXCLUIR CONTA para confirmar.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     LOAN_INVALID: "Confira o empréstimo: valores de 0 a 1 trilhão, 1º vencimento numa data válida e de 1 a 600 parcelas.",

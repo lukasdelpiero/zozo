@@ -208,6 +208,12 @@
     return derivar(senha, sal, it, kdf);
   }
 
+  /** Código do 2FA vindo da tela (só 6 dígitos ou nada; o servidor confere) */
+  const codigo2FA = (d: unknown): string | undefined => {
+    const c = d && typeof d === "object" ? (d as { codigo?: unknown }).codigo : undefined;
+    return typeof c === "string" && c ? c : undefined;
+  };
+
   /* ---------------- chave dos dados guardada (cifrada com o envelope da sessão) ---------------- */
   const aadLocal = (email: string) => enc.encode("zozo|sessao|" + email);
   async function chaveEnvelope(envelope: string, usos: KeyUsage[]): Promise<CryptoKey> {
@@ -625,7 +631,8 @@
     async changePassword(d) {
       const s = exigirConta();
       validarSenha(d.novaSenha);
-      if (simulada(s)) return { alterada: true };
+      const codigo = codigo2FA(d);
+      if (simulada(s)) { if (s.doisFatores && !/^\d{6}$/.test(codigo || "")) throw erro(codigo ? "CODE_INVALID" : "CODE_REQUIRED"); return { alterada: true }; }
       const atual = await derivarConta(d.senhaAtual, await parametros(s.email));
       atual.bits.fill(0);
       const doc = await api("GET", "/documento", undefined, atual.prova);     // senha errada → WRONG_PASSWORD
@@ -637,7 +644,7 @@
       const nova = await derivar(d.novaSenha, sal, ITERACOES, KDF_ARGON2);           // senha nova já em Argon2id
       const conteudo = await cifrar(nova.chave, s.email, va + 1, documento);
       // troca atômica no servidor: novo sal + nova prova + documento recifrado (e os outros dispositivos saem)
-      await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va }, atual.prova);
+      await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va, codigo }, atual.prova);
       if (sessao === s) {
         Object.assign(s, { chave: nova.chave, prova: nova.prova, versao: va + 1 });
         await guardarChaveLocal(s.email, s.envelope, nova.bits, nova.prova);
@@ -675,12 +682,16 @@
       return { apagado: true };
     },
 
+    /** Excluir a conta: a frase EXCLUIR CONTA (no lugar da senha) e, com 2FA, o código atual; usa a prova da sessão */
     async deleteUser(d) {
       const s = exigirConta();
-      if (simulada(s)) { sessao = null; teste.emailSimulado = ""; teste.docSimulado = null; return { excluido: true }; }
-      const k = await derivarConta(d.senha, await parametros(s.email));
-      k.bits.fill(0);
-      await api("DELETE", "/conta", undefined, k.prova);
+      const confirmacao = String((d && d.confirmacao) || ""), codigo = codigo2FA(d);
+      if (confirmacao !== "EXCLUIR CONTA") throw erro("CONFIRMATION_REQUIRED");
+      if (simulada(s)) {
+        if (s.doisFatores && !/^\d{6}$/.test(codigo || "")) throw erro(codigo ? "CODE_INVALID" : "CODE_REQUIRED");
+        sessao = null; teste.emailSimulado = ""; teste.docSimulado = null; return { excluido: true };
+      }
+      await comProvaDaSessao(() => api("DELETE", "/conta", { confirmacao, codigo }, s.prova));
       await esquecerVersao(s.email);
       esquecerChaveLocal();
       sessao = null;
@@ -763,10 +774,15 @@
     },
     async setProtecao(d) {
       const s = exigirConta();
-      if (simulada(s)) { if (!d.senha) throw erro("WRONG_PASSWORD"); teste.protecao = d.avancada === true; return ACOES.getProtecao({}); }
+      const codigo = d.avancada === true ? undefined : codigo2FA(d);          // desligar, com 2FA: código atual
+      if (simulada(s)) {
+        if (!d.senha) throw erro("WRONG_PASSWORD");
+        if (d.avancada !== true && s.doisFatores && !/^\d{6}$/.test(codigo || "")) throw erro(codigo ? "CODE_INVALID" : "CODE_REQUIRED");
+        teste.protecao = d.avancada === true; return ACOES.getProtecao({});
+      }
       const k = await derivarConta(d.senha, await parametros(s.email));
       try {
-        await api("PUT", "/conta/protecao", { avancada: d.avancada === true }, k.prova);   // senha errada → WRONG_PASSWORD
+        await api("PUT", "/conta/protecao", { avancada: d.avancada === true, codigo }, k.prova);   // senha errada → WRONG_PASSWORD
         if (d.avancada !== true) await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
       } finally { k.bits.fill(0); }
       return ACOES.getProtecao({});

@@ -192,7 +192,9 @@
           linha(...CONFIRMACOES.map(([rotulo, titulo, mensagem, opts]) =>
             ir(rotulo, () => ZoZo.feedback.confirmarExclusao(titulo, mensagem, opts), false))),
           sub("Confirmações com senha"),
-          linha(...CONFIRMACOES_SENHA.map(([rotulo, cfg]) => ir(rotulo, () => ZoZo.modais.confirmarComSenha(cfg), false)))),
+          linha(...CONFIRMACOES_SENHA.map(([rotulo, cfg]) => ir(rotulo, () => ZoZo.modais.confirmarComSenha(cfg), false))),
+          sub("Ações sem volta (frase, senha e código do 2FA; confirmar aqui não faz nada)"),
+          linha(...ACOES_SEM_VOLTA.map(([rotulo, cfg]) => ir(rotulo, () => ZoZo.modais.confirmarSeguro(Object.assign({ executar: () => Promise.resolve() }, cfg)), false)))),
 
         secao("Menus", false,
           h("p", { class: C.nota }, "Abrem no botão \"Modo teste\". Os menus próprios de cada tela abrem pelos botões dela (abra a tela ou o painel acima)."),
@@ -265,9 +267,19 @@
   const CONFIRMACOES_SENHA: Array<[string, { titulo: string; botao: string; mensagem: string }]> = [
     ["Alterar nome", { titulo: "Confirmar alteração", botao: "Salvar", mensagem: "Digite sua senha para alterar o nome." }],
     ["Apagar todos os dados", { titulo: "Apagar todos os dados?", botao: "Apagar dados", mensagem: "Transações, contas, categorias e perfis serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." }],
-    ["Excluir conta do ZoZo", { titulo: "Excluir conta?", botao: "Excluir conta", mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." }],
     ["Ativar proteção avançada", { titulo: "Ativar proteção avançada?", botao: "Ativar", mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar." }],
-    ["Desativar proteção avançada", { titulo: "Desativar proteção avançada?", botao: "Desativar", mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha para confirmar." }],
+  ];
+  const ACOES_SEM_VOLTA: Array<[string, Omit<ConfigConfirmarSeguro, "executar">]> = [
+    ["Excluir conta do ZoZo", { titulo: "Excluir conta?", botao: "Excluir conta", frase: "EXCLUIR CONTA",
+      mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." }],
+    ["Excluir conta (com 2FA)", { titulo: "Excluir conta?", botao: "Excluir conta", frase: "EXCLUIR CONTA", codigo2FA: true,
+      mensagem: "Sua conta, todos os seus dados e o histórico de versões serão excluídos do servidor. Essa ação não pode ser desfeita." }],
+    ["Trocar a senha (com 2FA)", { titulo: "Trocar a senha?", botao: "Trocar senha", codigo2FA: true,
+      mensagem: "Para trocar a senha, digite o código atual do seu aplicativo 2FA." }],
+    ["Desativar proteção avançada", { titulo: "Desativar proteção avançada?", botao: "Desativar", senha: true,
+      mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha para confirmar." }],
+    ["Desativar proteção avançada (com 2FA)", { titulo: "Desativar proteção avançada?", botao: "Desativar", senha: true, codigo2FA: true,
+      mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha e o código do seu aplicativo 2FA para confirmar." }],
   ];
 
   /* ---------- galeria de gráficos (dados de exemplo, sem conta) ---------- */

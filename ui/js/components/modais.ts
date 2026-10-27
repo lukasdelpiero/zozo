@@ -618,5 +618,72 @@
     });
   }
 
-  ZoZo.modais = { janela, novoPerfil, novaCategoria, criarGrupo, novaConta, novaRecorrencia, frequencia, confirmarComSenha, seletorIcone, Interruptor, pagarFatura, receberFatura };
+  /* ---------------- Confirmar ação sem volta (frase, senha e/ou código do 2FA) ---------------- */
+  /**
+   * Excluir a conta, trocar a senha, desligar a proteção avançada: a janela pede o que a ação exige (a frase
+   * digitada, a senha, o código ATUAL do 2FA) e só fecha quando a ação deu certo — um código ou senha errados
+   * aparecem ali mesmo, para tentar de novo. true = feito; false = fechou sem fazer.
+   */
+  function confirmarSeguro(cfg: ConfigConfirmarSeguro): Promise<boolean> {
+    const normalizar = (v: string) => v.trim().replace(/\s+/g, " ").toUpperCase();
+    return new Promise((resolve) => {
+      let feito = false;
+      janela({
+        titulo: cfg.titulo,
+        onClose: () => resolve(feito),
+        passo: (api) => {
+          const E = ZoZo.estrutura;
+          const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
+          const campos: HTMLElement[] = [];
+          let frase: HTMLInputElement | null = null, senha: HTMLInputElement | null = null, codigo: CampoCodigo6 | null = null;
+          let botao: HTMLButtonElement | null = null, ocupado = false;
+          const pronto = () => !ocupado && (!frase || normalizar(frase.value) === cfg.frase) && (!senha || !!senha.value)
+            && (!codigo || /^\d{6}$/.test(codigo.valor()));
+          const atualizar = () => { if (botao) botao.disabled = !pronto(); };
+          const confirmar = () => {
+            if (!pronto()) return;
+            ocupado = true; atualizar(); erro.textContent = "";
+            if (codigo) codigo.desabilitar(true);
+            cfg.executar({ senha: senha ? senha.value : undefined, codigo: codigo ? codigo.valor() : undefined })
+              .then(() => { feito = true; api.fechar(); })
+              .catch((e: ErroPonte) => {
+                erro.textContent = e.friendly;
+                if (codigo && (e.code === "CODE_INVALID" || e.code === "CODE_REQUIRED")) { codigo.desabilitar(false); codigo.marcarErro(true); codigo.limpar(); codigo.foco(); }
+                else if (senha && e.code === "WRONG_PASSWORD") { senha.value = ""; senha.focus(); }
+              })
+              .finally(() => { ocupado = false; if (codigo) codigo.desabilitar(false); atualizar(); });
+          };
+          const enter = (e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); confirmar(); } };
+          if (cfg.frase) {
+            frase = UI.Input({ name: "confirmacao", autocomplete: "off", placeholder: cfg.frase });
+            frase.spellcheck = false;
+            frase.dataset.autofocus = "";
+            frase.addEventListener("input", atualizar);
+            frase.addEventListener("keydown", enter);
+            campos.push(UI.Field("Digite " + cfg.frase + " para confirmar", frase));
+          }
+          if (cfg.senha) {
+            senha = UI.Input({ type: "password", name: "password", autocomplete: "current-password", placeholder: "Sua senha" });
+            if (!frase) senha.dataset.autofocus = "";
+            senha.addEventListener("input", atualizar);
+            senha.addEventListener("keydown", enter);
+            campos.push(UI.Field("Senha", ZoZo.verificacao.ComRevelar(senha)));       // oculta, com "mostrar" e sem copiar
+          }
+          if (cfg.codigo2FA) {
+            const c = ZoZo.verificacao.CampoCodigo({ rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-1",
+              onDigitar: () => { c.marcarErro(false); atualizar(); }, onCompleto: () => { atualizar(); if (!frase && !senha) confirmar(); } });
+            codigo = c;
+            campos.push(h("div", null, h("p", { class: E.modalTexto }, "Código atual do seu aplicativo 2FA"), c.el));
+          }
+          return {
+            corpo: h("div", { class: E.janelaForm }, h("p", { class: E.modalTexto }, cfg.mensagem), campos, erro),
+            botoes: [{ label: "Cancelar", onClick: () => api.fechar() },
+              { label: cfg.botao, perigo: true, desabilitado: true, onClick: confirmar, ref: (b) => { botao = b; } }],
+          };
+        },
+      });
+    });
+  }
+
+  ZoZo.modais = { janela, novoPerfil, novaCategoria, criarGrupo, novaConta, novaRecorrencia, frequencia, confirmarComSenha, confirmarSeguro, seletorIcone, Interruptor, pagarFatura, receberFatura };
 })(window.ZoZo);

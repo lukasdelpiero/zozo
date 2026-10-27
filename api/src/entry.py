@@ -146,7 +146,7 @@ class Default(WorkerEntrypoint):
         metodo = _metodo(request)
 
         corpo = ""
-        if metodo in ("POST", "PUT"):
+        if metodo in ("POST", "PUT", "DELETE"):              # DELETE /api/conta leva a confirmação no corpo
             declarado = cab.get("content-length")
             if declarado is not None:
                 # Só lê o corpo com tamanho declarado e dentro do limite (o HTTP garante que o corpo não passa disso).

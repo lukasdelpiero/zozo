@@ -131,6 +131,13 @@ def dois_fatores_desativado(nome: str | None, agora: float) -> Mensagem:
                    rodape="Não foi você? Troque sua senha e ative o 2FA de novo.")
 
 
+def conta_excluida(nome: str | None, agora: float) -> Mensagem:
+    return _montar("Sua conta do ZoZo foi excluída", _ola(nome),
+                   [f"A sua conta no ZoZo foi excluída em {_quando(agora)} (horário de Brasília).",
+                    "Os seus dados, o histórico de versões e as sessões abertas foram apagados do servidor. Essa ação não pode ser desfeita."],
+                   rodape="Não foi você? Entre em contato com o suporte do ZoZo imediatamente.")
+
+
 async def enviar(servicos: _Servicos, config: Mapping[str, Any], para: str, mensagem: Mensagem) -> bool:
     """Envia pelo Resend. Nunca lança: devolve True/False (quem chama registra o evento)."""
     if not ativo(config):

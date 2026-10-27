@@ -205,12 +205,20 @@ class TesteFastAPI(unittest.TestCase):
         self.assertEqual(self.api("PUT", "/api/conta/kdf", base, prova=self.prova)[0], 200)
         self.assertEqual(self.api("GET", "/api/conta/parametros?email=" + EMAIL)[1]["kdf"], "argon2id-1")
 
+    def test_excluir_conta_pelo_fastapi_exige_a_frase(self):
+        self.assertEqual(self.api("POST", "/api/conta", self.cadastro())[0], 201)
+        for ruim in ({}, {"confirmacao": "excluir conta"}, {"confirmacao": "EXCLUIR CONTA", "admin": True}):
+            self.assertEqual(self.api("DELETE", "/api/conta", ruim, prova=self.prova)[0], 400, repr(ruim))
+        self.assertEqual(self.contas(), 1)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=self.prova)[0], 204)
+        self.assertEqual(self.contas(), 0)
+
     def test_toda_rota_com_corpo_tem_modelo(self):
         com_corpo = {("POST", "/api/conta"), ("POST", "/api/sessao"), ("POST", "/api/sessao/2fa"),
                      ("POST", "/api/email/reenviar"), ("POST", "/api/email/link"),
                      ("POST", "/api/recuperacao/pedir"), ("POST", "/api/recuperacao/abrir"), ("PUT", "/api/recuperacao/historico"),
                      ("PUT", "/api/recuperacao/concluir")} | {
-            (m, c) for m, c in nucleo._PROTEGIDAS if m in ("POST", "PUT") and c not in nucleo._SEM_CORPO}
+            (m, c) for m, c in nucleo._PROTEGIDAS if m in ("POST", "PUT", "DELETE") and c not in nucleo._SEM_CORPO}
         self.assertEqual(com_corpo, set(app_fastapi.MODELOS))
 
 

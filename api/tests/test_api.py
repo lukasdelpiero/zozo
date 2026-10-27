@@ -446,9 +446,10 @@ class TesteBloqueio(Base):
 class TesteDocumento(Base):
     def test_exige_sessao_e_prova(self):
         anonimo = Cliente(self.banco, ip="198.51.100.20")
-        for m, c in (("GET", "/api/documento"), ("DELETE", "/api/conta"), ("GET", "/api/historico"), ("POST", "/api/2fa/iniciar")):
-            self.assertEqual(anonimo(m, c, prova=self.prova)[0], 401, c)     # sem sessão
-            self.assertEqual(self.api(m, c)[0], 403, c)                       # sem prova
+        for m, c, corpo in (("GET", "/api/documento", None), ("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}), ("GET", "/api/historico", None),
+                            ("POST", "/api/2fa/iniciar", None)):
+            self.assertEqual(anonimo(m, c, corpo, prova=self.prova)[0], 401, c)     # sem sessão
+            self.assertEqual(self.api(m, c, corpo)[0], 403, c)                       # sem prova
             self.con.execute("DELETE FROM limites")
 
     def test_isolamento_entre_contas(self):
@@ -532,12 +533,20 @@ class TesteDocumento(Base):
 
     def test_excluir_conta(self):
         self.gravar(0)
-        self.assertEqual(self.api("DELETE", "/api/conta", prova=prova())[0], 403)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=prova())[0], 403)
         self.con.execute("DELETE FROM limites")
-        self.assertEqual(self.api("DELETE", "/api/conta", prova=self.prova)[0], 204)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=self.prova)[0], 204)
         self.assertNotIn("__Host-zozo", self.api.cookies)
         for t in ("contas", "documentos", "historico", "sessoes"):
             self.assertEqual(self.con.execute(f"SELECT count(*) FROM {t} WHERE email = ?", (EMAIL,)).fetchone()[0], 0, t)
+
+    def test_excluir_conta_exige_a_frase(self):
+        # no lugar da senha digitada, a frase EXCLUIR CONTA (a sessão e a prova continuam exigidas)
+        for corpo in (None, {}, {"confirmacao": "excluir conta"}, {"confirmacao": "EXCLUIR"}, {"confirmacao": "EXCLUIR CONTA", "email": OUTRO}):
+            st, r = self.api("DELETE", "/api/conta", corpo, prova=self.prova)
+            self.assertIn(st, (400, 415), repr(corpo))
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 1)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=self.prova)[0], 204)
 
 
 class Teste2FA(Base):
@@ -617,6 +626,55 @@ class Teste2FA(Base):
         self.con.execute("DELETE FROM limites")
         self.assertEqual(self.api("POST", "/api/2fa/desativar", {"codigo": self.codigo()}, prova=self.prova)[1], {"doisFatores": False})
         self.assertFalse(self.entrar(Cliente(self.banco, ip="198.51.100.44"))[1]["doisFatores"])
+
+    def test_acoes_sem_volta_exigem_codigo_atual(self):
+        # com 2FA, trocar a senha, desligar a proteção avançada e excluir a conta pedem um código ATUAL:
+        # a sessão e a prova guardadas no navegador não bastam
+        self.ativar()
+        self.gravar(0)
+        verificador = lambda: self.con.execute("SELECT verificador FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0]
+        antes = verificador()
+        senha = lambda **x: self.api("PUT", "/api/conta/senha", dict({"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova,
+                                     "kdf": "argon2id-1", "conteudo": conteudo(), "versaoAnterior": 1}, **x), prova=self.prova)
+        nova = prova()
+        self.api.agora += 60                                                 # o código da ativação não vale de novo
+        self.assertEqual(senha()[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(senha(codigo="000000")[1]["erro"], "CODE_INVALID")
+        self.assertEqual(senha(codigo="１２３４５６")[1]["erro"], "CODE_INVALID")
+        self.assertEqual(verificador(), antes)                             # nada mudou
+        self.con.execute("DELETE FROM limites")
+        codigo = self.codigo()
+        self.assertEqual(senha(codigo=codigo)[0], 200)
+        self.assertNotEqual(verificador(), antes)
+        self.prova = nova
+        # o mesmo código não serve para outra ação
+        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova)[0], 200)    # ligar: sem código
+        st, r = self.api("PUT", "/api/conta/protecao", {"avancada": False, "codigo": codigo}, prova=self.prova)
+        self.assertEqual((st, r["erro"]), (401, "CODE_INVALID"))
+        self.api.agora += 30
+        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": False}, prova=self.prova)[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(self.con.execute("SELECT protecao_avancada FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 1)
+        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": False, "codigo": self.codigo()}, prova=self.prova)[1],
+                         {"avancada": False})
+        # excluir: a frase e um código atual
+        self.api.agora += 30
+        excluir = lambda corpo: self.api("DELETE", "/api/conta", corpo, prova=self.prova)
+        self.assertEqual(excluir({"confirmacao": "EXCLUIR CONTA"})[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(excluir({"confirmacao": "EXCLUIR CONTA", "codigo": "123456"})[1]["erro"], "CODE_INVALID")
+        self.assertEqual(excluir({"codigo": self.codigo()})[1]["erro"], "CONFIRMATION_REQUIRED")
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 1)
+        self.con.execute("DELETE FROM limites")
+        self.assertEqual(excluir({"confirmacao": "EXCLUIR CONTA", "codigo": self.codigo()})[0], 204)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 0)
+
+    def test_codigo_das_acoes_tem_o_mesmo_bloqueio_do_login(self):
+        self.ativar()
+        self.api.agora += 60
+        for _ in range(5):
+            self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA", "codigo": "000000"}, prova=self.prova)
+        st, r = self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA", "codigo": self.codigo()}, prova=self.prova)
+        self.assertEqual(st, 429)                                            # bloqueado mesmo com o código certo
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 1)
 
     def test_codigo_com_digitos_unicode_nao_quebra(self):
         self.ativar()
@@ -1112,6 +1170,16 @@ class TesteEmail(unittest.TestCase):
         self.assertIn("Ana &lt;b&gt;", self.serv.emails[-1]["html"])                   # nome da conta escapado no HTML
         self.assertEqual(self.con.execute("SELECT kdf FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "argon2id-1")
 
+    def test_aviso_de_conta_excluida(self):
+        self.cadastrar()
+        self.entrar(confirmacao=self.token())
+        st, _ = self.cli("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=self.pv)
+        self.assertEqual(st, 204)
+        m = self.serv.emails[-1]
+        self.assertEqual((m["to"], m["subject"]), ([EMAIL], "Sua conta do ZoZo foi excluída"))
+        self.assertIn("Ana &lt;b&gt;", m["html"])                                       # nome escapado
+        self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 0)
+
     def test_sem_configuracao_o_cadastro_e_como_antes(self):
         cli = Cliente(self.banco, self.serv, dict(CONFIG_EMAIL, RESEND_API_KEY=""), ip="198.51.100.92")
         self.assertEqual(self.cadastrar(cli)[0], 201)
@@ -1287,7 +1355,7 @@ class TesteRecuperacao(Base):
         anonimo = Cliente(self.banco, ip="198.51.100.160")
         self.assertEqual(anonimo("GET", "/api/custodia", prova=self.prova)[0], 401)
         self.assertEqual(anonimo("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova)[0], 401)
-        self.assertEqual(self.api("DELETE", "/api/conta", prova=self.prova)[0], 204)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=self.prova)[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM custodia").fetchone()[0], 0)
 
 
@@ -1502,7 +1570,7 @@ class TesteMigracaoKdf(Base):
         self.assertEqual(st, 200)
         self.assertEqual(self.etapas(), [])
         self.assertEqual(self.etapa(sal, 1, prova_=nova)[0], 409)               # conta já em Argon2id
-        self.assertEqual(self.api("DELETE", "/api/conta", prova=nova)[0], 204)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=nova)[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM kdf_etapas").fetchone()[0], 0)
 
     def test_conta_ja_em_argon2_recusa(self):
