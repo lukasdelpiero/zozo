@@ -92,6 +92,6 @@ Não ensaiado (fica para o próximo): importar um export em um **D1 novo** no Cl
 
 ## Pendências
 
-- Backup externo **automático**: pronto no workflow (seção 0); falta ligar — workflow no `main`, segredos e `schedule`.
+- Backup externo **automático**: ligado em 27/10/2026 (todo dia às 03:17; 1º backup conferido sem problemas). Falta a segunda cópia fora do GitHub (seção 0, caminho A ou B).
 - Trocar a senha apaga o histórico cifrado com a senha anterior (as versões antigas não abririam com a nova).
 - A detecção de "documento sumido" depende de um marcador neste navegador: num dispositivo novo, a ausência parece primeiro uso.

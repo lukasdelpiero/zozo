@@ -14,11 +14,11 @@
 # Passo a passo: docs/RESTAURACAO.md, seção 0.
 name: Backup do banco (D1)
 
-# DESLIGADO por enquanto: só roda à mão (Actions → Run workflow). Para o backup diário, depois de
-# cadastrar os segredos, descomente as 2 linhas de "schedule" (03:17 em Brasília).
+# Todo dia às 03:17 (Brasília = 06:17 UTC) e à mão (Actions → Run workflow). Ligado em 27/10/2026.
+# O GitHub pausa agendamentos depois de 60 dias sem atividade no repositório: ele avisa por e-mail; reative em Actions.
 on:
-  # schedule:
-  #   - cron: "17 6 * * *"
+  schedule:
+    - cron: "17 6 * * *"
   workflow_dispatch:
 
 permissions:
