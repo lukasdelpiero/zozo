@@ -4,7 +4,7 @@
 # Restauração: docs/RESTAURACAO.md ("Backup automático").
 #
 # Segredos do repositório (Settings → Secrets and variables → Actions):
-#   CLOUDFLARE_API_TOKEN   token com só "Account → D1 → Edit" (o export do D1 exige escrita) nesta conta
+#   CLOUDFLARE_API_TOKEN   token da conta (Account API tokens) com só "D1 Write" (o export do D1 exige escrita)
 #   CLOUDFLARE_ACCOUNT_ID  id da conta
 #   BACKUP_AGE_RECIPIENT   chave pública do age (age1…)
 # Opcional — cópia também numa nuvem sua (Google Drive, Dropbox, Backblaze B2, OneDrive…), pelo rclone:
