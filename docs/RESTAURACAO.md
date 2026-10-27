@@ -92,6 +92,6 @@ Não ensaiado (fica para o próximo): importar um export em um **D1 novo** no Cl
 
 ## Pendências
 
-- Backup externo **automático**: ligado em 27/10/2026 (todo dia às 03:17; 1º backup conferido sem problemas). Falta a segunda cópia fora do GitHub (seção 0, caminho A ou B).
+- Backup externo **automático**: ligado em 27/10/2026 (todo dia às 03:17; 1º backup conferido sem problemas). Segunda cópia: caminho B no Google Drive para computador (`G:\Meu Drive\ZoZo-backups`, tarefa "ZoZo backup" do Windows, todo dia às 09:00 ou assim que o PC ligar; guarda 1 ano; registro em `%LOCALAPPDATA%\ZoZo-backup.log`). O rclone com Google Drive foi barrado pelo 2FA da conta Google.
 - Trocar a senha apaga o histórico cifrado com a senha anterior (as versões antigas não abririam com a nova).
 - A detecção de "documento sumido" depende de um marcador neste navegador: num dispositivo novo, a ausência parece primeiro uso.
