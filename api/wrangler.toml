@@ -64,6 +64,13 @@ routes = []                     # NÃO herda o domínio da produção (a prévia
 [env.previa.observability]
 enabled = true
 
+# Onde o Worker roda: perto do banco D1 (região ENAM, leste dos EUA), não perto do usuário. Cada pedido de
+# dados faz ~5 consultas ao banco; do Brasil, cada uma levava ~120 ms (~600 ms por pedido). Assim o usuário faz
+# uma viagem longa até o Worker e as consultas ficam em poucos ms. A interface (assets) continua saindo do
+# Cloudflare mais próximo. Só na prévia por enquanto; aprovado, repetir em [placement] (produção).
+[env.previa.placement]
+region = "aws:us-east-1"
+
 [[env.previa.d1_databases]]
 binding = "DB"
 database_name = "zozo-previa"
