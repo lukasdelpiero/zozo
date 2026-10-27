@@ -1,22 +1,87 @@
 # ZoZo (web) — configuração do Cloudflare (Python Workers + D1)
+#
+# Dois ambientes, com banco e endereço SEPARADOS:
+#   PRODUÇÃO  (usuários)    uv run pywrangler deploy               → https://usezozo.com.br (workers.dev desligado)
+#   PRÉVIA    (só testes)   uv run pywrangler deploy --env previa  → https://zozo-previa.zozo-finance-app.workers.dev
+# Teste na prévia primeiro; só depois publique em produção.
+#
+# Segredos (NUNCA neste arquivo) — uma vez por ambiente:
+#   npx wrangler secret put SEGREDO                       (e: --env previa)
+#   npx wrangler secret put TURNSTILE_SECRET              (e: --env previa)
+#   npx wrangler secret put GOOGLE_CLIENT_SECRET          (opcional, para o "Continuar com Google")
+#   npx wrangler secret put RESEND_API_KEY                (chave da API do Resend: e-mails de confirmação e avisos)
+#   npx wrangler secret put RECURSOS_CAMBIO               (e-mails que podem levar transações entre moedas no multicâmbio)
+#   npx wrangler secret put RECURSOS_AVANCADOS            (e-mails com Perfis, boletos e Pix, separados por vírgula;
+#                                                          a conta demo@usezozo.com.br sempre tem)
 name = "zozo"
 main = "src/entry.py"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["python_workers"]
 
-# Interface (pasta gerada por: python montar_interface.py)
+# Endereço: só o domínio usezozo.com.br. O workers.dev fica DESLIGADO: as regras de segurança do domínio
+# (limite de pedidos, robôs) não valem nele, e seria um caminho para contorná-las. As URLs de
+# pré-visualização por versão também ficam desligadas (a prévia oficial é o ambiente "previa").
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "usezozo.com.br", custom_domain = true }]
+
+# Logs do Worker (eventos de segurança, sem senhas, e-mails ou IPs em texto)
+[observability]
+enabled = true
+
+# Interface (pasta gerada por: npm run build — Vite, na raiz do projeto)
 # Os arquivos são servidos direto pelo Cloudflare; só /api/* chega ao Python.
 [assets]
 directory = "./public"
 not_found_handling = "none"
 
-# Banco SQL (crie com: npx wrangler d1 create zozo  e cole o id abaixo)
+# Banco SQL de PRODUÇÃO. Tabelas: npx wrangler d1 migrations apply zozo --remote
 [[d1_databases]]
 binding = "DB"
 database_name = "zozo"
 database_id = "7964c186-da78-4c07-942c-79d583691f75"
+migrations_dir = "migracoes"
 
 [vars]
-ACCESS_TEAM_DOMAIN = "zozo-finance-app.cloudflareaccess.com"
-ACCESS_AUD = "73171f59b9f70ccf6b80906dd384b5baaaa98c60e99fb4ff6211759e7d0fcf3f"
-ALLOWED_EMAILS = "lukas.delpiero@outlook.com.br,lk-cat2@hotmail.com,cibelecamargospp@gmail.com"
+# E-mail (Resend): remetente do domínio verificado e endereço público usado nos links (nunca o Host do pedido).
+# Sem o segredo RESEND_API_KEY o e-mail fica desligado e o cadastro funciona como antes.
+EMAIL_REMETENTE = "ZoZo <nao-responda@usezozo.com.br>"
+URL_PUBLICA = "https://usezozo.com.br"
+# CAPTCHA (chave pública; a secreta é o segredo TURNSTILE_SECRET)
+TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
+# "Continuar com Google": ID do cliente OAuth (público). Vazio = botão avisa que não está disponível.
+# A chave secreta vai por: npx wrangler secret put GOOGLE_CLIENT_SECRET  — veja docs/AMBIENTE-DE-TESTES.md
+GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
+
+# ================= PRÉVIA (testes antes de publicar) =================
+# Aberta: sem Cloudflare Access e sem lista de e-mails (cadastro livre, com CAPTCHA).
+[env.previa]
+name = "zozo-previa"
+workers_dev = true
+preview_urls = false
+routes = []                     # NÃO herda o domínio da produção (a prévia só existe no workers.dev)
+
+[env.previa.observability]
+enabled = true
+
+# Onde o Worker roda: perto do banco D1 (região ENAM, leste dos EUA), não perto do usuário. Cada pedido de
+# dados faz ~5 consultas ao banco; do Brasil, cada uma levava ~120 ms (~600 ms por pedido). Assim o usuário faz
+# uma viagem longa até o Worker e as consultas ficam em poucos ms. A interface (assets) continua saindo do
+# Cloudflare mais próximo. Só na prévia por enquanto; aprovado, repetir em [placement] (produção).
+[env.previa.placement]
+region = "aws:us-east-1"
+
+[[env.previa.d1_databases]]
+binding = "DB"
+database_name = "zozo-previa"
+database_id = "d267ce2a-3920-4c7b-8e91-7b3990dba0ba"
+migrations_dir = "migracoes"
+
+[env.previa.vars]
+EMAIL_REMETENTE = "ZoZo <nao-responda@usezozo.com.br>"
+URL_PUBLICA = "https://zozo-previa.zozo-finance-app.workers.dev"
+TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
+GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
+# FastAPI + Pydantic na frente do núcleo (validação estrita do JSON de cada rota; ver src/app_fastapi.py).
+# Só na prévia por enquanto; aprovado aqui, repetir em [vars] (produção).
+API_FASTAPI = "1"

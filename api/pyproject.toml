@@ -1,9 +1,30 @@
 [project]
 name = "zozo-api"
-version = "2.0.0"
+version = "3.18.0"
 description = "ZoZo — API em Python (Cloudflare Python Workers + D1)"
 requires-python = ">=3.12"
-dependencies = []
+# Vão para o Worker (pywrangler sync → python_modules). Só são importadas com API_FASTAPI = "1".
+dependencies = [
+    "fastapi==0.141.1",
+    "pydantic==2.12.5",                  # a versão com pydantic-core compilado para o Pyodide (index.pyodide.org)
+    "starlette==1.7.0",
+]
 
 [dependency-groups]
-dev = ["workers-py"]
+dev = [
+    "mypy==2.4.0",
+    "workers-py",
+]
+
+# Tipos do back-end: uv run mypy (confere src/; os módulos do Cloudflare — pyodide, workers, js — só existem no Worker)
+[tool.mypy]
+files = ["src"]
+mypy_path = "src"
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["pyodide", "pyodide.*", "workers", "js", "asgi"]
+ignore_missing_imports = true
+

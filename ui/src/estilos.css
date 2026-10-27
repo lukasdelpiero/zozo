@@ -1,0 +1,139 @@
+/* =============================================================
+   ZoZo — estilos (Tailwind CSS + o pouco CSS que sobrou de propósito)
+   ------------------------------------------------------------
+   • O CSS da pasta css/ (tokens, base, movimento, impressão) entra na
+     camada "legado", a de MENOR prioridade: uma classe do Tailwind vence
+     uma regra comum dali. Exceções: regras com !important da camada
+     legado (ex.: impressão) vencem as classes, e estilo inline vence
+     as duas.
+   • Prefixo "tw:" em todas as classes (ex.: tw:flex, tw:text-sm):
+     nunca colide com as classes atuais (.row, .btn, .page…).
+   • Sem o "preflight" (reset do Tailwind): o base.css continua valendo.
+   • Cores e medidas vêm dos tokens do ZoZo (css/tokens.css), não da
+     paleta padrão do Tailwind: tw:bg-zz-primary, tw:text-zz-secondary…
+   • Todas as telas estão em Tailwind; classes compartilhadas em
+     components/estrutura.ts e components/pecas.ts.
+   • Classes tw: sempre ESCRITAS POR INTEIRO no código (nada de montar
+     "tw:animate-" + nome): o Tailwind só gera o que encontra no texto.
+   • Cuidado ao migrar: utilitário vence o legado também em :focus,
+     :hover etc. — quem troca a cor da borda de um .input precisa
+     repetir a cor do foco (tw:focus:border-zz-primary).
+   ============================================================= */
+@layer legado, theme, base, components, utilities;
+@import "../css/tokens.css" layer(legado);
+@import "../css/base.css" layer(legado);
+@import "../css/movimento.css" layer(legado);
+@import "../css/print.css" layer(legado);
+@import "tailwindcss/theme.css" layer(theme) prefix(tw);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(tw);
+
+/* Onde procurar classes tw: (só os arquivos da interface) */
+@source "../js";
+@source "../index.html";
+@source "../politica-privacidade.html";
+@source "../termos-uso.html";
+@source "../sobre.html";
+
+@theme inline {
+  --color-zz-primary: var(--color-primary);
+  --color-zz-surface: var(--color-surface);
+  --color-zz-surface-hover: var(--color-surface-hover);
+  --color-zz-border: var(--color-border);
+  --color-zz-text: var(--color-text-primary);
+  --color-zz-secondary: var(--color-text-secondary);
+  --color-zz-muted: var(--color-text-muted);
+  --color-zz-cinza: var(--color-text-cinza);
+  --color-zz-positive: var(--color-positive);
+  --color-zz-primary-soft: var(--color-primary-soft);
+  --color-zz-primary-softer: var(--color-primary-softer);
+  --color-zz-border-strong: var(--color-border-strong);
+  --color-zz-warning-soft: var(--color-warning-soft);
+  --color-zz-warning-text: var(--color-warning-text);
+  --radius-zz-sm: var(--radius-small);
+  --radius-zz-md: var(--radius-medium);
+  --font-zz: var(--font-family, inherit);
+}
+
+/* Base dos componentes (components/pecas.ts): :where(&) tem especificidade zero, então qualquer classe
+   passada por quem usa o componente — ou um ajuste por contexto no contêiner — vence a base sem "!" */
+@custom-variant base (:where(&));
+/* Telas do ZoZo: celular (≤ 640 px) e janela baixa no computador — mesmos cortes do CSS legado */
+@custom-variant celular (@media (max-width: 640px));
+@custom-variant tela-baixa (@media (max-height: 640px) and (min-width: 641px));
+/* Estrutura (menu lateral, barra superior e painel; components/estrutura.js). Declaradas ANTES de "gaveta":
+   assim as regras do celular vêm depois no CSS gerado e vencem as das larguras maiores */
+@custom-variant computador (@media (min-width: 601px));
+@custom-variant largo (@media (min-width: 901px));
+@custom-variant painel-gaveta (@media (max-width: 1180px));   /* painel de informações vira gaveta sobreposta */
+@custom-variant estreito (@media (max-width: 900px));         /* menu lateral só com ícones */
+@custom-variant ate700 (@media (max-width: 700px));       /* Configurações: abas em cima */
+@custom-variant ate520 (@media (max-width: 520px));
+/* Menu lateral vira gaveta (≤ 600 px) */
+@custom-variant gaveta (@media (max-width: 600px));
+/* Largura da ÁREA (não da tela): .main, .detail__body e .dash-area são containers. Ex.: com o painel
+   aberto a lista fica estreita mesmo num monitor grande — as colunas saem conforme o espaço real. */
+@custom-variant area620 (@container (max-width: 620px));
+@custom-variant area560 (@container (max-width: 560px));
+@custom-variant area480 (@container (max-width: 480px));
+@custom-variant area460 (@container (max-width: 460px));
+@custom-variant area420 (@container (max-width: 420px));
+@custom-variant area340 (@container (max-width: 340px));
+/* Orçamento desligado nas Configurações (#app.sem-orcamento): barras e valores de orçamento somem */
+@custom-variant sem-orcamento (&:where(#app.sem-orcamento *));
+/* Dashboard "cabe na tela" (classe .dash--na-tela posta por pages/dashboard.js): vale para a página e o que está dentro */
+@custom-variant na-tela (&:where(.dash--na-tela, .dash--na-tela *));
+/* Janela até 860 px de altura (notebooks): menos respiro no Dashboard que cabe na tela */
+@custom-variant baixa860 (@media (max-height: 860px));
+
+/* Login: o cartão surge; trocar de etapa desliza o conteúdo (para a frente / para trás).
+   Os atrasos (40/70 ms) fazem o conteúdo entrar em sequência. */
+@theme {
+  --animate-zz-auth-cartao: zz-auth-cartao 480ms cubic-bezier(.2, .8, .2, 1) both;
+  --animate-zz-auth-logo: zz-auth-logo 560ms cubic-bezier(.2, .8, .2, 1) 80ms both;
+  --animate-zz-auth-frente: zz-auth-frente 320ms var(--easing) both;
+  --animate-zz-auth-frente-40: zz-auth-frente 320ms var(--easing) 40ms both;
+  --animate-zz-auth-frente-70: zz-auth-frente 320ms var(--easing) 70ms both;
+  --animate-zz-auth-tras: zz-auth-tras 320ms var(--easing) both;
+  --animate-zz-auth-tras-40: zz-auth-tras 320ms var(--easing) 40ms both;
+  --animate-zz-auth-tras-70: zz-auth-tras 320ms var(--easing) 70ms both;
+  @keyframes zz-auth-cartao { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+  @keyframes zz-auth-logo { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: none; } }
+  @keyframes zz-auth-frente { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-auth-tras { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+
+  /* Transações: barra de seleção sobe; a lista entra suave quando a pesquisa muda (meses em sequência) */
+  --animate-zz-selbar: zz-selbar 280ms var(--easing) both;
+  --animate-zz-busca: zz-busca 220ms var(--easing) both;
+  --animate-zz-busca-30: zz-busca 220ms var(--easing) 30ms both;
+  --animate-zz-busca-60: zz-busca 220ms var(--easing) 60ms both;
+  --animate-zz-chips: zz-chips 280ms var(--easing);
+  @keyframes zz-selbar { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-busca { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-chips { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* Dashboard: os cards entram em sequência (0/50/100/150 ms); os que têm gráfico só deslizam (sem esmaecer) */
+  --animate-zz-bloco: zz-bloco 380ms var(--easing) both;
+  --animate-zz-bloco-40: zz-bloco 380ms var(--easing) 40ms both;
+  --animate-zz-bloco-80: zz-bloco 380ms var(--easing) 80ms both;
+  --animate-zz-bloco-120: zz-bloco 380ms var(--easing) 120ms both;
+  --animate-zz-desliza: zz-desliza 380ms var(--easing) both;
+  --animate-zz-desliza-40: zz-desliza 380ms var(--easing) 40ms both;
+  --animate-zz-desliza-80: zz-desliza 380ms var(--easing) 80ms both;
+  --animate-zz-desliza-120: zz-desliza 380ms var(--easing) 120ms both;
+  @keyframes zz-bloco { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-desliza { from { transform: translateY(10px); } to { transform: none; } }
+
+  /* Estrutura: conteúdo do painel de informações entra da direita; o texto do painel vazio aparece suave */
+  --animate-zz-painel: zz-painel var(--duration-medium) var(--easing);
+  --animate-zz-surge: zz-surge var(--duration-medium) var(--easing);
+  @keyframes zz-painel { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+  @keyframes zz-surge { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  /* Peças: carregando (gira), esqueleto (brilho que passa) */
+  --animate-zz-gira: zz-gira 0.8s linear infinite;
+  --animate-zz-brilho: zz-brilho 1.3s ease-in-out infinite;
+  @keyframes zz-gira { to { transform: rotate(360deg); } }
+  @keyframes zz-brilho { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  /* Menus flutuantes surgem logo abaixo do botão */
+  --animate-zz-menu: zz-menu var(--duration-fast) var(--easing);
+  @keyframes zz-menu { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+}

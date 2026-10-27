@@ -1,0 +1,159 @@
+/* =============================================================
+   ZoZo — Verificação: CAPTCHA (Turnstile), código de 6 dígitos e QR code
+   ------------------------------------------------------------
+   • Captcha(sitekey): widget do Cloudflare Turnstile. O script só é
+     carregado quando o CAPTCHA é exigido (4ª tentativa de login em diante
+     e cadastro). A validação de verdade acontece no servidor.
+   • CampoCodigo(cfg): seis caixas de um dígito (avança sozinho, aceita
+     colar o código inteiro, Backspace volta) → cfg.onCompleto(codigo).
+   • QR(texto, px): QR code em SVG montado com ZoZo.dom (sem innerHTML),
+     usando a biblioteca qrcode-generator (npm, baixada só quando um QR aparece).
+   TypeScript: tipos em src/globais.d.ts (ZoZoVerificacao).
+   ============================================================= */
+(function (ZoZo: ZoZoGlobal) {
+  "use strict";
+  const { h, s, mount } = ZoZo.dom;
+  const TURNSTILE_JS = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+  /* ---------------- CAPTCHA ---------------- */
+  let carregando: Promise<Turnstile> | null = null;
+  function carregarTurnstile(): Promise<Turnstile> {
+    if (window.turnstile) return Promise.resolve(window.turnstile);
+    if (!carregando) {
+      carregando = new Promise<Turnstile>((ok, falha) => {
+        const sc = document.createElement("script");
+        sc.src = TURNSTILE_JS; sc.async = true;
+        sc.onload = () => { if (window.turnstile) ok(window.turnstile); else falha(new Error("turnstile")); };
+        sc.onerror = () => { carregando = null; sc.remove(); falha(new Error("turnstile")); };
+        document.head.appendChild(sc);
+      });
+    }
+    return carregando;
+  }
+
+  function Captcha(sitekey: string): CaptchaWidget {
+    const el = h("div", { class: "tw:flex tw:justify-center tw:min-h-[65px]", "aria-live": "polite" });
+    let token = "", id: string | null = null;
+    carregarTurnstile().then((ts) => {
+      requestAnimationFrame(() => {                    // espera o elemento estar na página
+        id = ts.render(el, {
+          sitekey, language: "pt-br", appearance: "always", "refresh-expired": "auto",
+          callback: (t: string) => { token = t; },
+          "expired-callback": () => { token = ""; },
+          "error-callback": () => { token = ""; },
+        });
+      });
+    }).catch(() => mount(el, h("p", { class: "auth__error", role: "alert" }, "Não foi possível carregar a verificação anti-robô. Recarregue a página.")));
+    return {
+      el,
+      token: () => token,
+      reset() { token = ""; if (id !== null && window.turnstile) { try { window.turnstile.reset(id); } catch (e) { /* ok */ } } },
+    };
+  }
+
+  /* ---------------- Código de 6 dígitos ---------------- */
+  function CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6 {
+    const c = cfg || {};
+    // base com especificidade zero: quem usa ajusta tamanho e espaçamento (c.classe / c.classeCaixa); erro: borda vermelha
+    const caixas = Array.from({ length: 6 }, (_, i) => h("input", {
+      type: "text", inputmode: "numeric", pattern: "[0-9]*", maxlength: "1",
+      class: ["codigo6__caixa tw:base:w-[46px] tw:base:h-[50px] tw:base:p-0 tw:base:text-center tw:base:text-[20px] tw:base:font-[550] "
+        + "tw:base:[font-variant-numeric:tabular-nums] tw:base:text-zz-text tw:base:bg-(--color-surface-hover,#f4f5f7) tw:base:border tw:base:border-zz-border "
+        + "tw:base:rounded-lg tw:base:[caret-color:var(--color-primary)] tw:base:focus:outline-none tw:base:focus:border-zz-primary "
+        + "tw:base:focus:[box-shadow:0_0_0_3px_var(--color-primary-soft)] tw:base:focus:bg-zz-surface tw:in-[.is-erro]:border-(--color-danger)!", c.classeCaixa],
+      autocomplete: i === 0 ? "one-time-code" : "off", "aria-label": "Dígito " + (i + 1) + " de 6",
+    }) as HTMLInputElement);
+    const el = h("div", { class: ["codigo6 tw:base:flex tw:base:justify-center tw:base:gap-2 tw:[&.is-ocupado]:opacity-60", c.classe], role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);
+    const valor = () => caixas.map((x) => x.value).join("");
+    const conferir = () => { const v = valor(); if (/^\d{6}$/.test(v) && c.onCompleto) c.onCompleto(v); };
+    function preencher(inicio: number, texto: string) {
+      const d = String(texto || "").replace(/\D/g, "").slice(0, 6 - inicio);
+      d.split("").forEach((ch, k) => { caixas[inicio + k].value = ch; });
+      caixas[Math.min(inicio + d.length, 5)].focus();
+      conferir();
+    }
+    caixas.forEach((cx, i) => {
+      cx.addEventListener("input", () => {
+        const d = cx.value.replace(/\D/g, "");
+        if (d.length > 1) { cx.value = ""; preencher(i, d); return; }      // autocompletar do celular
+        cx.value = d;
+        if (d && i < 5) caixas[i + 1].focus();
+        if (c.onDigitar) c.onDigitar();
+        conferir();
+      });
+      cx.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !cx.value && i > 0) { e.preventDefault(); caixas[i - 1].value = ""; caixas[i - 1].focus(); }
+        else if (e.key === "ArrowLeft" && i > 0) { e.preventDefault(); caixas[i - 1].focus(); }
+        else if (e.key === "ArrowRight" && i < 5) { e.preventDefault(); caixas[i + 1].focus(); }
+      });
+      cx.addEventListener("paste", (e) => { e.preventDefault(); preencher(i, (e.clipboardData && e.clipboardData.getData("text")) || ""); });
+      cx.addEventListener("focus", () => cx.select());
+    });
+    return {
+      el, valor,
+      limpar() { caixas.forEach((x) => { x.value = ""; }); caixas[0].focus(); },
+      foco() { caixas[0].focus(); },
+      desabilitar(v: boolean) { caixas.forEach((x) => { x.disabled = !!v; }); el.classList.toggle("is-ocupado", !!v); },
+      marcarErro(v: boolean) { el.classList.toggle("is-erro", !!v); },
+    };
+  }
+
+  /* ---------------- QR code ---------------- */
+  /** QR em SVG com a margem recomendada (4 módulos brancos). rotulo: o que o código é (leitor de tela) */
+  /** margem: zona branca em volta (módulos). Num fundo branco pode ser 0 — o desenho alinha com o texto ao lado */
+  // qrcode-generator só é baixado quando um QR aparece (ativar o 2FA, Pix da fatura): fora do pacote principal
+  let gerador: Promise<QrCodeFactory> | null = null;
+  const carregarGerador = () => (gerador ||= import("qrcode-generator").then((m) => m.default));
+
+  /** QR em SVG: o quadro (do tamanho final, sem pular a tela) sai na hora e os módulos entram assim que o gerador carrega */
+  function QR(texto: string, px?: number, rotulo?: string, margem = 4): SVGElement {
+    const tam = String(px || 176);
+    const svg = s("svg", { class: "qr", width: tam, height: tam, role: "img", "aria-busy": "true",
+      "aria-label": rotulo || "Código QR para o aplicativo autenticador", "shape-rendering": "crispEdges" });
+    carregarGerador().then((qrcode) => {
+      const q = qrcode(0, "M");
+      q.addData(texto);
+      q.make();
+      const n = q.getModuleCount(), borda = Math.max(0, margem), total = n + borda * 2;
+      let d = "";
+      for (let r = 0; r < n; r++) {
+        for (let col = 0; col < n; col++) if (q.isDark(r, col)) d += "M" + (col + borda) + " " + (r + borda) + "h1v1h-1z";
+      }
+      svg.setAttribute("viewBox", "0 0 " + total + " " + total);
+      svg.append(s("rect", { width: String(total), height: String(total), fill: "#ffffff" }), s("path", { d, fill: "#0f2742" }));
+      svg.removeAttribute("aria-busy");
+    }).catch(() => { svg.removeAttribute("aria-busy"); svg.setAttribute("aria-label", "Não foi possível gerar o código QR. Recarregue a página."); });
+    return svg;
+  }
+
+  /* ---------------- Senha: oculta por padrão, com "mostrar", e sem copiar ----------------
+     Copiar/recortar/arrastar ficam bloqueados (inclusive com a senha visível), para a senha
+     não parar na área de transferência. Colar continua permitido (gerenciadores de senha). */
+  function protegerSenha(input: HTMLInputElement): HTMLInputElement {
+    ["copy", "cut", "dragstart"].forEach((ev) => input.addEventListener(ev, (e) => e.preventDefault()));
+    input.setAttribute("autocapitalize", "off");
+    input.setAttribute("autocorrect", "off");
+    input.spellcheck = false;
+    return input;
+  }
+
+  /** Envolve um <input type="password"> com o botão de mostrar/ocultar */
+  function ComRevelar(input: HTMLInputElement, classe?: string): HTMLElement {
+    protegerSenha(input);
+    const btn = h("button", { type: "button", class: ZoZo.pecas.revelar, "aria-label": "Mostrar senha", "aria-pressed": "false", title: "Mostrar senha" },
+      ZoZo.icons.icon("olho", { size: 16 }));
+    btn.addEventListener("click", () => {
+      const visivel = input.type === "text";
+      input.type = visivel ? "password" : "text";
+      btn.setAttribute("aria-pressed", String(!visivel));
+      btn.setAttribute("aria-label", visivel ? "Mostrar senha" : "Ocultar senha");
+      btn.title = visivel ? "Mostrar senha" : "Ocultar senha";
+      mount(btn, ZoZo.icons.icon(visivel ? "olho" : "olho-fechado", { size: 16 }));
+      input.focus();
+    });
+    return h("div", { class: classe === "input-with-action--sm" ? ZoZo.pecas.comRevelarPequeno : [ZoZo.pecas.comRevelar, classe] }, input, btn);
+  }
+
+  const api: ZoZoVerificacao = { Captcha, CampoCodigo, QR, protegerSenha, ComRevelar };
+  ZoZo.verificacao = api;
+})(window.ZoZo);

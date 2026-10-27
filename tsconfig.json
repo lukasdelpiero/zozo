@@ -1,0 +1,21 @@
+{
+  // Toda a interface é TypeScript verificado com "strict".
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "strict": true,
+    "noUnusedLocals": true,              // código morto não passa
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "allowJs": false,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true
+  },
+  "include": ["ui/src/**/*.ts", "ui/js/**/*.ts"]
+}

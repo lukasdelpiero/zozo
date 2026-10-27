@@ -1,5 +1,5 @@
 /* =============================================================
-   ZoZo — Impressão do boleto (seção 46.10)
+   ZoZo — Impressão da fatura (antigo boleto, seção 46.10)
    Layout próprio para A4: sem sidebar, navegação, botões ou
    controles. Vale para a impressão do navegador ("Salvar como
    PDF"). Fora do boleto, a impressão sai em branco: nenhum dado
@@ -51,10 +51,11 @@
     box-shadow: none !important;
   }
 
-  .doc { gap: 22px; }
-  .doc__table thead { display: table-header-group; }   /* repete o cabeçalho em várias páginas */
+  .doc { gap: 22px !important; }      /* !important: vence a classe tw:gap-7 da tela */
   .doc__table tr,
-  .boleto-summary--doc,
+  .boleto-summary--doc, .doc__rodape, .doc__pix,
   .doc__block-title { break-inside: avoid; page-break-inside: avoid; }
   .doc__block-title { break-after: avoid; }
+  /* Fatura ainda carregando (perfil/período trocados): nada é impresso, nem pelo Ctrl+P */
+  .doc[aria-busy="true"] { display: none !important; }
 }

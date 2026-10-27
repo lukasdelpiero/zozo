@@ -5,22 +5,16 @@
    ============================================================= */
 :root {
   /* Identidade */
-  --color-primary: #652590;
-  --color-primary-strong: #521d76;
-  --color-primary-soft: #f1e9f6;
-  --color-primary-softer: #f8f4fb;
+  --color-primary: #6948D8;          /* roxo da marca: textos, barras e destaques */
+  --color-primary-soft: #EFEBFC;
+  --color-primary-softer: #F7F5FE;
   --color-on-primary: #ffffff;
-  --color-on-primary-muted: rgba(255, 255, 255, 0.74);
   --color-on-primary-hover: rgba(255, 255, 255, 0.14);
-  --color-on-primary-active: rgba(255, 255, 255, 0.22);
-  --color-on-primary-divider: rgba(255, 255, 255, 0.2);
 
   /* Superfícies */
   --color-background: #f8f8fa;
   --color-surface: #ffffff;
   --color-surface-hover: #f4f4f7;
-  --color-surface-selected: #edf2fb;
-  --color-row-checked: #f1e9f6;   /* roxo claro: mesmo fundo do item ativo do menu */
   --color-border: #e5e5e8;
   --color-border-strong: #d4d4da;
   --color-overlay: rgba(22, 33, 58, 0.38);
@@ -29,20 +23,35 @@
 
   /* Texto */
   --color-text-primary: #16213a;
-  --color-text-secondary: #71809a;
-  --color-text-muted: #9aa5b5;
+  --color-text-secondary: #4f5b71;      /* WCAG AA: ≥ 4,5:1 sobre branco e sobre os fundos claros */
+  --color-text-muted: #5b687f;          /* WCAG AA: ≥ 4,5:1 sobre branco (texto que informa, não só enfeita) */
+  --color-text-cinza: #7f8ba4;          /* cinza de datas, rótulos e legendas (cor pedida; abaixo de 4,5:1 por escolha do produto) */
 
   /* Financeiro */
   --color-positive: #176b3a;
   --color-positive-soft: #e5f3e9;
   --color-negative: #9d2525;
-  --color-negative-soft: #fbe8e8;
   --color-neutral: #4a5263;
   --color-neutral-soft: #eef0f3;
-  --color-income: #15903f;
+  --color-income: #0f7a34;               /* ≥ 4,5:1 também sobre a linha selecionada */
+  /* Pílulas de variação (gráficos, contas) — cores pedidas pelo produto */
+  --color-pilula-sobe: #008a33;  --color-pilula-sobe-fundo: #00cc4b14;
+  --color-pilula-desce: #e51300; --color-pilula-desce-fundo: #ff443314;
+  --color-pilula-igual: #7f8ba4; --color-pilula-igual-fundo: #7f8ba414;
+  /* Itens de menu perigosos (Excluir…): texto vermelho e realce claro */
+  --color-menu-perigo: #e51300;  --color-menu-perigo-fundo: #ff443314;
+  /* Avisos no rodapé (toast) */
+  /* fundo translúcido (sobre branco: ver pecas.aviso*) e texto/ícone na cor cheia */
+  --color-aviso-erro: #e51300;     --color-aviso-erro-fundo: #ff443314;
+  --color-aviso-alerta: #f58000;   --color-aviso-alerta-fundo: #f580001f;
+  --color-aviso-sucesso: #008a33;  --color-aviso-sucesso-fundo: #00cc4b14;
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
+  --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */
+  --color-alerta-soft: #fff1e3;
+  --color-progress-near: var(--color-alerta);   /* orçamento perto do limite */
   --color-progress-track: #eceef2;
+  --color-donut-fundo: #F1F2F5;    /* fundo dos gráficos de rosca (cinza-claro) */
   --color-allocation: #3b78e7;
 
   /* Gráficos */
@@ -51,7 +60,6 @@
   --color-chart-up: #19a14a;
   --color-chart-down: #e5484d;
   --color-chart-flat: #9aa5b5;
-  --color-chart-grid: #e7e9ee;
 
   /* Paleta de cores (contas, categorias e perfis) */
   --palette-01: #ff1a1a; --palette-02: #ff5d04; --palette-03: #f58000; --palette-04: #bc6d09;
@@ -60,8 +68,8 @@
   --palette-13: #d81aff; --palette-14: #ff1ad9; --palette-15: #ff0f5f; --palette-16: #6078a9;
 
   /* Feedback */
-  --color-danger: #c62828;
-  --color-danger-hover: #a91f1f;
+  --color-danger: #ff1a1a;              /* botão vermelho (cor pedida pelo produto) */
+  --color-danger-hover: #e40c0c;
   --color-danger-soft: #fdecec;
   --color-warning-soft: #fff5e2;
   --color-warning-text: #84570a;
@@ -70,7 +78,6 @@
   /* Raios */
   --radius-small: 8px;
   --radius-medium: 12px;
-  --radius-large: 20px;
   --radius-pill: 999px;
 
   /* Espaçamentos */
@@ -85,6 +92,8 @@
 
   /* Estrutura */
   --sidebar-width: 264px;
+  /* seta das listas (select) — usada pela classe de components/pecas.ts */
+  --seta-select: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371809a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --topbar-height: 56px;
   --detail-width: clamp(440px, 30vw, 580px);
   --row-height: 36px;
@@ -94,16 +103,8 @@
 
   /* Tipografia */
   --font-family: "Matter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  --font-size-xs: 11.5px;
-  --font-size-sm: 13px;
   --font-size-md: 15px;
-  --font-size-lg: 17px;
-  --font-size-xl: 20px;
-  --font-size-2xl: 24px;
-  --font-size-3xl: 28px;
-  --font-weight-regular: 400;
   --font-weight-medium: 500;
-  --font-weight-semibold: 600;
   --line-height: 1.45;
 
   /* Elevação */
@@ -119,7 +120,20 @@
   --duration-chart: 900ms;
   --page-gutter: 24px;
 
-  /* Ícones */
-  --icon-size: 16px;
-  --icon-stroke: 1.75;
+  /* Menu lateral roxo (usado também pelo câmbio e pela fatura) */
+  --sidebar-bg: #6948D8;
+  --sidebar-fg: rgba(255, 255, 255, 0.94);
+  --sidebar-fg-muted: rgba(255, 255, 255, 0.82);   /* ≥ 4,5:1 sobre o roxo do menu */
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active: rgba(255, 255, 255, 0.10);     /* texto branco ≥ 4,5:1 no item ativo */
+  --sidebar-divider: rgba(255, 255, 255, 0.14);
+
+  /* Botões roxos com o gradiente da marca (de cima para baixo) */
+  --botao-roxo: linear-gradient(180deg, #8063EE 0%, #6948D8 100%);
+  --botao-roxo-hover: linear-gradient(180deg, #7458EA 0%, #5F3FCF 100%);
+}
+
+/* Menu só com ícones (≤ 900 px): coluna estreita e respiro menor nas páginas */
+@media (max-width: 900px) {
+  :root { --sidebar-width: 64px; --page-gutter: 16px; }
 }

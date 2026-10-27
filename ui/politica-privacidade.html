@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Política de privacidade · ZoZo</title>
+  <meta name="description" content="Como o ZoZo trata os seus dados: o que guardamos, por quê, com quem e como você controla tudo.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/assets/img/favicon.png">
+  <link rel="stylesheet" href="/src/estilos.css">
+</head>
+<!-- Página pública e estática (sem JavaScript), no visual da tela de entrada: fundo #f8f9fb, cartão branco,
+     logo e fonte Matter. Ao mudar o que o ZoZo guarda ou com quem fala, atualize esta página e a data. -->
+<body class="tw:overflow-y-auto tw:bg-[#f8f9fb]">
+  <a href="#conteudo" class="tw:sr-only tw:focus:not-sr-only tw:focus:fixed tw:focus:top-3 tw:focus:left-3 tw:focus:z-10 tw:focus:px-3 tw:focus:py-2 tw:focus:rounded-lg tw:focus:bg-zz-surface tw:focus:text-zz-text">Pular para o conteúdo</a>
+
+  <header class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:w-[min(760px,calc(100%-32px))] tw:mx-auto tw:pt-7 tw:pb-5">
+    <a href="/" class="tw:inline-flex tw:items-center tw:gap-2.5 tw:rounded-[10px] tw:text-zz-text tw:no-underline tw:text-[17px] tw:font-[620] tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-4">
+      <img src="/assets/img/zozo-logo.svg" alt="" width="32" height="32" class="tw:size-8 tw:rounded-lg tw:shadow-[0_4px_10px_rgba(15,39,66,0.12),0_1px_2px_rgba(15,39,66,0.10)]">
+      ZoZo
+    </a>
+    <a href="/" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Entrar no ZoZo</a>
+  </header>
+
+  <main id="conteudo" class="politica tw:w-[min(760px,calc(100%-32px))] tw:mx-auto tw:mb-10 tw:px-14 tw:pt-12 tw:pb-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:text-zz-text tw:celular:px-5 tw:celular:pt-8 tw:celular:pb-8
+    tw:[&_h2]:mt-10 tw:[&_h2]:mb-3 tw:[&_h2]:text-[20px] tw:[&_h2]:leading-[1.3] tw:[&_h2]:font-[550] tw:[&_h2]:tracking-[-0.01em] tw:[&_h2]:text-[#1b2a4a] tw:[&_h2]:scroll-mt-6
+    tw:[&_h3]:mt-6 tw:[&_h3]:mb-2 tw:[&_h3]:text-[16px] tw:[&_h3]:font-[550]
+    tw:[&_p]:my-3 tw:[&_p]:text-[15px] tw:[&_p]:leading-[1.65]
+    tw:[&_li]:text-[15px] tw:[&_li]:leading-[1.6] tw:[&_li]:my-1.5 tw:[&_ul]:my-3 tw:[&_ul]:pl-5 tw:[&_ul]:list-disc tw:[&_ol]:my-3 tw:[&_ol]:pl-5 tw:[&_ol]:list-decimal tw:[&_li]:pl-1 tw:[&_li::marker]:text-zz-primary
+    tw:[&_strong]:font-[550] tw:[&_a]:text-zz-primary tw:[&_a]:font-[550] tw:[&_a]:underline-offset-2 tw:[&_a:hover]:underline">
+
+    <h1 class="tw:m-0 tw:text-[32px] tw:leading-[1.2] tw:font-[550] tw:tracking-[-0.015em] tw:text-[#1b2a4a] tw:celular:text-[26px]">Política de privacidade</h1>
+    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 27 de outubro de 2026</p>
+
+    <p>O ZoZo existe para você ter o controle das suas finanças, e isso inclui estar no controle dos seus dados. Esta página explica, sem rodeios, o que guardamos, por quê, com quem falamos e como você decide sobre tudo isso.</p>
+
+    <section aria-labelledby="resumo" class="tw:mt-7 tw:px-6 tw:py-5 tw:rounded-xl tw:bg-zz-primary-softer tw:border tw:border-zz-primary-soft tw:celular:px-4">
+      <h2 id="resumo" class="tw:mt-0!">Em resumo</h2>
+      <ul class="tw:mb-0!">
+        <li><strong>Seus dados financeiros são cifrados no seu navegador</strong> antes de chegarem ao servidor. Nós guardamos só a versão cifrada.</li>
+        <li><strong>Sua senha nunca sai do seu aparelho.</strong> O servidor recebe apenas uma prova derivada dela.</li>
+        <li><strong>Não vendemos, não alugamos e não usamos seus dados para publicidade.</strong> O ZoZo não tem anúncios, rastreadores nem ferramentas de análise de terceiros.</li>
+        <li><strong>Você exporta, apaga os dados ou exclui a conta</strong> a qualquer momento, no próprio app.</li>
+      </ul>
+    </section>
+
+    <h2 id="dados">Quais dados o ZoZo guarda?</h2>
+
+    <h3>Dados da conta (você informa)</h3>
+    <ul>
+      <li><strong>Primeiro nome e e-mail</strong>, para identificar a sua conta, falar com você e entrar no app.</li>
+      <li><strong>Uma prova da sua senha</strong>, nunca a senha. O seu navegador transforma a senha (com Argon2id) em duas chaves: uma cifra os seus dados e a outra vira uma prova. O servidor guarda só uma impressão digital (hash) dessa prova, para conferir que é você.</li>
+      <li><strong>Autenticação em duas etapas (2FA)</strong>, se você ativar: o segredo usado para conferir os códigos do seu aplicativo autenticador.</li>
+    </ul>
+
+    <h3>Dados financeiros (você insere)</h3>
+    <p>Transações, contas, cartões, faturas, categorias, orçamentos, recorrências, investimentos, perfis e preferências do app. Tudo isso fica num único documento que <strong>o seu navegador cifra com AES-256-GCM</strong> antes de enviar. O servidor guarda esse documento cifrado e as 10 versões anteriores mais recentes (também cifradas), para você não perder dados num erro ou num conflito entre aparelhos.</p>
+    <p>Sem a chave, que nasce da sua senha, ninguém lê esse conteúdo: nem quem tiver acesso ao banco de dados. A exceção é a cópia de recuperação, explicada logo abaixo.</p>
+
+    <h3>Dados técnicos (coletados no uso)</h3>
+    <ul>
+      <li><strong>Sessão:</strong> um cookie de sessão, protegido (HttpOnly, Secure, SameSite), que encerra depois de 24 horas.</li>
+      <li><strong>Proteção contra abuso:</strong> para limitar tentativas de login, cadastro e recuperação, usamos o endereço IP e o e-mail na forma de um identificador que não pode ser revertido (HMAC). Esses contadores expiram sozinhos em minutos ou horas.</li>
+      <li><strong>Registros de segurança:</strong> eventos como "login com falha" ou "senha alterada", sem e-mail, IP, senha ou códigos em texto (só identificadores não reversíveis).</li>
+      <li><strong>No seu navegador:</strong> o ZoZo guarda, cifrada, a chave para reabrir a sessão sem digitar a senha de novo, e algumas preferências da tela. Tudo isso é apagado quando você sai.</li>
+    </ul>
+
+    <h2 id="google">Entrar com o Google</h2>
+    <p>O botão "Continuar com Google" é opcional. Se você usá-lo, o Google pede a sua autorização e envia ao ZoZo apenas:</p>
+    <ul>
+      <li><strong>o seu endereço de e-mail</strong>, já confirmado pelo Google, para criar a sua conta ou encontrar a conta que você já tem;</li>
+      <li><strong>o seu primeiro nome</strong>, para preencher o cadastro (você pode trocá-lo depois).</li>
+    </ul>
+    <p>Pedimos só as permissões básicas de identificação (<code class="tw:text-[14px]">openid</code>, <code class="tw:text-[14px]">email</code> e <code class="tw:text-[14px]">profile</code>). Não acessamos os seus contatos, e-mails, arquivos, agenda nem nenhum outro dado da sua conta Google, e não guardamos a sua foto nem as credenciais de acesso do Google. O e-mail e o nome ficam guardados na sua conta do ZoZo, como num cadastro comum, e são apagados quando você exclui a conta. A senha do ZoZo continua sendo necessária, porque é ela que cifra os seus dados.</p>
+    <p>Não vendemos, não compartilhamos e não usamos os dados recebidos do Google para publicidade nem para treinar inteligência artificial. O uso das informações recebidas das APIs do Google segue a <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado. Você pode remover o acesso do ZoZo a qualquer momento em <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">myaccount.google.com/permissions</a>.</p>
+
+    <h2 id="recuperacao">E se eu esquecer a senha?</h2>
+    <p>Como a senha é a chave dos seus dados, esquecê-la poderia significar perder tudo. Por isso, <strong>por padrão</strong>, o seu navegador guarda no servidor uma cópia da chave dos dados, trancada com uma chave que só o servidor do ZoZo consegue calcular. Em "Esqueci minha senha", depois de confirmar o e-mail (e o código do 2FA, se estiver ativo), essa cópia é usada para você criar uma senha nova sem perder nada.</p>
+    <p>Na prática, isso significa que quem tivesse ao mesmo tempo o banco de dados <strong>e</strong> a chave secreta do servidor conseguiria abrir os dados dessas contas. Guardamos essa chave separada do banco, com acesso restrito.</p>
+    <p>Se preferir que só você consiga abrir os seus dados, ative a <strong>Proteção avançada</strong> em Configurações › Conta. A cópia é apagada do servidor na hora. Nesse modo, se você esquecer a senha, a conta recomeça vazia: ninguém, nem o ZoZo, consegue recuperar os dados.</p>
+
+    <h2 id="finalidades">Para que usamos os dados?</h2>
+    <ul>
+      <li>Prestar o serviço: guardar e sincronizar os seus dados entre os seus aparelhos.</li>
+      <li>Confirmar a sua identidade: login, confirmação de e-mail, 2FA e recuperação de senha.</li>
+      <li>Proteger você e o serviço: impedir tentativas de invasão, robôs e abuso.</li>
+      <li>Enviar e-mails necessários: confirmação de cadastro, recuperação de senha e avisos de segurança da conta. <strong>Não enviamos e-mails de marketing.</strong></li>
+      <li>Cumprir obrigações legais e atender pedidos de autoridades, quando a lei exigir.</li>
+    </ul>
+    <p>Fazemos isso com base na <strong>execução do contrato</strong> com você (prestar o serviço que você escolheu usar), no <strong>legítimo interesse</strong> de manter o serviço seguro e no <strong>cumprimento de obrigação legal</strong> (art. 7º, incisos II, V e IX, da LGPD). Não fazemos análises de perfil, decisões automatizadas sobre você nem uso para treinar inteligência artificial.</p>
+
+    <h2 id="compartilhamento">Vocês enviam minhas informações para mais alguém?</h2>
+    <p>Não vendemos nem compartilhamos os seus dados para fins comerciais. Para o ZoZo funcionar, contamos com alguns fornecedores, que tratam os dados só para nos prestar o serviço:</p>
+    <ul>
+      <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques e o CAPTCHA (Turnstile) do cadastro e do login.</li>
+      <li><strong>Resend:</strong> envio dos e-mails do ZoZo (recebe o seu endereço e o conteúdo do e-mail).</li>
+      <li><strong>Google:</strong> só se você escolher "Continuar com Google". Recebemos o seu e-mail confirmado e o seu primeiro nome. A senha do ZoZo continua sendo necessária.</li>
+      <li><strong>GitHub:</strong> guarda cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente.</li>
+    </ul>
+    <p>Esses serviços podem processar dados fora do Brasil, com garantias contratuais de proteção previstas na LGPD (art. 33). Também podemos ter de entregar informações a autoridades, quando a lei ou uma ordem judicial exigir. Mesmo assim, os dados financeiros continuam cifrados.</p>
+
+    <h2 id="seguranca">Meus dados estão protegidos?</h2>
+    <p>Sim. Além da criptografia de ponta a ponta:</p>
+    <ul>
+      <li>Toda a comunicação usa HTTPS (TLS 1.2 ou superior).</li>
+      <li>As senhas passam por Argon2id, a recomendação atual para senhas.</li>
+      <li>Há limites de tentativas, CAPTCHA, autenticação em duas etapas opcional e sessões que expiram.</li>
+      <li>O site bloqueia scripts de terceiros e não pode ser aberto dentro de outros sites.</li>
+      <li>Cada pedido ao servidor confere quem você é pela sessão. Um usuário nunca acessa os dados de outro.</li>
+    </ul>
+    <p>Nenhum sistema é infalível. Se acontecer um incidente de segurança que possa trazer risco a você, avisaremos você e a Autoridade Nacional de Proteção de Dados (ANPD), como a lei determina.</p>
+
+    <h2 id="retencao">Por quanto tempo os dados ficam guardados?</h2>
+    <ul>
+      <li><strong>Conta ativa:</strong> enquanto você usar o ZoZo.</li>
+      <li><strong>Cadastro não confirmado:</strong> apagado depois de 7 dias.</li>
+      <li><strong>Links de confirmação e de recuperação:</strong> valem 24 horas e 1 hora, respectivamente, e só podem ser usados uma vez.</li>
+      <li><strong>Exclusão da conta:</strong> a conta, os dados e as versões anteriores saem do banco na hora. As cópias de segurança são substituídas em até 30 dias e os registros de segurança, em poucos dias.</li>
+    </ul>
+
+    <h2 id="excluir">Posso excluir minha conta quando eu quiser?</h2>
+    <p>Sim, sem complicação. Em <strong>Configurações › Conta</strong>, use "Excluir conta" para apagar a conta e todos os dados: basta digitar EXCLUIR CONTA (e o código do aplicativo, se a verificação em duas etapas estiver ligada). Você recebe um e-mail confirmando a exclusão. Se quiser só recomeçar, "Apagar todos os dados" esvazia o conteúdo e mantém a conta.</p>
+
+    <h2 id="direitos">Seus direitos</h2>
+    <p>A Lei Geral de Proteção de Dados (Lei nº 13.709/2018) garante a você direitos sobre os seus dados pessoais. Muitos deles você exerce direto no app:</p>
+    <ol>
+      <li><strong>Confirmação e acesso:</strong> saber se tratamos os seus dados e quais são. Todos os seus dados financeiros já estão visíveis para você no app.</li>
+      <li><strong>Correção:</strong> altere o seu nome e os seus dados financeiros no próprio app.</li>
+      <li><strong>Portabilidade:</strong> em Configurações › Conta, "Exportar todas as transações" baixa um arquivo CSV, gerado no seu navegador. O arquivo baixado não é cifrado: guarde-o em local seguro.</li>
+      <li><strong>Eliminação:</strong> exclua a conta em Configurações › Conta, sem precisar falar conosco.</li>
+      <li><strong>Informação sobre compartilhamento:</strong> a lista de fornecedores está acima. Se tivermos de entregar dados a uma autoridade, você pode perguntar quais foram.</li>
+      <li><strong>Anonimização, bloqueio, oposição e revisão:</strong> você pode pedir por e-mail o que não estiver disponível no app.</li>
+    </ol>
+    <p>Como os seus dados financeiros são cifrados com uma chave que só você tem, <strong>não conseguimos lê-los nem enviá-los a você por e-mail</strong>: a exportação é feita no app. Para os outros pedidos, escreva para <a href="mailto:privacidade@usezozo.com.br">privacidade@usezozo.com.br</a>. Respondemos em até 15 dias e podemos pedir uma confirmação de que a conta é sua. Você também pode reclamar à <a href="https://www.gov.br/anpd" rel="noopener noreferrer">ANPD</a>.</p>
+
+    <h2 id="sobre">Sobre esta política</h2>
+    <p>O responsável pelo tratamento dos dados é o ZoZo (usezozo.com.br). Ao usar o ZoZo, você declara estar ciente desta política. Se ela mudar de forma importante, avisaremos no app ou por e-mail antes de a mudança valer. Dúvidas? Fale com a gente em <a href="mailto:privacidade@usezozo.com.br">privacidade@usezozo.com.br</a>.</p>
+  </main>
+
+  <footer class="tw:w-[min(760px,calc(100%-32px))] tw:mx-auto tw:pb-8 tw:text-center tw:text-[13px] tw:text-zz-secondary">
+    © 2026 ZoZo · <a href="/termos-uso" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Termos de uso</a> · <a href="/" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">usezozo.com.br</a>
+  </footer>
+</body>
+</html>
