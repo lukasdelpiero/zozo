@@ -5,7 +5,7 @@
 #
 # No VS Code: Terminal › Executar Tarefa… › "ZoZo: publicar na prévia" / "ZoZo: publicar em produção".
 #
-# Passos: testes automáticos (API + serviço de dados + tipos) → segredos → monta a interface (Vite) → (produção: ponto de restauração do banco)
+# Passos: testes automáticos (API + tipos do back-end + serviço de dados + tipos) → segredos → monta a interface (Vite) → (produção: ponto de restauração do banco)
 #         → migrações do banco → publica. Qualquer falha interrompe tudo. Produção pede confirmação.
 param(
   [Parameter(Mandatory = $true)][ValidateSet("previa", "producao")][string]$Ambiente,
@@ -26,9 +26,11 @@ $endereco = if ($Ambiente -eq "previa") { "https://zozo-previa.zozo-finance-app.
 function Parar($mensagem) { Write-Host ""; Write-Host $mensagem -ForegroundColor Red; exit 1 }
 
 Write-Host "1/6 Testes automáticos..." -ForegroundColor Cyan
-# uv run: usa o ambiente do projeto (grupo dev do pyproject.toml, com FastAPI/Pydantic para os testes da transição)
+# uv run: usa o ambiente do projeto (FastAPI/Pydantic nas mesmas versões do Worker; mypy do grupo dev)
 uv run python -m unittest discover -s tests
 if ($LASTEXITCODE -ne 0) { Parar "Testes da API falharam: nada foi publicado." }
+uv run mypy
+if ($LASTEXITCODE -ne 0) { Parar "Erros de tipo no back-end (mypy): nada foi publicado." }
 Push-Location ..
 # Dependências da interface exatamente como no package-lock.json (sem scripts de instalação: .npmrc)
 # Exatamente como no package-lock.json (versão e integridade de cada pacote). Se o node_modules já confere,

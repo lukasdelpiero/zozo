@@ -16,7 +16,7 @@ Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 import json
 from collections.abc import Mapping, Sequence
 from http import HTTPMethod
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 from pyodide.ffi import to_js
@@ -108,30 +108,26 @@ def _config(env: Any) -> dict[str, str]:
     return {k: str(getattr(env, k, "") or "") for k in _CONFIG}
 
 
-# Importado no carregamento (não no 1º pedido): o Cloudflare guarda o estado depois dos imports do topo num
-# "snapshot" de memória, então FastAPI + Pydantic não custam CPU a cada isolado novo. O app só é usado com
-# API_FASTAPI = "1"; sem isso os pedidos seguem direto para o núcleo.
+# Importado E montado no carregamento (não no 1º pedido): o Cloudflare guarda o estado depois do código do
+# topo num "snapshot" de memória, então importar FastAPI + Pydantic e montar as rotas e os validadores não
+# custa CPU a cada isolado novo. O app só é usado com API_FASTAPI = "1"; sem isso os pedidos seguem direto
+# para o núcleo.
+_APP_FASTAPI: "FastAPI | None"
 try:
     import asgi                                      # adaptador ASGI do Python Workers
     from app_fastapi import criar_app
-    _TEM_FASTAPI = True
 except ImportError:                                  # pragma: no cover — pacote fora do Worker
-    _TEM_FASTAPI = False
-
-_APP_FASTAPI: "FastAPI | Literal[False] | None" = None   # False: o pacote não está no Worker
+    _APP_FASTAPI = None
+else:
+    _APP_FASTAPI = criar_app(lambda req: {"banco": BancoD1(req.scope["env"].DB), "servicos": Servicos(),
+                                          "config": _config(req.scope["env"])})
 
 
 def _app_fastapi() -> "FastAPI | None":
-    """App FastAPI (transição). None se o pacote não estiver no Worker (aí o pedido é RECUSADO: ver fetch)."""
-    global _APP_FASTAPI
+    """App FastAPI. None se o pacote não estiver no Worker (aí o pedido é RECUSADO: ver fetch)."""
     if _APP_FASTAPI is None:
-        if not _TEM_FASTAPI:
-            print(json.dumps({"evento": "fastapi_indisponivel"}))
-            _APP_FASTAPI = False
-        else:
-            _APP_FASTAPI = criar_app(lambda req: {"banco": BancoD1(req.scope["env"].DB), "servicos": Servicos(),
-                                                  "config": _config(req.scope["env"])})
-    return _APP_FASTAPI or None
+        print(json.dumps({"evento": "fastapi_indisponivel"}))
+    return _APP_FASTAPI
 
 
 class Default(WorkerEntrypoint):

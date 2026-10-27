@@ -634,7 +634,7 @@
           btn.disabled = true;
           const dados = { senhaAtual: senhaAtual.value, novaSenha: novaSenha.value };
           depoisDasGravacoes(() => ctx.bridge.request(A.changePassword, dados, { timeout: 120000 }))
-            .then(() => { senhaAtual.value = ""; novaSenha.value = ""; ctx.toast("Senha alterada."); })
+            .then(() => { senhaAtual.value = ""; novaSenha.value = ""; ctx.toast("Senha alterada.", { tone: "success", importante: true }); })
             .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }))
             .finally(() => { btn.disabled = false; });
         };
@@ -645,7 +645,8 @@
             // Filtros, seleção e preferências apontavam para itens que não existem mais
             store.set({ ui: { filtros: null, selecionados: [], busca: "", invExcluidas: [], mostrarOcultas: {}, gruposFechados: {} }, selectedItem: null });
             ctx.detail.close({ silencioso: true });
-            ctx.toast("Dados apagados.");
+            // a tela de Configurações não mostra o resultado: confirmação visível (sucesso "importante")
+            ctx.toast("Todos os dados foram apagados.", { tone: "success", importante: true, duration: 5000 });
             return ctx.recarregarTudo();
           })
             .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })));
