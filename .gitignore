@@ -20,3 +20,10 @@ api/conferencia.db
 
 # interface (Vite/TypeScript)
 node_modules/
+
+# Backups do banco: nunca no git (chave privada do age, export aberto, arquivos cifrados baixados)
+*-chave.txt
+*.sql.age
+/api/zozo.sql
+/api/backup-teste/
+zozo-*.sql
