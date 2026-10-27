@@ -58,7 +58,8 @@ Referência: OWASP ASVS 5.0, nível 2 (requisitos aplicáveis). **Não é uma de
 
 **M2 — Backup automático desligado; restauração não comprovada nesta auditoria**
 - `.github/workflows/backup-d1.yml:15`: o agendamento está comentado (só roda à mão). O D1 guarda histórico próprio (Time Travel: 7 dias no plano gratuito, 30 no pago), e o `publicar.ps1` registra um ponto de restauração antes de cada publicação em produção.
-- Não executei restauração (exigiria exportar o banco de produção). Backup existente não é recuperação comprovada.
+- Não executei restauração nesta auditoria (exigiria exportar o banco de produção). Há um ensaio anterior, de 18/10/2026 (`docs/RESTAURACAO.md`, seção 3): export real da prévia e ciclo completo local com o documento decifrado idêntico; não ensaiado: importar num D1 novo na Cloudflare.
+- Depois da auditoria: o workflow ganhou cópia opcional para uma nuvem (rclone) e `api/dev/baixar_backup.ps1` baixa os backups para uma pasta sincronizada (OneDrive, Proton Drive…); passo a passo na seção 0 de `docs/RESTAURACAO.md`. O workflow precisa estar no `main` para rodar.
 - Recomendação: cadastrar os 3 segredos do workflow, ligar o `schedule` e fazer um ensaio de restauração num banco isolado (`docs/RESTAURACAO.md`), conferindo contagens e que uma conta de teste abre os dados.
 
 ### Baixa

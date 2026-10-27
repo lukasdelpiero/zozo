@@ -15,15 +15,37 @@ Os segredos **não** estão no export do banco: guarde um inventário deles (nom
 
 ## 0. Backup automático (diário, GitHub Actions)
 
-`.github/workflows/backup-d1.yml` — **desligado por enquanto**: só roda à mão em Actions → "Backup do banco (D1)" → Run workflow. Para rodar todo dia às 03:17 (Brasília), cadastre os segredos abaixo e descomente o `schedule` no arquivo. Exporta o banco de produção, confere com `conferir_backup.py` (falha se houver problema) e **cifra com age antes de sair do runner**. Guarda o arquivo `.sql.age` como artifact por 30 dias (repositório privado; cabe no espaço gratuito enquanto o banco for pequeno). Falha = e-mail do GitHub.
+`.github/workflows/backup-d1.yml` exporta o banco de produção, confere com `conferir_backup.py` (falha se houver problema) e **cifra com age antes de sair do runner**. Guarda o `.sql.age` como artifact do GitHub por 30 dias e, se configurado, copia para uma nuvem sua. Falha = e-mail do GitHub. O arquivo é sempre o mesmo `.sql.age` cifrado: quem tiver acesso ao GitHub ou à nuvem **não** abre sem a chave privada do age.
 
-Preparar uma vez:
-1. Instale o age (`winget install FiloSottile.age`) e gere o par: `age-keygen -o zozo-backup-chave.txt`. A linha `# public key: age1…` é a chave pública. **Guarde `zozo-backup-chave.txt` fora deste computador** (pendrive/cofre de senhas): sem ela nenhum backup abre; com ela, todos abrem. Perdeu a chave: os backups antigos ficam perdidos (o banco e o Time Travel do D1 não dependem dela); gere um par novo, troque `BACKUP_AGE_RECIPIENT` e siga.
-2. Cloudflare → Manage account → Account API tokens → Create → Custom: permissão **Account → D1 → Edit**, só esta conta.
-3. GitHub → repositório → Settings → Secrets and variables → Actions: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` e `BACKUP_AGE_RECIPIENT` (a chave pública `age1…`).
-4. Rode o workflow uma vez à mão e confira o artifact.
+**O workflow só funciona no branch principal (`main`)**: o agendamento e o botão "Run workflow" do GitHub só enxergam workflows do `main`. Mescle a PR (ou leve o arquivo para o `main`) antes do passo 4.
 
-Abrir um backup: baixe o artifact (Actions → execução → Artifacts), descompacte e `age -d -i zozo-backup-chave.txt -o zozo.sql zozo-AAAA-MM-DD.sql.age`. Daí em diante, siga a seção 2 com esse `zozo.sql`.
+### Preparar uma vez
+
+1. **Chave do age** (no seu computador): `winget install FiloSottile.age` e `age-keygen -o zozo-backup-chave.txt`. A linha `# public key: age1…` é a chave pública. **Guarde `zozo-backup-chave.txt` fora deste computador** (cofre de senhas e um pendrive): sem ela nenhum backup abre; com ela, todos abrem. Nunca a coloque no GitHub nem na nuvem dos backups. Perdeu a chave: os backups antigos ficam perdidos (o banco e o Time Travel do D1 não dependem dela); gere um par novo, troque `BACKUP_AGE_RECIPIENT` e siga.
+2. **Token da Cloudflare**: Cloudflare → Manage account → Account API tokens → Create → Custom: permissão **Account → D1 → Edit**, só esta conta (o export do D1 exige "Edit"). O ID da conta aparece na página inicial do painel.
+3. **Segredos do GitHub**: repositório → Settings → Secrets and variables → Actions → New repository secret: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` e `BACKUP_AGE_RECIPIENT` (a chave pública `age1…`).
+4. **Primeiro teste**: Actions → "Backup do banco (D1)" → Run workflow. Abra a execução, baixe o artifact e teste abrir (abaixo).
+5. **Ligar todo dia** (03:17 de Brasília): no workflow, apague o `#` das duas linhas de `schedule` e publique no `main`. O GitHub pausa agendamentos de repositórios sem atividade por 60 dias: se isso acontecer, ele avisa por e-mail; reative em Actions.
+
+### Onde guardar uma segunda cópia (escolha uma)
+
+O artifact do GitHub vence em 30 dias e fica na mesma conta do código. Para uma cópia independente:
+
+**A) Direto do GitHub para a nuvem (rclone)** — não depende do seu computador ligado.
+- Funciona bem: **Google Drive**, **Dropbox**, **Backblaze B2** (chaves de aplicação; 10 GB grátis). OneDrive também funciona, mas o token pode vencer em ~90 dias (gere de novo quando o backup avisar falha). Proton Drive no rclone ainda é beta: prefira o caminho B.
+- No seu computador: `winget install Rclone.Rclone`, depois `rclone config` → `n` (novo) → nome `gdrive` → tipo `drive` (Google Drive), `dropbox` ou `b2` → aceite os padrões → faça login no navegador quando pedir. Teste: `rclone mkdir gdrive:ZoZo-backups`.
+- Prefira uma conta ou pasta só para isso. No Google Drive, escolha o escopo `drive.file` no `rclone config` (o rclone só enxerga o que ele mesmo criou).
+- `rclone config file` mostra onde está o `rclone.conf`. Copie **só o bloco do remoto** (de `[gdrive]` até o fim dele) para o segredo `RCLONE_CONFIG` e crie `RCLONE_DESTINO` = `gdrive:ZoZo-backups`.
+- Pronto: cada execução copia o `.sql.age` para lá, nunca sobrescreve um que já existe e apaga da nuvem os que têm mais de 90 dias.
+
+**B) Para uma pasta sincronizada no seu computador** — OneDrive, **Proton Drive**, Google Drive para computador, Dropbox ou um HD externo. Nenhuma senha de nuvem fica no GitHub.
+- Precisa do GitHub CLI com login: `winget install GitHub.cli` e `gh auth login`.
+- Teste: `.\api\dev\baixar_backup.ps1 -Pasta "$env:USERPROFILE\OneDrive\ZoZo-backups"` (troque pela pasta do Proton Drive, Google Drive etc.). Ele baixa só os backups que ainda não estão lá. `-ManterDias 365` apaga os de mais de um ano.
+- Agendar todo dia às 09:00 (num terminal, uma vez): `schtasks /Create /SC DAILY /ST 09:00 /TN "ZoZo backup" /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Lukas\Downloads\ZoZo17\ZoZo\api\dev\baixar_backup.ps1 -Pasta C:\Users\Lukas\OneDrive\ZoZo-backups"`. Se o computador estiver desligado, o dia seguinte pega o que faltou (os artifacts duram 30 dias).
+
+### Abrir um backup
+
+Pegue o `zozo-AAAA-MM-DD.sql.age` (artifact do GitHub, pasta da nuvem ou do computador) e: `age -d -i zozo-backup-chave.txt -o zozo.sql zozo-AAAA-MM-DD.sql.age`. Daí em diante, siga a seção 2 com esse `zozo.sql`. Teste abrir um backup de vez em quando: backup que nunca foi aberto não é backup comprovado.
 
 ## 1. Fazer o backup à mão (cópia independente)
 
@@ -70,6 +92,6 @@ Não ensaiado (fica para o próximo): importar um export em um **D1 novo** no Cl
 
 ## Pendências
 
-- Backup externo **automático** (hoje o export é manual): agendar o `wrangler d1 export` e guardar fora do Cloudflare.
+- Backup externo **automático**: pronto no workflow (seção 0); falta ligar — workflow no `main`, segredos e `schedule`.
 - Trocar a senha apaga o histórico cifrado com a senha anterior (as versões antigas não abririam com a nova).
 - A detecção de "documento sumido" depende de um marcador neste navegador: num dispositivo novo, a ausência parece primeiro uso.

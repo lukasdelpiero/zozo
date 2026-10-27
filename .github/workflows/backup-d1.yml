@@ -7,6 +7,11 @@
 #   CLOUDFLARE_API_TOKEN   token com só "Account → D1 → Edit" (o export do D1 exige escrita) nesta conta
 #   CLOUDFLARE_ACCOUNT_ID  id da conta
 #   BACKUP_AGE_RECIPIENT   chave pública do age (age1…)
+# Opcional — cópia também numa nuvem sua (Google Drive, Dropbox, Backblaze B2, OneDrive…), pelo rclone:
+#   RCLONE_CONFIG          conteúdo do rclone.conf com UM remoto (gerado no seu computador: rclone config)
+#   RCLONE_DESTINO         remoto:pasta, ex.: gdrive:ZoZo-backups
+# O que vai para a nuvem é o mesmo .sql.age (cifrado): sem a chave PRIVADA do age, ninguém abre.
+# Passo a passo: docs/RESTAURACAO.md, seção 0.
 name: Backup do banco (D1)
 
 # DESLIGADO por enquanto: só roda à mão (Actions → Run workflow). Para o backup diário, depois de
@@ -27,6 +32,8 @@ jobs:
   backup:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      TEM_NUVEM: ${{ secrets.RCLONE_CONFIG != '' && 'sim' || 'nao' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
         with:
@@ -63,6 +70,28 @@ jobs:
           age -r "$BACKUP_AGE_RECIPIENT" -o "$RUNNER_TEMP/saida/zozo-$dia.sql.age" "$plano"
           shred -u "$plano" "$RUNNER_TEMP/conferencia.db"
           ls -l "$RUNNER_TEMP/saida"
+
+      - name: Copiar para a nuvem (opcional, rclone)
+        if: env.TEM_NUVEM == 'sim'
+        env:
+          CONF: ${{ secrets.RCLONE_CONFIG }}
+          DESTINO: ${{ secrets.RCLONE_DESTINO }}
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$DESTINO" in *:*) ;; *) echo "::error::RCLONE_DESTINO precisa ser remoto:pasta (ex.: gdrive:ZoZo-backups)"; exit 1;; esac
+          cd "$RUNNER_TEMP"
+          # rclone com versão e hash fixos (o hash é o publicado em SHA256SUMS da versão)
+          curl -fsSL -o rclone.zip https://github.com/rclone/rclone/releases/download/v1.75.2/rclone-v1.75.2-linux-amd64.zip
+          echo "349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702  rclone.zip" | sha256sum -c -
+          unzip -q -j rclone.zip '*/rclone' -d bin
+          printf '%s\n' "$CONF" > rclone.conf
+          trap 'shred -u rclone.conf 2>/dev/null || true' EXIT
+          # só acrescenta: um backup que já está lá (ex.: rodou duas vezes no mesmo dia) não é sobrescrito
+          bin/rclone --config rclone.conf copy saida/ "$DESTINO" --ignore-existing --no-traverse --stats-one-line
+          # na nuvem ficam 90 dias de backups (só os arquivos zozo-*.sql.age)
+          bin/rclone --config rclone.conf delete "$DESTINO" --min-age 90d --include "zozo-*.sql.age"
+          bin/rclone --config rclone.conf lsl "$DESTINO" --include "zozo-*.sql.age" | tail -n 3
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
         with:
