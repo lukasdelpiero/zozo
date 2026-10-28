@@ -149,7 +149,7 @@ declare global {
   /** Todas as ações da ponte (js/bridge/messages.ts: ACTIONS[nome] === nome) */
   type NomeAcao = NomeLeitura
     | "getSession" | "registerUser" | "reenviarConfirmacao" | "conferirLink" | "pedirRecuperacao" | "abrirRecuperacao" | "concluirRecuperacao"
-    | "getProtecao" | "setProtecao" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
+    | "getProtecao" | "setProtecao" | "repararRecuperacao" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
     | "createLancamento" | "updateLancamento" | "deleteLancamento" | "updateUser" | "changePassword" | "wipeUserData" | "deleteUser"
     | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "loadUserData" | "saveUserData"
     | "createConta" | "updateConta" | "updateCicloCartao" | "deleteConta"
@@ -160,6 +160,8 @@ declare global {
     | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura"
     | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
+  /** Por que a recuperação não traz os dados: escolha da pessoa, cópia ainda não guardada, cópia que não abre, dados ilegíveis */
+  type MotivoRecuperacao = "avancada" | "sem_copia" | "copia_invalida" | "dados_ilegiveis";
   /** Sessão como a interface a recebe; doisFatores sem authenticated = falta o código do 2FA */
   interface RespostaSessao { authenticated: boolean; user?: UsuarioSessao | null; email?: string; doisFatores?: boolean }
   interface RespostasHost {
@@ -174,16 +176,22 @@ declare global {
     reenviarConfirmacao: { enviado: boolean };
     conferirLink: { email: string; ativa: boolean };
     pedirRecuperacao: { enviado: boolean };
-    /** manter: os dados abrem com a cópia da chave (false = a conta recomeça vazia) */
-    abrirRecuperacao: { email: string; manter: boolean };
+    /**
+     * manter: os dados abrem com a cópia da chave (false = a conta só recomeça vazia, depois de confirmar; motivo diz por quê).
+     * restaurada: o documento atual não abria e voltou a cópia mais recente do histórico. descartadas: cópias que não abriram.
+     */
+    abrirRecuperacao: { email: string; manter: boolean; motivo: MotivoRecuperacao | null;
+      restaurada: { versao: number; quando: string | null } | null; descartadas: number };
     concluirRecuperacao: { email: string; recomecou: boolean };
     getProtecao: { avancada: boolean; recuperacao: boolean };
     setProtecao: { avancada: boolean; recuperacao: boolean };
+    repararRecuperacao: { avancada: boolean; recuperacao: boolean };
     verificarAtualizacao: { mudou: boolean; versao?: number };
     /** documento decifrado (o serviço confere tudo em normalizar); aviso: restaurado da cópia, documento sumido… */
     loadUserData: { documento: unknown; aviso: string | null; somenteLeitura?: boolean };
     saveUserData: { salvo: boolean };
-    changePassword: { alterada: boolean };
+    /** recuperacaoPendente: a senha mudou, mas a cópia nova da chave não foi guardada (Configurações › Conta repara) */
+    changePassword: { alterada: boolean; recuperacaoPendente?: boolean };
     updateUser: RespostaSessao;
     wipeUserData: { apagado: boolean };
     deleteUser: { excluido: boolean };

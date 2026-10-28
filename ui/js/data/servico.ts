@@ -278,8 +278,9 @@
           // quem leu enquanto gravava viu a alteração: a tela volta ao que está gravado
           window.dispatchEvent(new CustomEvent("zozo:dados-revertidos"));
           if (tratarConflito(e)) throw erro("DATA_CHANGED");
-          if (e && e.code === "TIMEOUT") {
-            // Sem resposta: a gravação pode ter acontecido ou não. Nada de "desfazer" às cegas: relê do servidor.
+          if (e && (e.code === "TIMEOUT" || e.code === "SAVE_UNCONFIRMED")) {
+            // Sem resposta (prazo ou conexão que caiu depois do envio): a gravação pode ter acontecido ou não.
+            // Nada de "desfazer" às cegas: relê do servidor.
             esquecer();
             window.dispatchEvent(new CustomEvent("zozo:dados-alterados", { detail: { codigo: "SAVE_UNCONFIRMED" } }));
             throw erro("SAVE_UNCONFIRMED");

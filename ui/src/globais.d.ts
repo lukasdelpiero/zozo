@@ -634,6 +634,11 @@ declare global {
     onCodigo(codigo: string): Promise<string | null>;
     onCancelar2FA(): void;
   }
+  /** Tela da senha nova da recuperação (ver abrirRecuperacao em dados.d.ts) */
+  interface ConfigNovaSenha {
+    email: string; manter: boolean; motivo?: MotivoRecuperacao | null; restaurada?: { versao: number; quando: string | null } | null;
+    descartadas?: number; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void;
+  }
   interface ZoZoAuth {
     render(root: HTMLElement, cfg: ConfigEntrada): void;
     reiniciar(): void;
@@ -644,7 +649,7 @@ declare global {
     aguardandoEmail(root: HTMLElement, email: string, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }): void;
     pedirRecuperacao(root: HTMLElement, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }): void;
     codigoRecuperacao(root: HTMLElement, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }): void;
-    novaSenha(root: HTMLElement, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }): void;
+    novaSenha(root: HTMLElement, cfg: ConfigNovaSenha): void;
     linkInvalido(root: HTMLElement, cfg: { onVoltar: () => void }): void;
     A: Readonly<Record<string, string>>;
   }

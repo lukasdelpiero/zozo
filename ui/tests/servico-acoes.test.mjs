@@ -344,6 +344,11 @@ test("gravação que falha desfaz a alteração na memória; sem resposta (TIMEO
   falha = "TIMEOUT";
   await assert.rejects(t.req(t.A.createConta, { conta: { nome: "Terceira", tipo: "corrente", saldo: 0 } }), codigo("SAVE_UNCONFIRMED"));
   assert.ok(t.eventos.some((e) => e.type === "zozo:dados-alterados" && e.detail && e.detail.codigo === "SAVE_UNCONFIRMED"));
+  // a conexão caiu depois do envio (o host diz SAVE_UNCONFIRMED): o mesmo tratamento, relê em vez de "desfeito"
+  const antes = t.eventos.length;
+  falha = "SAVE_UNCONFIRMED";
+  await assert.rejects(t.req(t.A.createConta, { conta: { nome: "Quarta", tipo: "corrente", saldo: 0 } }), codigo("SAVE_UNCONFIRMED"));
+  assert.ok(t.eventos.slice(antes).some((e) => e.type === "zozo:dados-alterados" && e.detail && e.detail.codigo === "SAVE_UNCONFIRMED"));
   t.Z.bridge.requestHost = original;
   assert.deepEqual((await t.req(t.A.getContas)).contas.map((c) => c.nome), ["Primeira"]);   // relido do "servidor"
 });

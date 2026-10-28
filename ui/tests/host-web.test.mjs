@@ -79,7 +79,13 @@ function servidorFalso() {
   const json = (status, corpo) => new Response(corpo === undefined ? null : JSON.stringify(corpo), { status, headers: { "content-type": "application/json" } });
   const novoEnvelope = () => { s.envelope = b64(webcrypto.getRandomValues(new Uint8Array(32))); return s.envelope; };
   const sessao = (c, email) => ({ email, nome: c.nome, envelope: s.envelope, demo: c.demo === true, recursos: c.recursos || {}, doisFatores: false });
+  // s.perder(metodo, caminho) → true: o servidor processa o pedido e a conexão cai antes da resposta
   s.fetch = async (url, init = {}) => {
+    const r = await atender(url, init);
+    if (s.perder && s.perder(init.method || "GET", new URL(url, "http://zozo.test").pathname)) throw new TypeError("a conexão caiu");
+    return r;
+  };
+  const atender = async (url, init = {}) => {
     const u = new URL(url, "http://zozo.test");
     const metodo = init.method || "GET";
     const corpo = init.body ? JSON.parse(init.body) : undefined;
@@ -127,12 +133,13 @@ function servidorFalso() {
       if (contaTok.codigo2fa && corpo.codigo === undefined) return json(401, { erro: "CODE_REQUIRED" });
       if (contaTok.codigo2fa && corpo.codigo !== contaTok.codigo2fa) return json(401, { erro: "CODE_INVALID" });
       tok.aberto = true;
+      tok.passe = "P" + randomUUID().replace(/-/g, "");          // cada "abrir" troca o passe
       const cu = !contaTok.avancada && contaTok.custodia && contaTok.custodia.prova === contaTok.provaHash ? contaTok.custodia : null;
-      return json(200, { email: tok.email, versao: contaTok.doc ? contaTok.doc.versao : 0,
+      return json(200, { email: tok.email, passe: tok.passe, avancada: !!contaTok.avancada, versao: contaTok.doc ? contaTok.doc.versao : 0,
         custodia: cu ? { nonce: cu.nonce, chave: cu.chave, r: chaveCustodia(tok.email, cu.nonce) } : null,
         documento: cu ? contaTok.doc : null, historico: cu ? contaTok.historico.slice().reverse() : [] });
     }
-    if (caminho.startsWith("/recuperacao/") && !tok.aberto) return json(400, { erro: "TOKEN_INVALID" });
+    if (caminho.startsWith("/recuperacao/") && (!tok.aberto || corpo.passe !== tok.passe)) return json(400, { erro: "TOKEN_INVALID" });
     if (metodo === "PUT" && caminho === "/recuperacao/historico") {
       contaTok.etapas = (contaTok.etapas || []).filter((x) => x.sal === corpo.sal && x.versao !== corpo.versao).concat([corpo]);
       return json(200, { ok: true });
@@ -184,6 +191,7 @@ function servidorFalso() {
       return json(200, { nonce, r: chaveCustodia(s.logado, nonce) });
     }
     if (metodo === "PUT" && caminho === "/custodia") {
+      if (s.custodiaFalha) return json(503, { erro: "UNAVAILABLE" });
       if (c.avancada) return json(409, { erro: "DATA_CHANGED" });
       c.custodia = { nonce: corpo.nonce, chave: corpo.chave, prova: c.provaHash };
       return json(200, { ok: true });
@@ -624,7 +632,7 @@ test("esqueci a senha: link + senha nova; o login com a senha nova abre os mesmo
   const outro = carregarHost({ fetch: srv.fetch });
   await outro.chamar("pedirRecuperacao", { email });
   await assert.rejects(outro.chamar("abrirRecuperacao", { token: "inventado-123456789012345" }), codigo("TOKEN_INVALID"));
-  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: true });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: true, motivo: null, restaurada: null, descartadas: 0 });
   const nova = novaSenha();
   assert.deepEqual(await outro.chamar("concluirRecuperacao", { senha: nova }), { email, recomecou: false });
   await assert.rejects(outro.chamar("concluirRecuperacao", { senha: nova }), codigo("TOKEN_INVALID"));   // não repete
@@ -649,7 +657,7 @@ test("proteção avançada: sem cópia da chave; recomeçar vazia só com confir
   assert.equal(srv.contas.get(email).custodia, null);
   const outro = carregarHost({ fetch: srv.fetch });
   await outro.chamar("pedirRecuperacao", { email });
-  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: false });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: false, motivo: "avancada", restaurada: null, descartadas: 0 });
   await assert.rejects(outro.chamar("concluirRecuperacao", { senha: novaSenha() }), codigo("OPERATION_FAILED"));    // sem confirmar
   const nova = novaSenha();
   assert.deepEqual(await outro.chamar("concluirRecuperacao", { senha: nova, recomecar: true }), { email, recomecou: true });
@@ -669,7 +677,104 @@ test("recuperação com 2FA pede o código; cópia adulterada não recupera (só
   await assert.rejects(outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), codigo("CODE_REQUIRED"));
   await assert.rejects(outro.chamar("abrirRecuperacao", { token: srv.ultimoToken, codigo: "000000" }), codigo("CODE_INVALID"));
   const b = Buffer.from(c.custodia.chave, "base64"); b[20] ^= 1; c.custodia.chave = b.toString("base64");
-  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken, codigo: "123456" }), { email, manter: false });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken, codigo: "123456" }),
+    { email, manter: false, motivo: "copia_invalida", restaurada: null, descartadas: 0 });
+});
+
+test("recuperação: documento atual estragado volta da cópia legível mais recente do histórico", async () => {
+  const srv = servidorFalso(), email = "estragado@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  for (let i = 1; i <= 3; i++) {
+    await h.chamar("loadUserData");
+    await h.chamar("saveUserData", { documento: { texto: "Mercado-" + i } });
+  }
+  await h.chamar("logout");
+  const c = srv.contas.get(email);
+  c.historico[1].criado_em = "2026-10-20T12:00:00.000Z";
+  const estraga = (x) => { const b = Buffer.from(x.conteudo, "base64"); b[b.length - 1] ^= 1; x.conteudo = b.toString("base64"); };
+  estraga(c.doc);                                             // versão 3 não abre
+  estraga(c.historico[0]);                                     // versão 1 também não: fica de fora (contada)
+  const outro = carregarHost({ fetch: srv.fetch });
+  await outro.chamar("pedirRecuperacao", { email });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }),
+    { email, manter: true, motivo: null, restaurada: { versao: 2, quando: "2026-10-20T12:00:00.000Z" }, descartadas: 1 });
+  const nova = novaSenha();
+  assert.deepEqual(await outro.chamar("concluirRecuperacao", { senha: nova }), { email, recomecou: false });
+  const depois = carregarHost({ fetch: srv.fetch });
+  await depois.chamar("login", { email, senha: nova });
+  assert.deepEqual((await depois.chamar("loadUserData")).documento, { texto: "Mercado-2" });   // os dados voltaram, não a conta vazia
+  assert.deepEqual(srv.contas.get(email).historico.map((x) => x.versao), [2]);
+});
+
+test("recuperação: sem cópia guardada ou com tudo ilegível, o motivo é dito e nada é apagado sem confirmar", async () => {
+  const srv = servidorFalso(), email = "semcopia@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  await h.chamar("loadUserData");
+  await h.chamar("saveUserData", { documento: { texto: "Guardado" } });
+  await h.chamar("logout");
+  const c = srv.contas.get(email);
+  const custodia = c.custodia;
+  c.custodia = null;                                            // a cópia não chegou a ser guardada
+  const outro = carregarHost({ fetch: srv.fetch });
+  await outro.chamar("pedirRecuperacao", { email });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: false, motivo: "sem_copia", restaurada: null, descartadas: 0 });
+  await assert.rejects(outro.chamar("concluirRecuperacao", { senha: novaSenha() }), codigo("OPERATION_FAILED"));
+  c.custodia = custodia;
+  const b = Buffer.from(c.doc.conteudo, "base64"); b[b.length - 1] ^= 1; c.doc.conteudo = b.toString("base64");
+  await outro.chamar("pedirRecuperacao", { email });
+  assert.deepEqual(await outro.chamar("abrirRecuperacao", { token: srv.ultimoToken }), { email, manter: false, motivo: "dados_ilegiveis", restaurada: null, descartadas: 0 });
+  assert.equal(srv.contas.get(email).doc.conteudo, b.toString("base64"));                  // nada foi gravado
+});
+
+test("recuperação: só o link não basta; o passe é o desta aba", async () => {
+  const srv = servidorFalso(), email = "passe@exemplo.test", senha = novaSenha();
+  await cadastrar(srv, email, senha);
+  const a = carregarHost({ fetch: srv.fetch }), b = carregarHost({ fetch: srv.fetch });
+  await a.chamar("pedirRecuperacao", { email });
+  await a.chamar("abrirRecuperacao", { token: srv.ultimoToken });
+  const pedido = srv.pedidos.findLast((p) => p.caminho === "/api/recuperacao/abrir");
+  assert.ok(!pedido.corpo.includes("passe"), "o passe vem do servidor, não do link");
+  await b.chamar("abrirRecuperacao", { token: srv.ultimoToken });                           // B abre: o passe de A deixa de valer
+  await assert.rejects(a.chamar("concluirRecuperacao", { senha: novaSenha() }), codigo("TOKEN_INVALID"));
+  const nova = novaSenha();
+  assert.deepEqual(await b.chamar("concluirRecuperacao", { senha: nova }), { email, recomecou: false });
+  const fim = srv.pedidos.findLast((p) => p.caminho === "/api/recuperacao/concluir");
+  assert.match(JSON.parse(fim.corpo).passe, /^P[0-9a-f]{32}$/);
+});
+
+test("conexão que cai depois de gravar: gravação incerta (relê), não 'desfeita'", async () => {
+  const srv = servidorFalso(), email = "incerto@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  await h.chamar("loadUserData");
+  srv.perder = (m, cam) => m === "PUT" && cam === "/api/documento";
+  await assert.rejects(h.chamar("saveUserData", { documento: { texto: "Chegou" } }), codigo("SAVE_UNCONFIRMED"));
+  srv.perder = null;
+  assert.equal(srv.contas.get(email).doc.versao, 1);                                          // o servidor gravou
+  assert.deepEqual((await h.chamar("loadUserData")).documento, { texto: "Chegou" });         // relida, a tela converge
+  await h.chamar("saveUserData", { documento: { texto: "Depois" } });                          // e a próxima gravação segue
+  // GET que falha continua sendo "sem conexão" (nada mudou)
+  srv.perder = (m) => m === "GET";
+  await assert.rejects(h.chamar("loadUserData"), (e) => e.code !== "SAVE_UNCONFIRMED");
+  srv.perder = null;
+  // troca de senha sem resposta: a tela orienta a entrar com a nova (sem repetir às cegas)
+  srv.perder = (m, cam) => cam === "/api/conta/senha";
+  await assert.rejects(h.chamar("changePassword", { senhaAtual: senha, novaSenha: novaSenha() }), codigo("PASSWORD_UNCONFIRMED"));
+});
+
+test("cópia da chave que falha ao guardar aparece como pendente e pode ser reparada", async () => {
+  const srv = servidorFalso(), email = "pendente@exemplo.test", senha = novaSenha();
+  srv.custodiaFalha = true;
+  const h = await cadastrar(srv, email, senha);                                               // o cadastro segue
+  assert.deepEqual(await h.chamar("getProtecao"), { avancada: false, recuperacao: false });
+  const nova = novaSenha();
+  assert.deepEqual(await h.chamar("changePassword", { senhaAtual: senha, novaSenha: nova }), { alterada: true, recuperacaoPendente: true });
+  await assert.rejects(h.chamar("repararRecuperacao", { senha: novaSenha() }), codigo("WRONG_PASSWORD"));
+  await assert.rejects(h.chamar("repararRecuperacao", { senha: nova }), codigo("STORAGE_UNAVAILABLE"));
+  srv.custodiaFalha = false;
+  assert.deepEqual(await h.chamar("repararRecuperacao", { senha: nova }), { avancada: false, recuperacao: true });
+  const c = srv.contas.get(email);
+  const ref = await derivarRef(nova, Buffer.from(c.sal, "base64"), "argon2id-1");
+  assert.equal(b64(await abrirCopia(srv, email)), b64(ref.dados));                            // é a chave da senha atual
 });
 
 test("proteção na frente da API (redirecionamento ou 403 sem JSON): CF_CHALLENGE, com aviso para a tela", async () => {

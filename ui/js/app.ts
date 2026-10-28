@@ -174,8 +174,9 @@
   }
 
   /** Senha nova (o host já abriu os dados com a cópia da chave, ou vai recomeçar vazia) */
-  function mostrarNovaSenha(r: { email: string; manter: boolean }, erroTela?: string) {
-    ZoZo.auth.novaSenha(authRoot, { email: r.email, manter: r.manter, erro: erroTela || null, onVoltar: voltarEntrada, onSalvar: (senha) => {
+  function mostrarNovaSenha(r: RespostaDe<"abrirRecuperacao">, erroTela?: string) {
+    ZoZo.auth.novaSenha(authRoot, { email: r.email, manter: r.manter, motivo: r.motivo, restaurada: r.restaurada, descartadas: r.descartadas,
+      erro: erroTela || null, onVoltar: voltarEntrada, onSalvar: (senha) => {
       ZoZo.auth.carregando(authRoot, "Redefinindo sua senha...");
       bridge.request(A.concluirRecuperacao, { senha, recomecar: !r.manter }, { timeout: 120000 }).then((x) => {
         authEmail = x.email; authErro = null; authAviso = null;
@@ -186,6 +187,11 @@
           { tone: "success", importante: true, duration: 8000 });
       }).catch((e: ErroPonte) => {
         if (e.code === "TOKEN_INVALID") { mostrarLinkInvalido(); return; }
+        if (e.code === "RECOVERY_UNCONFIRMED") {
+          // a conexão caiu: a senha pode ter mudado. Vai para a entrada com a orientação (nada é repetido às cegas)
+          authEmail = r.email; authErro = FR.RECOVERY_UNCONFIRMED; authAviso = null; ZoZo.auth.prepararLogin(r.email); store.set({ session: { status: "login" } }); renderAuth();
+          return;
+        }
         mostrarNovaSenha(r, ["PASSWORD_BREACHED", "WEAK_PASSWORD"].includes(e.code) ? FR[e.code] : (e.friendly || FR.OPERATION_FAILED));
       });
     } });
@@ -232,6 +238,9 @@
         codigo: () => ZoZo.auth.codigoRecuperacao(authRoot, { onVoltar: voltarEntrada, onCodigo: () => Promise.resolve(FR.CODE_INVALID) }),
         novaSenha: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: true, onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
         novaSenhaRecomecar: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: false, onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
+        novaSenhaSemCopia: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: false, motivo: "sem_copia", onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
+        novaSenhaRestaurada: () => ZoZo.auth.novaSenha(authRoot, { email: em, manter: true, restaurada: { versao: 3, quando: "2026-10-20T12:00:00.000Z" },
+          descartadas: 1, onVoltar: voltarEntrada, onSalvar: senhaSimulada }),
         carregando: () => { ZoZo.auth.carregando(authRoot, "Entrando no ZoZo"); setTimeout(() => { if (!store.get().session.authenticated) voltarEntrada(); }, 4000); },
       };
       // etapas do próprio formulário de entrada (login, cadastro e o código do 2FA)

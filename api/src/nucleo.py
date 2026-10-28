@@ -619,6 +619,11 @@ async def _cadastrar(ctx: Contexto) -> Resposta:
     verificado = 1 if google_ok else 0                    # o Google confirmou que a pessoa é dona do e-mail
     if emails.ativo(ctx.config) and not google_ok:
         return await _cadastrar_pendente(ctx, email, nome, sal, it, prova, kdf)
+    if str(ctx.config.get("EMAIL_OBRIGATORIO") or "") == "1" and not google_ok:
+        # Produção exige confirmar o e-mail: configuração de e-mail incompleta recusa o cadastro (nunca cria conta
+        # ativa sem confirmação às escondidas). Sem EMAIL_OBRIGATORIO (local, prévia) o cadastro sem e-mail é a escolha.
+        ctx.evento("cadastro_sem_email_configurado")
+        raise Falha(503, "UNAVAILABLE")
     # O Google provou a posse do e-mail: um cadastro PENDENTE (nunca confirmado, talvez de outra pessoa) dá lugar a este
     descartar: list[Comando] = [("DELETE FROM contas WHERE email = ? AND confirmacao_pendente = 1", (email,))] if google_ok else []
     n = (await ctx.banco.lote(descartar + [(
@@ -812,6 +817,11 @@ def _hash_recuperacao(token: str) -> str:
     return hashlib.sha256(("zozo/recuperar/v1|" + token).encode("utf-8")).hexdigest()
 
 
+def _hash_passe(passe: str) -> str:
+    """Passe da recuperação (entregue a quem abriu o link e passou pelo 2FA): só o SHA-256 fica no banco."""
+    return hashlib.sha256(("zozo/recuperar-passe/v1|" + passe).encode("utf-8")).hexdigest()
+
+
 def _chave_custodia(ctx: Contexto, email: str, nonce: str) -> str:
     """Chave que tranca a cópia da chave dos dados. Só o servidor calcula (HMAC do SEGREDO); não fica guardada."""
     return base64.b64encode(hmac.new(ctx.segredo.encode(), ("zozo/custodia/v1|" + email + "|" + nonce).encode("utf-8"),
@@ -844,15 +854,25 @@ async def _pedir_recuperacao(ctx: Contexto) -> Resposta:
     return Resposta(202, {"ok": True})
 
 
-async def _token_recuperacao(ctx: Contexto, token: object, aberto: bool = False) -> Linha:
-    """Link válido: existe, não usado, no prazo e da senha ATUAL (trocou a senha, os links antigos morrem)."""
-    if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{20,100}", token):
+_FORMATO_TOKEN = r"[A-Za-z0-9_-]{20,100}"
+
+
+async def _token_recuperacao(ctx: Contexto, token: object, passe: object = None, aberto: bool = False) -> Linha:
+    """
+    Link válido: existe, não usado, no prazo e da senha ATUAL (trocou a senha, os links antigos morrem).
+    aberto=True (etapas e conclusão): também o passe que o "abrir" entregou. Só o link não basta: outra pessoa
+    com o mesmo link não aproveita o 2FA que quem abriu digitou.
+    """
+    if not isinstance(token, str) or not re.fullmatch(_FORMATO_TOKEN, token):
+        raise Falha(400, "TOKEN_INVALID")
+    if aberto and (not isinstance(passe, str) or not re.fullmatch(_FORMATO_TOKEN, passe)):
         raise Falha(400, "TOKEN_INVALID")
     t = await ctx.banco.primeiro(
-        "SELECT t.hash, t.email, t.expira, t.aberto, c.nome, c.verificador, c.totp_segredo, c.totp_ultimo_passo, c.protecao_avancada "
-        "FROM tokens_recuperacao t JOIN contas c ON c.email = t.email AND c.verificador = t.verificador "
+        "SELECT t.hash, t.email, t.expira, t.aberto, t.passe, c.nome, c.verificador, c.totp_segredo, c.totp_ultimo_passo, "
+        "c.protecao_avancada FROM tokens_recuperacao t JOIN contas c ON c.email = t.email AND c.verificador = t.verificador "
         "WHERE t.hash = ? AND t.usado = 0 AND c.confirmacao_pendente = 0", _hash_recuperacao(token))
-    if not t or int(t["expira"]) < int(ctx.agora) or (aberto and not t["aberto"]):
+    if not t or int(t["expira"]) < int(ctx.agora) or (aberto and not (
+            t["aberto"] and t["passe"] and hmac.compare_digest(str(t["passe"]), _hash_passe(str(passe))))):
         ctx.evento("recuperacao_recusada")
         raise Falha(400, "TOKEN_INVALID")
     return t
@@ -886,16 +906,23 @@ async def _abrir_recuperacao(ctx: Contexto) -> Resposta:
             ctx.evento("recuperacao_2fa_falhou", email, tentativa=r["falhas"])
             raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
-    await ctx.banco.executar("UPDATE tokens_recuperacao SET aberto = 1 WHERE hash = ?", t["hash"])
+    # autorização nova, só para quem abriu (e passou pelo 2FA): etapas e conclusão exigem o link E este passe.
+    # Abrir de novo troca o passe (o anterior para de valer).
+    passe = secrets.token_urlsafe(32)
+    if await ctx.banco.executar("UPDATE tokens_recuperacao SET aberto = 1, passe = ? WHERE hash = ? AND usado = 0",
+                                _hash_passe(passe), t["hash"]) != 1:
+        raise Falha(400, "TOKEN_INVALID")
     cu = None if t["protecao_avancada"] else await ctx.banco.primeiro(
         "SELECT nonce, chave FROM custodia WHERE email = ? AND verificador = ?", email, t["verificador"])
     doc = await ctx.banco.primeiro("SELECT versao, conteudo FROM documentos WHERE email = ?", email)
-    resposta: Json = {"email": email, "versao": int(doc["versao"]) if doc else 0, "custodia": None, "documento": None, "historico": []}
+    # "avancada" (já autorizado: link + 2FA) diz à tela por que não há cópia: escolha da pessoa ou cópia ainda pendente
+    resposta: Json = {"email": email, "passe": passe, "versao": int(doc["versao"]) if doc else 0, "avancada": bool(t["protecao_avancada"]),
+                      "custodia": None, "documento": None, "historico": []}
     if cu:
         resposta["custodia"] = {"nonce": cu["nonce"], "chave": cu["chave"], "r": _chave_custodia(ctx, email, cu["nonce"])}
         resposta["documento"] = {"versao": int(doc["versao"]), "conteudo": doc["conteudo"]} if doc else None
         resposta["historico"] = await ctx.banco.todos(
-            "SELECT versao, conteudo FROM historico WHERE email = ? ORDER BY versao DESC LIMIT 10", email)
+            "SELECT versao, conteudo, criado_em FROM historico WHERE email = ? ORDER BY versao DESC LIMIT 10", email)
     ctx.evento("recuperacao_aberta", email, copia=bool(cu))
     return Resposta(200, resposta)
 
@@ -911,8 +938,8 @@ async def _etapa_recuperacao(ctx: Contexto) -> Resposta:
     """Histórico grande na recuperação: uma cópia recifrada por pedido (como na migração em etapas)."""
     await _limite_passos_recuperacao(ctx)
     b = _json(ctx.pedido)
-    t = await _token_recuperacao(ctx, b.get("token"), aberto=True)
-    await _guardar_etapa(ctx, t["email"], {k: v for k, v in b.items() if k != "token"}, {"sal", "versao", "conteudo"})
+    t = await _token_recuperacao(ctx, b.get("token"), b.get("passe"), aberto=True)
+    await _guardar_etapa(ctx, t["email"], {k: v for k, v in b.items() if k not in ("token", "passe")}, {"sal", "versao", "conteudo"})
     return Resposta(200, {"ok": True})
 
 
@@ -924,7 +951,7 @@ async def _concluir_recuperacao(ctx: Contexto) -> Resposta:
     """
     await _limite_passos_recuperacao(ctx)
     b = _json(ctx.pedido)
-    t = await _token_recuperacao(ctx, b.get("token"), aberto=True)
+    t = await _token_recuperacao(ctx, b.get("token"), b.get("passe"), aberto=True)
     email = t["email"]
     modo = b.get("modo")
     if modo not in ("manter", "recomecar") or b.get("kdf") != KDF_ARGON2:
@@ -941,7 +968,9 @@ async def _concluir_recuperacao(ctx: Contexto) -> Resposta:
             raise Falha(400, "INVALID_REQUEST")
         antes, depois = [], [("DELETE FROM historico WHERE email = ?", (email,)), ("DELETE FROM kdf_etapas WHERE email = ?", (email,))]  # recomeçar: sem cópias
     await _lote_atomico(ctx.banco, [
-        ("UPDATE tokens_recuperacao SET usado = 1 WHERE hash = ? AND usado = 0 AND aberto = 1", (t["hash"],)), _GUARDA, _LIMPA_GUARDA,
+        # o passe confere de novo dentro da transação: outro "abrir" no meio do caminho invalida esta conclusão
+        ("UPDATE tokens_recuperacao SET usado = 1 WHERE hash = ? AND usado = 0 AND aberto = 1 AND passe = ?",
+         (t["hash"], _hash_passe(str(b.get("passe"))))), _GUARDA, _LIMPA_GUARDA,
         *antes,
         _gravar_documento(email, va, conteudo), _GUARDA,
         ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ?",
@@ -1373,10 +1402,15 @@ async def _rota(ctx: Contexto) -> Resposta:
             raise Falha(400, "INVALID_REQUEST")                # 12 (IV) + 32 (chave) + 16 (etiqueta GCM)
         if conta["protecao_avancada"]:
             raise Falha(409, "DATA_CHANGED")
-        await ctx.banco.executar(
-            "INSERT INTO custodia (email, nonce, chave, verificador) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET "
-            f"nonce = excluded.nonce, chave = excluded.chave, verificador = excluded.verificador, criado_em = {_AGORA_SQL}",
-            email, b["nonce"], b["chave"], conta["verificador"])
+        # A condição vai NO MESMO comando: entre a leitura da conta (acima) e esta gravação, outro pedido pode ter
+        # ligado a proteção avançada ou trocado a senha. Nesse caso nada é gravado (sem cópia ressuscitada).
+        if await ctx.banco.executar(
+                "INSERT INTO custodia (email, nonce, chave, verificador) SELECT email, ?, ?, verificador FROM contas "
+                "WHERE email = ? AND verificador = ? AND protecao_avancada = 0 ON CONFLICT(email) DO UPDATE SET "
+                f"nonce = excluded.nonce, chave = excluded.chave, verificador = excluded.verificador, criado_em = {_AGORA_SQL}",
+                b["nonce"], b["chave"], email, conta["verificador"]) != 1:
+            ctx.evento("custodia_recusada", email)
+            raise Falha(409, "DATA_CHANGED")
         ctx.evento("custodia_guardada", email)
         return Resposta(200, {"ok": True})
 

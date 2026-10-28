@@ -19,6 +19,7 @@
     concluirRecuperacao: "concluirRecuperacao",
     getProtecao: "getProtecao",
     setProtecao: "setProtecao",
+    repararRecuperacao: "repararRecuperacao",
     login: "login",
     verificar2FA: "verificar2FA",
     logout: "logout",
@@ -98,7 +99,8 @@
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData]);
+  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
+    ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
   const FRIENDLY: Readonly<Record<string, string>> = Object.freeze({
@@ -136,6 +138,8 @@
     DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
+    PASSWORD_UNCONFIRMED: "A conexão caiu e não deu para confirmar a troca de senha. Saia e entre com a senha nova; se ela não funcionar, a senha atual continua valendo.",
+    RECOVERY_UNCONFIRMED: "A conexão caiu e não deu para confirmar a senha nova. Tente entrar com ela; se não funcionar, peça um novo link.",
     EMAIL_NOT_CONFIRMED: "Confirme seu e-mail antes de entrar: abra o link que enviamos para a sua caixa de entrada.",
     TOKEN_INVALID: "O link que clicou expirou ou é inválido.",
     CODE_REQUIRED: "Digite o código de 6 dígitos do seu aplicativo 2FA.",

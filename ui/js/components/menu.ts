@@ -218,15 +218,23 @@
         const desenhar = () => {
           const marcados = cfg.marcados();
           const itens = cfg.itens.filter((it) => !termo || norm(it.label).includes(termo));
+          // o item com o foco é recriado: guarda qual era para devolver o foco a ele (marcar por teclado sem perder o lugar)
+          const ativo = document.activeElement;
+          const valorFocado = ativo instanceof HTMLElement && lista.contains(ativo) ? ativo.dataset.valor : undefined;
           mount(lista, itens.length ? itens.map((it) => {
             const marcado = marcados.includes(it.value);
             return h("button", { type: "button", role: "menuitemcheckbox", "aria-checked": String(marcado), class: [E.menuItem, marcado && "is-checked"],
-              onClick: () => { cfg.alternar(it.value); desenhar(); } },
+              "data-valor": it.value, onClick: () => { cfg.alternar(it.value); desenhar(); } },
               h("span", { class: marcado ? E.menuCaixaMarcada : E.menuCaixa, "aria-hidden": "true" }, marcado ? icon("check", { size: 11, stroke: 3 }) : null),
               it.cor ? h("span", { class: E.menuPonto, style: { background: ZoZo.format.cor(it.cor, "var(--palette-16)") } }) : null,
               it.icone ? h("span", { class: E.menuEmoji, "aria-hidden": "true" }, ZoZo.dom.emoji(it.icone)) : null,
               h("span", { class: E.menuRotulo }, it.label));
           }) : h("p", { class: E.menuVazio }, cfg.vazio || "Nada encontrado."));
+          if (valorFocado !== undefined) {
+            const volta = Array.from(lista.querySelectorAll<HTMLElement>("[data-valor]")).find((b) => b.dataset.valor === valorFocado)
+              || lista.querySelector<HTMLElement>("[data-valor]");
+            if (volta) volta.focus(); else busca.focus();
+          }
         };
         busca.addEventListener("input", () => { termo = norm(busca.value.trim()); desenhar(); });
         mount(el,

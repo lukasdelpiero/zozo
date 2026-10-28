@@ -134,10 +134,12 @@ class AbrirRecuperacao(Modelo):
 
 class EtapaRecuperacao(KdfEtapa):
     token: TokenEmail
+    passe: TokenEmail
 
 
 class ConcluirRecuperacao(Documento):
     token: TokenEmail
+    passe: TokenEmail
     modo: Literal["manter", "recomecar"]
     sal: Sal
     prova: Prova

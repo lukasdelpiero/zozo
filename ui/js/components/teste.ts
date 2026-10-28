@@ -132,7 +132,8 @@
             .map(([nome, rotulo]) => ir(rotulo, () => app.tela(nome), false))),
           sub("Confirmação de e-mail e recuperação de senha"),
           linha(...([["verificar", "Verifique seu e-mail"], ["verificarRecuperacao", "Verifique (recuperação)"], ["linkInvalido", "Link inválido"],
-            ["redefinir", "Redefinir senha"], ["codigo", "Código do 2FA (recuperação)"], ["novaSenha", "Nova senha"], ["novaSenhaRecomecar", "Nova senha (recomeçar)"]] as Array<[string, string]>)
+            ["redefinir", "Redefinir senha"], ["codigo", "Código do 2FA (recuperação)"], ["novaSenha", "Nova senha"], ["novaSenhaRecomecar", "Nova senha (recomeçar)"],
+            ["novaSenhaSemCopia", "Nova senha (sem cópia da chave)"], ["novaSenhaRestaurada", "Nova senha (cópia anterior)"]] as Array<[string, string]>)
             .map(([nome, rotulo]) => ir(rotulo, () => app.tela(nome), false)))),
 
         secao("Painéis laterais", false,
