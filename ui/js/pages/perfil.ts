@@ -177,11 +177,13 @@
           C.detalheSecao(null, listaEl,
             h("div", { class: ZoZo.pecas.painelAcoesFim }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
-          const itens = d.lancamentos.filter((l) => l.perfilId === p.id).slice(0, 10);
+          // as do mês atual até hoje (o mesmo mês do "Gasto em"): as 10 mais novas eram, muitas vezes, parcelas futuras
+          const hoje = F.iso(new Date()), mes = hoje.slice(0, 7);
+          const itens = d.lancamentos.filter((l) => l.perfilId === p.id && l.data.startsWith(mes) && l.data <= hoje);
           mount(listaEl, itens.length
             // a transação abre aqui mesmo, com a seta para voltar a este perfil
             ? L.ListaPainel(itens, { onClick: (l: LancamentoTela) => { ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe(daLista(p.id) || p, ctx, opts) }); } })
-            : UI.EmptyState("Nenhuma transação com este perfil."));
+            : UI.EmptyState("Nenhuma transação deste perfil no mês."));
         }).catch((e: ErroPonte) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });
@@ -593,6 +595,8 @@
         conteudo = [
           h("h3", { class: "tw:m-0 tw:mb-(--space-2) tw:pb-(--space-2) tw:border-b tw:border-zz-border tw:text-(length:--t-15) tw:font-[550]" }, "Sobre"),
           linha("Versão", "ZoZo v" + ZoZo.sobre.versao),
+          linha("Novidades", h("button", { type: "button", class: "tw:[border:0] tw:bg-transparent tw:p-0 tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline",
+            onClick: () => ZoZo.novidades.abrir() }, "O que há de novo")),
           linha("Autor", ZoZo.sobre.autor),
           linha("Termos", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/termos-uso", target: "_blank", rel: "noopener" }, "Termos de uso")),
           linha("Privacidade", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade")),

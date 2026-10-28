@@ -275,12 +275,24 @@
           desenhar();
         }).catch(() => mount(graficoEl, h("p", { class: "tw:text-zz-muted" }, ZoZo.messages.FRIENDLY.LOAD_FAILED)));
 
-        ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
-          const itens = d.lancamentos.filter((l) => l.contaId === conta.id).slice(0, 8);
-          mount(listaEl, itens.length
-            // a transação abre aqui mesmo, com a seta para voltar a esta conta
-            ? L.ListaPainel(itens, { onClick: (l: LancamentoTela) => { ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta(contaAtual(), ctx, opts) }); } })
-            : UI.EmptyState("Nenhuma transação nesta conta."));
+        // cartão: a fatura aberta (fatura anterior + pagamento + compras do ciclo = total); outras contas: o mês atual.
+        // A conta (o ciclo e as transações do ciclo) vem do serviço de dados — regra de dinheiro fica lá.
+        const abrirLanc = (l: LancamentoTela) => { ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalheConta(contaAtual(), ctx, opts) }); };
+        ctx.bridge.request(A.getExtratoConta, { id: conta.id }).then((e) => {
+          const nomeMes = (m: string) => F.mesAno(m + "-01").replace(/\s+\d{4}$/, "").toLowerCase();
+          if (e.tipo === "mes") {
+            mount(listaEl, h("h3", { class: ZoZo.pecas.painelSecaoTitulo }, "Transações de " + nomeMes(e.mes)),
+              e.lancamentos.length ? L.ListaPainel(e.lancamentos, { onClick: abrirLanc }) : UI.EmptyState("Nenhuma transação neste mês."));
+            return;
+          }
+          const anterior = new Date(Number(e.mes.slice(0, 4)), Number(e.mes.slice(5, 7)) - 2, 1);
+          const mesAnterior = anterior.getFullYear() + "-" + String(anterior.getMonth() + 1).padStart(2, "0");
+          const sinal = (v: number) => h("span", { class: ["money", v > 0 && "money--income"] }, (v > 0 ? "+" : "") + F.moeda(v, { comSinal: true }));
+          mount(listaEl,
+            h("h3", { class: ZoZo.pecas.painelSecaoTitulo }, "Fatura de " + nomeMes(e.mes) + (e.fechamento ? " · fecha " + F.dataCurta(e.fechamento) : "")),
+            C.detalheLinha("Fatura anterior (" + nomeMes(mesAnterior) + ")", sinal(e.anterior)),
+            e.lancamentos.length ? L.ListaPainel(e.lancamentos, { onClick: abrirLanc, valorDe: (l) => l.naFatura }) : UI.EmptyState("Nenhuma transação nesta fatura."),
+            C.detalheLinha("Total da fatura", sinal(e.total), ZoZo.pecas.painelLinhaTotal));
         }).catch((e: ErroPonte) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });

@@ -87,6 +87,15 @@ declare global {
   interface ValorVariacao { valor: number; variacaoPercentual: number }
 
   interface RespostaLancamentos { lancamentos: LancamentoTela[] }
+  /**
+   * Painel da conta. Cartão: a fatura ABERTA (mes = mês do fechamento; de inicio até o dia antes de fechamento),
+   * com a fatura anterior (dívida de antes do ciclo), cada lançamento com o valor na fatura (compra negativa,
+   * pagamento/estorno positivo) e o total (dívida de agora): anterior + lançamentos = total. Outras contas: o mês atual.
+   */
+  type ExtratoConta =
+    | { tipo: "mes"; mes: string; lancamentos: LancamentoTela[] }
+    | { tipo: "fatura"; mes: string; inicio: string | null; fechamento: string | null; anterior: number; total: number;
+        lancamentos: Array<LancamentoTela & { naFatura: number }> };
   interface RespostaContas {
     contas: ContaTela[];
     resumo: { ativos: ValorVariacao; passivos: ValorVariacao; serie: Array<{ data: string; ativos: number; passivos: number }> };
@@ -129,6 +138,7 @@ declare global {
     getPerfis: RespostaPerfis;
     getConfig: RespostaConfig;
     getContaHistorico: { conta: ContaTela; diferenca: number; serie: Array<{ data: string; valor: number }> };
+    getExtratoConta: ExtratoConta;
     getCategoriaSerie: { meses: Array<{ mes: string; gasto: number }>; reservado: number };
     getSerieRecorrencia: { pontos: Array<{ mes: string; data: string; valor: number; pago: boolean; futuro: boolean }>; lancamentos: LancamentoTela[] };
     getDashboard: RespostaDashboard;

@@ -17,6 +17,7 @@ import "../js/core/format.ts";
 import "../js/core/busca.ts";
 import "../js/core/state.ts";
 import "../js/config/regras.ts";
+import "../js/config/novidades.ts";            // notas de cada versão (janela "O que há de novo")
 
 // Bridge: contrato de mensagens
 import "../js/bridge/messages.ts";
@@ -52,6 +53,7 @@ import "../js/components/cambio.ts";
 import "../js/components/detail-panel.ts";
 import "../js/components/verificacao.ts";
 import "../js/components/auth.ts";
+import "../js/components/novidades.ts";
 
 // Páginas
 import "../js/router.ts";

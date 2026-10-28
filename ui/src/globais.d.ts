@@ -310,6 +310,8 @@ declare global {
   interface OpcoesAviso { tone?: "default" | "success" | "aviso" | "error"; duration?: number; importante?: boolean }
   interface OpcoesModal {
     title?: string;
+    /** cabeçalho próprio no lugar do padrão: deve conter o título (h2 com o id recebido) e um botão de fechar */
+    cabecalho?: (tituloId: string, fechar: (resultado?: unknown) => void) => HTMLElement;
     body?: FilhoDom;
     class?: string;
     alert?: boolean;
@@ -496,7 +498,7 @@ declare global {
 
   /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
   interface ZoZoList {
-    ListaPainel(itens: LancamentoTela[], opts?: { onClick?: (l: LancamentoTela) => void }): HTMLElement;
+    ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number }): HTMLElement;
     LaunchRow(l: LancamentoTela, opts?: Record<string, unknown>): HTMLElement;
     AccountRow(c: ContaTela, opts?: Record<string, unknown>): HTMLElement;
     CategoryRow(cat: CategoriaTela, opts?: Record<string, unknown>): HTMLElement;
@@ -698,8 +700,17 @@ declare global {
     fechar(): void;
   }
 
+  /** config/novidades.ts — o que mudou em cada versão (janela "O que há de novo no ZoZo") */
+  type TipoNovidade = "novo" | "melhoria" | "correcao";
+  interface ItemNovidade { icone: string; tipo: TipoNovidade; titulo: string; texto: string }
+  interface NotaVersao { versao: string; quando: string; itens: readonly ItemNovidade[] }
+  /** components/novidades.ts */
+  interface ZoZoNovidades { abrir(): void; conferir(ctx: ContextoApp): void }
+
   interface ZoZoGlobal {
     dom: ZoZoDom;
+    notasVersao: readonly NotaVersao[];
+    novidades: ZoZoNovidades;
     store: ZoZoStore;
     recursos: ZoZoRecursos;
     log: ZoZoLog;

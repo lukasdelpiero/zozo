@@ -188,6 +188,7 @@
               setTimeout(() => { const b = Array.from(document.querySelectorAll<HTMLButtonElement>(".modal button")).find((x) => /Ativar 2FA|Desativar 2FA/.test(x.textContent || "")); if (b) b.click(); }, 400);
             }),
             ir("2FA: desativar (código)", () => ZoZo.configuracoes.desativar2FA(ctx))),
+          linha(ir("Novidades da versão (O que há de novo)", () => ZoZo.novidades.abrir(), false)),
           sub("Confirmações de ação (os textos de cada uma; confirmar aqui não faz nada)"),
           linha(...CONFIRMACOES.map(([rotulo, titulo, mensagem, opts]) =>
             ir(rotulo, () => ZoZo.feedback.confirmarExclusao(titulo, mensagem, opts), false))),

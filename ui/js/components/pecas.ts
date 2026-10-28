@@ -314,6 +314,8 @@
     painelSecao: "tw:base:py-4 tw:base:border-t tw:base:border-t-zz-border tw:base:-mx-(--page-gutter) tw:base:px-(--page-gutter)",
     painelSecaoTitulo: "tw:base:text-[15px] tw:base:font-semibold tw:base:mb-3",
     painelLinha: "tw:base:flex tw:base:justify-between tw:base:items-center tw:base:gap-4 tw:base:min-h-8",
+    // última linha de um resumo (ex.: "Total da fatura" no painel do cartão): separada e em destaque
+    painelLinhaTotal: "tw:mt-3 tw:pt-3 tw:border-t tw:border-zz-border tw:font-semibold",
     painelLinhaRotulo: "tw:base:text-zz-secondary",
     painelLinhaValor: "tw:base:font-medium tw:base:text-right tw:base:[font-variant-numeric:lining-nums_proportional-nums] tw:base:min-w-0",
     painelLista: "tw:base:-mx-2 tw:base:has-[>.pl]:mx-0",

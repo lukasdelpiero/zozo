@@ -68,6 +68,7 @@
     updateLancamentosEmLote: "updateLancamentosEmLote",
     deleteLancamentos: "deleteLancamentos",
     getContaHistorico: "getContaHistorico",
+    getExtratoConta: "getExtratoConta",
     getCategoriaSerie: "getCategoriaSerie",
     getSerieRecorrencia: "getSerieRecorrencia",
     arquivarPerfil: "arquivarPerfil",

@@ -866,6 +866,40 @@
       return { conta: contaPublica(c), diferenca: r2(saldoAtual(c) - (ant === null ? saldoAtual(c) : ant)),
         serie: serieDiaria([c], (dt) => ({ data: dt, valor: saldoEm(c, dt) || 0 })) };
     },
+    /**
+     * O que o painel da conta mostra. Cartão: a fatura ABERTA — o ciclo que ainda recebe compras (do fechamento
+     * anterior ao dia antes do próximo; sem fechamento, o mês) — com a "fatura anterior" (a dívida de antes do
+     * ciclo, que o pagamento dela anula), as transações do ciclo até hoje com o valor de cada uma na fatura (compra
+     * negativa; pagamento e estorno positivos) e o total (a dívida de agora). Sempre: anterior + lançamentos = total.
+     * Outras contas: as transações do mês atual. Lançamentos futuros (parcelas e recorrências) não entram.
+     */
+    [A.getExtratoConta]: (d) => {
+      const c = doc.contas.find((x) => x.id === d.id);
+      if (!c) throw erro("LOAD_FAILED");
+      const hoje = hojeIso();
+      const ordem = (a: LancamentoTela, b: LancamentoTela) => b.data.localeCompare(a.data) || b.id.localeCompare(a.id);
+      if (c.tipo !== "cartao") {
+        const mes = mesAtual();
+        return { tipo: "mes" as const, mes,
+          lancamentos: doc.lancamentos.filter((l) => l.contaId === c.id && l.data.startsWith(mes) && l.data <= hoje).map(enriquecer).sort(ordem) };
+      }
+      let mes = mesAtual();
+      let faixa = faixaDoCartao(c, mes);
+      if (faixa && hoje >= faixa.fim) { mes = somarMes(mes, 1); faixa = faixaDoCartao(c, mes); }
+      else if (faixa && hoje < faixa.inicio) { mes = somarMes(mes, -1); faixa = faixaDoCartao(c, mes); }
+      const f = faixa;
+      const doCiclo = doc.lancamentos.filter((l) => l.contaId === c.id && !l.valorInvalido && l.data <= hoje
+        && (f ? l.data >= f.inicio && l.data < f.fim : l.data.startsWith(mes)));
+      // efeito na dívida do cartão: compra soma; pagamento, estorno e receita subtraem (mesma regra do saldo)
+      const efeitos = doCiclo.map((l) => r2(efeitoNoSaldo(l, c, hoje)));
+      const total = r2(saldoAtual(c));
+      return {
+        tipo: "fatura" as const, mes, inicio: f ? f.inicio : null, fechamento: f ? f.fim : null,
+        // na fatura a dívida aparece negativa: anterior + Σ naFatura = total (todos com o sinal da fatura)
+        anterior: r2(-(total - efeitos.reduce((s, e) => s + e, 0))), total: r2(-total),
+        lancamentos: doCiclo.map((l, i) => Object.assign(enriquecer(l), { naFatura: r2(-efeitos[i]) })).sort(ordem),
+      };
+    },
     [A.getCategoriaSerie]: (d) => {
       // Últimos 12 meses de gasto: de uma categoria ou de todas as regulares (id vazio)
       const alvo = d.categoriaId ? doc.categorias.filter((c) => c.id === d.categoriaId) : doc.categorias.filter((c) => c.status === "regular");

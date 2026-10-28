@@ -604,13 +604,14 @@
             mesAtual = mes; diaAtual = null;
             // Total gasto do mês (mesma regra da barra de informações) à direita
             const doMes = porMes.get(mes) || [];
-            // "Mês Ano" e o total só nos meses passados; no mês atual, o título fica só para o leitor de tela
+            // "Mês Ano" e o total: sem filtro nem pesquisa, o mês atual fica só para o leitor de tela (a lista começa
+            // nele); com filtro ou pesquisa, todos os meses — inclusive o atual — aparecem com o título e o total
             const passado = mes < mesHoje;
             secao = h("section", { class: [T.mes, blocos.length && T.mesSeguinte, anim(blocos.length)] },
-              mes === mesHoje ? h("h2", { class: "tw:sr-only" }, F.mesAno(mes + "-01"))
+              mes === mesHoje && !filtrando ? h("h2", { class: "tw:sr-only" }, F.mesAno(mes + "-01"))
                 : h("header", { class: T.mesCab },
                   h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),
-                  passado ? h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto)) : null));
+                  passado || filtrando ? h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto)) : null));
             blocos.push(secao);
           }
           if (l.data !== diaAtual) {

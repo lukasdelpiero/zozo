@@ -350,6 +350,9 @@
     authErro = null; authAviso = null; esperandoEmail = null;
     if (ZoZo.servico) ZoZo.servico.reset();
     store.set({ session: { status: "authenticated", authenticated: true, user: sessao.user || null } });
+    // versão nova com notas: a janela "O que há de novo" (uma vez por versão), depois que a tela já entrou
+    const desta = geracao;
+    setTimeout(() => { if (desta === geracao && store.get().session.authenticated) ZoZo.novidades.conferir(ctx); }, 1200);
   }
 
   ctx.encerrarSessao = function () {
