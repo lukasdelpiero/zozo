@@ -258,7 +258,8 @@
   async function turno() {
     if (!ctx) return;
     const c = ctx, minha = geracao;
-    const ferramentas = ZoZo.zoFerramentas.criar((acao, dados) => c.bridge.request(acao, dados), { perfis: () => ZoZo.recursos.perfis() });
+    const ferramentas = ZoZo.zoFerramentas.criar((acao, dados) => c.bridge.request(acao, dados), {
+      perfis: () => ZoZo.recursos.perfis(), fatura: () => ZoZo.recursos.boleto() && ZoZo.recursos.perfis(), cambio: () => ZoZo.recursos.cambio(), tela: tela(c) });
     ocupado = true; atualizarEnvio(); digitando(true);
     let gravou = false;
     try {
@@ -300,6 +301,22 @@
       if (minha === geracao) { ocupado = false; digitando(false); if (janela) atualizarEnvio(); }
       if (gravou) c.recarregarTudo();                 // a tela acompanha o que o Zo gravou
     }
+  }
+
+  /** Telas que o Zo pode abrir. As ações seguras (senha, 2FA, proteção, apagar, excluir, Pix) ficam nas Configurações */
+  function tela(c: ContextoApp): TelaZo {
+    return {
+      abrirFatura: (o) => ZoZo.boleto.open(c, { perfilId: o.perfilId, cartaoId: o.cartaoId, mes: o.mes, ano: o.ano }),
+      filtrar: (filtros, busca) => {
+        ZoZo.store.set({ ui: { filtros: Object.assign({ contas: [], categorias: [], statusCategoria: "ambos", perfis: [], periodo: null, recorrencias: [], tipos: [], ordem: "data-desc" }, filtros),
+          busca, selecionados: [] } });
+        c.navigate("lancamentos", { force: true });
+      },
+      abrirConfiguracoes: (aba) => ZoZo.configuracoes.abrir(c, aba),
+      exportar: () => new Promise<void>((resolver) => { ZoZo.exportarCsv(c, h("button", { type: "button" }) as HTMLButtonElement); setTimeout(resolver, 700); }),
+      sair: () => { fechar(); c.logout(); },
+      seguranca: () => c.bridge.request(A.getProtecao).then((p) => ({ doisFatores: !!(ZoZo.store.get().session.user || {}).doisFatores, protecaoAvancada: p.avancada })),
+    };
   }
 
   /** Cartão de confirmação: o resumo vem das ferramentas (dados reais), não do texto do modelo */

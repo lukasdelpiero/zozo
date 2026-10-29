@@ -167,7 +167,7 @@
     if (r.status === 400 && codigo === "TOKEN_INVALID") throw erro(codigo);
     if (r.status === 403) throw erro("ACCESS_DENIED");                   // pedido recusado pela checagem de origem
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
-    if (r.status === 429) throw erro(codigo === "ZO_LIMIT" ? "ZO_LIMIT" : "TOO_MANY_ATTEMPTS", extra);
+    if (r.status === 429) throw erro(codigo === "ZO_LIMIT" || codigo === "ZO_PAUSED" ? codigo : "TOO_MANY_ATTEMPTS", extra);
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
     if (codigo === "ZO_UNAVAILABLE" || codigo === "ZO_FAILED") throw erro(codigo);          // Zo desligado ou OpenAI fora
     throw erro("STORAGE_UNAVAILABLE");

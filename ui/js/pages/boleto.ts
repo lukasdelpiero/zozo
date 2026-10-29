@@ -318,14 +318,15 @@
   }
 
   /* ---------------- Editor (janela em tela cheia) ---------------- */
-  function open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean }) {
+  function open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean; cartaoId?: string; mes?: number; ano?: number }) {
     if (atual) return;
     // Fatura: só contas com o recurso (o serviço de dados também recusa os dados da fatura)
     if (!ZoZo.recursos.boleto() || !ZoZo.recursos.perfis()) { ctx.toast(ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE, { tone: "error" }); return; }
     const o = opts || {};
     const hoje = new Date();
     const st: EstadoFatura = {
-      perfilId: o.perfilId || "", perfil: null, cartaoId: TODOS, consulta: false, mes: hoje.getMonth() + 1, ano: hoje.getFullYear(), dataFatura: F.iso(hoje),
+      perfilId: o.perfilId || "", perfil: null, cartaoId: o.cartaoId || TODOS, consulta: false,
+      mes: o.mes && o.mes >= 1 && o.mes <= 12 ? o.mes : hoje.getMonth() + 1, ano: o.ano || hoje.getFullYear(), dataFatura: F.iso(hoje),
       lancamentos: null, carregadoPara: null, carregando: false, erro: null,
       contribuicoes: [], descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
       recebimentos: [], saldoAnterior: 0, periodos: [],

@@ -101,6 +101,7 @@ CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
 ENTRADAS_POR_IP, ENTRADA_JANELA_S = 30, 600          # logins (certos ou errados) por IP: a senha da demo é pública
 COTA_DADOS, COTA_JANELA_S = 600, 600                 # pedidos às rotas de dados por conta (leituras e gravações)
 ZO_POR_DIA, ZO_JANELA_S = 150, 86400                 # pedidos ao Zo por conta por dia (cada ida à OpenAI conta)
+ZO_OFENSAS_POR_DIA = 3                               # mensagens ofensivas/discriminatórias toleradas: depois, o Zo pausa no dia
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
@@ -1225,17 +1226,35 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
         mensagens = zo.ler_mensagens(b.get("mensagens"))
     except zo.Invalido as ex:
         raise Falha(400, "INVALID_REQUEST") from ex
+    # pausa do dia: a pessoa já passou do limite de mensagens ofensivas
+    chave_ofensa = f"zo-ofensa|{ctx.h(email)}"
+    ofensas = await _limite(ctx, chave_ofensa)
+    if ofensas and ctx.agora - ofensas["ultima"] < ZO_JANELA_S and ofensas["falhas"] > ZO_OFENSAS_POR_DIA:
+        raise Falha(429, "ZO_PAUSED", {"espera": int(ZO_JANELA_S - (ctx.agora - ofensas["ultima"]))})
     if await _contar(ctx, f"zo|{ctx.h(email)}", ZO_POR_DIA, ZO_JANELA_S):
         ctx.evento("zo_limite", email)
         raise Falha(429, "ZO_LIMIT", {"espera": ZO_JANELA_S})
+    cab = {"Authorization": "Bearer " + chave, "Content-Type": "application/json"}
+    # Moderação da fala da pessoa ANTES do modelo: discriminação, ódio e assédio não são tolerados (resposta fixa e,
+    # repetidos, pausa no dia); fala de se machucar recebe a resposta de cuidado. Moderação fora do ar: segue (as
+    # instruções do Zo continuam valendo) e fica registrado.
+    if mensagens[-1]["role"] == "user":
+        marcadas = await _moderar(ctx, email, cab, str(mensagens[-1]["content"]))
+        if marcadas & zo.OFENSA:
+            ctx.evento("zo_ofensa", email, categorias=sorted(marcadas & zo.OFENSA))
+            if await _contar(ctx, chave_ofensa, ZO_OFENSAS_POR_DIA, ZO_JANELA_S):
+                raise Falha(429, "ZO_PAUSED", {"espera": ZO_JANELA_S})
+            return Resposta(200, {"texto": zo.TEXTO_RESPEITO, "chamadas": []})
+        if marcadas & zo.CUIDADO:
+            ctx.evento("zo_cuidado", email)
+            return Resposta(200, {"texto": zo.TEXTO_CUIDADO, "chamadas": []})
     # contexto do dia (Brasília) e dos recursos da conta: o Zo sabe o que pode oferecer
     dia = time.gmtime(int(ctx.agora) - 3 * 3600)
     av = _avancado(ctx, email, linha["email_verificado"])
     contexto = (f"Hoje é {dia.tm_mday:02d}/{dia.tm_mon:02d}/{dia.tm_year} ({time.strftime('%Y-%m-%d', dia)}). "
                 f"Perfis {'disponíveis' if av else 'indisponíveis'} nesta conta. Fatura de perfis {'disponível' if av else 'indisponível'}.")
     corpo = zo.montar_pedido(modelo, mensagens, contexto, ctx.h(email))
-    status, texto = await ctx.servicos.http_post_json(zo.OPENAI_URL, {"Authorization": "Bearer " + chave, "Content-Type": "application/json"},
-                                                      corpo, zo.LIMITE_RESPOSTA)
+    status, texto = await ctx.servicos.http_post_json(zo.OPENAI_URL, cab, corpo, zo.LIMITE_RESPOSTA)
     if status != 200:
         ctx.evento("zo_falhou", email, status=status)
         raise Falha(502, "ZO_FAILED")
@@ -1244,8 +1263,24 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     except zo.Invalido as ex:
         ctx.evento("zo_resposta_invalida", email)
         raise Falha(502, "ZO_FAILED") from ex
+    # a resposta do Zo também passa pela moderação: nada ofensivo chega à pessoa
+    if resposta["texto"] and (await _moderar(ctx, email, cab, resposta["texto"])) & zo.OFENSA:
+        ctx.evento("zo_resposta_bloqueada", email)
+        resposta = {"texto": zo.TEXTO_REFEITO, "chamadas": []}
     ctx.evento("zo_resposta", email, chamadas=len(resposta["chamadas"]))
     return Resposta(200, resposta)
+
+
+async def _moderar(ctx: Contexto, email: str, cab: Mapping[str, str], texto: str) -> frozenset[str]:
+    """Categorias marcadas pela moderação da OpenAI (gratuita). Fora do ar ou ilegível: nada marcado (registrado)."""
+    status, resposta = await ctx.servicos.http_post_json(zo.MODERACAO_URL, cab, zo.pedido_moderacao(texto), 20_000)
+    try:
+        if status != 200:
+            raise zo.Invalido()
+        return zo.ler_moderacao(resposta)
+    except zo.Invalido:
+        ctx.evento("zo_moderacao_falhou", email, status=status)
+        return frozenset()
 
 
 # ---------------- rotas ----------------

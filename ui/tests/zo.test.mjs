@@ -105,3 +105,76 @@ test("Zo: perfis só com o recurso; opções viram botões", async () => {
   const op = await zo.executar("oferecer_opcoes", args({ pergunta: "Qual conta?", opcoes: ["Nubank", "", 3, "Itaú"] }));
   assert.deepEqual(JSON.parse(JSON.stringify(op)), { tipo: "opcoes", pergunta: "Qual conta?", opcoes: ["Nubank", "Itaú"] });   // objeto de outro contexto (vm)
 });
+
+/* ---------------- fase 2: fatura, configurações, telas e ações ---------------- */
+function telaFalsa() {
+  const chamadas = [];
+  return { chamadas, tela: {
+    abrirFatura: (o) => chamadas.push(["fatura", JSON.parse(JSON.stringify(o))]),
+    filtrar: (f, busca) => chamadas.push(["filtrar", JSON.parse(JSON.stringify(f)), busca]),
+    abrirConfiguracoes: (aba) => chamadas.push(["configuracoes", aba]),
+    exportar: async () => { chamadas.push(["exportar"]); },
+    sair: () => chamadas.push(["sair"]),
+    seguranca: async () => ({ doisFatores: true, protecaoAvancada: false }),
+  } };
+}
+async function cenario2() {
+  const c = await cenario();
+  const f = telaFalsa();
+  c.zo = c.t.Z.zoFerramentas.criar((acao, dados) => c.t.req(acao, dados), { perfis: () => true, fatura: () => true, cambio: () => false, tela: f.tela });
+  return Object.assign(c, f);
+}
+
+test("Zo: ajustes e pagamento recebido da fatura só depois de confirmar; a consulta mostra o total", async () => {
+  const { t, zo, cartao, banco, compras, perfil } = await cenario2();
+  const mes = hoje().slice(0, 7);
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Mercado", valor: 300, tipo: "regular", contaId: cartao.id, categoriaId: compras.id, perfilId: perfil.id } });
+  const aj = await zo.executar("salvar_ajustes_fatura", args({ perfil_id: perfil.id, mes, descontos: [{ descricao: "Amizade", valor: 50 }] }));
+  assert.equal(aj.tipo, "escrita");
+  assert.equal(Object.fromEntries(aj.linhas).Descontos, "Amizade R$ 50,00");
+  let f = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes }))).resultado);
+  assert.equal(f.a_pagar, 300);                                                              // ainda não confirmou
+  await aj.confirmar();
+  const pg = await zo.executar("registrar_pagamento_recebido", args({ perfil_id: perfil.id, mes, conta_id: banco.id, valor: 100 }));
+  assert.equal(Object.fromEntries(pg.linhas)["Entrou em"], "Itaú");
+  await pg.confirmar();
+  f = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes }))).resultado);
+  assert.deepEqual([f.total_transacoes, f.descontos, f.recebido, f.a_pagar, f.so_consulta], [300, -50, 100, 150, false]);
+  const todos = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: "todos", mes }))).resultado);
+  assert.deepEqual([todos.perfil, todos.so_consulta, todos.a_pagar], ["todos", true, 300]);
+});
+
+test("Zo: configurações com confirmação; Pix e ações seguras só pela tela", async () => {
+  const { t, zo, chamadas } = await cenario2();
+  const cfg = await zo.executar("configurar", args({ orcamento: false }));
+  assert.deepEqual(JSON.parse(JSON.stringify(cfg.linhas)), [["Orçamento", "Desligar"]]);
+  assert.equal((await t.req(t.A.getConfig)).orcamentoAtivo, true);
+  await cfg.confirmar();
+  assert.equal((await t.req(t.A.getConfig)).orcamentoAtivo, false);
+  assert.deepEqual(JSON.parse((await zo.executar("remover_pix", "{}")).resultado), { erro: "pix_nao_cadastrado" });
+  const leitura = JSON.parse((await zo.executar("ler_configuracoes", "{}")).resultado);
+  assert.deepEqual([leitura.orcamento_ligado, leitura.dois_fatores, leitura.protecao_avancada, leitura.pix_cadastrado], [false, true, false, false]);
+  // senha, 2FA, apagar e excluir: abre a tela segura (nada passa pelo chat)
+  for (const [assunto, aba] of [["senha", "conta"], ["dois_fatores", "conta"], ["excluir_conta", "conta"], ["apagar_dados", "conta"], ["pix", "geral"]]) {
+    const r = JSON.parse((await zo.executar("abrir_configuracoes", args({ assunto }))).resultado);
+    assert.equal(r.aberta, true, assunto);
+    assert.deepEqual(chamadas.at(-1), ["configuracoes", aba], assunto);
+  }
+});
+
+test("Zo: telas abrem na hora; exportar e sair pedem confirmação; sem tela, nada abre", async () => {
+  const { zo, chamadas, perfil, cartao } = await cenario2();
+  await zo.executar("abrir_fatura", args({ perfil_id: perfil.id, cartao_id: cartao.id, mes: "2026-09" }));
+  assert.deepEqual(chamadas.at(-1), ["fatura", { perfilId: perfil.id, cartaoId: cartao.id, mes: 9, ano: 2026 }]);
+  await zo.executar("filtrar_transacoes", args({ texto: "uber", tipos: ["regular", "apagar"], periodo: "mes" }));
+  assert.deepEqual(chamadas.at(-1), ["filtrar", { contas: [], categorias: [], perfis: [], tipos: ["regular"], periodo: "mes" }, "uber"]);
+  const exp = await zo.executar("exportar_transacoes", "{}");
+  const sair = await zo.executar("sair", "{}");
+  assert.deepEqual([exp.tipo, sair.tipo], ["escrita", "escrita"]);
+  assert.ok(!chamadas.some((c) => c[0] === "exportar" || c[0] === "sair"));                  // nada antes do Confirmar
+  await exp.confirmar(); await sair.confirmar();
+  assert.deepEqual(chamadas.slice(-2), [["exportar"], ["sair"]]);
+  const semTela = (await cenario()).zo;                                                     // sem as ações de tela
+  assert.deepEqual(JSON.parse((await semTela.executar("abrir_configuracoes", args({ assunto: "senha" }))).resultado), { erro: "tela_indisponivel" });
+  assert.equal(JSON.parse((await zo.executar("transferir_entre_moedas", args({ ids: ["x"], destino: "EUR" }))).resultado).erro, "FEATURE_UNAVAILABLE");
+});

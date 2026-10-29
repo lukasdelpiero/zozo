@@ -148,6 +148,7 @@
     CONFIRMATION_REQUIRED: "Digite EXCLUIR CONTA para confirmar.",
     CONSENT_REQUIRED: "Para conversar com o Zo, aceite o aviso de uso dos dados.",
     ZO_LIMIT: "Você chegou ao limite de mensagens do Zo por hoje. Amanhã ele volta a responder.",
+    ZO_PAUSED: "O Zo fez uma pausa por hoje por causa de mensagens ofensivas. Amanhã ele volta a responder.",
     ZO_UNAVAILABLE: "O Zo ainda não está disponível. Tente de novo mais tarde.",
     ZO_FAILED: "O Zo não conseguiu responder agora. Tente de novo em instantes.",
     PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",

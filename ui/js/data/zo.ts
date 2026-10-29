@@ -7,7 +7,10 @@
      • leitura: devolve só o necessário (JSON curto) para o Zo responder;
      • gravação: devolve um RESUMO montado com os dados reais (nomes de conta, categoria…), nunca o texto do
        modelo, e só grava quando a pessoa toca em Confirmar (a tela chama confirmar());
-     • opções: a tela mostra botões e a escolha volta como mensagem da pessoa.
+     • opções: a tela mostra botões e a escolha volta como mensagem da pessoa;
+     • tela: abre uma tela do app (fatura, Transações filtradas, Configurações) pelas ações que a janela do Zo
+       entrega (opcoes.tela). Senha, 2FA, proteção avançada, apagar dados, excluir conta e chave Pix só pela tela
+       segura das Configurações: nada disso passa pelo chat.
    Os nomes das ferramentas são os de api/src/zo.py (teste em ui/tests/zo.test.mjs).
    TypeScript: tipos em src/globais.d.ts (ZoZoZoFerramentas).
    ============================================================= */
@@ -51,7 +54,15 @@
     return json({ erro: (x && x.code) || "OPERATION_FAILED", mensagem: (x && x.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED });
   };
 
-  function criar(req: PedidoZo, opcoes: { perfis: () => boolean }): ZoZoZoFerramentasInstancia {
+  function criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia {
+    const fatura = () => (opcoes.fatura ? opcoes.fatura() : false), cambio = () => (opcoes.cambio ? opcoes.cambio() : false);
+    const indisponivel = () => ({ tipo: "leitura" as const, resultado: json({ erro: "FEATURE_UNAVAILABLE", mensagem: ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE }) });
+    const semTela = () => ({ tipo: "leitura" as const, resultado: json({ erro: "tela_indisponivel" }) });
+    /** "AAAA-MM" → { mes, ano } do pedido da fatura (mês atual se vier vazio) */
+    const doMes = (v: unknown) => { const m = mesVal(v) || mesAtual(); return { mes: Number(m.slice(5, 7)), ano: Number(m.slice(0, 4)), texto: m }; };
+    const lerAjustes = (v: unknown): Array<{ descricao: string; valor: number }> | undefined => (Array.isArray(v)
+      ? v.slice(0, 30).map((x) => (x && typeof x === "object" ? { descricao: txt((x as Args).descricao, 50) || "", valor: r2(num((x as Args).valor) || 0) } : null))
+        .filter((x): x is { descricao: string; valor: number } => !!x && (!!x.descricao || !!x.valor)) : undefined);
     /** Listas atuais (lidas a cada uso: sempre o estado de agora) */
     const contas = () => req(A.getContas).then((r) => r.contas || []);
     const categorias = (mes?: string) => req(A.getCategorias, mes ? { mes } : undefined).then((r) => r.categorias || []);
@@ -106,6 +117,25 @@
         const cats = await categorias();
         return [...pontos].sort((x, y) => y[1] - x[1]).slice(0, 3).map(([id, p]) => ({ categoria_id: id, nome: (cats.find((c) => c.id === id) || { nome: "" }).nome, pontos: p }))
           .filter((x) => x.nome);
+      },
+      consultar_fatura: async (a) => {
+        if (!fatura()) return { erro: "FEATURE_UNAVAILABLE" };
+        const m = doMes(a.mes);
+        const perfilId = txt(a.perfil_id, 64) || "todos", cartaoId = txt(a.cartao_id, 64) || "todos";
+        const d = await req(A.getBoletoData, { perfilId, cartaoId, mes: m.mes, ano: m.ano });
+        const recebido = d.recebimentos.reduce((s, l) => s + l.valor, 0);
+        const t = ZoZo.servico.calcularFatura(Object.assign({}, d.ajustes, { lancamentos: d.lancamentos, saldoAnterior: d.saldoAnterior, recebido }));
+        return { mes: m.texto, perfil: d.todos ? "todos" : d.perfil ? d.perfil.nome : null, so_consulta: d.consulta,
+          transacoes: d.lancamentos.slice(0, 50).map((l) => ({ data: l.data, descricao: l.descricao, valor: l.valor, tipo: l.tipo, cartao: l.nomeConta || undefined })),
+          quantidade: d.lancamentos.length, total_transacoes: t.lancamentos, contribuicoes: t.contribuicoes, descontos: t.descontos,
+          arredondamentos: t.arredondamentos, saldo_anterior: t.saldoAnterior, recebido: t.recebido, a_pagar: t.aPagar,
+          ajustes: d.consulta ? undefined : d.ajustes, periodos: d.periodos.map((p) => ({ cartao: p.nome, de: p.inicio, ate: p.fim })) };
+      },
+      ler_configuracoes: async () => {
+        const c = await req(A.getConfig);
+        const seg = opcoes.tela ? await opcoes.tela.seguranca().catch(() => null) : null;
+        return { multicambio: c.multicambio, moeda: c.moeda, orcamento_ligado: c.orcamentoAtivo, pix_cadastrado: !!c.pix,
+          dois_fatores: seg ? seg.doisFatores : undefined, protecao_avancada: seg ? seg.protecaoAvancada : undefined };
       },
       sobre_o_zozo: async (a) => {
         const assunto = txt(a.assunto, 20);
@@ -252,6 +282,71 @@
           return { id: c.id };
         });
       },
+      salvar_ajustes_fatura: async (a) => {
+        if (!fatura()) return indisponivel();
+        const p = (await perfis()).find((x) => x.id === a.perfil_id);
+        if (!p) return faltam(["perfil_id"]);
+        const m = doMes(a.mes);
+        const atual = await req(A.getBoletoData, { perfilId: p.id, mes: m.mes, ano: m.ano });
+        const novos = { contribuicoes: lerAjustes(a.contribuicoes), descontos: lerAjustes(a.descontos), arredondamentos: lerAjustes(a.arredondamentos) };
+        if (!novos.contribuicoes && !novos.descontos && !novos.arredondamentos) return faltam(["contribuicoes", "descontos", "arredondamentos"]);
+        const final = { contribuicoes: novos.contribuicoes || atual.ajustes.contribuicoes, descontos: novos.descontos || atual.ajustes.descontos,
+          arredondamentos: novos.arredondamentos || atual.ajustes.arredondamentos };
+        const lista = (l: Array<{ descricao: string; valor: number }>) => (l.length ? l.map((x) => (x.descricao || "Sem nome") + " " + F.moeda(x.valor)).join(", ") : "nenhum");
+        return escrita("Ajustes da fatura", [["Perfil", p.nome], ["Fatura de", m.texto.slice(5, 7) + "/" + m.texto.slice(0, 4)],
+          ["Contribuições", lista(final.contribuicoes)], ["Descontos", lista(final.descontos)], ["Arredondamentos", lista(final.arredondamentos)]],
+        () => req(A.salvarFatura, Object.assign({ perfilId: p.id, mes: m.mes, ano: m.ano }, final)));
+      },
+      registrar_pagamento_recebido: async (a) => {
+        if (!fatura()) return indisponivel();
+        const [ps, cs] = await Promise.all([perfis(), contas()]);
+        const p = ps.find((x) => x.id === a.perfil_id), c = cs.find((x) => x.id === a.conta_id), valor = num(a.valor);
+        const precisa = [!p ? "perfil_id" : "", !c ? "conta_id" : "", !(valor && valor > 0) ? "valor" : ""].filter(Boolean);
+        if (precisa.length || !p || !c || !valor) return faltam(precisa);
+        const m = doMes(a.mes), dia = data(a.data) || hoje();
+        return escrita("Pagamento recebido", [["Perfil", p.nome], ["Fatura de", m.texto.slice(5, 7) + "/" + m.texto.slice(0, 4)], ["Valor", F.moeda(valor)],
+          ["Entrou em", nomeConta(c)], ["Data", dataBr(dia)]],
+        () => req(A.receberFatura, { perfilId: p.id, mes: m.mes, ano: m.ano, contaId: c.id, valor: r2(valor), data: dia }).then((r) => ({ id: r.lancamento.id })));
+      },
+      configurar: async (a) => {
+        const multi = typeof a.multicambio === "boolean" ? a.multicambio : undefined, orc = typeof a.orcamento === "boolean" ? a.orcamento : undefined;
+        if (multi === undefined && orc === undefined) return faltam(["multicambio", "orcamento"]);
+        const linhas: Array<[string, string]> = [];
+        if (multi !== undefined) linhas.push(["Multicâmbio", multi ? "Ligar" : "Desligar (tudo volta ao Real, nada é apagado)"]);
+        if (orc !== undefined) linhas.push(["Orçamento", orc ? "Ligar" : "Desligar"]);
+        const pedido: Record<string, boolean> = {};
+        if (multi !== undefined) pedido.multicambio = multi;
+        if (orc !== undefined) pedido.orcamentoAtivo = orc;
+        return escrita("Configurações", linhas, () => req(A.updateConfig, pedido).then(() => ({})));
+      },
+      remover_pix: async () => {
+        if (!(await req(A.getConfig)).pix) return { tipo: "leitura", resultado: json({ erro: "pix_nao_cadastrado" }) };
+        return escrita("Remover chave Pix", [["Chave Pix", "A chave cadastrada sai das faturas"]], () => req(A.updateConfig, { pix: null }).then(() => ({})));
+      },
+      transferir_entre_moedas: async (a) => {
+        if (!cambio()) return indisponivel();
+        const destino = typeof a.destino === "string" && ["BRL", "EUR", "USD"].includes(a.destino) ? a.destino : undefined;
+        const ids = Array.isArray(a.ids) ? a.ids.filter((x): x is string => typeof x === "string").slice(0, 200) : [];
+        if (!destino || !ids.length) return faltam([!destino ? "destino" : "", !ids.length ? "ids" : ""].filter(Boolean));
+        if (!(await req(A.getConfig)).multicambio) return { tipo: "leitura", resultado: json({ erro: "multicambio_desligado" }) };
+        const achadas = (await lancamentos()).filter((l) => ids.includes(l.id));
+        if (!achadas.length) return { tipo: "leitura", resultado: json({ erro: "transacoes_nao_encontradas" }) };
+        const nomes = achadas.slice(0, 5).map((l) => l.descricao).join(", ") + (achadas.length > 5 ? " e mais " + (achadas.length - 5) : "");
+        return escrita("Levar para outra moeda", [["Transações", nomes], ["Para", { BRL: "Real", EUR: "Euro", USD: "Dólar" }[destino] || destino],
+          ["Atenção", "Parcelas, recorrências e divisões vão inteiras. O valor fica igual, sem conversão."]],
+        () => req(A.transferirMoeda, { ids: achadas.map((l) => l.id), destino }));
+      },
+      exportar_transacoes: async () => {
+        const tela = opcoes.tela;
+        if (!tela) return semTela();
+        return escrita("Exportar transações", [["Arquivo", "CSV com todas as transações"], ["Atenção", "O arquivo não é cifrado. Guarde em local seguro."]],
+          () => tela.exportar().then(() => ({})));
+      },
+      sair: async () => {
+        const tela = opcoes.tela;
+        if (!tela) return semTela();
+        return escrita("Sair da conta", [["Neste aparelho", "A sessão termina e a senha será pedida de novo"]], () => { tela.sair(); return Promise.resolve({}); });
+      },
       criar_perfil: async (a) => {
         if (!opcoes.perfis()) return { tipo: "leitura", resultado: json({ erro: "FEATURE_UNAVAILABLE", mensagem: ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE }) };
         const nome = txt(a.nome, 50);
@@ -275,6 +370,32 @@
       },
     };
 
+    const ASSUNTOS: Record<string, { aba: "geral" | "conta"; onde: string }> = {
+      senha: { aba: "conta", onde: "Alterar senha" }, dois_fatores: { aba: "conta", onde: "Autenticação de Dois Fatores" },
+      protecao_avancada: { aba: "conta", onde: "Proteção avançada" }, apagar_dados: { aba: "conta", onde: "Apagar todos os dados" },
+      excluir_conta: { aba: "conta", onde: "Excluir conta" }, pix: { aba: "geral", onde: "Pix" }, geral: { aba: "geral", onde: "Geral" },
+    };
+    const TELA: Record<string, (a: Args) => Promise<unknown>> = {
+      abrir_fatura: async (a) => {
+        if (!fatura()) return { erro: "FEATURE_UNAVAILABLE" };
+        const m = doMes(a.mes);
+        (opcoes.tela as TelaZo).abrirFatura({ perfilId: txt(a.perfil_id, 64) || null, cartaoId: txt(a.cartao_id, 64) || "todos", mes: m.mes, ano: m.ano });
+        return { aberta: true, dica: "Para imprimir, toque em Imprimir na tela da fatura" };
+      },
+      filtrar_transacoes: async (a) => {
+        const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 50) : []);
+        const periodo = typeof a.periodo === "string" && ["semana", "semanaPassada", "mes", "mesPassado", "ultimos30", "ano", "anoPassado", "ultimos365"].includes(a.periodo) ? a.periodo : null;
+        const tipos = ids(a.tipos).filter((x) => ["regular", "estorno", "receita", "debito", "interno", "recorrente", "fatura"].includes(x));
+        (opcoes.tela as TelaZo).filtrar({ contas: ids(a.conta_ids), categorias: ids(a.categoria_ids), perfis: ids(a.perfil_ids), tipos, periodo }, txt(a.texto) || "");
+        return { aberta: true };
+      },
+      abrir_configuracoes: async (a) => {
+        const assunto = typeof a.assunto === "string" && Object.hasOwn(ASSUNTOS, a.assunto) ? ASSUNTOS[a.assunto] : ASSUNTOS.geral;
+        (opcoes.tela as TelaZo).abrirConfiguracoes(assunto.aba);
+        return { aberta: true, aba: assunto.aba === "conta" ? "Conta" : "Geral", item: assunto.onde };
+      },
+    };
+
     /** Executa uma chamada do Zo. Ferramenta fora da lista ou argumentos ilegíveis viram erro (nada roda). */
     async function executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo> {
       const a = ler(argumentos);
@@ -284,11 +405,12 @@
           return { tipo: "opcoes", pergunta: txt(a.pergunta) || "", opcoes: opcoesLista };
         }
         if (Object.hasOwn(LEITURA, nome)) return { tipo: "leitura", resultado: json(await LEITURA[nome](a)) };
+        if (Object.hasOwn(TELA, nome)) return opcoes.tela ? { tipo: "leitura", resultado: json(await TELA[nome](a)) } : semTela();
         if (Object.hasOwn(ESCRITA, nome)) return await ESCRITA[nome](a);
         return { tipo: "leitura", resultado: json({ erro: "ferramenta_desconhecida" }) };
       } catch (e) { return { tipo: "leitura", resultado: erroDe(e) }; }
     }
-    return { executar, nomes: Object.keys(LEITURA).concat(Object.keys(ESCRITA), ["oferecer_opcoes"]) };
+    return { executar, nomes: Object.keys(LEITURA).concat(Object.keys(ESCRITA), Object.keys(TELA), ["oferecer_opcoes"]) };
   }
 
   const api: ZoZoZoFerramentas = { criar };

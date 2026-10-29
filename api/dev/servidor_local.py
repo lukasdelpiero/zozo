@@ -18,7 +18,8 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
   ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
-  ZOZO_DEV_ZO=simulado     Zo sem a OpenAI: respostas fixas para testar a tela ("contas" lê, "teste" grava, o resto ecoa)
+  ZOZO_DEV_ZO=simulado     Zo sem a OpenAI: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
+                           "senha" e "orçamento" usam as ferramentas da fase 2, "OFENSA-TESTE" cai na moderação)
   ZOZO_DEV_OPENAI_KEY / ZOZO_DEV_ZO_MODELO   Zo com a OpenAI de verdade (gasta créditos; use dados de teste)
 """
 import asyncio
@@ -92,6 +93,15 @@ def _zo_simulado(corpo):
     elif "teste" in texto:
         msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim2", "type": "function",
                "function": {"name": "criar_categoria", "arguments": json.dumps({"nome": "Teste do Zo", "icone": "🧪"})}}]}
+    elif "filtr" in texto:
+        msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim4", "type": "function",
+               "function": {"name": "filtrar_transacoes", "arguments": json.dumps({"texto": "itaú", "periodo": "mes"})}}]}
+    elif "senha" in texto:
+        msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim5", "type": "function",
+               "function": {"name": "abrir_configuracoes", "arguments": json.dumps({"assunto": "senha"})}}]}
+    elif "orçamento" in texto or "orcamento" in texto:
+        msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim6", "type": "function",
+               "function": {"name": "configurar", "arguments": json.dumps({"orcamento": False})}}]}
     elif "opç" in texto or "opc" in texto:
         msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim3", "type": "function",
                "function": {"name": "oferecer_opcoes", "arguments": json.dumps({"pergunta": "Qual opção?", "opcoes": ["Primeira", "Segunda"]})}}]}
@@ -133,6 +143,10 @@ class Servicos:
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
 
     async def http_post_json(self, url, cabecalhos, corpo, limite=2000):
+        if url == zo.MODERACAO_URL and CONFIG.get("OPENAI_API_KEY") == "simulado":
+            # moderação simulada: só o texto de teste é marcado (para ver a resposta de respeito na tela)
+            marcada = "OFENSA-TESTE" in json.loads(corpo)["input"]
+            return 200, json.dumps({"results": [{"flagged": marcada, "categories": {"hate": marcada}}]})
         if url == zo.OPENAI_URL:
             if CONFIG.get("OPENAI_API_KEY") == "simulado":
                 return _zo_simulado(corpo)

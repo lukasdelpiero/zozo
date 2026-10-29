@@ -658,7 +658,7 @@ declare global {
   /** js/pages/boleto.ts — criação de fatura */
   interface ZoZoBoleto {
     /** receber: abre já a janela "Registrar pagamento recebido" (painel de testes) */
-    open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean }): void;
+    open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean; cartaoId?: string; mes?: number; ano?: number }): void;
     close(): void;
   }
   interface ZoZoCategoriasShared {
@@ -721,7 +721,17 @@ declare global {
     | { tipo: "escrita"; titulo: string; linhas: Array<[string, string]>; confirmar(): Promise<string> }
     | { tipo: "opcoes"; pergunta: string; opcoes: string[] };
   interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo>; nomes: string[] }
-  interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: { perfis: () => boolean }): ZoZoZoFerramentasInstancia }
+  /** Ações de tela que a janela do Zo entrega às ferramentas (nada aqui grava dados sem o serviço) */
+  interface TelaZo {
+    abrirFatura(o: { perfilId: string | null; cartaoId: string; mes: number; ano: number }): void;
+    filtrar(filtros: Partial<FiltrosLancamentos>, busca: string): void;
+    abrirConfiguracoes(aba: "geral" | "conta"): void;
+    exportar(): Promise<void>;
+    sair(): void;
+    seguranca(): Promise<{ doisFatores: boolean; protecaoAvancada: boolean }>;
+  }
+  interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo }
+  interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }
   interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
 
   interface ZoZoGlobal {
