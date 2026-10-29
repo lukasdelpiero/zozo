@@ -10,7 +10,8 @@
      segments: [{ valor, cor, label }]   ·  options.progresso (0–1) → anel de progresso
    renderBarChart(container, barras, options)
      barras: [{ rotulo, valor, titulo }] ·  options.limite → linha tracejada (orçamento)
-   Todos animam ao aparecer (exceto com "reduzir movimento").
+   Todos animam ao aparecer (exceto com "reduzir movimento"). Linha e barras recebem o foco: as setas
+   andam pelos pontos e o leitor de tela anuncia data e valor (o mesmo da dica do mouse).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
   "use strict";
@@ -74,6 +75,41 @@
   }
 
   /** Etiqueta escura com seta (valor de referência no fim de uma linha) */
+  /**
+   * Teclado e leitor de tela nos gráficos de linha e de barras: o suporte recebe o foco, as setas (Início/Fim)
+   * andam pelos pontos e o valor de cada um é anunciado; é o mesmo conteúdo da dica do mouse. O suporte
+   * sobrevive aos redesenhos (o SVG é trocado dentro dele), então o foco não se perde ao mudar a largura.
+   */
+  function navegavel(holder: HTMLElement, container: HTMLElement, rotulo: string) {
+    const anuncio = h("p", { class: "tw:sr-only", "aria-live": "polite" });
+    container.appendChild(anuncio);
+    holder.setAttribute("tabindex", "0");
+    holder.setAttribute("role", "img");
+    holder.setAttribute("aria-label", rotulo + ". Use as setas para ouvir o valor de cada ponto.");
+    const nav = { indice: -1, total: 0, mostrar: (_i: number): string => "", esconder: (): void => {} };
+    const ir = (i: number) => {
+      if (!nav.total) return;
+      nav.indice = Math.max(0, Math.min(nav.total - 1, i));
+      anuncio.textContent = nav.mostrar(nav.indice);
+    };
+    holder.addEventListener("keydown", (e) => {
+      const i = nav.indice;
+      const alvo = e.key === "ArrowRight" || e.key === "ArrowDown" ? (i < 0 ? 0 : i + 1)
+        : e.key === "ArrowLeft" || e.key === "ArrowUp" ? (i < 0 ? nav.total - 1 : i - 1)
+        : e.key === "Home" ? 0 : e.key === "End" ? nav.total - 1 : null;
+      if (alvo === null) return;
+      e.preventDefault();
+      e.stopPropagation();                         // as setas são do gráfico (não da lista ou do painel em volta)
+      ir(alvo);
+    });
+    holder.addEventListener("blur", () => { nav.indice = -1; nav.esconder(); anuncio.textContent = ""; });
+    return {
+      nav,
+      /** depois de redesenhar: volta a mostrar o ponto escolhido pelo teclado */
+      redesenhou() { if (nav.indice >= 0) nav.mostrar(Math.min(nav.indice, nav.total - 1)); },
+    };
+  }
+
   function etiqueta(svg: SVGElement, xFim: number, y: number, texto: string) {
     const larg = texto.length * 6.4 + 14, alt = 20;
     const x0 = xFim - larg;
@@ -99,6 +135,7 @@
     const holder = h("div", { class: P.graficoSuporte, style: { height: o.height + "px" } });
     container.appendChild(holder);
     container.appendChild(tooltip);
+    const teclado = navegavel(holder, container, o.ariaLabel || "Gráfico de linha");
 
     // Animação de entrada: o progresso sobrevive a redesenhos (ex.: a barra de rolagem aparece e muda a
     // largura no meio da animação) — antes, o redesenho pulava direto para o fim e o gráfico parecia sem animação
@@ -235,7 +272,11 @@
       const mostrar = (clientX: number) => {
         const r = tela.getBoundingClientRect();
         const rel = Math.max(0, Math.min(iw, clientX - r.left - m.l));
-        const i = Math.round((rel / iw) * (n - 1));
+        mostrarPonto(Math.round((rel / iw) * (n - 1)));
+      };
+      /** mostra o ponto i (mouse ou teclado) e devolve o texto que o leitor de tela anuncia */
+      const mostrarPonto = (i: number): string => {
+        const falas: string[] = [];
         cursor.setAttribute("x1", String(x(i, n))); cursor.setAttribute("x2", String(x(i, n))); cursor.setAttribute("visibility", "visible");
         clear(tooltip);
         let ponto = null as PontoGrafico | null;     // preenchido no forEach abaixo
@@ -248,7 +289,11 @@
           tooltip.appendChild(h("div", { class: P.dicaLinha },
             h("span", { class: P.dicaPonto, style: { background: sr.colorBySlope ? "var(--color-text-secondary)" : sr.color } }),
             h("span", null, sr.name), h("strong", null, o.formatValue(p.valor))));
+          falas.push((sr.name ? sr.name + " " : "") + (p.vazio ? "sem valor" : o.formatValue(p.valor)));
         });
+        const pp = ponto as PontoGrafico | null;     // o TS não vê a atribuição dentro do forEach
+        const quando = pp ? (o.rotuloTooltip ? o.rotuloTooltip(pp) : F.dataExtenso(pp.data)) : "";
+        const fala = [quando].concat(falas).filter(Boolean).join(", ");
         if (o.aoPassar && veu && dataTopo) {
           const xc = x(i, n);
           veu.setAttribute("x", String(xc)); veu.setAttribute("width", String(Math.max(0, W - xc))); veu.setAttribute("visibility", "visible");
@@ -256,11 +301,12 @@
           dataTopo.textContent = dt ? (String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()) + " " + dt.getFullYear()).toUpperCase() : "";
           dataTopo.setAttribute("x", String(Math.min(Math.max(xc, 44), W - 44))); dataTopo.setAttribute("visibility", "visible");
           o.aoPassar(validas.map((sr) => sr.points[Math.min(i, sr.points.length - 1)] || null));
-          return;                                    // no modo filtro o topo do cartão mostra os valores (sem caixinha)
+          return fala;                               // no modo filtro o topo do cartão mostra os valores (sem caixinha)
         }
-        tooltip.insertBefore(h("div", { class: P.dicaData }, ponto && o.rotuloTooltip ? o.rotuloTooltip(ponto) : F.dataExtenso(ponto && ponto.data)), tooltip.firstChild);
+        tooltip.insertBefore(h("div", { class: P.dicaData }, quando), tooltip.firstChild);
         tooltip.classList.add("is-visible");
         tooltip.style.left = Math.min(Math.max(x(i, n) - tooltip.offsetWidth / 2, 0), W - tooltip.offsetWidth) + "px";
+        return fala;
       };
       const esconder = () => {
         cursor.setAttribute("visibility", "hidden");
@@ -271,8 +317,10 @@
         if (o.aoPassar) o.aoPassar(null);
       };
       area.addEventListener("mousemove", (e) => mostrar(e.clientX));
-      area.addEventListener("mouseleave", esconder);
+      area.addEventListener("mouseleave", () => { if (teclado.nav.indice < 0) esconder(); });
       holder.appendChild(tela);
+      Object.assign(teclado.nav, { total: n, mostrar: mostrarPonto, esconder });
+      teclado.redesenhou();
 
       if (!iniciada && holder.isConnected && holder.clientWidth) {
         iniciada = true;
@@ -364,6 +412,7 @@
     container.classList.add(...P.graficoLinha.split(" "));
     container.appendChild(holder);
     container.appendChild(tooltip);
+    const teclado = navegavel(holder, container, o.ariaLabel || "Gráfico de barras");
 
     function draw() {
       clear(holder);
@@ -377,6 +426,7 @@
       const svg = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: P.graficoSvg });
       svg.appendChild(s("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, class: P.barrasLinha }));
       const rects: Array<{ el: SVGElement; altura: number }> = [];
+      const mostrarBarra: Array<() => string> = [];
       barras.forEach((b, i) => {
         const v = F.numero(b.valor);
         const cx = m.l + passo * i + passo / 2;
@@ -391,14 +441,17 @@
           rotuloDuasLinhas(svg, cx, H - 2, b.rotuloMes || b.rotulo || "", b.rotuloAno || "");
         }
         const alvo = s("rect", { x: cx - passo / 2, y: 0, width: passo, height: H, fill: "transparent" });
-        alvo.addEventListener("mouseenter", () => {
+        const mostrar = (): string => {
           clear(tooltip);
           tooltip.appendChild(h("div", { class: P.dicaData }, b.titulo || b.rotulo));
           tooltip.appendChild(h("div", { class: P.dicaLinha2 }, h("span", null, o.nomeValor || "Valor"), h("strong", null, F.moeda(v))));
           tooltip.classList.add("is-visible");
           tooltip.style.left = Math.min(Math.max(cx - tooltip.offsetWidth / 2, 0), W - tooltip.offsetWidth) + "px";
-        });
-        alvo.addEventListener("mouseleave", () => tooltip.classList.remove("is-visible"));
+          return [b.titulo || b.rotulo, (o.nomeValor || "Valor") + " " + F.moeda(v)].filter(Boolean).join(", ");
+        };
+        mostrarBarra.push(mostrar);
+        alvo.addEventListener("mouseenter", mostrar);
+        alvo.addEventListener("mouseleave", () => { if (teclado.nav.indice < 0) tooltip.classList.remove("is-visible"); });
         svg.appendChild(alvo);
       });
       if (o.limite && o.limite > 0) {
@@ -407,6 +460,8 @@
         etiqueta(svg, W - 2, ly, F.moeda(o.limite));
       }
       holder.appendChild(svg);
+      Object.assign(teclado.nav, { total: barras.length, mostrar: (i: number) => mostrarBarra[i](), esconder: () => tooltip.classList.remove("is-visible") });
+      teclado.redesenhou();
       pintarAtual = (p: number) => rects.forEach((r) => { const a = r.altura * p; r.el.setAttribute("y", String(m.t + ih - a)); r.el.setAttribute("height", String(a)); });
       pintarAtual(progresso);
       if (!iniciada) {

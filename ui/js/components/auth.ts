@@ -393,26 +393,44 @@
       corpo2FA({ onCodigo: cfg.onCodigo, onCancelar2FA: cfg.onVoltar, voltar: "Voltar para tela de entrada" })]));
   }
 
+  /** Por que os dados não voltam (só aparece depois do link e do 2FA: nada é revelado antes da autorização) */
+  const SEM_DADOS: Record<MotivoRecuperacao, string> = {
+    avancada: "Os dados desta conta não podem ser recuperados sem a senha antiga (proteção avançada).",
+    sem_copia: "A cópia de recuperação desta conta ainda não tinha sido guardada, então os dados não podem ser recuperados sem a senha antiga. Se lembrar a senha, volte e entre normalmente.",
+    copia_invalida: "Não conseguimos abrir a cópia de recuperação desta conta. Os seus dados continuam guardados: se lembrar a senha, volte e entre normalmente.",
+    dados_ilegiveis: "Os dados desta conta e as cópias anteriores não puderam ser abertos. Eles continuam guardados: se lembrar a senha, volte e entre normalmente.",
+  };
+
   /**
-   * Senha nova depois do link. manter = os dados voltam com a senha nova; senão (proteção avançada ou sem
-   * cópia da chave) a tela avisa que a conta recomeça vazia e o botão diz isso.
+   * Senha nova depois do link. manter = os dados voltam com a senha nova (restaurada: o documento atual não abria e
+   * volta a cópia mais recente). Senão a tela diz o motivo, avisa que a conta recomeça vazia e só segue com a
+   * confirmação marcada (nada é apagado sem a pessoa decidir).
    */
-  function novaSenha(root: HTMLElement, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }) {
+  function novaSenha(root: HTMLElement, cfg: ConfigNovaSenha) {
     estado.email = cfg.email;                          // e-mail oculto do formulário (gerenciador de senhas)
     const senha = campoSenha("new-password");
     senha.input.setAttribute("minlength", "8");
     const enviar = botao(cfg.manter ? "Salvar senha nova" : "Recomeçar com senha nova");
     const msg = aviso(cfg.erro || null);
+    const confirmar = cfg.manter ? null : h("input", { type: "checkbox", id: "recomecar-confirma", class: "tw:size-4 tw:mt-0.5 tw:flex-none tw:accent-zz-primary" }) as HTMLInputElement;
+    const aviso1 = cfg.manter
+      ? (cfg.restaurada
+        ? "A versão mais recente dos seus dados não pôde ser aberta. Vamos recuperar a cópia "
+          + (cfg.restaurada.quando ? "de " + ZoZo.format.dataExtenso(cfg.restaurada.quando) : "anterior") + ": o que foi feito depois dela pode faltar."
+        : cfg.descartadas ? (cfg.descartadas === 1 ? "Uma cópia antiga dos seus dados não abriu e fica de fora." : cfg.descartadas + " cópias antigas dos seus dados não abriram e ficam de fora.") : null)
+      : SEM_DADOS[cfg.motivo || "avancada"] + " Ao continuar, a conta recomeça vazia.";
     const form = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
       e.preventDefault();
       if (senha.input.value.length < 8) { msg.textContent = "Use pelo menos 8 caracteres."; senha.input.focus(); return; }
+      if (confirmar && !confirmar.checked) { msg.textContent = "Marque a confirmação para recomeçar a conta vazia."; confirmar.focus(); return; }
       if (senha.input.type === "text") senha.wrap.querySelector<HTMLElement>(".input-reveal")?.click();
       enviar.disabled = true; enviar.classList.add("is-busy");
       cfg.onSalvar(senha.input.value);
     } },
-      cfg.manter ? null : h("p", { class: C.atencao, role: "alert" },
-        "Os dados desta conta não podem ser recuperados sem a senha antiga (proteção avançada). Ao continuar, a conta recomeça vazia."),
-      h("div", { class: C.campos }, emailOculto(), senha.wrap),
+      aviso1 ? h("p", { class: C.atencao, role: "alert" }, aviso1) : null,
+      h("div", { class: C.campos }, emailOculto(), senha.wrap,
+        confirmar ? h("label", { for: "recomecar-confirma", class: "tw:flex tw:items-start tw:gap-2 tw:text-[14px] tw:leading-[1.4] tw:text-zz-text tw:cursor-pointer" },
+          confirmar, "Entendo que os dados atuais desta conta serão apagados.") : null),
       enviar, msg, rodape(null, "Voltar para tela de entrada", cfg.onVoltar));
     mount(root, cartao("frente", [logo(), h("h1", { class: C.titulo }, "Crie uma nova senha"), form]));
     requestAnimationFrame(() => senha.input.focus());

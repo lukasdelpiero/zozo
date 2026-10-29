@@ -19,6 +19,9 @@
     concluirRecuperacao: "concluirRecuperacao",
     getProtecao: "getProtecao",
     setProtecao: "setProtecao",
+    repararRecuperacao: "repararRecuperacao",
+    zoConsentimento: "zoConsentimento",
+    zoConversar: "zoConversar",
     login: "login",
     verificar2FA: "verificar2FA",
     logout: "logout",
@@ -68,7 +71,9 @@
     updateLancamentosEmLote: "updateLancamentosEmLote",
     deleteLancamentos: "deleteLancamentos",
     getContaHistorico: "getContaHistorico",
+    getExtratoConta: "getExtratoConta",
     getCategoriaSerie: "getCategoriaSerie",
+    sugerirCategorias: "sugerirCategorias",
     getSerieRecorrencia: "getSerieRecorrencia",
     arquivarPerfil: "arquivarPerfil",
     getConfig: "getConfig",
@@ -86,6 +91,7 @@
     // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador) e pagamento da fatura do cartão
     getBoletoData: "getBoletoData",
     pagarFatura: "pagarFatura",
+    importarLancamentos: "importarLancamentos",
     salvarFatura: "salvarFatura",       // ajustes da fatura de um perfil
     receberFatura: "receberFatura",     // pagamento recebido da fatura de um perfil
 
@@ -97,7 +103,8 @@
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData]);
+  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
+    ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao, ACTIONS.zoConversar]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
   const FRIENDLY: Readonly<Record<string, string>> = Object.freeze({
@@ -135,10 +142,21 @@
     DOCUMENT_MISSING_LOCKED: "Seus dados não foram encontrados no servidor; por segurança, nada é salvo até você decidir. Para recomeçar do zero: Configurações › Conta › Apagar todos os dados.",
     DOCUMENT_NEWER: "Seus dados foram gravados por uma versão mais nova do ZoZo. Recarregue a página (Ctrl+F5) para continuar.",
     SAVE_UNCONFIRMED: "Não deu para confirmar se a última alteração foi salva. Os dados foram recarregados do servidor: confira e, se faltar, refaça.",
+    PASSWORD_UNCONFIRMED: "A conexão caiu e não deu para confirmar a troca de senha. Saia e entre com a senha nova; se ela não funcionar, a senha atual continua valendo.",
+    RECOVERY_UNCONFIRMED: "A conexão caiu e não deu para confirmar a senha nova. Tente entrar com ela; se não funcionar, peça um novo link.",
     EMAIL_NOT_CONFIRMED: "Confirme seu e-mail antes de entrar: abra o link que enviamos para a sua caixa de entrada.",
     TOKEN_INVALID: "O link que clicou expirou ou é inválido.",
     CODE_REQUIRED: "Digite o código de 6 dígitos do seu aplicativo 2FA.",
     CONFIRMATION_REQUIRED: "Digite EXCLUIR CONTA para confirmar.",
+    CONSENT_REQUIRED: "Para conversar com o Zo, aceite o aviso de uso dos dados.",
+    ZO_LIMIT: "Você chegou ao limite de mensagens do Zo por hoje. Amanhã ele volta a responder.",
+    ZO_PAUSED: "O Zo fez uma pausa por hoje por causa de mensagens ofensivas. Amanhã ele volta a responder.",
+    ZO_UNAVAILABLE: "O Zo ainda não está disponível. Tente de novo mais tarde.",
+    ZO_FAILED: "O Zo não conseguiu responder agora. Tente de novo em instantes.",
+    IMPORT_ACCOUNT: "Escolha uma conta da moeda atual para importar.",
+    IMPORT_INVALID: "O arquivo tem uma linha que não deu para importar. Nada foi importado: confira o arquivo e tente de novo.",
+    ZO_BUSY: "O Zo está com muitos pedidos agora. Tente de novo em alguns minutos.",
+    PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     LOAN_INVALID: "Confira o empréstimo: valores de 0 a 1 trilhão, 1º vencimento numa data válida e de 1 a 600 parcelas.",

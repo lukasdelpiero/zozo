@@ -85,17 +85,20 @@
     // Visual em Tailwind (components/estrutura.ts). O tipo vem das classes modal--x (que ficam como ganchos)
     const E = ZoZo.estrutura;
     const tem = (c: string) => String(o.class || "").split(/\s+/).includes(c);
-    const tipo = tem("modal--confirm") ? "Confirmacao" : tem("modal--settings") ? "Config" : tem("modal--dividir") ? "Dividir" : tem("modal--zm") ? "Janela" : "";
+    const tipo = tem("modal--confirm") ? "Confirmacao" : tem("modal--settings") ? "Config" : tem("modal--dividir") ? "Dividir" : tem("modal--zm") ? "Janela"
+      : tem("modal--novidades") ? "Novidades" : "";
     // ex.: modalTopoConfirmacao, senão modalTopo; a divisão é uma janela de criação (corpo igual ao das janelas)
     const parte = (nome: string) => E[nome + tipo] || (tipo === "Dividir" && E[nome + "Janela"]) || E[nome];
     // título centralizado em CAIXA ALTA (o da divisão), também em janelas comuns que pedirem (modal--titulo-central)
     const tituloCentral = tem("modal--titulo-central");
     const dialog = h("div", { class: [E["modal" + (tipo || "Padrao")], o.class], role: o.alert ? "alertdialog" : "dialog", tabindex: "-1", "aria-modal": "true", "aria-labelledby": tituloId },
-      h("div", { class: tituloCentral ? E.modalTopoDividir : parte("modalTopo") },     // div: <header> aqui viraria um 2º "banner"
-        h("h2", { class: tituloCentral ? E.modalTituloDividir : parte("modalTitulo"), id: tituloId }, o.title || ""),
-        h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
+      // cabeçalho próprio (ex.: o roxo das novidades): quem monta põe o título com o id recebido e o botão de fechar
+      o.cabecalho ? o.cabecalho(tituloId, fechar)
+        : h("div", { class: tituloCentral ? E.modalTopoDividir : parte("modalTopo") },     // div: <header> aqui viraria um 2º "banner"
+          h("h2", { class: tituloCentral ? E.modalTituloDividir : parte("modalTitulo"), id: tituloId }, o.title || ""),
+          h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: () => fechar(false) }, icon("fechar"))),
       h("div", { class: parte("modalCorpo") }, o.body || null),
-      o.actions ? h("footer", { class: tipo === "Confirmacao" ? E.modalRodapeConfirmacao : E.modalRodape }, o.actions(fechar)) : null);
+      o.actions ? h("footer", { class: parte("modalRodape") }, o.actions(fechar)) : null);
 
     const overlay: HTMLElement = h("div", { class: E.modalFundo, onMousedown: (e: MouseEvent) => { if (e.target === overlay) fechar(false); } }, dialog);
 

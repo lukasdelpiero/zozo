@@ -66,7 +66,7 @@ test("IDs gerados são imprevisíveis, com o prefixo do tipo e sem repetição",
   assert.match(conta.id, /^c[0-9a-f]{20}$/);
 });
 
-test("fatura: só cartão de crédito e empréstimo do perfil, no mês pedido, em ordem de data", async () => {
+test("fatura: só cartão de crédito do perfil (empréstimo não), no mês pedido, em ordem de data", async () => {
   const t = carregar();
   const { perfil: ana } = await t.req(t.A.createPerfil, { perfil: { nome: "Ana" } });
   const { perfil: bia } = await t.req(t.A.createPerfil, { perfil: { nome: "Bia" } });
@@ -79,9 +79,10 @@ test("fatura: só cartão de crédito e empréstimo do perfil, no mês pedido, e
   await t.req(t.A.createLancamento, lanc({ data: "2025-04-01", descricao: "Outro mês", contaId: cartao, perfilId: ana.id }));
   await t.req(t.A.createLancamento, lanc({ data: "2025-03-07", descricao: "Sem perfil", contaId: cartao }));
   const f = await t.req(t.A.getBoletoData, { perfilId: ana.id, mes: 3, ano: 2025 });
-  assert.deepEqual(f.lancamentos.map((l) => l.descricao), ["Empréstimo", "Cartão"]);
+  assert.deepEqual(f.lancamentos.map((l) => l.descricao), ["Cartão"]);
   assert.equal(f.perfil.nome, "Ana");
-  assert.equal(f.lancamentos[1].ultimos4Digitos, "");
+  assert.equal(f.consulta, false);
+  assert.equal(f.lancamentos[0].ultimos4Digitos, "");
   // período fora da regra
   for (const p of [{ mes: 0, ano: 2025 }, { mes: 13, ano: 2025 }, { mes: 3, ano: 1999 }, { mes: "3x", ano: 2025 }]) {
     await assert.rejects(t.req(t.A.getBoletoData, Object.assign({ perfilId: ana.id }, p)), codigo("OPERATION_FAILED"), JSON.stringify(p));
@@ -344,6 +345,11 @@ test("gravação que falha desfaz a alteração na memória; sem resposta (TIMEO
   falha = "TIMEOUT";
   await assert.rejects(t.req(t.A.createConta, { conta: { nome: "Terceira", tipo: "corrente", saldo: 0 } }), codigo("SAVE_UNCONFIRMED"));
   assert.ok(t.eventos.some((e) => e.type === "zozo:dados-alterados" && e.detail && e.detail.codigo === "SAVE_UNCONFIRMED"));
+  // a conexão caiu depois do envio (o host diz SAVE_UNCONFIRMED): o mesmo tratamento, relê em vez de "desfeito"
+  const antes = t.eventos.length;
+  falha = "SAVE_UNCONFIRMED";
+  await assert.rejects(t.req(t.A.createConta, { conta: { nome: "Quarta", tipo: "corrente", saldo: 0 } }), codigo("SAVE_UNCONFIRMED"));
+  assert.ok(t.eventos.slice(antes).some((e) => e.type === "zozo:dados-alterados" && e.detail && e.detail.codigo === "SAVE_UNCONFIRMED"));
   t.Z.bridge.requestHost = original;
   assert.deepEqual((await t.req(t.A.getContas)).contas.map((c) => c.nome), ["Primeira"]);   // relido do "servidor"
 });
@@ -385,26 +391,32 @@ async function cenarioFatura(t, { fatura = 500, saldo = 1000, digitos = "0123" }
 }
 const valorDe = async (t, id) => (await t.req(t.A.getContas)).contas.find((c) => c.id === id).valor;
 
-test("pagar fatura: débito na conta + receita no cartão, com nome, data, perfil, categoria Fatura e observação", async () => {
+test("pagar fatura: duas transações do tipo Fatura (a do pagante em Transações, a do cartão só no painel do cartão)", async () => {
   const t = carregar();
   const { cartao, conta, perfil } = await cenarioFatura(t);
   const r = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 500, perfilId: perfil.id });
   const nota = "Pagamento da fatura do cartão de crédito Ultravioleta com 4 últimos dígitos 0123.";
-  assert.equal(r.debito.tipo, "debito");
-  assert.equal(r.debito.contaId, conta.id);
-  assert.equal(r.debito.categoria.nome, "Fatura");
-  assert.equal(r.receita.tipo, "receita");
-  assert.equal(r.receita.contaId, cartao.id);
-  for (const l of [r.debito, r.receita]) {
+  assert.equal(r.pagamento.tipo, "fatura");
+  assert.equal(r.pagamento.contaId, conta.id);
+  assert.equal(r.pagamento.perfilId, perfil.id);
+  assert.equal(r.pagamento.categoria.nome, "Fatura");
+  assert.equal(r.cartao.tipo, "fatura");
+  assert.equal(r.cartao.contaId, cartao.id);
+  assert.equal(r.cartao.perfilId, null);                                          // a do cartão fica só atrelada ao cartão
+  assert.equal(r.pagamento.parFatura, r.cartao.id);
+  assert.equal(r.cartao.parFatura, r.pagamento.id);
+  for (const l of [r.pagamento, r.cartao]) {
     assert.equal(l.descricao, "Pagamento fatura");
     assert.equal(l.valor, 500);
     assert.equal(l.data, hoje());
-    assert.equal(l.perfilId, perfil.id);
     assert.equal(l.notas, nota);
   }
   assert.equal(await valorDe(t, conta.id), 500);                                 // saiu da conta
   assert.equal(await valorDe(t, cartao.id), 0);                                  // fatura quitada
-  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 2);
+  assert.deepEqual((await t.req(t.A.getLancamentos)).lancamentos.map((l) => l.id), [r.pagamento.id]);   // só a do pagante em Transações
+  // pagamento de fatura não é gasto: a categoria Fatura não soma no orçamento (as compras já somaram)
+  const cat = (await t.req(t.A.getCategorias)).categorias.find((c) => c.nome === "Fatura");
+  assert.equal(cat.gasto || 0, 0);
 });
 
 test("pagar fatura: parcial; a categoria Fatura existente é reaproveitada (não duplica)", async () => {
@@ -413,8 +425,8 @@ test("pagar fatura: parcial; a categoria Fatura existente é reaproveitada (não
   const { categoria } = await t.req(t.A.createCategoria, { categoria: { nome: "Fatura", icone: "🧾" } });
   const r1 = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: "120.50", perfilId: perfil.id });
   const r2 = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 79.5, perfilId: perfil.id });
-  assert.equal(r1.debito.categoriaId, categoria.id);
-  assert.equal(r2.debito.categoriaId, categoria.id);
+  assert.equal(r1.pagamento.categoriaId, categoria.id);
+  assert.equal(r2.pagamento.categoriaId, categoria.id);
   assert.equal(await valorDe(t, cartao.id), 300);
   assert.equal(await valorDe(t, conta.id), 800);
   assert.equal((await t.req(t.A.getCategorias)).categorias.filter((c) => c.nome === "Fatura").length, 1);
@@ -455,8 +467,82 @@ test("pagar fatura: cartão sem fatura em aberto é recusado; sem o recurso Perf
   await assert.rejects(t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 10 }), codigo("NO_INVOICE"));
   const { conta: cartao2 } = await t.req(t.A.createConta, { conta: { nome: "Master", tipo: "cartao", saldo: 50 } });
   const r = await t.req(t.A.pagarFatura, { cartaoId: cartao2.id, contaId: conta.id, valor: 50 });
-  assert.equal(r.debito.perfilId, null);
-  assert.equal(r.debito.notas, "Pagamento da fatura do cartão de crédito Master.");    // sem dígitos cadastrados
+  assert.equal(r.pagamento.perfilId, null);
+  assert.equal(r.pagamento.notas, "Pagamento da fatura do cartão de crédito Master.");    // sem dígitos cadastrados
+});
+
+test("pagamento de fatura: editar atualiza as duas transações; tipo não muda; excluir apaga as duas", async () => {
+  const t = carregar();
+  const { cartao, conta, perfil } = await cenarioFatura(t, { fatura: 500, saldo: 1000 });
+  const { conta: poupanca } = await t.req(t.A.createConta, { conta: { nome: "Poupança", tipo: "poupanca", saldo: 100 } });
+  const r = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 200, perfilId: perfil.id });
+  const editar = (extra) => t.req(t.A.updateLancamento, { id: r.pagamento.id, lancamento: Object.assign({ data: hoje(), descricao: "Pagamento fatura",
+    valor: 200, tipo: "fatura", contaId: conta.id, perfilId: perfil.id, categoriaId: r.pagamento.categoriaId, notas: "" }, extra) });
+  // valor novo: as duas mudam juntas e os saldos acompanham
+  await editar({ valor: 350, descricao: "Fatura de outubro" });
+  const doc = () => t.documento().lancamentos;
+  assert.deepEqual(doc().map((l) => [l.tipo, l.valor, l.descricao]).sort(), [["fatura", 350, "Fatura de outubro"], ["fatura", 350, "Fatura de outubro"]]);
+  assert.equal(await valorDe(t, cartao.id), 150);
+  assert.equal(await valorDe(t, conta.id), 650);
+  // recusas: tipo, acima da dívida, sem saldo na conta, conta que não paga, sem perfil
+  await assert.rejects(editar({ tipo: "debito" }), codigo("PAYMENT_TYPE_LOCKED"));
+  await assert.rejects(editar({ valor: 500.01 }), codigo("PAYMENT_ABOVE_INVOICE"));    // dívida antes dele = 150 + 350
+  await assert.rejects(editar({ valor: 150, contaId: poupanca.id }), codigo("INSUFFICIENT_FUNDS"));
+  await assert.rejects(editar({ contaId: cartao.id }), codigo("PAYMENT_ACCOUNT"));
+  await assert.rejects(editar({ perfilId: null }), codigo("PROFILE_REQUIRED"));
+  await assert.rejects(t.req(t.A.updateLancamento, { id: r.cartao.id, lancamento: { data: hoje(), descricao: "X", valor: 1, tipo: "fatura", contaId: cartao.id } }), codigo("OPERATION_FAILED"));
+  await assert.rejects(t.req(t.A.updateLancamentosEmLote, { ids: [r.pagamento.id], tipo: "regular" }), codigo("PAYMENT_TYPE_LOCKED"));
+  await assert.rejects(t.req(t.A.dividirLancamento, { id: r.pagamento.id, partes: [{ valor: 350, data: hoje(), perfilId: perfil.id }] }), codigo("SPLIT_INVALID"));
+  await assert.rejects(t.req(t.A.tornarRecorrente, { id: r.pagamento.id, recorrencia: "mensal" }), codigo("OPERATION_FAILED"));
+  assert.equal(await valorDe(t, cartao.id), 150);                                  // nada mudou com as recusas
+  // outra conta pagante com saldo: troca e devolve à primeira
+  await editar({ valor: 100, contaId: poupanca.id, descricao: "Pagamento fatura" });
+  assert.equal(await valorDe(t, conta.id), 1000);
+  assert.equal(await valorDe(t, poupanca.id), 0);
+  assert.equal(await valorDe(t, cartao.id), 400);
+  // excluir a do pagante apaga as duas e devolve os dois saldos
+  await t.req(t.A.deleteLancamento, { id: r.pagamento.id });
+  assert.equal(doc().length, 0);
+  assert.equal(await valorDe(t, cartao.id), 500);
+  assert.equal(await valorDe(t, poupanca.id), 100);
+  // excluir em lote pelo lado do cartão (seleção no painel do cartão) também leva o par
+  const r2 = await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: conta.id, valor: 50, perfilId: perfil.id });
+  assert.deepEqual(await t.req(t.A.deleteLancamentos, { ids: [r2.cartao.id] }), { excluidos: 2 });
+  assert.equal(await valorDe(t, conta.id), 1000);
+});
+
+test("pagamentos de fatura antigos (Débito + Receita) viram o par do tipo Fatura ao abrir, sem mudar saldo", async () => {
+  const notas = "Pagamento da fatura do cartão de crédito Visa.";
+  const antigo = (id, tipo, contaId, extra) => Object.assign({ id, data: "2026-09-10", descricao: "Pagamento fatura", valor: 200, tipo, contaId,
+    categoriaId: null, perfilId: "p1", notas, moeda: "BRL", efeito: { contaId, delta: -200 } }, extra);
+  const documento = {
+    versao: 1, perfis: [{ id: "p1", nome: "Ana" }], categorias: [{ id: "k1", nome: "Fatura", status: "regular" }], grupos: {}, config: {}, faturas: {},
+    meta: { saldoPorTransacao: 1 },
+    contas: [{ id: "c1", nome: "Itaú", tipo: "corrente", historico: [{ data: "2026-01-01", saldo: 800 }] },
+      { id: "c2", nome: "Visa", tipo: "cartao", historico: [{ data: "2026-01-01", saldo: 100 }] }],
+    lancamentos: [
+      antigo("l1", "debito", "c1", { categoriaId: "k1", debito: true, pagamentoCartao: true }),
+      antigo("l2", "receita", "c2", { pagamentoCartao: true }),
+      // sem par (o débito foi apagado): fica como está
+      antigo("l3", "receita", "c2", { data: "2026-08-10", valor: 70, pagamentoCartao: true, efeito: { contaId: "c2", delta: -70 } }),
+    ],
+  };
+  const t = carregar({ documento });
+  const { contas } = await t.req(t.A.getContas);
+  assert.equal(contas.find((c) => c.id === "c1").valor, 800);                    // saldos iguais
+  assert.equal(contas.find((c) => c.id === "c2").valor, 100);
+  await new Promise((r) => setTimeout(r, 0));
+  const salvo = t.documento().lancamentos;
+  const l1 = salvo.find((l) => l.id === "l1"), l2 = salvo.find((l) => l.id === "l2"), l3 = salvo.find((l) => l.id === "l3");
+  assert.equal(l1.tipo, "fatura");
+  assert.equal(l2.tipo, "fatura");
+  assert.equal(l1.pagamento.grupo, l2.pagamento.grupo);
+  assert.deepEqual([l1.pagamento.lado, l2.pagamento.lado], ["pagante", "cartao"]);
+  assert.equal(l1.perfilId, "p1");
+  assert.equal(l2.perfilId, null);
+  assert.ok(!l1.debito && !l1.pagamentoCartao && !l2.pagamentoCartao);
+  assert.equal(l3.tipo, "receita");                                               // sem par: não muda
+  assert.deepEqual((await t.req(t.A.getLancamentos)).lancamentos.map((l) => l.id).sort(), ["l1", "l3"]);
 });
 
 test("frequência só da tabela: nomes herdados de Object viram mensal", async () => {

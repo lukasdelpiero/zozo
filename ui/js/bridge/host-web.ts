@@ -3,7 +3,9 @@
    ------------------------------------------------------------
    Criptografia de ponta a ponta: os dados são cifrados AQUI, no
    navegador. O servidor (API + banco SQL) só guarda blocos cifrados
-   e nunca vê a senha nem os lançamentos.
+   e nunca vê a senha nem os lançamentos. Exceção escolhida pelo produto:
+   a custódia da chave para "Esqueci minha senha" (ver guardarCustodia);
+   nome e e-mail da conta são legíveis no servidor.
      • senha → Argon2id (64 MiB, 3 passagens; contas novas, senhas trocadas
        e contas antigas a partir do primeiro login na 3.12) ou PBKDF2-SHA256
        (600.000 iterações; contas antigas que ainda não entraram),
@@ -48,7 +50,9 @@
   type Dados = Record<string, unknown>;
   /** Resposta JSON da API (também conferida campo a campo onde importa) */
   type RespostaApi = Record<string, any>;
-  type ErroHost = Error & { code: string; espera?: number; captcha?: boolean };
+  type ErroHost = Error & { code: string; espera?: number; captcha?: boolean; incerto?: boolean };
+  /** A gravação pode ter acontecido: a conexão caiu depois de o pedido sair (ver api) */
+  const incerto = (e: unknown) => !!e && (e as ErroHost).incerto === true;
   type Kdf = typeof KDF_PBKDF2 | typeof KDF_ARGON2;
   /** Chaves de uma senha: a dos dados (e os bytes dela, para guardar cifrada) e a prova */
   type Chaves = { chave: CryptoKey; bits: Bytes; prova: string };
@@ -64,8 +68,8 @@
   type MigracaoKdf = { sal: Bytes; chaves: Chaves };
   let pendente: { email: string; k: Chaves; migracao: MigracaoKdf | null } | null = null;  // senha certa, falta o código do 2FA
   /** "Esqueci minha senha": link aberto; dados já abertos com a cópia da chave (só na memória desta aba) */
-  type Recuperacao = { token: string; email: string; versao: number; manter: boolean; documento: unknown;
-    historico: Array<{ versao: number; claro: unknown }> };
+  type Recuperacao = { token: string; passe: string; email: string; versao: number; manter: boolean; documento: unknown;
+    historico: Array<{ versao: number; claro: unknown; quando: string | null }> };
   let recuperacao: Recuperacao | null = null;
 
   /* ---------------- modo de teste: SÓ no endereço local e na prévia ----------------
@@ -77,7 +81,7 @@
   const TESTE = hostAtual === "127.0.0.1" || hostAtual === "localhost" || hostAtual === "[::1]" || hostAtual.endsWith(".localhost") || HOSTS_PREVIA.includes(hostAtual);
   const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true };
   const CHAVE_SIMULAR = "zozo.teste.simular";
-  const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown };
+  const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown, zoAceito: false };
   try { teste.simular = TESTE && sessionStorage.getItem(CHAVE_SIMULAR) === "1"; } catch (e) { /* sem sessionStorage */ }
   /** Ações de conta simuladas: conta sem servidor, ou a demo no ambiente de teste */
   const simulada = (s: Sessao) => !!s.simulada || (TESTE && s.demo);
@@ -138,7 +142,10 @@
         redirect: "manual",                       // a API nunca redireciona: um redirecionamento vem de algo na frente dela
         headers, body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
       });
-    } catch (e) { throw erro("STORAGE_UNAVAILABLE"); }
+    } catch (e) {
+      // GET: nada mudou. Gravação: o pedido pode ter chegado e sido gravado antes de a conexão cair (incerto)
+      throw Object.assign(erro("STORAGE_UNAVAILABLE"), { incerto: metodo !== "GET" });
+    }
     if (r.type === "opaqueredirect") throw erro("CF_CHALLENGE");          // redirecionamento de uma proteção na frente da API
     // Proteção do Cloudflare (ex.: modo "Under Attack") pedindo verificação: o pedido nem chegou ao ZoZo
     if (r.headers.get("cf-mitigated") === "challenge" || (r.status === 403 && !/json/i.test(r.headers.get("content-type") || ""))) {
@@ -156,12 +163,13 @@
     }
     if (r.status === 404 && metodo === "GET") return null;
     if (r.status === 409) throw erro(["EMAIL_IN_USE", "2FA_ALREADY_ON", "2FA_NOT_PENDING"].includes(codigo) ? codigo : "DATA_CHANGED");
-    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY", "EMAIL_NOT_CONFIRMED"].includes(codigo)) throw erro(codigo);
+    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY", "EMAIL_NOT_CONFIRMED", "CONSENT_REQUIRED"].includes(codigo)) throw erro(codigo);
     if (r.status === 400 && codigo === "TOKEN_INVALID") throw erro(codigo);
     if (r.status === 403) throw erro("ACCESS_DENIED");                   // pedido recusado pela checagem de origem
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
-    if (r.status === 429) throw erro("TOO_MANY_ATTEMPTS", extra);
+    if (r.status === 429) throw erro(["ZO_LIMIT", "ZO_PAUSED", "ZO_BUSY"].includes(codigo) ? codigo : "TOO_MANY_ATTEMPTS", extra);
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
+    if (codigo === "ZO_UNAVAILABLE" || codigo === "ZO_FAILED") throw erro(codigo);          // Zo desligado ou Gemini fora
     throw erro("STORAGE_UNAVAILABLE");
   }
   const parametros = (email: string) => api("GET", "/conta/parametros?email=" + encodeURIComponent(normalizarEmail(email)));
@@ -258,18 +266,24 @@
      dos dados com ela e guarda só a cópia trancada. Esqueceu a senha: o link do e-mail devolve a chave de
      custódia e a cópia. Proteção avançada: não há cópia (o servidor responde "avancada"). */
   const aadCustodia = (email: string, nonce: string) => enc.encode("zozo|custodia|v1|" + email + "|" + nonce);
-  async function guardarCustodia(s: Sessao | null, bits: Bytes): Promise<void> {
-    if (!s || s.demo) return;
+  /**
+   * Guarda a cópia da chave. true = guardada (ou já estava, ou proteção avançada: nada a guardar); false = falhou
+   * (sem cópia, "Esqueci minha senha" não recupera os dados até o próximo login ou o reparo em Configurações › Conta).
+   */
+  async function guardarCustodia(s: Sessao | null, bits: Bytes): Promise<boolean> {
+    if (!s || s.demo) return true;
     try {
       const r = await api("POST", "/custodia/chave", undefined, s.prova);
-      if (!r || typeof r.nonce !== "string" || typeof r.r !== "string") return;      // já guardada ou proteção avançada
+      if (r && (r.atual === true || r.avancada === true)) return true;              // já guardada ou proteção avançada
+      if (!r || typeof r.nonce !== "string" || typeof r.r !== "string") return false;
       const chave = await crypto.subtle.importKey("raw", deB64(r.r), { name: "AES-GCM" }, false, ["encrypt"]);
       const iv = aleatorio(12);
       const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aadCustodia(s.email, r.nonce) }, chave, bits));
       const tudo = new Uint8Array(12 + ct.length);
       tudo.set(iv); tudo.set(ct, 12);
       await api("PUT", "/custodia", { nonce: r.nonce, chave: b64(tudo) }, s.prova);
-    } catch (e) { /* fica para o próximo login */ }
+      return true;
+    } catch (e) { return false; }                   // o login segue; a tela de Configurações mostra a pendência
   }
   /** Abre a cópia da chave dos dados com a chave de custódia que veio com o link do e-mail */
   async function abrirCustodia(email: string, c: RespostaApi): Promise<CryptoKey> {
@@ -621,8 +635,11 @@
       const va = s.versao;
       const conteudo = await cifrar(s.chave, s.email, va + 1, d.documento);
       // o servidor recusa (409) se outro dispositivo gravou depois da nossa leitura
-      const r = await comProvaDaSessao(() => api("PUT", "/documento", { versaoAnterior: va, conteudo }, s.prova));
-      if (!r || r.versao !== va + 1) throw erro("DATA_CHANGED");
+      let r: RespostaApi | null;
+      try { r = await comProvaDaSessao(() => api("PUT", "/documento", { versaoAnterior: va, conteudo }, s.prova)); }
+      catch (e) { throw incerto(e) ? erro("SAVE_UNCONFIRMED") : e; }   // sem resposta: o serviço relê do servidor
+      if (!r || typeof r.versao !== "number") throw erro("SAVE_UNCONFIRMED");                    // resposta ilegível
+      if (r.versao !== va + 1) throw erro("DATA_CHANGED");
       s.versao = va + 1;
       await lembrarVersao(s.email, s.versao);
       return { salvo: true };
@@ -644,15 +661,18 @@
       const nova = await derivar(d.novaSenha, sal, ITERACOES, KDF_ARGON2);           // senha nova já em Argon2id
       const conteudo = await cifrar(nova.chave, s.email, va + 1, documento);
       // troca atômica no servidor: novo sal + nova prova + documento recifrado (e os outros dispositivos saem)
-      await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va, codigo }, atual.prova);
+      try {
+        await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va, codigo }, atual.prova);
+      } catch (e) { nova.bits.fill(0); throw incerto(e) ? erro("PASSWORD_UNCONFIRMED") : e; }   // trocou ou não: a tela orienta
+      let recuperacaoPendente = false;
       if (sessao === s) {
         Object.assign(s, { chave: nova.chave, prova: nova.prova, versao: va + 1 });
         await guardarChaveLocal(s.email, s.envelope, nova.bits, nova.prova);
-        await guardarCustodia(s, nova.bits);                // a cópia antiga (recuperação) foi apagada pelo servidor
+        recuperacaoPendente = !(await guardarCustodia(s, nova.bits));   // a cópia antiga (recuperação) foi apagada pelo servidor
       }
       nova.bits.fill(0);
       await lembrarVersao(s.email, va + 1);
-      return { alterada: true };
+      return recuperacaoPendente ? { alterada: true, recuperacaoPendente } : { alterada: true };
     },
 
     async updateUser(d) {
@@ -706,8 +726,11 @@
 
     /**
      * Link do e-mail (+ código do 2FA): abre os dados com a cópia da chave e guarda tudo só na memória.
-     * manter = os dados voltam com a senha nova; senão (proteção avançada, sem cópia ou cópia que não abre)
-     * a conta só pode recomeçar vazia — a tela avisa antes.
+     * O servidor entrega um passe só para esta aba (etapas e conclusão exigem o link E o passe).
+     * manter = os dados voltam com a senha nova. Documento atual ilegível: a cópia legível mais recente do
+     * histórico volta no lugar (restaurada, com a data). Sem nada legível, motivo diz por quê (proteção avançada,
+     * cópia da chave ainda não guardada, cópia que não abre ou dados ilegíveis) e a conta só pode recomeçar vazia
+     * depois de a pessoa confirmar. Falha de rede ou do servidor não chega aqui: vira erro e nada é oferecido.
      */
     async abrirRecuperacao(d) {
       recuperacao = null;
@@ -715,22 +738,35 @@
       if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw erro("TOKEN_INVALID");
       const codigo = d && d.codigo !== undefined ? String(d.codigo || "") : undefined;
       const r = await api("POST", "/recuperacao/abrir", { token, codigo });
-      if (!r || typeof r.email !== "string") throw erro("TOKEN_INVALID");
+      if (!r || typeof r.email !== "string" || typeof r.passe !== "string") throw erro("TOKEN_INVALID");
       const email = r.email, versao = Number.isSafeInteger(r.versao) && r.versao >= 0 ? r.versao : 0;
-      const rec: Recuperacao = { token, email, versao, manter: false, documento: null, historico: [] };
-      if (r.custodia) {
-        try {
-          const chave = await abrirCustodia(email, r.custodia);
-          rec.documento = r.documento ? await decifrar(chave, email, r.documento.versao, r.documento.conteudo) : null;
-          for (const v of (Array.isArray(r.historico) ? r.historico : [])) {
-            try { rec.historico.push({ versao: v.versao, claro: await decifrar(chave, email, v.versao, v.conteudo) }); }
-            catch (e) { /* cópia que já não abria: fica de fora */ }
-          }
-          rec.manter = !r.documento || r.documento.versao === versao;
-        } catch (e) { rec.documento = null; rec.historico = []; rec.manter = false; }
+      const rec: Recuperacao = { token, passe: r.passe, email, versao, manter: false, documento: null, historico: [] };
+      let motivo: MotivoRecuperacao | null = null, restaurada: { versao: number; quando: string | null } | null = null, descartadas = 0;
+      let chave: CryptoKey | null = null;
+      if (!r.custodia) motivo = r.avancada === true ? "avancada" : "sem_copia";
+      else { try { chave = await abrirCustodia(email, r.custodia); } catch (e) { motivo = "copia_invalida"; } }
+      if (chave) {
+        // cada versão por si: uma cópia estragada não esconde as outras
+        for (const v of (Array.isArray(r.historico) ? r.historico : [])) {
+          try { rec.historico.push({ versao: v.versao, claro: await decifrar(chave, email, v.versao, v.conteudo), quando: typeof v.criado_em === "string" ? v.criado_em : null }); }
+          catch (e) { descartadas += 1; }          // cópia que já não abria: fica de fora (a tela conta quantas)
+        }
+        let atual = !r.documento;                   // sem documento e sem histórico: conta sem dados, nada a perder
+        if (r.documento) {
+          try { rec.documento = await decifrar(chave, email, r.documento.versao, r.documento.conteudo); atual = true; }
+          catch (e) { atual = false; }
+        }
+        if ((!atual || !r.documento) && rec.historico.length) {
+          // o documento atual não abre (ou sumiu): volta a cópia legível mais recente do histórico
+          const h0 = rec.historico[0];
+          rec.documento = h0.claro;
+          restaurada = { versao: h0.versao, quando: h0.quando };
+          rec.manter = true;
+        } else if (atual) rec.manter = true;
+        else motivo = "dados_ilegiveis";
       }
       recuperacao = rec;
-      return { email, manter: rec.manter };
+      return { email, manter: rec.manter, motivo, restaurada, descartadas };
     },
 
     /** Senha nova: recifra os dados (ou recomeça vazia, se confirmado) e conclui numa transação no servidor */
@@ -753,12 +789,14 @@
             historico.push({ versao: v.versao, conteudo: c });
           }
           if (tamanho > LIMITE_PEDIDO) {           // não cabe num pedido: uma cópia por pedido, como na migração
-            for (const h of historico) await api("PUT", "/recuperacao/historico", { token: rec.token, sal: b64(sal), versao: h.versao, conteudo: h.conteudo });
+            for (const h of historico) await api("PUT", "/recuperacao/historico", { token: rec.token, passe: rec.passe, sal: b64(sal), versao: h.versao, conteudo: h.conteudo });
             historico = [];
           }
         }
-        await api("PUT", "/recuperacao/concluir", { token: rec.token, modo: rec.manter ? "manter" : "recomecar", sal: b64(sal), kdf: KDF_ARGON2,
-          prova: nova.prova, conteudo, versaoAnterior: rec.versao, historico });
+        try {
+          await api("PUT", "/recuperacao/concluir", { token: rec.token, passe: rec.passe, modo: rec.manter ? "manter" : "recomecar", sal: b64(sal),
+            kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: rec.versao, historico });
+        } catch (e) { throw incerto(e) ? erro("RECOVERY_UNCONFIRMED") : e; }   // pode ter concluído: a tela orienta
       } finally { nova.bits.fill(0); }
       recuperacao = null;
       esquecerChaveLocal();                       // a chave guardada era da senha antiga
@@ -771,6 +809,17 @@
       if (simulada(s)) return { avancada: teste.protecao, recuperacao: !teste.protecao };
       const r = await comProvaDaSessao(() => api("GET", "/custodia", undefined, s.prova));
       return { avancada: !!(r && r.avancada === true), recuperacao: !!(r && r.ativa === true) };
+    },
+    /** Recuperação pendente (a cópia da chave não foi guardada): guarda agora, com a senha atual */
+    async repararRecuperacao(d) {
+      const s = exigirConta();
+      if (simulada(s)) { if (!d.senha) throw erro("WRONG_PASSWORD"); return ACOES.getProtecao({}); }
+      const k = await derivarConta(d.senha, await parametros(s.email));
+      try {
+        await api("GET", "/custodia", undefined, k.prova);                          // senha errada → WRONG_PASSWORD
+        if (!(await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits))) throw erro("STORAGE_UNAVAILABLE");
+      } finally { k.bits.fill(0); }
+      return ACOES.getProtecao({});
     },
     async setProtecao(d) {
       const s = exigirConta();
@@ -786,6 +835,25 @@
         if (d.avancada !== true) await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
       } finally { k.bits.fill(0); }
       return ACOES.getProtecao({});
+    },
+
+    /* ---- Zo, o assistente: consentimento e conversa (a API leva ao Gemini; as ferramentas rodam aqui, no navegador) ---- */
+    async zoConsentimento(d) {
+      const s = exigirConta();
+      const aceito = d && typeof d.aceito === "boolean" ? d.aceito : undefined;
+      if (simulada(s)) { if (aceito !== undefined) teste.zoAceito = aceito; return { aceito: teste.zoAceito }; }
+      const r = await comProvaDaSessao(() => (aceito === undefined
+        ? api("GET", "/zo/consentimento", undefined, s.prova)
+        : api("PUT", "/zo/consentimento", { aceito }, s.prova)));
+      return { aceito: !!(r && r.aceito === true) };
+    },
+    async zoConversar(d) {
+      const s = exigirConta();
+      if (simulada(s)) return { texto: "Modo teste. O Zo de verdade responde com a API local ou na prévia.", chamadas: [] };
+      const r = await comProvaDaSessao(() => api("POST", "/zo", { mensagens: d && Array.isArray(d.mensagens) ? d.mensagens : [] }, s.prova));
+      const chamadas = r && Array.isArray(r.chamadas) ? r.chamadas.filter((c: RespostaApi) => c && typeof c.id === "string" && typeof c.nome === "string" && typeof c.argumentos === "string")
+        .map((c: RespostaApi) => ({ id: c.id as string, nome: c.nome as string, argumentos: c.argumentos as string })) : [];
+      return { texto: r && typeof r.texto === "string" ? r.texto : null, chamadas };
     },
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */

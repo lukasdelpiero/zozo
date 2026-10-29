@@ -10,7 +10,8 @@ este código só recebe os caminhos /api/*.
 Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
   API_FASTAPI = "1"  → os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py) antes do
                        núcleo. Ligado na prévia; produção só depois de aprovado lá.
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO, RESEND_API_KEY
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO, RESEND_API_KEY,
+  GEMINI_API_KEY (Zo, o assistente; sem ela o Zo fica desligado). Variável ZO_MODELO (wrangler.toml): o modelo do Gemini.
 Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 """
 import json
@@ -34,7 +35,7 @@ except ImportError:                   # pragma: no cover
     _JSNULL = None
 
 _CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO",
-           "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA")
+           "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "GEMINI_API_KEY", "ZO_MODELO")
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 
@@ -89,9 +90,9 @@ class Servicos:
                         headers={"Content-Type": "application/x-www-form-urlencoded"})
         return int(r.status), await r.text()
 
-    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str) -> tuple[int, str]:
+    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str, limite: int = 2000) -> tuple[int, str]:
         r = await fetch(url, method=HTTPMethod.POST, body=corpo, headers=dict(cabecalhos))
-        return int(r.status), (await r.text())[:2000]          # resposta do Resend: só o começo interessa
+        return int(r.status), (await r.text())[:limite]        # Resend: só o começo interessa; Zo (Gemini): até zo.LIMITE_RESPOSTA
 
 
 def _cabecalhos(request: Request) -> dict[str, str]:

@@ -31,7 +31,7 @@
     tw:[&_strong]:font-[550] tw:[&_a]:text-zz-primary tw:[&_a]:font-[550] tw:[&_a]:underline-offset-2 tw:[&_a:hover]:underline">
 
     <h1 class="tw:m-0 tw:text-[32px] tw:leading-[1.2] tw:font-[550] tw:tracking-[-0.015em] tw:text-[#1b2a4a] tw:celular:text-[26px]">Política de privacidade</h1>
-    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 27 de outubro de 2026</p>
+    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 29 de outubro de 2026</p>
 
     <p>O ZoZo existe para você ter o controle das suas finanças, e isso inclui estar no controle dos seus dados. Esta página explica, sem rodeios, o que guardamos, por quê, com quem falamos e como você decide sobre tudo isso.</p>
 
@@ -53,6 +53,7 @@
       <li><strong>Uma prova da sua senha</strong>, nunca a senha. O seu navegador transforma a senha (com Argon2id) em duas chaves: uma cifra os seus dados e a outra vira uma prova. O servidor guarda só uma impressão digital (hash) dessa prova, para conferir que é você.</li>
       <li><strong>Autenticação em duas etapas (2FA)</strong>, se você ativar: o segredo usado para conferir os códigos do seu aplicativo autenticador.</li>
     </ul>
+    <p>O nome e o e-mail não ficam cifrados como os dados financeiros: o servidor precisa deles para você entrar e receber os e-mails do ZoZo.</p>
 
     <h3>Dados financeiros (você insere)</h3>
     <p>Transações, contas, cartões, faturas, categorias, orçamentos, recorrências, investimentos, perfis e preferências do app. Tudo isso fica num único documento que <strong>o seu navegador cifra com AES-256-GCM</strong> antes de enviar. O servidor guarda esse documento cifrado e as 10 versões anteriores mais recentes (também cifradas), para você não perder dados num erro ou num conflito entre aparelhos.</p>
@@ -79,6 +80,20 @@
     <p>Como a senha é a chave dos seus dados, esquecê-la poderia significar perder tudo. Por isso, <strong>por padrão</strong>, o seu navegador guarda no servidor uma cópia da chave dos dados, trancada com uma chave que só o servidor do ZoZo consegue calcular. Em "Esqueci minha senha", depois de confirmar o e-mail (e o código do 2FA, se estiver ativo), essa cópia é usada para você criar uma senha nova sem perder nada.</p>
     <p>Na prática, isso significa que quem tivesse ao mesmo tempo o banco de dados <strong>e</strong> a chave secreta do servidor conseguiria abrir os dados dessas contas. Guardamos essa chave separada do banco, com acesso restrito.</p>
     <p>Se preferir que só você consiga abrir os seus dados, ative a <strong>Proteção avançada</strong> em Configurações › Conta. A cópia é apagada do servidor na hora. Nesse modo, se você esquecer a senha, a conta recomeça vazia: ninguém, nem o ZoZo, consegue recuperar os dados.</p>
+    <p>As cópias de segurança do banco feitas antes de você ligar a Proteção avançada ainda contêm a cópia antiga da chave, pelo prazo explicado em <a href="#retencao">Por quanto tempo os dados ficam guardados</a>. Elas são cifradas e guardadas com acesso restrito.</p>
+
+    <h2 id="zo">E o Zo, o assistente?</h2>
+    <p>O Zo é opcional e <strong>está em fase de testes</strong>. Na primeira conversa ele pede o seu consentimento, e sem ele nada é enviado. Com o consentimento, o seu navegador abre os dados (como sempre) e, a cada pergunta, envia ao <strong>Gemini</strong>, a inteligência artificial do Google, pelo servidor do ZoZo, só o necessário para responder: a sua mensagem, a conversa recente e os trechos dos dados que o Zo consultou (por exemplo, as contas ou as transações de um mês). O seu e-mail, a sua senha e as chaves dos dados não são enviados.</p>
+    <p><strong>Atenção, nesta fase de testes:</strong> o Zo usa o plano gratuito do Gemini. Nesse plano, o Google pode usar o que é enviado para treinar e melhorar os produtos dele, e pessoas da equipe do Google podem ler esse conteúdo, conforme os termos do Google. Por isso, não escreva no chat nada que você não queira compartilhar. Quando a fase de testes terminar, o Zo vai para o plano pago, em que o Google não usa os dados dessa forma, e esta política será atualizada.</p>
+    <ul>
+      <li>O Zo só grava (cria, edita ou exclui) depois de você tocar em Confirmar no resumo que aparece na conversa.</li>
+      <li>Senha, código da verificação em duas etapas, CPF e chave Pix nunca passam pelo chat: para isso o Zo abre a tela segura das Configurações.</li>
+      <li>Arquivos do banco (CSV ou OFX) que você importa pelo Zo são lidos no seu aparelho e nunca são enviados ao Gemini nem ao servidor do ZoZo. Só as transações que você confirmar entram nos seus dados, cifradas como sempre.</li>
+      <li>Cada mensagem sua e cada resposta do Zo passam pelo filtro de segurança do Gemini, que identifica ofensa e discriminação. Mensagens ofensivas recebem uma resposta padrão e, se repetidas, o Zo pausa até o dia seguinte. Guardamos só a contagem, nunca o texto.</li>
+      <li>O ZoZo não guarda a conversa: ela fica só na tela e some ao fechar a aba ou sair. No servidor guardamos só qual aviso você aceitou, a data, e a contagem de mensagens do dia, para o limite diário.</li>
+      <li>Você retira o consentimento quando quiser no menu do Zo. Se o aviso mudar, o Zo pede o seu consentimento de novo.</li>
+    </ul>
+    <p>O Google processa esses dados fora do Brasil, com as garantias contratuais previstas na LGPD (art. 33).</p>
 
     <h2 id="finalidades">Para que usamos os dados?</h2>
     <ul>
@@ -96,7 +111,8 @@
       <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques e o CAPTCHA (Turnstile) do cadastro e do login.</li>
       <li><strong>Resend:</strong> envio dos e-mails do ZoZo (recebe o seu endereço e o conteúdo do e-mail).</li>
       <li><strong>Google:</strong> só se você escolher "Continuar com Google". Recebemos o seu e-mail confirmado e o seu primeiro nome. A senha do ZoZo continua sendo necessária.</li>
-      <li><strong>GitHub:</strong> guarda cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente.</li>
+      <li><strong>Google (Gemini):</strong> só se você usar o Zo, o assistente, e der o seu consentimento. Recebe as suas mensagens e os trechos dos seus dados necessários para responder; na fase de testes, pode usá-los para melhorar os produtos dele (veja abaixo).</li>
+      <li><strong>GitHub e Google Drive:</strong> guardam as cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente. Sem a chave, que fica só com o responsável pelo ZoZo, elas não podem ser abertas.</li>
     </ul>
     <p>Esses serviços podem processar dados fora do Brasil, com garantias contratuais de proteção previstas na LGPD (art. 33). Também podemos ter de entregar informações a autoridades, quando a lei ou uma ordem judicial exigir. Mesmo assim, os dados financeiros continuam cifrados.</p>
 
@@ -116,7 +132,8 @@
       <li><strong>Conta ativa:</strong> enquanto você usar o ZoZo.</li>
       <li><strong>Cadastro não confirmado:</strong> apagado depois de 7 dias.</li>
       <li><strong>Links de confirmação e de recuperação:</strong> valem 24 horas e 1 hora, respectivamente, e só podem ser usados uma vez.</li>
-      <li><strong>Exclusão da conta:</strong> a conta, os dados e as versões anteriores saem do banco na hora. As cópias de segurança são substituídas em até 30 dias e os registros de segurança, em poucos dias.</li>
+      <li><strong>Exclusão da conta:</strong> a conta, os dados e as versões anteriores saem do banco na hora. Os registros de segurança somem em poucos dias.</li>
+      <li><strong>Cópias de segurança do banco:</strong> são cifradas e guardam o banco do dia em que foram feitas, inclusive de contas excluídas depois. As do GitHub vencem em 30 dias. As do Google Drive ficam guardadas sem prazo para apagar, para permitir restaurar o serviço depois de um problema grave; elas só são abertas para isso.</li>
     </ul>
 
     <h2 id="excluir">Posso excluir minha conta quando eu quiser?</h2>
@@ -127,12 +144,12 @@
     <ol>
       <li><strong>Confirmação e acesso:</strong> saber se tratamos os seus dados e quais são. Todos os seus dados financeiros já estão visíveis para você no app.</li>
       <li><strong>Correção:</strong> altere o seu nome e os seus dados financeiros no próprio app.</li>
-      <li><strong>Portabilidade:</strong> em Configurações › Conta, "Exportar todas as transações" baixa um arquivo CSV, gerado no seu navegador. O arquivo baixado não é cifrado: guarde-o em local seguro.</li>
+      <li><strong>Portabilidade:</strong> em Configurações › Conta, "Exportar todas as transações" baixa um arquivo CSV, gerado no seu navegador. O arquivo baixado não é cifrado, assim como a fatura impressa ou salva em PDF: guarde-os em local seguro.</li>
       <li><strong>Eliminação:</strong> exclua a conta em Configurações › Conta, sem precisar falar conosco.</li>
       <li><strong>Informação sobre compartilhamento:</strong> a lista de fornecedores está acima. Se tivermos de entregar dados a uma autoridade, você pode perguntar quais foram.</li>
       <li><strong>Anonimização, bloqueio, oposição e revisão:</strong> você pode pedir por e-mail o que não estiver disponível no app.</li>
     </ol>
-    <p>Como os seus dados financeiros são cifrados com uma chave que só você tem, <strong>não conseguimos lê-los nem enviá-los a você por e-mail</strong>: a exportação é feita no app. Para os outros pedidos, escreva para <a href="mailto:privacidade@usezozo.com.br">privacidade@usezozo.com.br</a>. Respondemos em até 15 dias e podemos pedir uma confirmação de que a conta é sua. Você também pode reclamar à <a href="https://www.gov.br/anpd" rel="noopener noreferrer">ANPD</a>.</p>
+    <p>Os seus dados financeiros chegam ao servidor só cifrados, e a cópia de recuperação existe apenas para você criar uma senha nova. <strong>Não abrimos os seus dados para atender pedidos nem os enviamos por e-mail</strong>: a exportação é feita no app. Para os outros pedidos, escreva para <a href="mailto:privacidade@usezozo.com.br">privacidade@usezozo.com.br</a>. Respondemos em até 15 dias e podemos pedir uma confirmação de que a conta é sua. Você também pode reclamar à <a href="https://www.gov.br/anpd" rel="noopener noreferrer">ANPD</a>.</p>
 
     <h2 id="sobre">Sobre esta política</h2>
     <p>O responsável pelo tratamento dos dados é o ZoZo (usezozo.com.br). Ao usar o ZoZo, você declara estar ciente desta política. Se ela mudar de forma importante, avisaremos no app ou por e-mail antes de a mudança valer. Dúvidas? Fale com a gente em <a href="mailto:privacidade@usezozo.com.br">privacidade@usezozo.com.br</a>.</p>

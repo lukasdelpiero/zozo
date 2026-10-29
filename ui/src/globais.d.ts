@@ -310,6 +310,8 @@ declare global {
   interface OpcoesAviso { tone?: "default" | "success" | "aviso" | "error"; duration?: number; importante?: boolean }
   interface OpcoesModal {
     title?: string;
+    /** cabeçalho próprio no lugar do padrão: deve conter o título (h2 com o id recebido) e um botão de fechar */
+    cabecalho?: (tituloId: string, fechar: (resultado?: unknown) => void) => HTMLElement;
     body?: FilhoDom;
     class?: string;
     alert?: boolean;
@@ -496,7 +498,7 @@ declare global {
 
   /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
   interface ZoZoList {
-    ListaPainel(itens: LancamentoTela[], opts?: { onClick?: (l: LancamentoTela) => void }): HTMLElement;
+    ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number; semMais?: boolean }): HTMLElement;
     LaunchRow(l: LancamentoTela, opts?: Record<string, unknown>): HTMLElement;
     AccountRow(c: ContaTela, opts?: Record<string, unknown>): HTMLElement;
     CategoryRow(cat: CategoriaTela, opts?: Record<string, unknown>): HTMLElement;
@@ -632,6 +634,11 @@ declare global {
     onCodigo(codigo: string): Promise<string | null>;
     onCancelar2FA(): void;
   }
+  /** Tela da senha nova da recuperação (ver abrirRecuperacao em dados.d.ts) */
+  interface ConfigNovaSenha {
+    email: string; manter: boolean; motivo?: MotivoRecuperacao | null; restaurada?: { versao: number; quando: string | null } | null;
+    descartadas?: number; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void;
+  }
   interface ZoZoAuth {
     render(root: HTMLElement, cfg: ConfigEntrada): void;
     reiniciar(): void;
@@ -642,7 +649,7 @@ declare global {
     aguardandoEmail(root: HTMLElement, email: string, cfg: { onReenviar: () => Promise<unknown>; recuperacao?: boolean; onVoltar?: () => void }): void;
     pedirRecuperacao(root: HTMLElement, cfg: { email: string; onEnviar: (email: string) => Promise<unknown>; onVoltar: () => void }): void;
     codigoRecuperacao(root: HTMLElement, cfg: { onCodigo: (codigo: string) => Promise<string | null>; onVoltar: () => void }): void;
-    novaSenha(root: HTMLElement, cfg: { email: string; manter: boolean; erro?: string | null; onSalvar: (senha: string) => void; onVoltar: () => void }): void;
+    novaSenha(root: HTMLElement, cfg: ConfigNovaSenha): void;
     linkInvalido(root: HTMLElement, cfg: { onVoltar: () => void }): void;
     A: Readonly<Record<string, string>>;
   }
@@ -651,7 +658,7 @@ declare global {
   /** js/pages/boleto.ts — criação de fatura */
   interface ZoZoBoleto {
     /** receber: abre já a janela "Registrar pagamento recebido" (painel de testes) */
-    open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean }): void;
+    open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean; cartaoId?: string; mes?: number; ano?: number }): void;
     close(): void;
   }
   interface ZoZoCategoriasShared {
@@ -698,8 +705,52 @@ declare global {
     fechar(): void;
   }
 
+  /** config/novidades.ts — o que mudou em cada versão (janela "O que há de novo no ZoZo") */
+  type TipoNovidade = "novo" | "melhoria" | "correcao";
+  interface ItemNovidade { icone: string; tipo: TipoNovidade; titulo: string; texto: string }
+  interface NotaVersao { versao: string; quando: string; itens: readonly ItemNovidade[] }
+  /** components/novidades.ts */
+  interface ZoZoNovidades { abrir(): void; conferir(ctx: ContextoApp): void }
+
+  /* ---------------- Zo, o assistente ---------------- */
+  /** Pedido ao serviço de dados (a tela usa ctx.bridge.request; os testes, o serviço direto) */
+  type PedidoZo = <K extends NomeAcao>(acao: K, dados?: unknown) => Promise<RespostaDe<K>>;
+  /** O que uma ferramenta devolve: dados para o Zo, um resumo para a pessoa confirmar, ou botões de escolha */
+  type ResultadoFerramentaZo =
+    | { tipo: "leitura"; resultado: string }
+    | { tipo: "escrita"; titulo: string; linhas: Array<[string, string]>; confirmar(): Promise<string> }
+    | { tipo: "opcoes"; pergunta: string; opcoes: string[] }
+    | { tipo: "arquivo" };
+  /** Importar do banco (data/importar.ts): linhas com o valor COM SINAL, como vieram no arquivo */
+  interface LinhaImportada { data: string; descricao: string; valor: number }
+  interface ResultadoImportacao { formato: "csv" | "ofx"; cartao: boolean; itens: LinhaImportada[]; ignoradas: number }
+  interface ZoZoImportar {
+    ler(texto: string): ResultadoImportacao;
+    decodificar(bytes: ArrayBuffer): string;
+    data(bruto: string): string | null;
+    valor(bruto: string): number | null;
+  }
+  interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo>; nomes: string[] }
+  /** Ações de tela que a janela do Zo entrega às ferramentas (nada aqui grava dados sem o serviço) */
+  interface TelaZo {
+    abrirFatura(o: { perfilId: string | null; cartaoId: string; mes: number; ano: number }): void;
+    filtrar(filtros: Partial<FiltrosLancamentos>, busca: string): void;
+    abrirConfiguracoes(aba: "geral" | "conta"): void;
+    exportar(): Promise<void>;
+    sair(): void;
+    seguranca(): Promise<{ doisFatores: boolean; protecaoAvancada: boolean }>;
+  }
+  interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo }
+  interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }
+  interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
+
   interface ZoZoGlobal {
     dom: ZoZoDom;
+    notasVersao: readonly NotaVersao[];
+    novidades: ZoZoNovidades;
+    zo: ZoZoZo;
+    zoFerramentas: ZoZoZoFerramentas;
+    importar: ZoZoImportar;
     store: ZoZoStore;
     recursos: ZoZoRecursos;
     log: ZoZoLog;

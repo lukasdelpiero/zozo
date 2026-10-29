@@ -56,7 +56,6 @@
       + "tw:gaveta:group-data-[gaveta=aberta]/shell:[transform:none] "
       + "tw:gaveta:group-data-[gaveta=aberta]/shell:[box-shadow:8px_0_32px_rgba(15,39,66,0.28)] tw:motion-reduce:transition-none!",
     menuTopo: "tw:h-(--topbar-height) tw:flex-none tw:flex tw:items-center tw:justify-start tw:pt-0 tw:pr-3 tw:pb-0 tw:pl-[14px]",
-    logo: "tw:size-7 tw:rounded-[5px] tw:flex-none tw:[box-shadow:0_1px_3px_rgba(15,39,66,0.25)] tw:estreito:hidden tw:gaveta:block",
     nav: "tw:flex-none tw:flex tw:flex-col tw:gap-0.5 tw:p-3 tw:border-b tw:border-b-(--sidebar-divider) tw:estreito:p-2 tw:estreito:flex-1 "
       + "tw:gaveta:flex-none tw:gaveta:p-3",
     navItem: "tw:group/nav tw:relative tw:flex tw:items-center tw:gap-2.5 tw:h-[34px] tw:px-2.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-[15px] tw:font-[550] "
@@ -228,6 +227,8 @@
       + "tw:relative tw:overflow-hidden",
     modalJanela: CAIXA + " tw:w-[min(560px,calc(100vw_-_32px))] tw:gaveta:w-full",
     modalDividir: CAIXA + " tw:w-[min(820px,calc(100vw_-_32px))] tw:gaveta:w-full",
+    // novidades da versão: cabeçalho roxo próprio (components/novidades.ts); a lista rola, o topo e o rodapé ficam
+    modalNovidades: CAIXA + " tw:w-[min(560px,calc(100vw_-_32px))] tw:max-h-[calc(100vh_-_48px)] tw:flex tw:flex-col tw:overflow-hidden tw:rounded-[20px]",
     modalTopo: "tw:flex tw:items-center tw:justify-between tw:pt-5 tw:pr-5 tw:pb-0 tw:pl-6",
     modalTopoConfirmacao: "tw:flex tw:items-center tw:justify-between tw:pt-5 tw:px-6 tw:pb-0 tw:[&_.icon-btn]:hidden",   // confirmação: sem o X
     modalTopoConfig: "tw:flex tw:items-center tw:justify-between tw:absolute tw:top-2.5 tw:right-2.5 tw:p-0 tw:z-2",       // só o X, sobre o conteúdo
@@ -240,8 +241,10 @@
     modalCorpoConfirmacao: "tw:pt-2 tw:px-6 tw:pb-5 tw:text-left",
     modalCorpoConfig: "tw:p-0 tw:h-full tw:overflow-hidden tw:bg-zz-surface tw:rounded-[20px]",
     modalCorpoJanela: "tw:pt-4 tw:px-6 tw:pb-0",
+    modalCorpoNovidades: "tw:min-h-0 tw:overflow-y-auto tw:px-6 tw:py-1",
     modalRodape: "tw:flex tw:justify-end tw:gap-2 tw:py-4 tw:px-6 tw:border-t tw:border-t-zz-border " + RODAPE_CELULAR,
     modalRodapeConfirmacao: "tw:flex tw:justify-end tw:gap-2 tw:pt-0 tw:px-6 tw:pb-5 " + RODAPE_CELULAR,
+    modalRodapeNovidades: "tw:flex tw:flex-none tw:items-center tw:justify-between tw:gap-4 tw:py-4 tw:px-6 tw:border-t tw:border-t-zz-border",
     modalTexto: "tw:text-zz-secondary tw:text-[15px] tw:font-[450]",
     modalTextoConfirmacao: "tw:text-zz-secondary tw:text-[13px] tw:font-[450] tw:max-w-none tw:[text-wrap:pretty]",
     // conteúdo das janelas de criação (modais.janela) e de transferência (cambio.ts)

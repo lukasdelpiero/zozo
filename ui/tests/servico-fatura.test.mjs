@@ -19,7 +19,7 @@ async function cenario(t, cartaoExtra = {}) {
 }
 const fatura = (t, perfilId, mes, ano) => t.req(t.A.getBoletoData, { perfilId, mes, ano });
 
-test("fatura: pagar o cartão (Pagar fatura, transferência de entrada e o formato antigo) não abate a cobrança do perfil", async () => {
+test("fatura: pagar o cartão (Pagar fatura, transferência de entrada, Receita à mão e o formato antigo) não abate a cobrança do perfil", async () => {
   const t = carregar();
   const hoje = new Date();
   const mes = hoje.getMonth() + 1, ano = hoje.getFullYear(), dia = isoDe(hoje);
@@ -31,32 +31,73 @@ test("fatura: pagar o cartão (Pagar fatura, transferência de entrada e o forma
   // pagamento gravado antes da marca (3.17): reconhecido pelo texto que o "Pagar fatura" gerava
   await t.req(t.A.createLancamento, lanc({ data: dia, descricao: "Pagamento fatura", valor: 70, contaId: cartao.id, perfilId: perfil.id, tipo: "receita",
     notas: "Pagamento da fatura do cartão de crédito Visa." }));
+  // pagamento lançado à mão como Receita no cartão, sem marca nem texto: também não é gasto
+  await t.req(t.A.createLancamento, lanc({ data: dia, descricao: "Fatura", valor: 7022.87, contaId: cartao.id, perfilId: perfil.id, tipo: "receita" }));
   const f = await fatura(t, perfil.id, mes, ano);
   assert.deepEqual(f.lancamentos.map((l) => l.descricao).sort(), ["Estorno loja", "Mercado"]);
   assert.equal(t.Z.servico.calcularFatura(f).total, 280);                       // 300 − estorno 20
-  // editar o pagamento do cartão mantém a marca (continua fora da cobrança)
-  const pag = (await t.req(t.A.getLancamentos)).lancamentos.find((l) => l.tipo === "receita" && l.pagamentoCartao);
-  await t.req(t.A.updateLancamento, { id: pag.id, lancamento: { data: dia, descricao: "Pagamento fatura", valor: 90, tipo: "receita", contaId: cartao.id, perfilId: perfil.id } });
+  // editar o pagamento continua fora da cobrança (o par do tipo Fatura nunca aparece na fatura)
+  const pag = (await t.req(t.A.getLancamentos)).lancamentos.find((l) => l.tipo === "fatura");
+  await t.req(t.A.updateLancamento, { id: pag.id, lancamento: { data: dia, descricao: "Pagamento fatura", valor: 90, tipo: "fatura", contaId: banco.id, perfilId: perfil.id } });
   assert.equal((await fatura(t, perfil.id, mes, ano)).lancamentos.length, 2);
+  assert.equal((await t.req(t.A.getBoletoData, { perfilId: "todos", mes, ano })).lancamentos.length, 2);
 });
 
-test("fatura: cartão com fechamento usa o ciclo (do fechamento anterior ao dia antes do fechamento); sem fechamento, o mês", async () => {
+test("fatura: ciclo do dia seguinte ao fechamento anterior até o dia do fechamento; sem fechamento, o mês", async () => {
   const t = carregar();
-  const { cartao, perfil } = await cenario(t, { fechamento: 25, vencimento: 5 });
+  // o exemplo: fecha dia 5 e vence dia 12. Compra no dia 4 (ou 5) de outubro cai na fatura de outubro; no dia 6, na de novembro
+  const { cartao, perfil } = await cenario(t, { fechamento: 5, vencimento: 12 });
   const { conta: semCiclo } = await t.req(t.A.createConta, { conta: { nome: "Master", tipo: "cartao", saldo: 0 } });
   const compra = (data, descricao, contaId = cartao.id) => t.req(t.A.createLancamento, lanc({ data, descricao, contaId, perfilId: perfil.id }));
-  await compra("2025-02-24", "Antes do ciclo");
-  await compra("2025-02-25", "No fechamento de fevereiro");
-  await compra("2025-03-24", "Véspera do fechamento");
-  await compra("2025-03-25", "No fechamento de março");
-  await compra("2025-03-02", "Cartão sem fechamento", semCiclo.id);
-  await compra("2025-02-28", "Sem fechamento, outro mês", semCiclo.id);
-  const f = await fatura(t, perfil.id, 3, 2025);
-  assert.deepEqual(f.lancamentos.map((l) => l.descricao), ["No fechamento de fevereiro", "Cartão sem fechamento", "Véspera do fechamento"]);
+  await compra("2025-09-05", "No fechamento de setembro");
+  await compra("2025-09-06", "Dia seguinte ao fechamento de setembro");
+  await compra("2025-10-04", "Dia 4 de outubro");
+  await compra("2025-10-05", "No fechamento de outubro");
+  await compra("2025-10-06", "Dia 6 de outubro");
+  await compra("2025-10-02", "Cartão sem fechamento", semCiclo.id);
+  await compra("2025-09-30", "Sem fechamento, outro mês", semCiclo.id);
+  const f = await fatura(t, perfil.id, 10, 2025);
+  assert.deepEqual(f.lancamentos.map((l) => l.descricao), ["Dia seguinte ao fechamento de setembro", "Cartão sem fechamento", "Dia 4 de outubro", "No fechamento de outubro"]);
   const p = f.periodos.find((x) => x.contaId === cartao.id);
-  assert.equal(p.inicio, "2025-02-25");
-  assert.equal(p.fim, "2025-03-24");
-  assert.deepEqual((await fatura(t, perfil.id, 4, 2025)).lancamentos.map((l) => l.descricao), ["No fechamento de março"]);
+  assert.equal(p.inicio, "2025-09-06");
+  assert.equal(p.fim, "2025-10-05");
+  assert.deepEqual((await fatura(t, perfil.id, 11, 2025)).lancamentos.map((l) => l.descricao), ["Dia 6 de outubro"]);
+  assert.deepEqual((await fatura(t, perfil.id, 9, 2025)).lancamentos.map((l) => l.descricao), ["No fechamento de setembro", "Sem fechamento, outro mês"]);
+});
+
+test("fatura: perfil Todos e escolha do cartão (Todos ou um); com Todos ou um cartão é só consulta", async () => {
+  const t = carregar();
+  const { cartao, banco, perfil } = await cenario(t);
+  const { conta: master } = await t.req(t.A.createConta, { conta: { nome: "Master", tipo: "cartao", saldo: 0 } });
+  const { perfil: bia } = await t.req(t.A.createPerfil, { perfil: { nome: "Bia" } });
+  const compra = (descricao, contaId, perfilId) => t.req(t.A.createLancamento, lanc({ data: "2025-03-10", descricao, contaId, perfilId }));
+  await compra("Visa Mãe", cartao.id, perfil.id);
+  await compra("Master Mãe", master.id, perfil.id);
+  await compra("Visa Bia", cartao.id, bia.id);
+  await compra("Visa sem perfil", cartao.id, null);
+  await compra("Na conta", banco.id, perfil.id);
+  await t.req(t.A.salvarFatura, { perfilId: perfil.id, mes: 3, ano: 2025, descontos: [{ descricao: "Desconto", valor: 1 }] });
+  const nomes = (f) => f.lancamentos.map((l) => l.descricao).sort();
+  // um perfil, todos os cartões: os dois cartões dele, com os ajustes guardados
+  const umTodos = await t.req(t.A.getBoletoData, { perfilId: perfil.id, cartaoId: "todos", mes: 3, ano: 2025 });
+  assert.deepEqual(nomes(umTodos), ["Master Mãe", "Visa Mãe"]);
+  assert.equal(umTodos.consulta, false);
+  assert.equal(umTodos.ajustes.descontos.length, 1);
+  assert.deepEqual(umTodos.periodos.map((p) => p.nome).sort(), ["Master", "Visa"]);
+  // um perfil, um cartão: só o do cartão, sem ajustes (consulta)
+  const umVisa = await t.req(t.A.getBoletoData, { perfilId: perfil.id, cartaoId: cartao.id, mes: 3, ano: 2025 });
+  assert.deepEqual(nomes(umVisa), ["Visa Mãe"]);
+  assert.equal(umVisa.consulta, true);
+  assert.deepEqual([umVisa.ajustes.descontos, umVisa.recebimentos, umVisa.saldoAnterior, umVisa.pix], [[], [], 0, null]);
+  // todos os perfis: inclusive as compras sem perfil; com um cartão, só as dele
+  const todos = await t.req(t.A.getBoletoData, { perfilId: "todos", mes: 3, ano: 2025 });
+  assert.deepEqual(nomes(todos), ["Master Mãe", "Visa Bia", "Visa Mãe", "Visa sem perfil"]);
+  assert.deepEqual([todos.todos, todos.perfil, todos.consulta], [true, null, true]);
+  assert.deepEqual(nomes(await t.req(t.A.getBoletoData, { perfilId: "todos", cartaoId: master.id, mes: 3, ano: 2025 })), ["Master Mãe"]);
+  // cartão que não existe ou que não é cartão: recusado
+  for (const cartaoId of ["c-inexistente", banco.id]) {
+    await assert.rejects(t.req(t.A.getBoletoData, { perfilId: "todos", cartaoId, mes: 3, ano: 2025 }), codigo("OPERATION_FAILED"), cartaoId);
+  }
 });
 
 test("fatura: ajustes ficam guardados por perfil e mês; valores inválidos são recusados sem gravar", async () => {

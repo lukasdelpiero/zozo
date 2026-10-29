@@ -83,8 +83,14 @@ if ($nomes -notcontains "TURNSTILE_SECRET") {
   if ($Ambiente -eq "producao") { Parar "Configure o TURNSTILE_SECRET e publique de novo: nada foi publicado." }
 }
 if ($nomes -notcontains "RESEND_API_KEY") {
-  Write-Host "   Aviso: RESEND_API_KEY não configurado — sem e-mail: o cadastro não pede confirmação e não há aviso de senha alterada." -ForegroundColor Yellow
+  Write-Host "   Aviso: RESEND_API_KEY não configurado — sem e-mail: não há confirmação de cadastro, recuperação de senha nem avisos de segurança." -ForegroundColor Yellow
   Write-Host "   Para ligar: npx wrangler secret put RESEND_API_KEY $($extra -join ' ')  (chave em resend.com › API Keys, permissão só de envio)" -ForegroundColor Yellow
+  # produção exige o e-mail (EMAIL_OBRIGATORIO no wrangler.toml): sem ele o cadastro seria recusado
+  if ($Ambiente -eq "producao") { Parar "Configure o RESEND_API_KEY e publique de novo: nada foi publicado." }
+}
+if ($nomes -notcontains "GEMINI_API_KEY") {
+  Write-Host "   Aviso: GEMINI_API_KEY não configurado — o Zo (assistente) fica desligado." -ForegroundColor Yellow
+  Write-Host "   Para ligar: npx wrangler secret put GEMINI_API_KEY $($extra -join ' ')  (chave em aistudio.google.com › Get API key)" -ForegroundColor Yellow
 }
 if ($nomes -notcontains "RECURSOS_CAMBIO") {
   Write-Host "   Aviso: RECURSOS_CAMBIO não configurado — levar transações entre moedas fica só para a demonstração e as contas de RECURSOS_AVANCADOS." -ForegroundColor Yellow

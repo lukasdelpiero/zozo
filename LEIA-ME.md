@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.18.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.19.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -13,12 +13,19 @@ Aplicativo web com design baseado no Copilot Money.
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
 
+## Novidades da versão 3.19.0
+
+- **Zo, o assistente:** botão em vidro com o Z no canto inferior direito; a janela de conversa abre no mesmo canto. Na primeira conversa, aviso de consentimento (sem ele, nada vai para o Gemini; o servidor também recusa). Cria, consulta, edita e exclui transações (inclusive parceladas e recorrentes), contas, categorias e orçamento, recorrências e perfis; resume o mês; sugere categoria pelo histórico; responde sobre versão, novidades, termos, privacidade e armazenamento. **Toda gravação** passa por um cartão de resumo (montado com os dados reais) e só acontece no Confirmar. As instruções e a lista de ferramentas ficam no servidor (`api/src/zo.py`); a conversa é conferida (sem papel de sistema, só ferramentas conhecidas, tamanhos e ids); a resposta do Gemini é filtrada; limite de 150 pedidos por conta por dia; nada da conversa nos logs nem guardado no ZoZo. Configuração: `npx wrangler secret put GEMINI_API_KEY` (e `ZO_MODELO` no wrangler.toml). **Fase 2:** consulta a fatura de perfil (um perfil ou todos, um cartão ou todos), troca contribuições, descontos e arredondamentos, registra pagamentos recebidos e abre a fatura para imprimir; liga e desliga multicâmbio e orçamento, remove a chave Pix, leva transações para outra moeda, filtra Transações, exporta o CSV e sai da conta (exportar e sair com confirmação). Senha, 2FA, proteção avançada, apagar dados, excluir conta e cadastrar a chave Pix **nunca pelo chat**: o Zo abre a tela segura das Configurações. **Respeito e neutralidade:** regras nas instruções (sem palavrões, ofensas ou discriminação; não tolera discriminação nem apologia; sem julgamentos, opiniões ou sugestões fora do pedido) e filtro de segurança do Gemini na mensagem da pessoa e na resposta do Zo (ofensa: resposta fixa e, depois de 3 no dia, o Zo pausa até o dia seguinte). **Gemini (plano gratuito, fase de testes):** o aviso de consentimento diz que o Google pode usar as mensagens e os trechos de dados para treinamento; o consentimento guarda a versão do aviso (`zo.CONSENTIMENTO_VERSAO`) e quem aceitou o aviso anterior aceita de novo. **Fase 3:** importar CSV ou OFX do banco pelo clipe do Zo (lido no navegador, nada sai do aparelho; conferência linha por linha com conta, perfil e categoria sugerida; o serviço grava tudo ou nada e pula o que já existe) e categorizar em lote as transações sem categoria pelo histórico, com confirmação.
+- **Menu lateral:** sem o logo do ZoZo no topo.
+- **Fatura de perfis:** uma Receita lançada à mão no cartão (como o pagamento da fatura) não entra mais na cobrança dos perfis; estornos continuam abatendo.
+
 ## Novidades da versão 3.18.0
 
 - **Fatura de perfis (cobrança):**
-  - pagar o **cartão** ("Pagar fatura" ou transferência de entrada no cartão) não abate mais a cobrança do perfil — é você pagando o banco;
+  - entram **só transações de cartão de crédito** (empréstimo saiu); campo **Cartão** (cada cartão ou Todos, no fim da lista) e opção **Todos** no fim de Perfil (o gasto de todos os perfis, inclusive compras sem perfil). Com Todos ou um cartão escolhido é **só consulta**: sem ajustes, pagamentos recebidos, saldo anterior nem Pix (guardados por perfil e mês);
+  - pagar o **cartão** ("Pagar fatura" ou transferência de entrada no cartão) não abate mais a cobrança do perfil — é você pagando o banco — e não aparece na fatura;
   - **"Registrar pagamento recebido"**: o que o perfil pagou entra como receita na conta escolhida (categoria "Reembolso") e abate da fatura do mês, com o selo "Paga" ou "Falta R$ X" e o Pix pelo que falta;
-  - cartão com fechamento cadastrado usa o **ciclo** (do fechamento anterior ao dia antes do fechamento; o período aparece no editor); sem fechamento, o mês inteiro;
+  - cartão com fechamento cadastrado usa o **ciclo**: do dia seguinte ao fechamento anterior até o dia do fechamento (fecha dia 5: compra no dia 4 ou 5 entra na fatura desse mês; no dia 6, na seguinte; o período aparece no editor); sem fechamento, o mês inteiro;
   - **saldo anterior**: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais) passa para o mês seguinte;
   - contribuições, descontos e arredondamentos ficam **guardados** por perfil e mês.
 - **Páginas públicas** (sem login e sem JavaScript): `/sobre` (apresentação, página inicial informada ao Google), `/politica-privacidade` e `/termos-uso`; links na tela de entrada e em Configurações › Sobre.
@@ -28,6 +35,10 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 - **Segurança:** etapas da recuperação de senha limitadas por IP. TypeScript recusa código não usado.
 - **Back-end:** tipos conferidos com **mypy** (modo estrito) em todo `api/src`; a sessão de uma conta que não existe mais é encerrada (antes: erro 500). **FastAPI + Pydantic** vão no pacote do Worker (Pydantic 2.12.5, a versão compilada para o Pyodide; ~2,2 MB comprimido) e ficam **ligados na prévia**: todo JSON é validado com modelos estritos antes das regras de sempre. Produção continua no caminho direto até a prévia ser aprovada.
 - **Auditoria do frontend** ([docs/AUDITORIA-FRONTEND.md](docs/AUDITORIA-FRONTEND.md)): Transações sem travar com milhares de itens (abrir uma transação ~175 → 29 ms; marcar caixa ~775 → 40 ms); foco não se perde ao abrir uma linha pelo teclado; menu do celular fechado fora do Tab; prévia da fatura rolável pelo teclado; cabeçalho do painel sem sobreposição em 320 px; menu de perfis, esqueleto e títulos da fatura com a semântica certa; aviso laranja do câmbio legível; área de toque do ponto de cor com 24 px.
+- **Janela "O que há de novo no ZoZo":** aparece uma vez a cada versão nova, depois de entrar, com as novidades, melhorias e correções; "Ver notas completas" mostra todas as versões e Configurações › Sobre reabre a janela.
+- **Pagamento de fatura (tipo Fatura):** "Pagar fatura" cria duas transações do tipo **Fatura** (não dá para criar à mão): a do pagante (conta e perfil escolhidos, categoria "Fatura"), que aparece em Transações com a letra F, e a do cartão, que abate a dívida e aparece só no painel do cartão. Editar a do pagante (valor, data, conta, perfil, nome) atualiza as duas; o tipo não muda; excluir apaga as duas. Não conta como gasto nem no orçamento (as compras já contaram). Os pagamentos antigos (Débito + Receita) viram esse par ao abrir os dados, sem mudar nenhum saldo.
+- **Painel do cartão:** mostra a fatura aberta — fatura anterior e fatura atual sem sinal, as compras do ciclo sem sinal e o pagamento e os estornos com "−". Fatura anterior + transações = fatura atual, que é o saldo do cartão. **Outras contas:** as transações do mês atual (antes eram as 8 mais novas, e parcelas futuras escondiam o mês). Perfis: o mês atual.
+- **Transações:** com pesquisa ou filtro, o mês atual aparece com o título e o total (sem filtro, continua só para o leitor de tela).
 - **Ações sem volta com 2FA:** trocar a senha, desligar a proteção avançada e excluir a conta pedem o código atual do aplicativo (com 2FA ligado); excluir a conta pede que se digite EXCLUIR CONTA (não a senha) e manda um e-mail de aviso.
 - **Auditoria de segurança do back-end** ([docs/AUDITORIA-BACKEND.md](docs/AUDITORIA-BACKEND.md), ASVS 5.0 nível 2): JSON aninhado demais não gera mais erro 500 (agora 400) e o nome só aceita texto; dependências sem vulnerabilidades conhecidas (OSV). Pendências: código do 2FA para excluir a conta e desligar a proteção avançada, backup automático e ensaio de restauração.
 - **Interface:** sem o modo `?mock=1` (a demonstração e o Modo teste cobrem o uso sem servidor); nenhuma resposta da API sem tipo.

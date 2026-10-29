@@ -132,7 +132,8 @@
             .map(([nome, rotulo]) => ir(rotulo, () => app.tela(nome), false))),
           sub("Confirmação de e-mail e recuperação de senha"),
           linha(...([["verificar", "Verifique seu e-mail"], ["verificarRecuperacao", "Verifique (recuperação)"], ["linkInvalido", "Link inválido"],
-            ["redefinir", "Redefinir senha"], ["codigo", "Código do 2FA (recuperação)"], ["novaSenha", "Nova senha"], ["novaSenhaRecomecar", "Nova senha (recomeçar)"]] as Array<[string, string]>)
+            ["redefinir", "Redefinir senha"], ["codigo", "Código do 2FA (recuperação)"], ["novaSenha", "Nova senha"], ["novaSenhaRecomecar", "Nova senha (recomeçar)"],
+            ["novaSenhaSemCopia", "Nova senha (sem cópia da chave)"], ["novaSenhaRestaurada", "Nova senha (cópia anterior)"]] as Array<[string, string]>)
             .map(([nome, rotulo]) => ir(rotulo, () => app.tela(nome), false)))),
 
         secao("Painéis laterais", false,
@@ -143,6 +144,7 @@
             tipoLanc("estorno", "Estorno", (l) => l.tipo === "estorno"),
             tipoLanc("débito", "Débito", (l) => l.tipo === "debito"),
             tipoLanc("transferência", "Transferência", (l) => l.tipo === "interno"),
+            tipoLanc("pagamento de fatura", "Fatura", (l) => l.tipo === "fatura"),
             tipoLanc("recorrente", "Recorrente", (l) => l.tipo === "recorrente" && l.recorrencia !== "parcelada"),
             tipoLanc("parcelada", "Parcelada", (l) => l.recorrencia === "parcelada"),
             tipoLanc("dividida", "Dividida", (l) => !!l.divisao)),
@@ -168,6 +170,7 @@
             ["emprestimo", "Nova conta: empréstimo"], ["outros", "Nova conta: outros"]] as Array<[string, string]>)
             .map(([tipo, rotulo]) => ir(rotulo, () => ZoZo.modais.novaConta(ctx, tipo, {}))),
             ir("Pagar fatura", async () => ZoZo.modais.pagarFatura(ctx, await cartao())),
+            ir("Zo (assistente)", () => ZoZo.zo.abrir()),
             // abre a fatura do 1º perfil e, com os dados carregados, a janela do pagamento recebido
             ir("Fatura: pagamento recebido", async () => ZoZo.boleto.open(ctx, { perfilId: (await primeira(() => perfis(ctx), "perfil")).id, receber: true }))),
           sub("Categorias e perfis"),
@@ -188,6 +191,7 @@
               setTimeout(() => { const b = Array.from(document.querySelectorAll<HTMLButtonElement>(".modal button")).find((x) => /Ativar 2FA|Desativar 2FA/.test(x.textContent || "")); if (b) b.click(); }, 400);
             }),
             ir("2FA: desativar (código)", () => ZoZo.configuracoes.desativar2FA(ctx))),
+          linha(ir("Novidades da versão (O que há de novo)", () => ZoZo.novidades.abrir(), false)),
           sub("Confirmações de ação (os textos de cada uma; confirmar aqui não faz nada)"),
           linha(...CONFIRMACOES.map(([rotulo, titulo, mensagem, opts]) =>
             ir(rotulo, () => ZoZo.feedback.confirmarExclusao(titulo, mensagem, opts), false))),

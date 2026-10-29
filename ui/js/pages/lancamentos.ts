@@ -112,6 +112,7 @@
     { value: "regular", label: "Regular" },
     { value: "estorno", label: "Estorno" },
     { value: "recorrente", label: "Recorrente" },
+    { value: "fatura", label: "Fatura" },
   ];
 
   function intervalo(periodo: string | null): [Date, Date] | null {
@@ -137,7 +138,7 @@
   /* ---------------- Pesquisa (busca local: js/core/busca.ts) ----------------
      Os dados são cifrados de ponta a ponta, então a busca roda aqui. Campos e pesos: descrição pesa
      mais; valor e data entram em vários formatos ("1.234,56", "1234", "11/10", "outubro"). */
-  const TIPO_BUSCA: Record<string, string> = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito" };
+  const TIPO_BUSCA: Record<string, string> = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito", fatura: "fatura pagamento" };
   function valorBusca(v: unknown) {
     const n = Math.abs(F.numero(v)), inteiro = Math.trunc(n);
     return [F.moedaEditavel(n), n.toFixed(2).replace(".", ","), n.toFixed(2), String(inteiro), F.moedaEditavel(inteiro).replace(/,00$/, "")].join(" ");
@@ -604,13 +605,14 @@
             mesAtual = mes; diaAtual = null;
             // Total gasto do mês (mesma regra da barra de informações) à direita
             const doMes = porMes.get(mes) || [];
-            // "Mês Ano" e o total só nos meses passados; no mês atual, o título fica só para o leitor de tela
+            // "Mês Ano" e o total: sem filtro nem pesquisa, o mês atual fica só para o leitor de tela (a lista começa
+            // nele); com filtro ou pesquisa, todos os meses — inclusive o atual — aparecem com o título e o total
             const passado = mes < mesHoje;
             secao = h("section", { class: [T.mes, blocos.length && T.mesSeguinte, anim(blocos.length)] },
-              mes === mesHoje ? h("h2", { class: "tw:sr-only" }, F.mesAno(mes + "-01"))
+              mes === mesHoje && !filtrando ? h("h2", { class: "tw:sr-only" }, F.mesAno(mes + "-01"))
                 : h("header", { class: T.mesCab },
                   h("h2", { class: T.mesTitulo }, F.mesAno(mes + "-01")),
-                  passado ? h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto)) : null));
+                  passado || filtrando ? h("span", { class: T.mesTotal, title: "Total gasto no mês" }, F.moeda(totais(doMes).gasto)) : null));
             blocos.push(secao);
           }
           if (l.data !== diaAtual) {

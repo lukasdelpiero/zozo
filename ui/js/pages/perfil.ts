@@ -177,11 +177,13 @@
           C.detalheSecao(null, listaEl,
             h("div", { class: ZoZo.pecas.painelAcoesFim }, UI.Button("Ver todos", { variant: "text", size: "sm", onClick: () => verLancamentos(p, ctx) }))));
         ctx.loadData("lancamentos", A.getLancamentos).then((d) => {
-          const itens = d.lancamentos.filter((l) => l.perfilId === p.id).slice(0, 10);
+          // as do mês atual até hoje (o mesmo mês do "Gasto em"): as 10 mais novas eram, muitas vezes, parcelas futuras
+          const hoje = F.iso(new Date()), mes = hoje.slice(0, 7);
+          const itens = d.lancamentos.filter((l) => l.perfilId === p.id && l.data.startsWith(mes) && l.data <= hoje);
           mount(listaEl, itens.length
             // a transação abre aqui mesmo, com a seta para voltar a este perfil
             ? L.ListaPainel(itens, { onClick: (l: LancamentoTela) => { ZoZo.lancamentoPainel.abrir(l, ctx, { voltar: () => abrirDetalhe(daLista(p.id) || p, ctx, opts) }); } })
-            : UI.EmptyState("Nenhuma transação com este perfil."));
+            : UI.EmptyState("Nenhuma transação deste perfil no mês."));
         }).catch((e: ErroPonte) => mount(listaEl, UI.ErrorState(e.friendly)));
       },
     });
@@ -288,7 +290,7 @@
     // Número: sempre gerado aqui (nunca vem do usuário), fica numérico no Excel
     const numero = (v: number) => v.toFixed(2).replace(".", ",");
     const entra = (l: LancamentoTela) => ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
-    const tipos: Record<string, string> = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno" };
+    const tipos: Record<string, string> = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno", fatura: "Fatura" };
     const freq = ZoZo.servico.FREQUENCIAS;
     const comPerfil = ZoZo.recursos.perfis();             // coluna Perfil só para contas com o recurso
     const linhas = [["Data", "Nome", "Valor"].concat(moeda ? ["Moeda"] : [], ["Tipo", "Conta", "Categoria"], comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
@@ -536,8 +538,23 @@
   /**
    * Proteção avançada: sem cópia da chave no servidor — só você abre os dados, mas esqueceu a senha, a conta
    * recomeça vazia. Desligada (padrão): "Esqueci minha senha" recupera os dados pelo link do e-mail.
+   * Desligada mas sem a cópia guardada (falha na hora de guardar): aparece a linha "Recuperação pendente".
    */
-  function linhaProtecao(ctx: ContextoApp) {
+  function linhaProtecao(ctx: ContextoApp): FilhoDom[] {
+    const pendente = linhaConfig("Recuperação pendente",
+      "A cópia que permite recuperar seus dados por \u201cEsqueci minha senha\u201d ainda não foi guardada. Guarde agora com a sua senha.",
+      UI.Button("Guardar", { size: "sm", variant: "primary", onClick: () => {
+        ZoZo.modais.confirmarSeguro({ titulo: "Guardar a cópia de recuperação?", botao: "Guardar", senha: true,
+          mensagem: "Digite sua senha para guardar a cópia da chave que permite recuperar seus dados se você esquecer a senha.",
+          executar: ({ senha }) => ctx.bridge.request(A.repararRecuperacao, { senha }, { timeout: 120000 }).then(mostrar) })
+          .then((feito) => { if (feito) ctx.toast("Recuperação pela senha ativa.", { tone: "success" }); });
+      } }));
+    pendente.hidden = true;
+    const mostrar = (r: { avancada: boolean; recuperacao: boolean }) => {
+      entrada.checked = !!r.avancada;
+      pendente.hidden = !!r.avancada || !!r.recuperacao;
+      return r;
+    };
     const interruptor = ZoZo.modais.Interruptor("", false, (ligar) => {
       // desligar volta a guardar a cópia da chave no servidor: com 2FA, também o código atual
       const com2FA = !ligar && !!(store.get().session.user || {}).doisFatores;
@@ -545,18 +562,18 @@
       ZoZo.modais.confirmarSeguro(ligar
         ? { titulo: "Ativar proteção avançada?", botao: "Ativar", senha: true,
           mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar.",
-          executar: ({ senha }) => ctx.bridge.request(A.setProtecao, { avancada: true, senha }, { timeout: 120000 }) }
+          executar: ({ senha }) => ctx.bridge.request(A.setProtecao, { avancada: true, senha }, { timeout: 120000 }).then(mostrar) }
         : { titulo: "Desativar proteção avançada?", botao: "Desativar", senha: true, codigo2FA: com2FA,
           mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha"
             + (com2FA ? " e o código do seu aplicativo 2FA" : "") + " para confirmar.",
-          executar: ({ senha, codigo }) => ctx.bridge.request(A.setProtecao, { avancada: false, senha, codigo }, { timeout: 120000 }) })
-        .then((feito) => { entrada.checked = feito ? ligar : !ligar; })
+          executar: ({ senha, codigo }) => ctx.bridge.request(A.setProtecao, { avancada: false, senha, codigo }, { timeout: 120000 }).then(mostrar) })
+        .then((feito) => { if (!feito) entrada.checked = !ligar; })
         .finally(() => { entrada.disabled = false; });
     }, "Proteção avançada");
     const entrada = interruptor.querySelector("input") as HTMLInputElement;
     entrada.disabled = true;                            // até saber o estado atual
-    ctx.bridge.request(A.getProtecao).then((r: { avancada: boolean }) => { entrada.checked = !!r.avancada; entrada.disabled = false; }).catch(() => null);
-    return linhaConfig("Proteção avançada", "Só você abre seus dados. Se esquecer a senha, a conta recomeça vazia (sem recuperação pelo e-mail).", interruptor);
+    ctx.bridge.request(A.getProtecao).then((r) => { mostrar(r); entrada.disabled = false; }).catch(() => null);
+    return [linhaConfig("Proteção avançada", "Só você abre seus dados. Se esquecer a senha, a conta recomeça vazia (sem recuperação pelo e-mail).", interruptor), pendente];
   }
 
   function linhaConfig(titulo: string, sub: string | null, direita: FilhoDom) {
@@ -593,6 +610,8 @@
         conteudo = [
           h("h3", { class: "tw:m-0 tw:mb-(--space-2) tw:pb-(--space-2) tw:border-b tw:border-zz-border tw:text-(length:--t-15) tw:font-[550]" }, "Sobre"),
           linha("Versão", "ZoZo v" + ZoZo.sobre.versao),
+          linha("Novidades", h("button", { type: "button", class: "tw:[border:0] tw:bg-transparent tw:p-0 tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline",
+            onClick: () => ZoZo.novidades.abrir() }, "O que há de novo")),
           linha("Autor", ZoZo.sobre.autor),
           linha("Termos", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/termos-uso", target: "_blank", rel: "noopener" }, "Termos de uso")),
           linha("Privacidade", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade")),
@@ -636,13 +655,20 @@
           if (novaSenha.value.length < 8) { ctx.toast("Use uma nova senha com pelo menos 8 caracteres.", { tone: "error" }); novaSenha.focus(); return; }
           btn.disabled = true;
           const dados = { senhaAtual: senhaAtual.value, novaSenha: novaSenha.value };
-          const alterou = () => { senhaAtual.value = ""; novaSenha.value = ""; ctx.toast("Senha alterada.", { tone: "success", importante: true }); };
+          const alterou = (r?: RespostaDe<"changePassword"> | boolean) => {
+            senhaAtual.value = ""; novaSenha.value = "";
+            ctx.toast("Senha alterada.", { tone: "success", importante: true });
+            // a cópia nova da chave não foi guardada: a linha "Recuperação pendente" aparece ao redesenhar
+            if (r && typeof r === "object" && r.recuperacaoPendente) { ctx.toast("Guarde a cópia de recuperação em Configurações › Conta.", { tone: "aviso" }); redesenhar(); }
+          };
+          let resposta: RespostaDe<"changePassword"> | undefined;
           if (u.doisFatores) {
             // com 2FA, trocar a senha pede o código atual do aplicativo (o servidor confere)
             ZoZo.modais.confirmarSeguro({ titulo: "Trocar a senha?", botao: "Trocar senha", codigo2FA: true,
               mensagem: "Para trocar a senha, digite o código atual do seu aplicativo 2FA.",
-              executar: ({ codigo }) => depoisDasGravacoes(() => ctx.bridge.request(A.changePassword, Object.assign({ codigo }, dados), { timeout: 120000 })) })
-              .then((feito) => { if (feito) alterou(); })
+              executar: ({ codigo }) => depoisDasGravacoes(() => ctx.bridge.request(A.changePassword, Object.assign({ codigo }, dados), { timeout: 120000 }))
+                .then((r) => { resposta = r; }) })
+              .then((feito) => { if (feito) alterou(resposta); })
               .finally(() => { btn.disabled = false; });
             return;
           }

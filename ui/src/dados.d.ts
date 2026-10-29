@@ -15,7 +15,8 @@ declare global {
   type Moeda = CodigoMoeda;
   type Sentido = "entrada" | "saida";
   type TipoConta = "cartao" | "corrente" | "poupanca" | "investimento" | "emprestimo" | "outros";
-  type TipoLancamento = "regular" | "recorrente" | "interno" | "receita" | "estorno" | "debito";
+  /** "fatura": pagamento de fatura (só o "Pagar fatura" cria; não está nos menus de tipo) */
+  type TipoLancamento = "regular" | "recorrente" | "interno" | "receita" | "estorno" | "debito" | "fatura";
 
   interface PontoSaldo { data: string; saldo: number }
   interface CicloCartao { fechamento: number | null; vencimento: number | null }
@@ -41,8 +42,10 @@ declare global {
     moeda?: Moeda; debito?: boolean; valorParcela?: number; valorTotal?: number; efeito?: Efeito; divisao?: Divisao | null;
     automatico?: boolean; editado?: boolean; ignorados?: string[]; ocorrencia?: string; valorInvalido?: boolean;
     debitado?: { contaId: Id; valor: number };          // formato anterior (2.8–3.1)
-    /** "Pagar fatura": o par débito (conta) + receita (cartão) do pagamento do CARTÃO ao banco (não é cobrança de perfil) */
+    /** Formato anterior do "Pagar fatura" (débito na conta + receita no cartão): convertido para o tipo "fatura" ao abrir */
     pagamentoCartao?: boolean;
+    /** Pagamento de fatura (tipo "fatura"): as duas transações têm o mesmo grupo; "pagante" aparece em Transações, "cartao" não */
+    pagamento?: { grupo: Id; lado: "pagante" | "cartao" };
     /** Receita que quita a fatura de um perfil: o mês ("AAAA-MM") da fatura paga (o perfil é o do lançamento) */
     faturaPerfil?: string;
   }
@@ -65,7 +68,9 @@ declare global {
   /* ---------------- o que as telas recebem ---------------- */
   type ResumoCategoria = { nome: string; icone: string; cor: string | null };
   /** Lançamento como a interface o recebe: com nome da conta, categoria e perfil */
-  type LancamentoTela = Lancamento & { nomeConta: string; ultimos4Digitos: string; categoria: ResumoCategoria | null; perfil: { nome: string; cor: string | null } | null };
+  /** parFatura: no pagamento de fatura, o id da outra transação do par (a do cartão abre a do pagante) */
+  type LancamentoTela = Lancamento & { nomeConta: string; ultimos4Digitos: string; categoria: ResumoCategoria | null; perfil: { nome: string; cor: string | null } | null;
+    parFatura?: Id | null };
   interface ContaTela {
     id: Id; nome: string; ultimos4Digitos: string; tipo: string; tipoInvestimento: string; oculta: boolean; cor: string | null | undefined;
     instituicao: string; limite: number | null; fechamento: number | null; vencimento: number | null; ciclos: Record<string, CicloCartao>;
@@ -87,6 +92,15 @@ declare global {
   interface ValorVariacao { valor: number; variacaoPercentual: number }
 
   interface RespostaLancamentos { lancamentos: LancamentoTela[] }
+  /**
+   * Painel da conta. Cartão: a fatura ABERTA (mes = mês do fechamento; de inicio até o dia antes de fechamento),
+   * com a fatura anterior (dívida de antes do ciclo), cada lançamento com o valor na fatura (compra negativa,
+   * pagamento/estorno positivo) e o total (dívida de agora): anterior + lançamentos = total. Outras contas: o mês atual.
+   */
+  type ExtratoConta =
+    | { tipo: "mes"; mes: string; lancamentos: LancamentoTela[] }
+    | { tipo: "fatura"; mes: string; inicio: string | null; fechamento: string | null; anterior: number; total: number;
+        lancamentos: Array<LancamentoTela & { naFatura: number }> };
   interface RespostaContas {
     contas: ContaTela[];
     resumo: { ativos: ValorVariacao; passivos: ValorVariacao; serie: Array<{ data: string; ativos: number; passivos: number }> };
@@ -110,8 +124,9 @@ declare global {
     gastoMensal: { mes: string; dias: Array<{ data: string; valor: number }>; total: number; orcamento: number; ultimoDia: number };
     contas: RespostaContas; categorias: RespostaCategorias; recorrencias: RespostaRecorrencias; ultimosLancamentos: LancamentoTela[];
   }
+  /** todos: perfil "Todos"; cartaoId: o cartão escolhido (null = todos); consulta: sem ajustes, recebidos, saldo anterior e Pix */
   interface RespostaFatura {
-    perfil: Perfil | null; mes: string; moeda: Moeda;
+    perfil: Perfil | null; todos: boolean; cartaoId: Id | null; consulta: boolean; mes: string; moeda: Moeda;
     lancamentos: LancamentoTela[];
     ajustes: FaturaGuardada;
     periodos: Array<{ contaId: Id; nome: string; ultimos4Digitos: string; inicio: string; fim: string; semFechamento: boolean }>;
@@ -129,7 +144,9 @@ declare global {
     getPerfis: RespostaPerfis;
     getConfig: RespostaConfig;
     getContaHistorico: { conta: ContaTela; diferenca: number; serie: Array<{ data: string; valor: number }> };
+    getExtratoConta: ExtratoConta;
     getCategoriaSerie: { meses: Array<{ mes: string; gasto: number }>; reservado: number };
+    sugerirCategorias: { sugestoes: Array<{ categoriaId: Id | null; nome: string | null; alternativas: Array<{ categoriaId: Id; nome: string; pontos: number }> }> };
     getSerieRecorrencia: { pontos: Array<{ mes: string; data: string; valor: number; pago: boolean; futuro: boolean }>; lancamentos: LancamentoTela[] };
     getDashboard: RespostaDashboard;
     getBoletoData: RespostaFatura;
@@ -139,7 +156,7 @@ declare global {
   /** Todas as ações da ponte (js/bridge/messages.ts: ACTIONS[nome] === nome) */
   type NomeAcao = NomeLeitura
     | "getSession" | "registerUser" | "reenviarConfirmacao" | "conferirLink" | "pedirRecuperacao" | "abrirRecuperacao" | "concluirRecuperacao"
-    | "getProtecao" | "setProtecao" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
+    | "getProtecao" | "setProtecao" | "repararRecuperacao" | "zoConsentimento" | "zoConversar" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
     | "createLancamento" | "updateLancamento" | "deleteLancamento" | "updateUser" | "changePassword" | "wipeUserData" | "deleteUser"
     | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "loadUserData" | "saveUserData"
     | "createConta" | "updateConta" | "updateCicloCartao" | "deleteConta"
@@ -147,9 +164,18 @@ declare global {
     | "createPerfil" | "updatePerfil" | "deletePerfil" | "arquivarPerfil"
     | "updateLancamentosEmLote" | "deleteLancamentos" | "updateConfig"
     | "pagarRecorrencia" | "encerrarRecorrencia" | "excluirRecorrencia" | "tornarRecorrente" | "vincularRecorrencia" | "desvincularRecorrencia"
-    | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura"
+    | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura" | "importarLancamentos"
     | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
+  /* ---------------- Zo, o assistente ---------------- */
+  /** Chamada de ferramenta escolhida pelo Zo (argumentos em JSON, conferidos no navegador antes de usar) */
+  interface ChamadaZo { id: string; nome: string; argumentos: string }
+  interface RespostaZo { texto: string | null; chamadas: ChamadaZo[] }
+  /** Uma mensagem da conversa como a API recebe (sem papel de sistema: as instruções ficam no servidor) */
+  type MensagemZo = { papel: "usuario"; texto: string } | { papel: "assistente"; texto: string | null; chamadas: ChamadaZo[] }
+    | { papel: "ferramenta"; id: string; resultado: string };
+  /** Por que a recuperação não traz os dados: escolha da pessoa, cópia ainda não guardada, cópia que não abre, dados ilegíveis */
+  type MotivoRecuperacao = "avancada" | "sem_copia" | "copia_invalida" | "dados_ilegiveis";
   /** Sessão como a interface a recebe; doisFatores sem authenticated = falta o código do 2FA */
   interface RespostaSessao { authenticated: boolean; user?: UsuarioSessao | null; email?: string; doisFatores?: boolean }
   interface RespostasHost {
@@ -164,16 +190,24 @@ declare global {
     reenviarConfirmacao: { enviado: boolean };
     conferirLink: { email: string; ativa: boolean };
     pedirRecuperacao: { enviado: boolean };
-    /** manter: os dados abrem com a cópia da chave (false = a conta recomeça vazia) */
-    abrirRecuperacao: { email: string; manter: boolean };
+    /**
+     * manter: os dados abrem com a cópia da chave (false = a conta só recomeça vazia, depois de confirmar; motivo diz por quê).
+     * restaurada: o documento atual não abria e voltou a cópia mais recente do histórico. descartadas: cópias que não abriram.
+     */
+    abrirRecuperacao: { email: string; manter: boolean; motivo: MotivoRecuperacao | null;
+      restaurada: { versao: number; quando: string | null } | null; descartadas: number };
     concluirRecuperacao: { email: string; recomecou: boolean };
     getProtecao: { avancada: boolean; recuperacao: boolean };
     setProtecao: { avancada: boolean; recuperacao: boolean };
+    repararRecuperacao: { avancada: boolean; recuperacao: boolean };
+    zoConsentimento: { aceito: boolean };
+    zoConversar: RespostaZo;
     verificarAtualizacao: { mudou: boolean; versao?: number };
     /** documento decifrado (o serviço confere tudo em normalizar); aviso: restaurado da cópia, documento sumido… */
     loadUserData: { documento: unknown; aviso: string | null; somenteLeitura?: boolean };
     saveUserData: { salvo: boolean };
-    changePassword: { alterada: boolean };
+    /** recuperacaoPendente: a senha mudou, mas a cópia nova da chave não foi guardada (Configurações › Conta repara) */
+    changePassword: { alterada: boolean; recuperacaoPendente?: boolean };
     updateUser: RespostaSessao;
     wipeUserData: { apagado: boolean };
     deleteUser: { excluido: boolean };
@@ -197,7 +231,8 @@ declare global {
     dividirLancamento: { id: Id; grupo: string };
     salvarFatura: { ok: boolean };
     receberFatura: { lancamento: LancamentoTela };
-    pagarFatura: { debito: LancamentoTela; receita: LancamentoTela };
+    pagarFatura: { pagamento: LancamentoTela; cartao: LancamentoTela };
+    importarLancamentos: { importados: number; repetidos: number };
     createConta: { conta: ContaTela };
     updateCicloCartao: { conta: ContaTela };
     updateConta: { conta: ContaTela; id: Id; cor: string | null | undefined };

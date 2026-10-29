@@ -17,6 +17,7 @@ import "../js/core/format.ts";
 import "../js/core/busca.ts";
 import "../js/core/state.ts";
 import "../js/config/regras.ts";
+import "../js/config/novidades.ts";            // notas de cada versão (janela "O que há de novo")
 
 // Bridge: contrato de mensagens
 import "../js/bridge/messages.ts";
@@ -28,6 +29,8 @@ import "../js/bridge/host-web.ts";
 import "../js/data/pix.ts";
 import "../js/data/demo.ts";
 import "../js/data/servico.ts";
+import "../js/data/importar.ts";                 // ler CSV/OFX do banco (no navegador)
+import "../js/data/zo.ts";                       // Zo: ferramentas (rodam no navegador, pelo serviço de dados)
 
 // Bridge: transporte
 import "../js/bridge/transporte.ts";
@@ -52,6 +55,8 @@ import "../js/components/cambio.ts";
 import "../js/components/detail-panel.ts";
 import "../js/components/verificacao.ts";
 import "../js/components/auth.ts";
+import "../js/components/novidades.ts";
+import "../js/components/zo.ts";                 // Zo: botão flutuante e janela de conversa
 
 // Páginas
 import "../js/router.ts";

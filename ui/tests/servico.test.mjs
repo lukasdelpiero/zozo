@@ -334,6 +334,50 @@ test("compra no cartão aumenta a fatura; estorno e pagamento diminuem", async (
   assert.equal(await saldo(t, cartao.id), -250);                                  // excluiu: devolve
 });
 
+const mesMais = (n) => { const d = new Date(); const x = new Date(d.getFullYear(), d.getMonth() + n, 1); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0"); };
+const diaDoMes = (n, dia) => mesMais(n) + "-" + String(dia).padStart(2, "0");
+const amanha = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+const soma = (ls) => Math.round(ls.reduce((s, l) => s + l.naFatura * 100, 0)) / 100;
+
+const diaHoje = () => new Date().getDate();
+for (const [rotulo, comFechamento] of [["cartão que fecha hoje (o dia do fechamento ainda é desta fatura)", true], ["cartão sem fechamento (ciclo = mês do calendário)", false]]) {
+  test("painel da conta: " + rotulo + " — fatura anterior, compras e pagamento somam a fatura atual", async () => {
+    const t = carregar({ recursos: { perfis: false, boleto: false, pix: false, cambio: false } });
+    const { conta: banco } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 1000 } });
+    const { conta: cartao } = await t.req(t.A.createConta, { conta: Object.assign({ nome: "Bradesco", tipo: "cartao", saldo: 0 }, comFechamento ? { fechamento: diaHoje(), vencimento: 10 } : {}) });
+    // fatura anterior: compra de dois meses atrás (antes de qualquer ciclo que contém hoje)
+    await t.req(t.A.createLancamento, { lancamento: { data: diaDoMes(-2, 15), descricao: "Viagem", valor: 300, tipo: "regular", contaId: cartao.id } });
+    await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: banco.id, valor: 300 });                      // paga a anterior (hoje)
+    await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Mercado", valor: 120, tipo: "regular", contaId: cartao.id } });
+    await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Devolução", valor: 20, tipo: "estorno", contaId: cartao.id } });
+    await t.req(t.A.createLancamento, { lancamento: { data: amanha(), descricao: "Futura", valor: 999, tipo: "regular", contaId: cartao.id } });
+    const e = await t.req(t.A.getExtratoConta, { id: cartao.id });
+    assert.equal(e.tipo, "fatura");
+    assert.equal(e.mes, mesMais(0));                                          // fecha hoje: ainda é a fatura deste mês
+    if (comFechamento) assert.equal(e.fechamento, hoje());
+    assert.equal(e.anterior, 300);                                           // o que se devia antes do ciclo, sem sinal
+    assert.deepEqual([...e.lancamentos].map((l) => [l.descricao, l.naFatura]).sort(),
+      [["Devolução", -20], ["Mercado", 120], ["Pagamento fatura", -300]]);   // compra sem sinal; pagamento e estorno negativos
+    assert.equal(e.total, 100);                                              // a fatura atual = a dívida de agora
+    assert.equal(Math.round((e.anterior + soma(e.lancamentos)) * 100) / 100, e.total);   // as linhas fecham o total
+    assert.equal(e.total, await saldo(t, cartao.id));                        // e o total é o saldo do cartão
+    assert.ok(!e.lancamentos.some((l) => l.descricao === "Futura" || l.descricao === "Viagem"));
+  });
+}
+
+test("painel da conta: conta comum mostra só as transações do mês atual (nem as antigas, nem as futuras)", async () => {
+  const t = carregar();
+  const { conta } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 1000 } });
+  await t.req(t.A.createLancamento, { lancamento: { data: diaDoMes(-1, 10), descricao: "Antiga", valor: 10, tipo: "debito", contaId: conta.id } });
+  await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Deste mês", valor: 20, tipo: "debito", contaId: conta.id } });
+  await t.req(t.A.createLancamento, { lancamento: { data: diaDoMes(1, 5), descricao: "Futura", valor: 30, tipo: "debito", contaId: conta.id } });
+  const e = await t.req(t.A.getExtratoConta, { id: conta.id });
+  assert.equal(e.tipo, "mes");
+  assert.equal(e.mes, mesMais(0));
+  assert.deepEqual([...e.lancamentos].map((l) => l.descricao), ["Deste mês"]);
+  await assert.rejects(t.req(t.A.getExtratoConta, { id: "naoexiste" }));
+});
+
 test("receita e transferências mudam o saldo da conta; regular não", async () => {
   const t = carregar();
   const { conta } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 1000 } });
