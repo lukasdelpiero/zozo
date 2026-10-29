@@ -849,7 +849,7 @@
     },
     async zoConversar(d) {
       const s = exigirConta();
-      if (simulada(s)) return { texto: "Modo teste. O Zo de verdade responde com a API local ou na prévia.", chamadas: [] };
+      if (simulada(s)) return { texto: "Esta é uma conta de teste, então eu não falo com o servidor. Para conversar comigo de verdade, entre com uma conta criada na prévia ou no servidor local.", chamadas: [] };
       const r = await comProvaDaSessao(() => api("POST", "/zo", { mensagens: d && Array.isArray(d.mensagens) ? d.mensagens : [] }, s.prova));
       const chamadas = r && Array.isArray(r.chamadas) ? r.chamadas.filter((c: RespostaApi) => c && typeof c.id === "string" && typeof c.nome === "string" && typeof c.argumentos === "string")
         .map((c: RespostaApi) => ({ id: c.id as string, nome: c.nome as string, argumentos: c.argumentos as string })) : [];
