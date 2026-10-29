@@ -80,7 +80,7 @@
     <p>Como a senha é a chave dos seus dados, esquecê-la poderia significar perder tudo. Por isso, <strong>por padrão</strong>, o seu navegador guarda no servidor uma cópia da chave dos dados, trancada com uma chave que só o servidor do ZoZo consegue calcular. Em "Esqueci minha senha", depois de confirmar o e-mail (e o código do 2FA, se estiver ativo), essa cópia é usada para você criar uma senha nova sem perder nada.</p>
     <p>Na prática, isso significa que quem tivesse ao mesmo tempo o banco de dados <strong>e</strong> a chave secreta do servidor conseguiria abrir os dados dessas contas. Guardamos essa chave separada do banco, com acesso restrito.</p>
     <p>Se preferir que só você consiga abrir os seus dados, ative a <strong>Proteção avançada</strong> em Configurações › Conta. A cópia é apagada do servidor na hora. Nesse modo, se você esquecer a senha, a conta recomeça vazia: ninguém, nem o ZoZo, consegue recuperar os dados.</p>
-    <p>As cópias de segurança do banco feitas antes de você ligar a Proteção avançada ainda contêm a cópia antiga da chave, até vencerem (em até 90 dias). Elas são cifradas e guardadas com acesso restrito.</p>
+    <p>As cópias de segurança do banco feitas antes de você ligar a Proteção avançada ainda contêm a cópia antiga da chave, pelo prazo explicado em <a href="#retencao">Por quanto tempo os dados ficam guardados</a>. Elas são cifradas e guardadas com acesso restrito.</p>
 
     <h2 id="finalidades">Para que usamos os dados?</h2>
     <ul>
@@ -98,7 +98,7 @@
       <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques e o CAPTCHA (Turnstile) do cadastro e do login.</li>
       <li><strong>Resend:</strong> envio dos e-mails do ZoZo (recebe o seu endereço e o conteúdo do e-mail).</li>
       <li><strong>Google:</strong> só se você escolher "Continuar com Google". Recebemos o seu e-mail confirmado e o seu primeiro nome. A senha do ZoZo continua sendo necessária.</li>
-      <li><strong>GitHub:</strong> guarda cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente.</li>
+      <li><strong>GitHub e Google Drive:</strong> guardam as cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente. Sem a chave, que fica só com o responsável pelo ZoZo, elas não podem ser abertas.</li>
     </ul>
     <p>Esses serviços podem processar dados fora do Brasil, com garantias contratuais de proteção previstas na LGPD (art. 33). Também podemos ter de entregar informações a autoridades, quando a lei ou uma ordem judicial exigir. Mesmo assim, os dados financeiros continuam cifrados.</p>
 
@@ -118,7 +118,8 @@
       <li><strong>Conta ativa:</strong> enquanto você usar o ZoZo.</li>
       <li><strong>Cadastro não confirmado:</strong> apagado depois de 7 dias.</li>
       <li><strong>Links de confirmação e de recuperação:</strong> valem 24 horas e 1 hora, respectivamente, e só podem ser usados uma vez.</li>
-      <li><strong>Exclusão da conta:</strong> a conta, os dados e as versões anteriores saem do banco na hora. As cópias de segurança do banco, cifradas, vencem em até 90 dias e os registros de segurança, em poucos dias.</li>
+      <li><strong>Exclusão da conta:</strong> a conta, os dados e as versões anteriores saem do banco na hora. Os registros de segurança somem em poucos dias.</li>
+      <li><strong>Cópias de segurança do banco:</strong> são cifradas e guardam o banco do dia em que foram feitas, inclusive de contas excluídas depois. As do GitHub vencem em 30 dias. As do Google Drive ficam guardadas sem prazo para apagar, para permitir restaurar o serviço depois de um problema grave; elas só são abertas para isso.</li>
     </ul>
 
     <h2 id="excluir">Posso excluir minha conta quando eu quiser?</h2>
