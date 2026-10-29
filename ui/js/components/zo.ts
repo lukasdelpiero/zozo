@@ -274,7 +274,8 @@
     let gravou = false;
     try {
       for (let rodada = 0; rodada < MAX_RODADAS; rodada += 1) {
-        const r = await c.bridge.request(A.zoConversar, { mensagens: recentes() }, { timeout: 60000 });
+        // o servidor desiste do Gemini em 20 s (zo.TEMPO_LIMITE_S) e avisa; aqui a espera é um pouco maior, para o aviso chegar
+        const r = await c.bridge.request(A.zoConversar, { mensagens: recentes() }, { timeout: 30000 });
         if (minha !== geracao) return;
         historico.push({ papel: "assistente", texto: r.texto, chamadas: r.chamadas });
         if (r.texto && r.texto.trim()) { digitando(false); bolha(r.texto.trim(), "bot"); }

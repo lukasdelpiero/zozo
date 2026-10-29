@@ -135,11 +135,14 @@ class FakeServicos:
             if categoria:                                  # filtro de segurança do Gemini barrou a fala
                 return 200, json.dumps({"promptFeedback": {"blockReason": "SAFETY",
                                                            "safetyRatings": [{"category": categoria, "probability": "HIGH", "blocked": True}]}})
+            if self.gemini_atraso:
+                await asyncio.sleep(self.gemini_atraso)
             return self.gemini_status, self.gemini_resposta[:limite]
         return 404, ""
 
-    # Gemini falso (Zo): o que foi pedido, o que ele responde e as falas que o filtro de segurança barra
+    # Gemini falso (Zo): o que foi pedido, o que ele responde, quanto demora e as falas que o filtro de segurança barra
     gemini_status = 200
+    gemini_atraso = 0.0
     gemini_resposta = json.dumps({"candidates": [{"content": {"role": "model", "parts": [{"text": "Oi, eu sou o Zo."}]}, "finishReason": "STOP"}]})
     bloquear: dict = {}
 
@@ -1629,6 +1632,39 @@ class TesteZo(Base):
         self.assertEqual(self.falar(u), (502, {"erro": "ZO_FAILED"}))
         self.serv.gemini_status = 429
         self.assertEqual(self.falar(u), (429, {"erro": "ZO_BUSY"}))                            # cota gratuita esgotada
+
+    def test_gemini_lento_demais_vira_aviso_rapido(self):
+        # o Gemini já levou 126 s: passou do limite, a pessoa recebe o aviso do Zo em vez de esperar
+        self.consentir()
+        u = [{"papel": "usuario", "texto": "oi"}]
+        limite, zo.TEMPO_LIMITE_S = zo.TEMPO_LIMITE_S, 0.05
+        try:
+            self.serv.gemini_atraso = 2
+            inicio = time.monotonic()
+            self.assertEqual(self.falar(u), (504, {"erro": "ZO_TIMEOUT"}))
+            self.assertLess(time.monotonic() - inicio, 1)
+            self.assertIn('"zo_demorou"', " ".join(self.zo.logs))
+            self.serv.gemini_atraso = 0                                                        # no tempo: responde normal
+            self.assertEqual(self.falar(u), (200, {"texto": "Oi, eu sou o Zo.", "chamadas": []}))
+        finally:
+            zo.TEMPO_LIMITE_S = limite
+        self.assertIn('"zo_tempo"', " ".join(self.zo.logs))                                     # quanto o Gemini levou vai para os logs
+
+    def test_raciocinio_minimo_conforme_o_modelo(self):
+        self.assertEqual(zo.raciocinio("gemini-3.8-flash"), {"thinkingLevel": "low"})
+        self.assertEqual(zo.raciocinio("gemini-3-pro-preview"), {"thinkingLevel": "low"})
+        self.assertEqual(zo.raciocinio("gemini-2.5-flash"), {"thinkingBudget": 0})
+        self.assertEqual(zo.raciocinio("gemini-2.5-flash-lite"), {"thinkingBudget": 0})
+        self.assertEqual(zo.raciocinio("gemini-2.5-pro"), {"thinkingBudget": 128})
+        for sem in ("gemini-2.0-flash", "gemini-teste", "outro-modelo"):
+            self.assertIsNone(zo.raciocinio(sem), sem)
+        self.consentir()
+        modelo = Cliente(self.banco, self.serv, dict(CONFIG_ZO, ZO_MODELO="gemini-3.8-flash"))
+        modelo.cookies = dict(self.api.cookies)
+        self.assertEqual(self.falar([{"papel": "usuario", "texto": "oi"}], cli=modelo)[0], 200)
+        self.assertEqual(self.serv.gemini[-1]["generationConfig"]["thinkingConfig"], {"thinkingLevel": "low"})
+        self.falar([{"papel": "usuario", "texto": "oi"}])                                       # modelo desconhecido: padrão dele
+        self.assertNotIn("thinkingConfig", self.serv.gemini[-1]["generationConfig"])
 
     def test_ofensa_e_discriminacao_nao_sao_toleradas(self):
         # o filtro de segurança barra a fala: resposta fixa de respeito; repetida, o Zo pausa no dia

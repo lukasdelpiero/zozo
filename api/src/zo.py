@@ -32,6 +32,7 @@ LIMITE_CHAMADAS = 8
 LIMITE_TOTAL = 120_000           # caracteres somados da conversa
 LIMITE_RESPOSTA = 200_000        # bytes lidos da resposta do Gemini
 MAX_TOKENS = 4096                # inclui o "raciocínio" dos modelos que pensam antes de responder
+TEMPO_LIMITE_S = 20              # espera máxima pelo Gemini; o navegador espera um pouco mais (components/zo.ts)
 
 # Filtro de segurança do Gemini: ódio e assédio barrados já no nível baixo; o resto no padrão médio
 SEGURANCA = [
@@ -303,15 +304,35 @@ def url(modelo: str) -> str:
     return GEMINI_URL.format(modelo=modelo)
 
 
-def montar_pedido(mensagens: list[dict[str, Any]], contexto: str) -> str:
+def raciocinio(modelo: str) -> dict[str, Any] | None:
+    """
+    Raciocínio mínimo: os pedidos do Zo são curtos (criar, buscar, resumir) e pensar demais só atrasa a resposta.
+    Gemini 3 em diante: nível "low" (aceito por todos os modelos 3). Gemini 2.5 Flash: desligado (orçamento 0);
+    2.5 Pro: o mínimo que ele aceita (128). Outros: o padrão do modelo.
+    """
+    m = re.match(r"gemini-(\d+)(?:\.(\d+))?-", modelo)
+    if not m:
+        return None
+    if int(m.group(1)) >= 3:
+        return {"thinkingLevel": "low"}
+    if m.group(1) == "2" and m.group(2) == "5":
+        return {"thinkingBudget": 0 if "flash" in modelo else 128}
+    return None
+
+
+def montar_pedido(mensagens: list[dict[str, Any]], contexto: str, modelo: str = "") -> str:
     """Corpo do pedido ao Gemini: instruções do servidor + contexto do dia + a conversa conferida."""
+    geracao: dict[str, Any] = {"maxOutputTokens": MAX_TOKENS, "temperature": 0.3}
+    pensar = raciocinio(modelo)
+    if pensar:
+        geracao["thinkingConfig"] = pensar
     return json.dumps({
         "systemInstruction": {"parts": [{"text": INSTRUCOES + "\n\nContexto\n" + contexto}]},
         "contents": mensagens,
         "tools": [{"functionDeclarations": DECLARACOES}],
         "toolConfig": {"functionCallingConfig": {"mode": "AUTO"}},
         "safetySettings": SEGURANCA,
-        "generationConfig": {"maxOutputTokens": MAX_TOKENS, "temperature": 0.3},
+        "generationConfig": geracao,
     }, ensure_ascii=False)
 
 

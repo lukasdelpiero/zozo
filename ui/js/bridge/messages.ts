@@ -153,6 +153,7 @@
     ZO_PAUSED: "O Zo fez uma pausa por hoje por causa de mensagens ofensivas. Amanhã ele volta a responder.",
     ZO_UNAVAILABLE: "O Zo ainda não está disponível. Tente de novo mais tarde.",
     ZO_FAILED: "O Zo não conseguiu responder agora. Tente de novo em instantes.",
+    ZO_TIMEOUT: "O Zo demorou demais para responder. Tente de novo em instantes.",
     IMPORT_ACCOUNT: "Escolha uma conta da moeda atual para importar.",
     IMPORT_INVALID: "O arquivo tem uma linha que não deu para importar. Nada foi importado: confira o arquivo e tente de novo.",
     ZO_BUSY: "O Zo está com muitos pedidos agora. Tente de novo em alguns minutos.",

@@ -43,6 +43,7 @@ o e-mail de outra pessoa com uma senha própria e esperar que ela clique. A resp
 a mesma para e-mail novo ou já cadastrado (não revela quem tem conta). Derivação da senha no navegador: PBKDF2 (contas antigas)
 ou Argon2id (kdf "argon2id-1": contas novas e senhas trocadas).
 """
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -1247,7 +1248,16 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     contexto = (f"Hoje é {dia.tm_mday:02d}/{dia.tm_mon:02d}/{dia.tm_year} ({time.strftime('%Y-%m-%d', dia)}). "
                 f"Perfis {'disponíveis' if av else 'indisponíveis'} nesta conta. Fatura de perfis {'disponível' if av else 'indisponível'}.")
     cab = {"x-goog-api-key": chave, "Content-Type": "application/json"}
-    status, texto = await ctx.servicos.http_post_json(endereco, cab, zo.montar_pedido(mensagens, contexto), zo.LIMITE_RESPOSTA)
+    # Tempo limite: o Gemini já levou 126 s e o navegador desistiu antes, com o erro genérico. Passou do limite,
+    # a pessoa recebe na hora o aviso do Zo (a chamada que ficou para trás é descartada).
+    inicio = time.monotonic()
+    try:
+        status, texto = await asyncio.wait_for(
+            ctx.servicos.http_post_json(endereco, cab, zo.montar_pedido(mensagens, contexto, modelo), zo.LIMITE_RESPOSTA), zo.TEMPO_LIMITE_S)
+    except TimeoutError as ex:
+        ctx.evento("zo_demorou", email, ms=int((time.monotonic() - inicio) * 1000))
+        raise Falha(504, "ZO_TIMEOUT") from ex
+    ctx.evento("zo_tempo", email, ms=int((time.monotonic() - inicio) * 1000), status=status)
     if status != 200:
         ctx.evento("zo_falhou", email, status=status)
         raise Falha(429, "ZO_BUSY") if status == 429 else Falha(502, "ZO_FAILED")    # 429: cota gratuita do Gemini

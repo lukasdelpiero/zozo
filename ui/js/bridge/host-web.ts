@@ -169,7 +169,7 @@
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
     if (r.status === 429) throw erro(["ZO_LIMIT", "ZO_PAUSED", "ZO_BUSY"].includes(codigo) ? codigo : "TOO_MANY_ATTEMPTS", extra);
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
-    if (codigo === "ZO_UNAVAILABLE" || codigo === "ZO_FAILED") throw erro(codigo);          // Zo desligado ou Gemini fora
+    if (["ZO_UNAVAILABLE", "ZO_FAILED", "ZO_TIMEOUT"].includes(codigo)) throw erro(codigo); // Zo desligado, Gemini fora ou lento demais
     throw erro("STORAGE_UNAVAILABLE");
   }
   const parametros = (email: string) => api("GET", "/conta/parametros?email=" + encodeURIComponent(normalizarEmail(email)));
