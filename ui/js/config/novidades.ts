@@ -11,10 +11,21 @@
 
   const NOTAS: readonly NotaVersao[] = [
     {
-      versao: "3.18.0", quando: "outubro de 2026",
+      versao: "3.19.0", quando: "outubro de 2026",
       itens: [
         { icone: "💬", tipo: "novo", titulo: "Conheça o Zo",
-          texto: "Toque no Z no canto da tela e peça ao Zo para lançar uma compra, importar o arquivo do seu banco ou resumir o seu mês." },
+          texto: "Toque no Z no canto da tela e peça ao Zo para lançar uma compra, editar uma categoria ou resumir o seu mês." },
+        { icone: "📥", tipo: "novo", titulo: "Importe o arquivo do seu banco",
+          texto: "Mande o CSV ou o OFX da fatura ou do extrato pelo clipe do Zo, confira a lista e importe tudo de uma vez, sem repetir o que já existe." },
+        { icone: "🏷️", tipo: "novo", titulo: "Categorias num toque",
+          texto: "Peça ao Zo para categorizar as transações sem categoria. Ele usa o seu histórico e você confirma antes." },
+        { icone: "🛠️", tipo: "correcao", titulo: "Pequenos ajustes",
+          texto: "O pagamento de fatura lançado à mão no cartão não entra mais na cobrança dos perfis, e o menu lateral ficou mais limpo." },
+      ],
+    },
+    {
+      versao: "3.18.0", quando: "outubro de 2026",
+      itens: [
         { icone: "💳", tipo: "melhoria", titulo: "Fatura do cartão mais clara",
           texto: "Agora você vê a fatura anterior, as compras do mês e a fatura atual, e o pagamento da fatura aparece como uma transação só." },
         { icone: "🗂️", tipo: "novo", titulo: "Fatura de todos os perfis",

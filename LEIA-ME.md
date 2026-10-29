@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.18.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.19.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -13,10 +13,14 @@ Aplicativo web com design baseado no Copilot Money.
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
 
-## Novidades da versão 3.18.0
+## Novidades da versão 3.19.0
 
 - **Zo, o assistente:** botão em vidro com o Z no canto inferior direito; a janela de conversa abre no mesmo canto. Na primeira conversa, aviso de consentimento (sem ele, nada vai para o Gemini; o servidor também recusa). Cria, consulta, edita e exclui transações (inclusive parceladas e recorrentes), contas, categorias e orçamento, recorrências e perfis; resume o mês; sugere categoria pelo histórico; responde sobre versão, novidades, termos, privacidade e armazenamento. **Toda gravação** passa por um cartão de resumo (montado com os dados reais) e só acontece no Confirmar. As instruções e a lista de ferramentas ficam no servidor (`api/src/zo.py`); a conversa é conferida (sem papel de sistema, só ferramentas conhecidas, tamanhos e ids); a resposta do Gemini é filtrada; limite de 150 pedidos por conta por dia; nada da conversa nos logs nem guardado no ZoZo. Configuração: `npx wrangler secret put GEMINI_API_KEY` (e `ZO_MODELO` no wrangler.toml). **Fase 2:** consulta a fatura de perfil (um perfil ou todos, um cartão ou todos), troca contribuições, descontos e arredondamentos, registra pagamentos recebidos e abre a fatura para imprimir; liga e desliga multicâmbio e orçamento, remove a chave Pix, leva transações para outra moeda, filtra Transações, exporta o CSV e sai da conta (exportar e sair com confirmação). Senha, 2FA, proteção avançada, apagar dados, excluir conta e cadastrar a chave Pix **nunca pelo chat**: o Zo abre a tela segura das Configurações. **Respeito e neutralidade:** regras nas instruções (sem palavrões, ofensas ou discriminação; não tolera discriminação nem apologia; sem julgamentos, opiniões ou sugestões fora do pedido) e filtro de segurança do Gemini na mensagem da pessoa e na resposta do Zo (ofensa: resposta fixa e, depois de 3 no dia, o Zo pausa até o dia seguinte). **Gemini (plano gratuito, fase de testes):** o aviso de consentimento diz que o Google pode usar as mensagens e os trechos de dados para treinamento; o consentimento guarda a versão do aviso (`zo.CONSENTIMENTO_VERSAO`) e quem aceitou o aviso anterior aceita de novo. **Fase 3:** importar CSV ou OFX do banco pelo clipe do Zo (lido no navegador, nada sai do aparelho; conferência linha por linha com conta, perfil e categoria sugerida; o serviço grava tudo ou nada e pula o que já existe) e categorizar em lote as transações sem categoria pelo histórico, com confirmação.
 - **Menu lateral:** sem o logo do ZoZo no topo.
+- **Fatura de perfis:** uma Receita lançada à mão no cartão (como o pagamento da fatura) não entra mais na cobrança dos perfis; estornos continuam abatendo.
+
+## Novidades da versão 3.18.0
+
 - **Fatura de perfis (cobrança):**
   - entram **só transações de cartão de crédito** (empréstimo saiu); campo **Cartão** (cada cartão ou Todos, no fim da lista) e opção **Todos** no fim de Perfil (o gasto de todos os perfis, inclusive compras sem perfil). Com Todos ou um cartão escolhido é **só consulta**: sem ajustes, pagamentos recebidos, saldo anterior nem Pix (guardados por perfil e mês);
   - pagar o **cartão** ("Pagar fatura" ou transferência de entrada no cartão) não abate mais a cobrança do perfil — é você pagando o banco — e não aparece na fatura;
