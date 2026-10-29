@@ -56,7 +56,7 @@ TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
 # Zo, o assistente: modelo do Gemini (confira o nome no Google AI Studio). A chave vai por:
 #   npx wrangler secret put GEMINI_API_KEY   — sem ela o Zo responde "ainda não disponível"
-ZO_MODELO = "gemini-2.5-flash"
+ZO_MODELO = "gemini-3.8-flash"
 
 # ================= PRÉVIA (testes antes de publicar) =================
 # Aberta: sem Cloudflare Access e sem lista de e-mails (cadastro livre, com CAPTCHA).
