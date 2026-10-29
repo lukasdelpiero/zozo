@@ -46,9 +46,9 @@
     const avisoEl = h("div");
     const cambioEl = h("div", { class: E.cambio });
 
+    // o topo vazio mantém a navegação alinhada abaixo da barra superior (o logo saiu do menu)
     mount(el,
-      h("div", { class: E.menuTopo },
-        h("img", { class: E.logo, src: "assets/img/zozo-logo.svg", alt: "ZoZo", width: "28", height: "28", decoding: "async" })),
+      h("div", { class: E.menuTopo }),
       navEl, contasEl, avisoEl, cambioEl, footerEl);
 
     let assinatura: unknown[] | null = null;

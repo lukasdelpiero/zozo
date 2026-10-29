@@ -19,7 +19,7 @@ async function cenario(t, cartaoExtra = {}) {
 }
 const fatura = (t, perfilId, mes, ano) => t.req(t.A.getBoletoData, { perfilId, mes, ano });
 
-test("fatura: pagar o cartão (Pagar fatura, transferência de entrada e o formato antigo) não abate a cobrança do perfil", async () => {
+test("fatura: pagar o cartão (Pagar fatura, transferência de entrada, Receita à mão e o formato antigo) não abate a cobrança do perfil", async () => {
   const t = carregar();
   const hoje = new Date();
   const mes = hoje.getMonth() + 1, ano = hoje.getFullYear(), dia = isoDe(hoje);
@@ -31,6 +31,8 @@ test("fatura: pagar o cartão (Pagar fatura, transferência de entrada e o forma
   // pagamento gravado antes da marca (3.17): reconhecido pelo texto que o "Pagar fatura" gerava
   await t.req(t.A.createLancamento, lanc({ data: dia, descricao: "Pagamento fatura", valor: 70, contaId: cartao.id, perfilId: perfil.id, tipo: "receita",
     notas: "Pagamento da fatura do cartão de crédito Visa." }));
+  // pagamento lançado à mão como Receita no cartão, sem marca nem texto: também não é gasto
+  await t.req(t.A.createLancamento, lanc({ data: dia, descricao: "Fatura", valor: 7022.87, contaId: cartao.id, perfilId: perfil.id, tipo: "receita" }));
   const f = await fatura(t, perfil.id, mes, ano);
   assert.deepEqual(f.lancamentos.map((l) => l.descricao).sort(), ["Estorno loja", "Mercado"]);
   assert.equal(t.Z.servico.calcularFatura(f).total, 280);                       // 300 − estorno 20

@@ -18,6 +18,8 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
   ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
+  ZOZO_DEV_ZO=simulado     Zo sem a OpenAI: respostas fixas para testar a tela ("contas" lê, "teste" grava, o resto ecoa)
+  ZOZO_DEV_OPENAI_KEY / ZOZO_DEV_ZO_MODELO   Zo com a OpenAI de verdade (gasta créditos; use dados de teste)
 """
 import asyncio
 import http.server
@@ -38,6 +40,7 @@ sys.path.insert(0, str(AQUI))
 import json  # noqa: E402
 
 import nucleo  # noqa: E402
+import zo  # noqa: E402
 from banco_sqlite import BancoSqlite, conectar  # noqa: E402
 
 # Interface montada pelo Vite (npm run build): exatamente o que vai para o Cloudflare
@@ -72,6 +75,29 @@ if os.environ.get("ZOZO_DEV_EMAIL") == "console" or os.environ.get("ZOZO_DEV_RES
 CONFIG.update({
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 })
+if os.environ.get("ZOZO_DEV_ZO") == "simulado":
+    CONFIG.update({"OPENAI_API_KEY": "simulado", "ZO_MODELO": "simulado"})
+elif os.environ.get("ZOZO_DEV_OPENAI_KEY"):
+    CONFIG.update({"OPENAI_API_KEY": os.environ["ZOZO_DEV_OPENAI_KEY"], "ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "")})
+
+
+def _zo_simulado(corpo):
+    """Resposta fixa no formato da OpenAI: o bastante para testar a janela, a leitura e a confirmação de gravação."""
+    ultima = json.loads(corpo)["messages"][-1]
+    texto = str(ultima.get("content") or "").lower()
+    if ultima["role"] == "tool":
+        msg = {"role": "assistant", "content": "Pronto. Modo simulado do Zo. Posso ajudar em mais alguma coisa?"}
+    elif "conta" in texto:
+        msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim1", "type": "function", "function": {"name": "listar_contas", "arguments": "{}"}}]}
+    elif "teste" in texto:
+        msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim2", "type": "function",
+               "function": {"name": "criar_categoria", "arguments": json.dumps({"nome": "Teste do Zo", "icone": "🧪"})}}]}
+    elif "opç" in texto or "opc" in texto:
+        msg = {"role": "assistant", "content": None, "tool_calls": [{"id": "sim3", "type": "function",
+               "function": {"name": "oferecer_opcoes", "arguments": json.dumps({"pergunta": "Qual opção?", "opcoes": ["Primeira", "Segunda"]})}}]}
+    else:
+        msg = {"role": "assistant", "content": "Modo simulado do Zo. Recebi a sua mensagem."}
+    return 200, json.dumps({"choices": [{"message": msg}]})
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
 if os.environ.get("ZOZO_DEV_GOOGLE_ID") and os.environ.get("ZOZO_DEV_GOOGLE_SECRET"):
     CONFIG["GOOGLE_CLIENT_ID"], CONFIG["GOOGLE_CLIENT_SECRET"] = os.environ["ZOZO_DEV_GOOGLE_ID"], os.environ["ZOZO_DEV_GOOGLE_SECRET"]
@@ -106,7 +132,12 @@ class Servicos:
         dados = urllib.parse.urlencode(campos).encode("utf-8")
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
 
-    async def http_post_json(self, url, cabecalhos, corpo):
+    async def http_post_json(self, url, cabecalhos, corpo, limite=2000):
+        if url == zo.OPENAI_URL:
+            if CONFIG.get("OPENAI_API_KEY") == "simulado":
+                return _zo_simulado(corpo)
+            status, texto = await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=corpo.encode("utf-8"), headers=cabecalhos, method="POST"))
+            return status, texto[:limite]
         if CONFIG.get("RESEND_API_KEY") == "console":
             # modo console: mostra o e-mail aqui (assunto e texto, com o link) e não envia nada
             m = json.loads(corpo)

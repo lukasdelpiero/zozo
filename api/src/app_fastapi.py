@@ -147,6 +147,29 @@ class ConcluirRecuperacao(Documento):
     historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []
 
 
+class ZoChamada(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+    nome: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+    argumentos: Annotated[str, StringConstraints(max_length=4000)]
+
+
+class ZoMensagem(Modelo):
+    """Uma mensagem da conversa com o Zo (as regras finas, como a ordem e os ids, ficam em zo.ler_mensagens)."""
+    papel: Literal["usuario", "assistente", "ferramenta"]
+    texto: Annotated[str, StringConstraints(max_length=8000)] | None = None
+    chamadas: Annotated[list[ZoChamada], Field(max_length=8)] = []
+    id: Annotated[str, StringConstraints(max_length=64)] | None = None
+    resultado: Annotated[str, StringConstraints(max_length=20000)] | None = None
+
+
+class ZoConversa(Modelo):
+    mensagens: Annotated[list[ZoMensagem], Field(min_length=1, max_length=40)]
+
+
+class ZoConsentimento(Modelo):
+    aceito: bool
+
+
 class ReenviarEmail(Modelo):
     email: Email
 
@@ -176,6 +199,8 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/documento/apagar"): Documento,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,
     ("POST", "/api/2fa/desativar"): CodigoDoisFatores,
+    ("POST", "/api/zo"): ZoConversa,
+    ("PUT", "/api/zo/consentimento"): ZoConsentimento,
 }
 
 # Os mesmos cabeçalhos que o entry.py repassa ao núcleo (nada além disso chega às regras)

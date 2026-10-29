@@ -59,6 +59,7 @@ from urllib.parse import parse_qs, urlsplit
 import emails
 import google
 import totp
+import zo
 
 LIMITE_CORPO = 2_100_000        # bytes do pedido
 LIMITE_CONTEUDO = 1_900_000     # caracteres do documento cifrado (D1: máx. ~2 MB por linha)
@@ -99,6 +100,7 @@ CONTA_CAPTCHA, CONTA_JANELA_S = 20, 3600   # 20 falhas/h na conta (todos os IPs)
 CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
 ENTRADAS_POR_IP, ENTRADA_JANELA_S = 30, 600          # logins (certos ou errados) por IP: a senha da demo é pública
 COTA_DADOS, COTA_JANELA_S = 600, 600                 # pedidos às rotas de dados por conta (leituras e gravações)
+ZO_POR_DIA, ZO_JANELA_S = 150, 86400                 # pedidos ao Zo por conta por dia (cada ida à OpenAI conta)
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
 TURNSTILE_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
@@ -132,7 +134,7 @@ class Servicos(Protocol):
     """Pedidos HTTP para fora (Turnstile, Google, Resend, lista de senhas vazadas)."""
     async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]: ...
     async def http_post(self, url: str, campos: Mapping[str, str]) -> tuple[int, str]: ...
-    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str) -> tuple[int, str]: ...
+    async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str, limite: int = 2000) -> tuple[int, str]: ...
 
 
 Config = Mapping[str, Any]                # SEGREDO, chaves, listas de recursos… (ver o topo do arquivo)
@@ -1193,12 +1195,66 @@ async def _google_identidade(ctx: Contexto) -> Resposta:
     existe = await ctx.banco.primeiro("SELECT 1 AS x FROM contas WHERE email = ? AND confirmacao_pendente = 0", c["m"])
     return Resposta(200, {"email": c["m"], "nome": c.get("nm") or "", "contaExiste": bool(existe)})
 
+# ---------------- Zo, o assistente (regras em zo.py) ----------------
+async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
+    """
+    Consentimento (GET/PUT /api/zo/consentimento) e conversa (POST /api/zo). Sessão e prova já conferidas.
+    Sem consentimento registrado, nada vai para a OpenAI. Limite diário por conta. Nenhum conteúdo nos logs.
+    """
+    p = ctx.pedido
+    if p.caminho == "/api/zo/consentimento":
+        if p.metodo == "GET":
+            linha = await ctx.banco.primeiro("SELECT zo_consentimento FROM contas WHERE email = ?", email)
+            return Resposta(200, {"aceito": bool(linha and linha["zo_consentimento"])})
+        aceito = b.get("aceito")
+        if set(b) != {"aceito"} or not isinstance(aceito, bool):
+            raise Falha(400, "INVALID_REQUEST")
+        quando = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(ctx.agora))) if aceito else ""
+        await ctx.banco.executar("UPDATE contas SET zo_consentimento = ? WHERE email = ?", quando, email)
+        ctx.evento("zo_consentimento_dado" if aceito else "zo_consentimento_retirado", email)
+        return Resposta(200, {"aceito": aceito})
+    linha = await ctx.banco.primeiro("SELECT zo_consentimento, email_verificado FROM contas WHERE email = ?", email)
+    if not linha or not linha["zo_consentimento"]:
+        raise Falha(403, "CONSENT_REQUIRED")
+    chave, modelo = str(ctx.config.get("OPENAI_API_KEY") or "").strip(), str(ctx.config.get("ZO_MODELO") or "").strip()
+    if not chave or not modelo:
+        raise Falha(503, "ZO_UNAVAILABLE")
+    if set(b) != {"mensagens"}:
+        raise Falha(400, "INVALID_REQUEST")
+    try:
+        mensagens = zo.ler_mensagens(b.get("mensagens"))
+    except zo.Invalido as ex:
+        raise Falha(400, "INVALID_REQUEST") from ex
+    if await _contar(ctx, f"zo|{ctx.h(email)}", ZO_POR_DIA, ZO_JANELA_S):
+        ctx.evento("zo_limite", email)
+        raise Falha(429, "ZO_LIMIT", {"espera": ZO_JANELA_S})
+    # contexto do dia (Brasília) e dos recursos da conta: o Zo sabe o que pode oferecer
+    dia = time.gmtime(int(ctx.agora) - 3 * 3600)
+    av = _avancado(ctx, email, linha["email_verificado"])
+    contexto = (f"Hoje é {dia.tm_mday:02d}/{dia.tm_mon:02d}/{dia.tm_year} ({time.strftime('%Y-%m-%d', dia)}). "
+                f"Perfis {'disponíveis' if av else 'indisponíveis'} nesta conta. Fatura de perfis {'disponível' if av else 'indisponível'}.")
+    corpo = zo.montar_pedido(modelo, mensagens, contexto, ctx.h(email))
+    status, texto = await ctx.servicos.http_post_json(zo.OPENAI_URL, {"Authorization": "Bearer " + chave, "Content-Type": "application/json"},
+                                                      corpo, zo.LIMITE_RESPOSTA)
+    if status != 200:
+        ctx.evento("zo_falhou", email, status=status)
+        raise Falha(502, "ZO_FAILED")
+    try:
+        resposta = zo.ler_resposta(texto)
+    except zo.Invalido as ex:
+        ctx.evento("zo_resposta_invalida", email)
+        raise Falha(502, "ZO_FAILED") from ex
+    ctx.evento("zo_resposta", email, chamadas=len(resposta["chamadas"]))
+    return Resposta(200, resposta)
+
+
 # ---------------- rotas ----------------
 _PROTEGIDAS = {
     ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("PUT", "/api/conta/kdf/historico"), ("DELETE", "/api/conta"),
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
     ("GET", "/api/custodia"), ("POST", "/api/custodia/chave"), ("PUT", "/api/custodia"), ("PUT", "/api/conta/protecao"),
+    ("POST", "/api/zo"), ("GET", "/api/zo/consentimento"), ("PUT", "/api/zo/consentimento"),
 }
 _SEM_CORPO = {"/api/2fa/iniciar", "/api/custodia/chave"}
 
@@ -1276,6 +1332,9 @@ async def _rota(ctx: Contexto) -> Resposta:
     # Corpo validado ANTES da prova: pedido malformado não consome tentativa
     b = _json(p) if m in ("POST", "PUT", "DELETE") and c not in _SEM_CORPO else {}
     conta = await _conferir_prova(ctx, email)
+
+    if c.startswith("/api/zo"):
+        return await _zo(ctx, email, b)
 
     if c == "/api/conta/nome":
         nome = _nome(b.get("nome"))

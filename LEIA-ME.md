@@ -15,6 +15,8 @@ Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](d
 
 ## Novidades da versão 3.18.0
 
+- **Zo, o assistente (fase 1):** botão em vidro com o Z no canto inferior direito; a janela de conversa abre no mesmo canto. Na primeira conversa, aviso de consentimento (sem ele, nada vai para a OpenAI; o servidor também recusa). Cria, consulta, edita e exclui transações (inclusive parceladas e recorrentes), contas, categorias e orçamento, recorrências e perfis; resume o mês; sugere categoria pelo histórico; responde sobre versão, novidades, termos, privacidade e armazenamento. **Toda gravação** passa por um cartão de resumo (montado com os dados reais) e só acontece no Confirmar. As instruções e a lista de ferramentas ficam no servidor (`api/src/zo.py`); a conversa é conferida (sem papel de sistema, só ferramentas conhecidas, tamanhos e ids); a resposta da OpenAI é filtrada; limite de 150 pedidos por conta por dia; nada da conversa nos logs nem guardado no ZoZo. Configuração: `npx wrangler secret put OPENAI_API_KEY` (e `ZO_MODELO` no wrangler.toml). Fases seguintes: fatura, configurações, ações da conta, filtros, importar fatura.
+- **Menu lateral:** sem o logo do ZoZo no topo.
 - **Fatura de perfis (cobrança):**
   - entram **só transações de cartão de crédito** (empréstimo saiu); campo **Cartão** (cada cartão ou Todos, no fim da lista) e opção **Todos** no fim de Perfil (o gasto de todos os perfis, inclusive compras sem perfil). Com Todos ou um cartão escolhido é **só consulta**: sem ajustes, pagamentos recebidos, saldo anterior nem Pix (guardados por perfil e mês);
   - pagar o **cartão** ("Pagar fatura" ou transferência de entrada no cartão) não abate mais a cobrança do perfil — é você pagando o banco — e não aparece na fatura;

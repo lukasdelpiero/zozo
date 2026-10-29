@@ -31,7 +31,7 @@
     tw:[&_strong]:font-[550] tw:[&_a]:text-zz-primary tw:[&_a]:font-[550] tw:[&_a]:underline-offset-2 tw:[&_a:hover]:underline">
 
     <h1 class="tw:m-0 tw:text-[32px] tw:leading-[1.2] tw:font-[550] tw:tracking-[-0.015em] tw:text-[#1b2a4a] tw:celular:text-[26px]">Política de privacidade</h1>
-    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 28 de outubro de 2026</p>
+    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 29 de outubro de 2026</p>
 
     <p>O ZoZo existe para você ter o controle das suas finanças, e isso inclui estar no controle dos seus dados. Esta página explica, sem rodeios, o que guardamos, por quê, com quem falamos e como você decide sobre tudo isso.</p>
 
@@ -82,6 +82,16 @@
     <p>Se preferir que só você consiga abrir os seus dados, ative a <strong>Proteção avançada</strong> em Configurações › Conta. A cópia é apagada do servidor na hora. Nesse modo, se você esquecer a senha, a conta recomeça vazia: ninguém, nem o ZoZo, consegue recuperar os dados.</p>
     <p>As cópias de segurança do banco feitas antes de você ligar a Proteção avançada ainda contêm a cópia antiga da chave, pelo prazo explicado em <a href="#retencao">Por quanto tempo os dados ficam guardados</a>. Elas são cifradas e guardadas com acesso restrito.</p>
 
+    <h2 id="zo">E o Zo, o assistente?</h2>
+    <p>O Zo é opcional. Na primeira conversa ele pede o seu consentimento, e sem ele nada é enviado. Com o consentimento, o seu navegador abre os dados (como sempre) e, a cada pergunta, envia à <strong>OpenAI</strong> (a empresa do ChatGPT), pelo servidor do ZoZo, só o necessário para responder: a sua mensagem, a conversa recente e os trechos dos dados que o Zo consultou (por exemplo, as contas ou as transações de um mês). O seu e-mail, a sua senha e as chaves dos dados não são enviados.</p>
+    <ul>
+      <li>O Zo só grava (cria, edita ou exclui) depois de você tocar em Confirmar no resumo que aparece na conversa.</li>
+      <li>Pedimos à OpenAI que não guarde a conversa para reuso. Pela política da OpenAI, os dados enviados pela API não são usados para treinar modelos e podem ficar guardados por até 30 dias para monitorar abuso, e depois são apagados.</li>
+      <li>O ZoZo não guarda a conversa: ela fica só na tela e some ao fechar a aba ou sair. No servidor guardamos só a data do seu consentimento e a contagem de mensagens do dia, para o limite diário.</li>
+      <li>Você retira o consentimento quando quiser no menu do Zo.</li>
+    </ul>
+    <p>A OpenAI processa esses dados fora do Brasil, com as garantias contratuais previstas na LGPD (art. 33).</p>
+
     <h2 id="finalidades">Para que usamos os dados?</h2>
     <ul>
       <li>Prestar o serviço: guardar e sincronizar os seus dados entre os seus aparelhos.</li>
@@ -98,6 +108,7 @@
       <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques e o CAPTCHA (Turnstile) do cadastro e do login.</li>
       <li><strong>Resend:</strong> envio dos e-mails do ZoZo (recebe o seu endereço e o conteúdo do e-mail).</li>
       <li><strong>Google:</strong> só se você escolher "Continuar com Google". Recebemos o seu e-mail confirmado e o seu primeiro nome. A senha do ZoZo continua sendo necessária.</li>
+      <li><strong>OpenAI:</strong> só se você usar o Zo, o assistente, e der o seu consentimento. Recebe os trechos dos seus dados necessários para responder (veja abaixo).</li>
       <li><strong>GitHub e Google Drive:</strong> guardam as cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente. Sem a chave, que fica só com o responsável pelo ZoZo, elas não podem ser abertas.</li>
     </ul>
     <p>Esses serviços podem processar dados fora do Brasil, com garantias contratuais de proteção previstas na LGPD (art. 33). Também podemos ter de entregar informações a autoridades, quando a lei ou uma ordem judicial exigir. Mesmo assim, os dados financeiros continuam cifrados.</p>

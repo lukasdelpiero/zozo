@@ -56,7 +56,6 @@
       + "tw:gaveta:group-data-[gaveta=aberta]/shell:[transform:none] "
       + "tw:gaveta:group-data-[gaveta=aberta]/shell:[box-shadow:8px_0_32px_rgba(15,39,66,0.28)] tw:motion-reduce:transition-none!",
     menuTopo: "tw:h-(--topbar-height) tw:flex-none tw:flex tw:items-center tw:justify-start tw:pt-0 tw:pr-3 tw:pb-0 tw:pl-[14px]",
-    logo: "tw:size-7 tw:rounded-[5px] tw:flex-none tw:[box-shadow:0_1px_3px_rgba(15,39,66,0.25)] tw:estreito:hidden tw:gaveta:block",
     nav: "tw:flex-none tw:flex tw:flex-col tw:gap-0.5 tw:p-3 tw:border-b tw:border-b-(--sidebar-divider) tw:estreito:p-2 tw:estreito:flex-1 "
       + "tw:gaveta:flex-none tw:gaveta:p-3",
     navItem: "tw:group/nav tw:relative tw:flex tw:items-center tw:gap-2.5 tw:h-[34px] tw:px-2.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:text-[15px] tw:font-[550] "

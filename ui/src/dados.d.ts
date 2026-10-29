@@ -155,7 +155,7 @@ declare global {
   /** Todas as ações da ponte (js/bridge/messages.ts: ACTIONS[nome] === nome) */
   type NomeAcao = NomeLeitura
     | "getSession" | "registerUser" | "reenviarConfirmacao" | "conferirLink" | "pedirRecuperacao" | "abrirRecuperacao" | "concluirRecuperacao"
-    | "getProtecao" | "setProtecao" | "repararRecuperacao" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
+    | "getProtecao" | "setProtecao" | "repararRecuperacao" | "zoConsentimento" | "zoConversar" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
     | "createLancamento" | "updateLancamento" | "deleteLancamento" | "updateUser" | "changePassword" | "wipeUserData" | "deleteUser"
     | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "loadUserData" | "saveUserData"
     | "createConta" | "updateConta" | "updateCicloCartao" | "deleteConta"
@@ -166,6 +166,13 @@ declare global {
     | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura"
     | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
+  /* ---------------- Zo, o assistente ---------------- */
+  /** Chamada de ferramenta escolhida pelo Zo (argumentos em JSON, conferidos no navegador antes de usar) */
+  interface ChamadaZo { id: string; nome: string; argumentos: string }
+  interface RespostaZo { texto: string | null; chamadas: ChamadaZo[] }
+  /** Uma mensagem da conversa como a API recebe (sem papel de sistema: as instruções ficam no servidor) */
+  type MensagemZo = { papel: "usuario"; texto: string } | { papel: "assistente"; texto: string | null; chamadas: ChamadaZo[] }
+    | { papel: "ferramenta"; id: string; resultado: string };
   /** Por que a recuperação não traz os dados: escolha da pessoa, cópia ainda não guardada, cópia que não abre, dados ilegíveis */
   type MotivoRecuperacao = "avancada" | "sem_copia" | "copia_invalida" | "dados_ilegiveis";
   /** Sessão como a interface a recebe; doisFatores sem authenticated = falta o código do 2FA */
@@ -192,6 +199,8 @@ declare global {
     getProtecao: { avancada: boolean; recuperacao: boolean };
     setProtecao: { avancada: boolean; recuperacao: boolean };
     repararRecuperacao: { avancada: boolean; recuperacao: boolean };
+    zoConsentimento: { aceito: boolean };
+    zoConversar: RespostaZo;
     verificarAtualizacao: { mudou: boolean; versao?: number };
     /** documento decifrado (o serviço confere tudo em normalizar); aviso: restaurado da cópia, documento sumido… */
     loadUserData: { documento: unknown; aviso: string | null; somenteLeitura?: boolean };

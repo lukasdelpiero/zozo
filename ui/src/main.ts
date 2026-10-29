@@ -29,6 +29,7 @@ import "../js/bridge/host-web.ts";
 import "../js/data/pix.ts";
 import "../js/data/demo.ts";
 import "../js/data/servico.ts";
+import "../js/data/zo.ts";                       // Zo: ferramentas (rodam no navegador, pelo serviço de dados)
 
 // Bridge: transporte
 import "../js/bridge/transporte.ts";
@@ -54,6 +55,7 @@ import "../js/components/detail-panel.ts";
 import "../js/components/verificacao.ts";
 import "../js/components/auth.ts";
 import "../js/components/novidades.ts";
+import "../js/components/zo.ts";                 // Zo: botão flutuante e janela de conversa
 
 // Páginas
 import "../js/router.ts";

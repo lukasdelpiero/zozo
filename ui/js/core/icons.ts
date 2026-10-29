@@ -14,6 +14,7 @@
   const ICONS: Record<string, Desenho[]> = {
     // "Z" vazado: contorno na cor do texto (cinza) ou roxo quando selecionado
     dashboard: [["path", { d: "M5 4h14v3.2L10.4 17H19v3H5v-3.2L13.6 7H5z" }]],
+    enviar: [P("M12 19V5"), P("m5 12 7-7 7 7")],
     lancamentos: [
       P("m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"),
       P("m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"),

@@ -618,6 +618,8 @@
     });
   }
 
+  ZoZo.zo.montar(ctx);                           // Zo: botão flutuante quando há sessão (some ao sair e na demo)
+
   // painel de testes: só no endereço local e na prévia, num pacote à parte (o site publicado não o baixa)
   if (ZoZo.testeHost) import("./components/teste").then(() => ZoZo.teste && ZoZo.teste.iniciar(ctx, {
     tela: telaTeste,

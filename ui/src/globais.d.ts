@@ -712,10 +712,24 @@ declare global {
   /** components/novidades.ts */
   interface ZoZoNovidades { abrir(): void; conferir(ctx: ContextoApp): void }
 
+  /* ---------------- Zo, o assistente ---------------- */
+  /** Pedido ao serviço de dados (a tela usa ctx.bridge.request; os testes, o serviço direto) */
+  type PedidoZo = <K extends NomeAcao>(acao: K, dados?: unknown) => Promise<RespostaDe<K>>;
+  /** O que uma ferramenta devolve: dados para o Zo, um resumo para a pessoa confirmar, ou botões de escolha */
+  type ResultadoFerramentaZo =
+    | { tipo: "leitura"; resultado: string }
+    | { tipo: "escrita"; titulo: string; linhas: Array<[string, string]>; confirmar(): Promise<string> }
+    | { tipo: "opcoes"; pergunta: string; opcoes: string[] };
+  interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo>; nomes: string[] }
+  interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: { perfis: () => boolean }): ZoZoZoFerramentasInstancia }
+  interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
+
   interface ZoZoGlobal {
     dom: ZoZoDom;
     notasVersao: readonly NotaVersao[];
     novidades: ZoZoNovidades;
+    zo: ZoZoZo;
+    zoFerramentas: ZoZoZoFerramentas;
     store: ZoZoStore;
     recursos: ZoZoRecursos;
     log: ZoZoLog;

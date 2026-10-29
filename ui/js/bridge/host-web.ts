@@ -81,7 +81,7 @@
   const TESTE = hostAtual === "127.0.0.1" || hostAtual === "localhost" || hostAtual === "[::1]" || hostAtual.endsWith(".localhost") || HOSTS_PREVIA.includes(hostAtual);
   const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true };
   const CHAVE_SIMULAR = "zozo.teste.simular";
-  const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown };
+  const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown, zoAceito: false };
   try { teste.simular = TESTE && sessionStorage.getItem(CHAVE_SIMULAR) === "1"; } catch (e) { /* sem sessionStorage */ }
   /** Ações de conta simuladas: conta sem servidor, ou a demo no ambiente de teste */
   const simulada = (s: Sessao) => !!s.simulada || (TESTE && s.demo);
@@ -163,12 +163,13 @@
     }
     if (r.status === 404 && metodo === "GET") return null;
     if (r.status === 409) throw erro(["EMAIL_IN_USE", "2FA_ALREADY_ON", "2FA_NOT_PENDING"].includes(codigo) ? codigo : "DATA_CHANGED");
-    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY", "EMAIL_NOT_CONFIRMED"].includes(codigo)) throw erro(codigo);
+    if (r.status === 403 && ["WRONG_PASSWORD", "REGISTER_FAILED", "DEMO_READ_ONLY", "EMAIL_NOT_CONFIRMED", "CONSENT_REQUIRED"].includes(codigo)) throw erro(codigo);
     if (r.status === 400 && codigo === "TOKEN_INVALID") throw erro(codigo);
     if (r.status === 403) throw erro("ACCESS_DENIED");                   // pedido recusado pela checagem de origem
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
-    if (r.status === 429) throw erro("TOO_MANY_ATTEMPTS", extra);
+    if (r.status === 429) throw erro(codigo === "ZO_LIMIT" ? "ZO_LIMIT" : "TOO_MANY_ATTEMPTS", extra);
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
+    if (codigo === "ZO_UNAVAILABLE" || codigo === "ZO_FAILED") throw erro(codigo);          // Zo desligado ou OpenAI fora
     throw erro("STORAGE_UNAVAILABLE");
   }
   const parametros = (email: string) => api("GET", "/conta/parametros?email=" + encodeURIComponent(normalizarEmail(email)));
@@ -834,6 +835,25 @@
         if (d.avancada !== true) await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
       } finally { k.bits.fill(0); }
       return ACOES.getProtecao({});
+    },
+
+    /* ---- Zo, o assistente: consentimento e conversa (a API leva à OpenAI; as ferramentas rodam aqui, no navegador) ---- */
+    async zoConsentimento(d) {
+      const s = exigirConta();
+      const aceito = d && typeof d.aceito === "boolean" ? d.aceito : undefined;
+      if (simulada(s)) { if (aceito !== undefined) teste.zoAceito = aceito; return { aceito: teste.zoAceito }; }
+      const r = await comProvaDaSessao(() => (aceito === undefined
+        ? api("GET", "/zo/consentimento", undefined, s.prova)
+        : api("PUT", "/zo/consentimento", { aceito }, s.prova)));
+      return { aceito: !!(r && r.aceito === true) };
+    },
+    async zoConversar(d) {
+      const s = exigirConta();
+      if (simulada(s)) return { texto: "Modo teste. O Zo de verdade responde com a API local ou na prévia.", chamadas: [] };
+      const r = await comProvaDaSessao(() => api("POST", "/zo", { mensagens: d && Array.isArray(d.mensagens) ? d.mensagens : [] }, s.prova));
+      const chamadas = r && Array.isArray(r.chamadas) ? r.chamadas.filter((c: RespostaApi) => c && typeof c.id === "string" && typeof c.nome === "string" && typeof c.argumentos === "string")
+        .map((c: RespostaApi) => ({ id: c.id as string, nome: c.nome as string, argumentos: c.argumentos as string })) : [];
+      return { texto: r && typeof r.texto === "string" ? r.texto : null, chamadas };
     },
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */

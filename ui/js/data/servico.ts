@@ -1063,11 +1063,13 @@
   }
   // pagamento do cartão gravado antes da marca pagamentoCartao (3.17 e anteriores): o texto que o "Pagar fatura" gerava
   const PAGAMENTO_ANTIGO = "Pagamento da fatura do cartão de crédito ";
+  /** Pagamento ou crédito no cartão, nunca um gasto: Fatura, transferência de entrada e qualquer Receita (inclusive o
+   *  pagamento lançado à mão como Receita). Estorno não entra aqui: devolução de compra continua abatendo a fatura. */
   function pagamentoDoCartao(l: Lancamento, conta: Conta): boolean {
     if (l.tipo === "fatura") return true;
     if (conta.tipo !== "cartao") return false;
     if (l.tipo === "interno") return l.sentido === "entrada";
-    return l.tipo === "receita" && (!!l.pagamentoCartao || (l.descricao === "Pagamento fatura" && String(l.notas || "").startsWith(PAGAMENTO_ANTIGO)));
+    return l.tipo === "receita";
   }
   /**
    * Transações cobradas na fatura do mês, em ordem de data: só cartão de crédito. perfilId null = todos os perfis

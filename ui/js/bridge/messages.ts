@@ -20,6 +20,8 @@
     getProtecao: "getProtecao",
     setProtecao: "setProtecao",
     repararRecuperacao: "repararRecuperacao",
+    zoConsentimento: "zoConsentimento",
+    zoConversar: "zoConversar",
     login: "login",
     verificar2FA: "verificar2FA",
     logout: "logout",
@@ -100,7 +102,7 @@
 
   /** Ações cujo payload nunca pode aparecer em log */
   const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
-    ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao]);
+    ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao, ACTIONS.zoConversar]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
   const FRIENDLY: Readonly<Record<string, string>> = Object.freeze({
@@ -144,6 +146,10 @@
     TOKEN_INVALID: "O link que clicou expirou ou é inválido.",
     CODE_REQUIRED: "Digite o código de 6 dígitos do seu aplicativo 2FA.",
     CONFIRMATION_REQUIRED: "Digite EXCLUIR CONTA para confirmar.",
+    CONSENT_REQUIRED: "Para conversar com o Zo, aceite o aviso de uso dos dados.",
+    ZO_LIMIT: "Você chegou ao limite de mensagens do Zo por hoje. Amanhã ele volta a responder.",
+    ZO_UNAVAILABLE: "O Zo ainda não está disponível. Tente de novo mais tarde.",
+    ZO_FAILED: "O Zo não conseguiu responder agora. Tente de novo em instantes.",
     PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
