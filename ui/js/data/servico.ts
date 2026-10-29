@@ -215,7 +215,7 @@
             ZoZo.log.error("serviço", { evento: "documento_invalido", problemas: Array.from(new Set(lido.problemas)) });
             window.dispatchEvent(new CustomEvent("zozo:aviso-dados", { detail: { codigo: "DOCUMENT_INVALID_LOCKED" } }));
           }
-          if (!somenteLeitura && sincronizarParcelas() + sincronizarSaldos() > 0) {
+          if (!somenteLeitura && converterPagamentosAntigos() + sincronizarParcelas() + sincronizarSaldos() > 0) {
             doc.meta.ultimaGravacao = new Date().toISOString();
             // grava pela mesma fila das alterações (nunca em paralelo com elas) e conta como gravação pendente
             pendentes += 1;
@@ -389,15 +389,30 @@
     const conta = doc.contas.find((c) => c.id === l.contaId);
     const cat = doc.categorias.find((c) => c.id === l.categoriaId);
     const perfil = avancado() ? doc.perfis.find((p) => p.id === l.perfilId) : null;   // sem o recurso: o perfil não aparece
+    const par = l.pagamento ? parDoPagamento(l) : null;
     return Object.assign({}, l, {
       nomeConta: conta ? conta.nome : "",
       ultimos4Digitos: conta ? conta.ultimos4Digitos || "" : "",
       categoria: cat ? { nome: cat.nome, icone: cat.icone, cor: cat.cor } : null,
       perfil: perfil ? { nome: perfil.nome, cor: perfil.cor } : null,
+      parFatura: par ? par.id : null,
     });
   }
+  /* Pagamento de fatura (tipo "fatura"): duas transações com o mesmo pagamento.grupo. A do pagante (conta e perfil
+     escolhidos) aparece em Transações; a do cartão (abate a dívida) só no painel do cartão. Não se cria à mão. */
+  const ladoDoCartao = (l: Lancamento) => !!l.pagamento && l.pagamento.lado === "cartao";
+  function parDoPagamento(l: Lancamento): Lancamento | null {
+    const g = l.pagamento && l.pagamento.grupo;
+    return g ? doc.lancamentos.find((x) => x.id !== l.id && !!x.pagamento && x.pagamento.grupo === g) || null : null;
+  }
+  /** ids escolhidos + o outro lado de cada pagamento de fatura (excluir um lado exclui os dois) */
+  function comOsPares(ids: Iterable<Id>): Set<Id> {
+    const todos = new Set(ids);
+    doc.lancamentos.forEach((l) => { if (todos.has(l.id) && l.pagamento) { const p = parDoPagamento(l); if (p) todos.add(p.id); } });
+    return todos;
+  }
   function getLancamentos(): RespostaLancamentos {
-    return { lancamentos: doc.lancamentos.map(enriquecer).sort((a, b) => b.data.localeCompare(a.data) || b.id.localeCompare(a.id)) };
+    return { lancamentos: doc.lancamentos.filter((l) => !ladoDoCartao(l)).map(enriquecer).sort((a, b) => b.data.localeCompare(a.data) || b.id.localeCompare(a.id)) };
   }
 
   /** Perfil arquivado: continua nos lançamentos antigos, mas não pode ser escolhido em novos */
@@ -520,7 +535,8 @@
          receita e transferência de entrada somam; a "Regular" não mexe (para sair da conta, use Débito);
        • cartão: compra (Regular/Recorrente) aumenta a fatura; estorno, receita e transferência de
          entrada (pagamento da fatura) diminuem;
-       • empréstimo: só transferências (entrada = pagamento, diminui a dívida).
+       • empréstimo: só transferências (entrada = pagamento, diminui a dívida);
+       • Fatura (pagamento de fatura, as duas transações do par): tira da conta pagante e diminui a dívida do cartão.
      O efeito aplicado fica anotado na transação (efeito = { contaId, delta }) e é conciliado depois de
      toda gravação e ao abrir os dados: mudou valor, conta, tipo, sentido ou data → desfaz o efeito antigo
      e aplica o novo (nunca em dobro). Excluir devolve. Data futura só conta no dia.
@@ -530,6 +546,7 @@
   function efeitoNoSaldo(l: Lancamento, conta: Conta | null | undefined, hoje: string): number {
     if (!conta || !l.data || l.data > hoje || l.valorInvalido) return 0;
     const v = l.valor, entrada = l.tipo === "interno" && l.sentido === "entrada";
+    if (l.tipo === "fatura") return -v;                    // pagamento de fatura: sai da conta pagante e abate a dívida do cartão
     if (conta.tipo === "cartao") {
       if (l.tipo === "interno") return entrada ? -v : v;
       return l.tipo === "receita" || l.tipo === "estorno" ? -v : v;
@@ -547,6 +564,31 @@
     if (c && Number.isFinite(ef.delta)) registrarSaldo(c, r2(saldoAtual(c) - ef.delta));
     delete l.efeito;
     return true;
+  }
+  /**
+   * Pagamentos de fatura gravados até a 3.18 (Débito na conta + Receita no cartão, com a marca pagamentoCartao ou o
+   * texto que o "Pagar fatura" gerava) viram o par do tipo Fatura. Só pares completos (mesma data, valor, notas e moeda);
+   * o que não tem par fica como estava. O efeito no saldo é o mesmo (−valor nos dois lados): nenhum saldo muda.
+   */
+  function converterPagamentosAntigos() {
+    const marcado = (l: Lancamento) => !!l.pagamentoCartao || (l.descricao === "Pagamento fatura" && String(l.notas || "").startsWith(PAGAMENTO_ANTIGO));
+    const tipoDaConta = (l: Lancamento) => { const c = doc.contas.find((x) => x.id === l.contaId); return c ? c.tipo : ""; };
+    const livre = (l: Lancamento) => !l.pagamento && !l.divisao && !l.serieId && !l.valorInvalido && marcado(l);
+    const doCartao = doc.lancamentos.filter((l) => l.tipo === "receita" && tipoDaConta(l) === "cartao" && livre(l));
+    const usados = new Set<Id>();
+    let n = 0;
+    doc.lancamentos.filter((l) => l.tipo === "debito" && CONTAS_PAGAMENTO.includes(tipoDaConta(l)) && livre(l)).forEach((pag) => {
+      const par = doCartao.find((r) => !usados.has(r.id) && r.data === pag.data && r2(r.valor) === r2(pag.valor)
+        && String(r.notas || "") === String(pag.notas || "") && moedaDe(r) === moedaDe(pag));
+      if (!par) return;
+      usados.add(par.id);
+      const grupo = novoId("f");
+      Object.assign(pag, { tipo: "fatura", pagamento: { grupo, lado: "pagante" } });
+      Object.assign(par, { tipo: "fatura", pagamento: { grupo, lado: "cartao" }, perfilId: null, categoriaId: null });
+      [pag, par].forEach((l) => { delete l.debito; delete l.pagamentoCartao; delete l.faturaPerfil; });
+      n += 2;
+    });
+    return n;
   }
   function sincronizarSaldos() {
     const hoje = hojeIso();
@@ -868,11 +910,12 @@
         serie: serieDiaria([c], (dt) => ({ data: dt, valor: saldoEm(c, dt) || 0 })) };
     },
     /**
-     * O que o painel da conta mostra. Cartão: a fatura ABERTA — o ciclo que ainda recebe compras (do fechamento
-     * anterior ao dia antes do próximo; sem fechamento, o mês) — com a "fatura anterior" (a dívida de antes do
-     * ciclo, que o pagamento dela anula), as transações do ciclo até hoje com o valor de cada uma na fatura (compra
-     * negativa; pagamento e estorno positivos) e o total (a dívida de agora). Sempre: anterior + lançamentos = total.
-     * Outras contas: as transações do mês atual. Lançamentos futuros (parcelas e recorrências) não entram.
+     * O que o painel da conta mostra. Cartão: a fatura ABERTA — o ciclo que ainda recebe compras (do dia seguinte ao
+     * fechamento anterior até o dia do próximo fechamento; sem fechamento, o mês) — com a "fatura anterior" (a dívida
+     * de antes do ciclo, que o pagamento dela anula), as transações do ciclo até hoje com o valor de cada uma na fatura
+     * (compra positiva; pagamento e estorno negativos) e a fatura atual (a dívida de agora).
+     * Sempre: anterior + lançamentos = total. Outras contas: as transações do mês atual.
+     * Lançamentos futuros (parcelas e recorrências) não entram.
      */
     [A.getExtratoConta]: (d) => {
       const c = doc.contas.find((x) => x.id === d.id);
@@ -895,10 +938,10 @@
       const efeitos = doCiclo.map((l) => r2(efeitoNoSaldo(l, c, hoje)));
       const total = r2(saldoAtual(c));
       return {
-        tipo: "fatura" as const, mes, inicio: f ? f.inicio : null, fechamento: f ? f.fim : null,
-        // na fatura a dívida aparece negativa: anterior + Σ naFatura = total (todos com o sinal da fatura)
-        anterior: r2(-(total - efeitos.reduce((s, e) => s + e, 0))), total: r2(-total),
-        lancamentos: doCiclo.map((l, i) => Object.assign(enriquecer(l), { naFatura: r2(-efeitos[i]) })).sort(ordem),
+        tipo: "fatura" as const, mes, inicio: f ? f.inicio : null, fechamento: f ? diaAnterior(f.fim) : null,
+        // a dívida aparece positiva (compra +, pagamento e estorno −): anterior + Σ naFatura = total
+        anterior: r2(total - efeitos.reduce((s, e) => s + e, 0)), total,
+        lancamentos: doCiclo.map((l, i) => Object.assign(enriquecer(l), { naFatura: efeitos[i] })).sort(ordem),
       };
     },
     [A.getCategoriaSerie]: (d) => {
@@ -949,45 +992,58 @@
       };
     },
     /**
-     * Fatura (cobrança) de um perfil: transações de cartão de crédito e empréstimo do perfil, os ajustes guardados,
-     * os pagamentos recebidos, o saldo anterior e o período de cada cartão (regras em cobrancaDoMes / saldoAnterior).
+     * Fatura (cobrança): transações de cartão de crédito de um perfil (ou de todos, "todos") num cartão (ou em todos),
+     * o período de cada cartão e, só com UM perfil e todos os cartões, os ajustes guardados, os pagamentos recebidos,
+     * o saldo anterior e o Pix (guardados por perfil e mês). Com Todos ou um cartão escolhido é só consulta
+     * (regras em cobrancaDoMes / saldoAnterior).
      */
     [A.getBoletoData]: (d) => {
       exigir(boletoLiberado() && avancado());
       const mes = mesDoPedido(d);
-      const perfil = doc.perfis.find((p) => p.id === d.perfilId) || null;
-      const itens = perfil ? cobrancaDoMes(perfil.id, mes) : [];
-      const guardada = perfil ? doc.faturas[perfil.id + "|" + mes] : undefined;
+      const todos = d.perfilId === TODOS;
+      const perfil = todos ? null : doc.perfis.find((p) => p.id === d.perfilId) || null;
+      let cartaoId: Id | null = null;
+      if (d.cartaoId !== undefined && d.cartaoId !== null && d.cartaoId !== "" && d.cartaoId !== TODOS) {
+        const c = doc.contas.find((x) => x.id === d.cartaoId && x.tipo === "cartao");
+        if (!c) throw erro("OPERATION_FAILED");
+        cartaoId = c.id;
+      }
+      const consulta = todos || !!cartaoId;
+      const itens = perfil || todos ? cobrancaDoMes(perfil ? perfil.id : null, mes, cartaoId) : [];
+      const guardada = perfil && !consulta ? doc.faturas[perfil.id + "|" + mes] : undefined;
       const ajustes = { contribuicoes: guardada ? guardada.contribuicoes : [], descontos: guardada ? guardada.descontos : [], arredondamentos: guardada ? guardada.arredondamentos : [] };
-      // período de cada cartão que aparece na fatura (do fechamento anterior até o dia antes do fechamento)
-      const periodos = doc.contas.filter((c) => c.tipo === "cartao" && itens.some((l) => l.contaId === c.id)).map((c) => {
+      // período de cada cartão que aparece na fatura (do dia seguinte ao fechamento anterior até o dia do fechamento)
+      const periodos = doc.contas.filter((c) => c.tipo === "cartao" && (c.id === cartaoId || itens.some((l) => l.contaId === c.id))).map((c) => {
         const f = faixaDoCartao(c, mes);
         return { contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f ? f.inicio : mes + "-01", fim: f ? diaAnterior(f.fim) : dataNoMes(mes, 31), semFechamento: !f };
       });
+      const cheia = !!perfil && !consulta;
       return {
-        perfil, mes, moeda: moedaAtual(),
+        perfil, todos, cartaoId, consulta, mes, moeda: moedaAtual(),
         lancamentos: itens.map(enriquecer),
         ajustes, periodos,
-        recebimentos: perfil ? recebimentosDoMes(perfil.id, mes).map(enriquecer) : [],
-        saldoAnterior: perfil ? saldoAnterior(perfil.id, mes) : 0,
+        recebimentos: cheia && perfil ? recebimentosDoMes(perfil.id, mes).map(enriquecer) : [],
+        saldoAnterior: cheia && perfil ? saldoAnterior(perfil.id, mes) : 0,
         // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
-        pix: pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null,
+        pix: cheia && pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null,
       };
     },
   };
 
   /* ---------------- Fatura de perfis (cobrança) ----------------
-     • Entram as transações do perfil em cartão de crédito e empréstimo. Cartão com fechamento: as compras do
-       fechamento anterior (inclusive) até o dia antes do fechamento do mês (compra no dia do fechamento vai para
-       a fatura seguinte); sem fechamento, e no empréstimo: o mês do calendário.
-     • Pagar o CARTÃO (o par do "Pagar fatura" e a transferência de entrada no cartão) é você pagando o banco:
-       não abate a cobrança do perfil. O que abate são os pagamentos RECEBIDOS do perfil (receberFatura).
+     • Entram as transações do perfil (ou de todos) em cartão de crédito (empréstimo não). Cartão com fechamento: as
+       compras do dia seguinte ao fechamento anterior até o dia do fechamento do mês, inclusive; sem fechamento, o mês
+       do calendário.
+     • Pagar o CARTÃO (o par do tipo Fatura, o formato antigo e a transferência de entrada no cartão) é você pagando o
+       banco: não aparece nem abate a cobrança do perfil. O que abate são os pagamentos RECEBIDOS do perfil (receberFatura).
      • Saldo anterior: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais)
        em cada mês passa para o seguinte. Antes disso nada é cobrado de novo.
      • O total segue regras.boleto (sinal por tipo, contribuições, descontos e arredondamentos), em centavos. */
   const somarMes = (mes: string, n: number) => { const [a, m] = mes.split("-").map(Number); const d = new Date(a, m - 1 + n, 1); return d.getFullYear() + "-" + pad(d.getMonth() + 1); };
   const diaAnterior = (dataIso: string) => { const [a, m, d] = dataIso.split("-").map(Number); return iso(new Date(a, m - 1, d - 1)); };
+  const diaSeguinte = (dataIso: string) => { const [a, m, d] = dataIso.split("-").map(Number); return iso(new Date(a, m - 1, d + 1)); };
   const MES_FATURA = /^(\d{4})-(\d{2})$/;
+  const TODOS = "todos";                                      // perfil ou cartão "Todos" na fatura
   const mesFaturaValido = (v: unknown) => { const m = MES_FATURA.exec(String(v || "")); return !!m && Number(m[1]) >= 2000 && Number(m[1]) <= 2100 && Number(m[2]) >= 1 && Number(m[2]) <= 12; };
   /** Mês da fatura pedido pela interface ({ mes: 1–12, ano: 2000–2100 }, só inteiros) → "AAAA-MM" */
   function mesDoPedido(d: Dados): string {
@@ -995,27 +1051,35 @@
     if (!(Number.isInteger(ano) && Number.isInteger(mes) && ano >= 2000 && ano <= 2100 && mes >= 1 && mes <= 12)) throw erro("OPERATION_FAILED");
     return ano + "-" + pad(mes);
   }
-  /** Compras de um cartão que entram na fatura do mês: [fechamento anterior, fechamento do mês) — sem fechamento: null */
+  /**
+   * Compras de um cartão que entram na fatura do mês: do dia SEGUINTE ao fechamento anterior até o dia do fechamento
+   * do mês, inclusive (fecha dia 5: compra no dia 5 entra; no dia 6, vai para a fatura seguinte). Devolve [inicio, fim)
+   * com fim = dia seguinte ao fechamento, para comparar datas com >= e <. Sem fechamento: null (mês do calendário).
+   */
   function faixaDoCartao(c: Conta, mes: string): { inicio: string; fim: string } | null {
     const f = Number(cicloDoCartao(c, mes).fechamento), fa = Number(cicloDoCartao(c, somarMes(mes, -1)).fechamento);
     if (!(f >= 1 && fa >= 1)) return null;
-    return { inicio: dataNoMes(somarMes(mes, -1), fa), fim: dataNoMes(mes, f) };
+    return { inicio: diaSeguinte(dataNoMes(somarMes(mes, -1), fa)), fim: diaSeguinte(dataNoMes(mes, f)) };
   }
   // pagamento do cartão gravado antes da marca pagamentoCartao (3.17 e anteriores): o texto que o "Pagar fatura" gerava
   const PAGAMENTO_ANTIGO = "Pagamento da fatura do cartão de crédito ";
   function pagamentoDoCartao(l: Lancamento, conta: Conta): boolean {
+    if (l.tipo === "fatura") return true;
     if (conta.tipo !== "cartao") return false;
     if (l.tipo === "interno") return l.sentido === "entrada";
     return l.tipo === "receita" && (!!l.pagamentoCartao || (l.descricao === "Pagamento fatura" && String(l.notas || "").startsWith(PAGAMENTO_ANTIGO)));
   }
-  /** Transações cobradas do perfil na fatura do mês, em ordem de data */
-  function cobrancaDoMes(perfilId: Id, mes: string): Lancamento[] {
-    const contas = new Map(doc.contas.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo").map((c) => [c.id, c] as const));
+  /**
+   * Transações cobradas na fatura do mês, em ordem de data: só cartão de crédito. perfilId null = todos os perfis
+   * (inclusive as compras sem perfil, nos cartões da moeda atual); cartaoId null = todos os cartões.
+   */
+  function cobrancaDoMes(perfilId: Id | null, mes: string, cartaoId: Id | null = null): Lancamento[] {
+    const contas = new Map(doc.contas.filter((c) => c.tipo === "cartao" && (!cartaoId || c.id === cartaoId)
+      && (perfilId || moedaDe(c) === moedaAtual())).map((c) => [c.id, c] as const));
     const faixas = new Map<Id, { inicio: string; fim: string } | null>();
     return doc.lancamentos.filter((l) => {
-      const c = l.perfilId === perfilId && !l.valorInvalido && l.contaId ? contas.get(l.contaId) : undefined;
+      const c = (perfilId === null || l.perfilId === perfilId) && !l.valorInvalido && l.contaId ? contas.get(l.contaId) : undefined;
       if (!c || pagamentoDoCartao(l, c)) return false;
-      if (c.tipo !== "cartao") return l.data.startsWith(mes);
       if (!faixas.has(c.id)) faixas.set(c.id, faixaDoCartao(c, mes));
       const f = faixas.get(c.id);
       return f ? l.data >= f.inicio && l.data < f.fim : l.data.startsWith(mes);
@@ -1066,6 +1130,40 @@
     }).filter((x) => x.descricao || x.valor);
   }
 
+  /**
+   * Editar o pagamento de fatura (a transação do pagante): valor, data, conta pagante, perfil, categoria, nome e notas.
+   * O tipo não muda. A transação do cartão acompanha valor, data, nome e notas. Valor maior ou outra conta: as mesmas
+   * regras do "Pagar fatura" (até a dívida do cartão e até o saldo da conta, contando o que este pagamento já tirou).
+   */
+  function editarPagamentoFatura(antigo: Lancamento, e: Dados): Lancamento {
+    if (!antigo.pagamento || antigo.pagamento.lado !== "pagante") throw erro("OPERATION_FAILED");
+    if (e.tipo !== undefined && e.tipo !== "fatura") throw erro("PAYMENT_TYPE_LOCKED");
+    const par = parDoPagamento(antigo);
+    const cartao = par ? doc.contas.find((c) => c.id === par.contaId && c.tipo === "cartao") : undefined;
+    const data = dataValida(e.data), valor = numero(e.valor), descricao = texto(e.descricao, NOME());
+    if (!data || !descricao || !(r2(valor) > 0) || valor > 1e12) throw erro("OPERATION_FAILED");
+    const conta = doc.contas.find((c) => c.id === e.contaId);
+    if (!conta || !CONTAS_PAGAMENTO.includes(conta.tipo) || moedaDe(conta) !== moedaDe(antigo)) throw erro("PAYMENT_ACCOUNT");
+    const comPerfis = avancado() && doc.perfis.some((p) => !p.arquivado && moedaDe(p) === moedaDe(antigo));
+    const perfilId = avancado() ? perfilPermitido(e.perfilId, antigo) : antigo.perfilId || null;
+    if (comPerfis && !perfilId) throw erro("PROFILE_REQUIRED");
+    const c = (v: number) => Math.round(v * 100);
+    const subiu = c(valor) > c(antigo.valor), outraConta = conta.id !== antigo.contaId;
+    if (cartao && subiu) {
+      // dívida antes deste pagamento = dívida de agora + o que ele já abateu
+      const abatido = par && par.efeito ? -par.efeito.delta : 0;
+      if (c(valor) > c(saldoAtual(cartao) + abatido)) throw erro("PAYMENT_ABOVE_INVOICE");
+    }
+    if (subiu || outraConta) {
+      const devolvido = antigo.efeito && antigo.efeito.contaId === conta.id ? -antigo.efeito.delta : 0;
+      if (c(valor) > c(saldoAtual(conta) + devolvido)) throw erro("INSUFFICIENT_FUNDS");
+    }
+    const notas = texto(e.notas, 2000);
+    Object.assign(antigo, { data, valor: r2(valor), descricao, notas, contaId: conta.id, perfilId, categoriaId: existe(doc.categorias, e.categoriaId), competencia: mesDe(data) });
+    if (par) Object.assign(par, { data, valor: r2(valor), descricao, notas, competencia: mesDe(data) });
+    return antigo;
+  }
+
   // cada gravação devolve exatamente RespostasEscrita[ação] (ui/src/dados.d.ts): o compilador confere
   const ESCRITAS: { readonly [K in NomeEscrita]: (d: Dados) => RespostasEscrita[K] } = {
     /* Lançamentos */
@@ -1082,6 +1180,7 @@
       const i = doc.lancamentos.findIndex((l) => l.id === d.id);
       if (i < 0) throw erro("OPERATION_FAILED");
       const antigo = doc.lancamentos[i];
+      if (antigo.tipo === "fatura") return { lancamento: enriquecer(editarPagamentoFatura(antigo, objeto(d.lancamento) ? d.lancamento : {})) };
       const novo = Object.assign({ id: d.id }, lerLancamento(d.lancamento, antigo));
       const divisaoAntiga = antigo.divisao;
       if (divisaoAntiga) {
@@ -1107,8 +1206,10 @@
       if (!alvo) throw erro("OPERATION_FAILED");
       // Excluir a origem: parcelas futuras automáticas saem; pagamentos já registrados ficam
       encerrarSerieDe(alvo);
-      reverterEfeito(alvo);                                                   // transação excluída devolve o efeito no saldo
-      doc.lancamentos = doc.lancamentos.filter((l) => l.id !== d.id);
+      // pagamento de fatura: as duas transações saem juntas (e cada uma devolve o efeito no saldo)
+      const ids = comOsPares([alvo.id]);
+      doc.lancamentos.filter((l) => ids.has(l.id)).forEach(reverterEfeito);   // transação excluída devolve o efeito no saldo
+      doc.lancamentos = doc.lancamentos.filter((l) => !ids.has(l.id));
       if (alvo.divisao) ajustarDivisao(alvo.divisao.id);
       return { id: d.id };
     },
@@ -1142,7 +1243,7 @@
     [A.tornarRecorrente]: (d) => {
       conferirLimiteDemo("recorrencia");
       const l = doc.lancamentos.find((x) => x.id === d.id);
-      if (!l || (l.serieId && l.serieId !== l.id && !String(l.serieId).startsWith("removida:"))) throw erro("OPERATION_FAILED");
+      if (!l || l.tipo === "fatura" || (l.serieId && l.serieId !== l.id && !String(l.serieId).startsWith("removida:"))) throw erro("OPERATION_FAILED");
       const rec = recorrenciaValida(d.recorrencia);
       let pa = null, pt = null;
       if (rec === "parcelada") {
@@ -1174,7 +1275,7 @@
     [A.vincularRecorrencia]: (d) => {
       const l = doc.lancamentos.find((x) => x.id === d.id);
       const o = doc.lancamentos.find((x) => x.id === d.serieId && ehOrigem(x));
-      if (!l || !o || l.id === o.id || ehOrigem(l)) throw erro("OPERATION_FAILED");
+      if (!l || !o || l.id === o.id || ehOrigem(l) || l.tipo === "fatura") throw erro("OPERATION_FAILED");
       if (l.divisao) throw erro("SPLIT_INVALID");                           // parte de divisão não entra em recorrência
       const mes = mesDe(l.data);
       Object.assign(l, { tipo: "recorrente", recorrencia: o.recorrencia, serieId: o.id, competencia: mes, ocorrencia: l.data, sentido: null,
@@ -1202,7 +1303,7 @@
       const base = doc.lancamentos.find((l) => l.id === d.id);
       // Recorrente: a ORIGEM da série vira uma série por parte (cada uma com o seu perfil). Uma OCORRÊNCIA já
       // lançada (membro da série) divide só aquele mês: todas as partes continuam na mesma série e competência.
-      if (!base) throw erro("SPLIT_INVALID");
+      if (!base || base.tipo === "fatura") throw erro("SPLIT_INVALID");     // pagamento de fatura não se divide
       const recorrente = base.tipo === "recorrente" && ehOrigem(base);
       const grupoBase = base.divisao && base.divisao.id;
       const membros = grupoBase ? doc.lancamentos.filter((l) => l.divisao && l.divisao.id === grupoBase) : [base];
@@ -1332,13 +1433,19 @@
       const data = hojeIso();
       const notas = "Pagamento da fatura do cartão de crédito " + cartao.nome
         + (cartao.ultimos4Digitos ? " com 4 últimos dígitos " + cartao.ultimos4Digitos : "") + ".";
-      const base = { data, descricao: "Pagamento fatura", valor: centavos / 100, perfilId, notas };
-      const debito = Object.assign({ id: novoId("l") }, lerLancamento(Object.assign({ tipo: "debito", contaId: conta.id, categoriaId: categoria.id }, base), null));
-      const receita = Object.assign({ id: novoId("l") }, lerLancamento(Object.assign({ tipo: "receita", contaId: cartao.id, categoriaId: null }, base), null));
-      debito.pagamentoCartao = true; receita.pagamentoCartao = true;     // pagar o cartão não abate a cobrança do perfil
-      doc.lancamentos.push(debito, receita);
+      // duas transações do tipo Fatura: a do pagante (conta e perfil escolhidos, aparece em Transações) e a do
+      // cartão (abate a dívida, aparece só no painel do cartão). Nenhuma entra em gasto, orçamento ou cobrança de perfil.
+      const grupo = novoId("f");
+      const lado = (contaId: Id, extra: Partial<Lancamento>, ladoPag: "pagante" | "cartao"): Lancamento => Object.assign({
+        id: novoId("l"), data, descricao: "Pagamento fatura", valor: centavos / 100, tipo: "fatura", contaId, categoriaId: null, perfilId: null, notas,
+        recorrencia: null, parcelaAtual: null, parcelaTotal: null, sentido: null, direcao: null, serieId: null, competencia: mesDe(data),
+        encerradaEm: null, moeda: moedaDe(cartao), pagamento: { grupo, lado: ladoPag },
+      }, extra);
+      const pagante = lado(conta.id, { categoriaId: categoria.id, perfilId }, "pagante");
+      const doCartao = lado(cartao.id, {}, "cartao");
+      doc.lancamentos.push(pagante, doCartao);
       contarDemo("pagamento");
-      return { debito: enriquecer(debito), receita: enriquecer(receita) };
+      return { pagamento: enriquecer(pagante), cartao: enriquecer(doCartao) };
     },
 
     /* Contas */
@@ -1535,9 +1642,11 @@
       if (d.perfilId !== undefined) { exigir(avancado()); perfilId = d.perfilId ? perfilPermitido(d.perfilId, null) : null; }
       // Débito sai de uma conta: nenhuma das escolhidas pode estar num cartão (ou sem conta)
       if (tipo === "debito" && doc.lancamentos.some((l) => ids.includes(l.id) && !doc.contas.some((c) => c.id === l.contaId && c.tipo !== "cartao"))) throw erro("DEBIT_ACCOUNT");
+      // pagamento de fatura não muda de tipo; o lado do cartão não recebe perfil nem categoria
+      if (tipo && doc.lancamentos.some((l) => ids.includes(l.id) && l.tipo === "fatura")) throw erro("PAYMENT_TYPE_LOCKED");
       let n = 0;
       doc.lancamentos.forEach((l) => {
-        if (!ids.includes(l.id)) return;
+        if (!ids.includes(l.id) || ladoDoCartao(l)) return;
         if (tipo) { encerrarSerieDe(l); l.tipo = tipo; l.recorrencia = null; l.parcelaAtual = null; l.parcelaTotal = null; }
         if (perfilId !== undefined) l.perfilId = perfilId;
         if (categoriaId !== undefined) l.categoriaId = categoriaId;
@@ -1547,7 +1656,7 @@
       return { alterados: n };
     },
     [A.deleteLancamentos]: (d) => {
-      const ids = new Set(Array.isArray(d.ids) ? d.ids : []);
+      const ids = comOsPares(Array.isArray(d.ids) ? d.ids : []);
       const antes = doc.lancamentos.length;
       const grupos = new Set<string>();
       doc.lancamentos.filter((l) => ids.has(l.id)).forEach((l) => { encerrarSerieDe(l); reverterEfeito(l); if (l.divisao) grupos.add(l.divisao.id); });

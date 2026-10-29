@@ -339,26 +339,28 @@ const diaDoMes = (n, dia) => mesMais(n) + "-" + String(dia).padStart(2, "0");
 const amanha = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const soma = (ls) => Math.round(ls.reduce((s, l) => s + l.naFatura * 100, 0)) / 100;
 
-for (const [rotulo, fechamento] of [["cartão com fechamento no dia 1 (ciclo = este mês, fecha no dia 1 do mês seguinte)", 1], ["cartão sem fechamento (ciclo = mês do calendário)", null]]) {
-  test("painel da conta: " + rotulo + " — fatura anterior, pagamento e compras somam o total", async () => {
+const diaHoje = () => new Date().getDate();
+for (const [rotulo, comFechamento] of [["cartão que fecha hoje (o dia do fechamento ainda é desta fatura)", true], ["cartão sem fechamento (ciclo = mês do calendário)", false]]) {
+  test("painel da conta: " + rotulo + " — fatura anterior, compras e pagamento somam a fatura atual", async () => {
     const t = carregar({ recursos: { perfis: false, boleto: false, pix: false, cambio: false } });
     const { conta: banco } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 1000 } });
-    const { conta: cartao } = await t.req(t.A.createConta, { conta: Object.assign({ nome: "Bradesco", tipo: "cartao", saldo: 0 }, fechamento ? { fechamento, vencimento: 10 } : {}) });
-    // fatura anterior: compra no mês passado
-    await t.req(t.A.createLancamento, { lancamento: { data: diaDoMes(-1, 15), descricao: "Viagem", valor: 300, tipo: "regular", contaId: cartao.id } });
+    const { conta: cartao } = await t.req(t.A.createConta, { conta: Object.assign({ nome: "Bradesco", tipo: "cartao", saldo: 0 }, comFechamento ? { fechamento: diaHoje(), vencimento: 10 } : {}) });
+    // fatura anterior: compra de dois meses atrás (antes de qualquer ciclo que contém hoje)
+    await t.req(t.A.createLancamento, { lancamento: { data: diaDoMes(-2, 15), descricao: "Viagem", valor: 300, tipo: "regular", contaId: cartao.id } });
     await t.req(t.A.pagarFatura, { cartaoId: cartao.id, contaId: banco.id, valor: 300 });                      // paga a anterior (hoje)
     await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Mercado", valor: 120, tipo: "regular", contaId: cartao.id } });
     await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Devolução", valor: 20, tipo: "estorno", contaId: cartao.id } });
     await t.req(t.A.createLancamento, { lancamento: { data: amanha(), descricao: "Futura", valor: 999, tipo: "regular", contaId: cartao.id } });
     const e = await t.req(t.A.getExtratoConta, { id: cartao.id });
     assert.equal(e.tipo, "fatura");
-    assert.equal(e.mes, fechamento ? mesMais(1) : mesMais(0));                 // fatura nomeada pelo mês do fechamento
-    assert.equal(e.anterior, -300);                                          // o que se devia antes do ciclo
+    assert.equal(e.mes, mesMais(0));                                          // fecha hoje: ainda é a fatura deste mês
+    if (comFechamento) assert.equal(e.fechamento, hoje());
+    assert.equal(e.anterior, 300);                                           // o que se devia antes do ciclo, sem sinal
     assert.deepEqual([...e.lancamentos].map((l) => [l.descricao, l.naFatura]).sort(),
-      [["Devolução", 20], ["Mercado", -120], ["Pagamento fatura", 300]]);    // compra negativa; pagamento e estorno positivos
-    assert.equal(e.total, -100);                                             // a dívida de agora, com o sinal da fatura
+      [["Devolução", -20], ["Mercado", 120], ["Pagamento fatura", -300]]);   // compra sem sinal; pagamento e estorno negativos
+    assert.equal(e.total, 100);                                              // a fatura atual = a dívida de agora
     assert.equal(Math.round((e.anterior + soma(e.lancamentos)) * 100) / 100, e.total);   // as linhas fecham o total
-    assert.equal(-e.total, await saldo(t, cartao.id));                       // e o total é o saldo do cartão
+    assert.equal(e.total, await saldo(t, cartao.id));                        // e o total é o saldo do cartão
     assert.ok(!e.lancamentos.some((l) => l.descricao === "Futura" || l.descricao === "Viagem"));
   });
 }

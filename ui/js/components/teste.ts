@@ -144,6 +144,7 @@
             tipoLanc("estorno", "Estorno", (l) => l.tipo === "estorno"),
             tipoLanc("débito", "Débito", (l) => l.tipo === "debito"),
             tipoLanc("transferência", "Transferência", (l) => l.tipo === "interno"),
+            tipoLanc("pagamento de fatura", "Fatura", (l) => l.tipo === "fatura"),
             tipoLanc("recorrente", "Recorrente", (l) => l.tipo === "recorrente" && l.recorrencia !== "parcelada"),
             tipoLanc("parcelada", "Parcelada", (l) => l.recorrencia === "parcelada"),
             tipoLanc("dividida", "Dividida", (l) => !!l.divisao)),

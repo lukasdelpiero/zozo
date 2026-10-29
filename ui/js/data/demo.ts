@@ -158,7 +158,12 @@
       const dTr = dia(s.entre(8, 20));
       if (principal && passou(dTr) && s.r() < 0.7) lancamentos.push(base(dTr, "Transferência para poupança", principal.id, transf.id, s.valor(300, 2000), "interno", { sentido: "saida", direcao: "saida" }));
       const dFat = dia(25);
-      if (principal && cartoes.length && passou(dFat)) lancamentos.push(base(dFat, "Pagamento fatura " + cartoes[0].nome, principal.id, fatura.id, s.valor(800, 3800), "interno", { sentido: "saida", direcao: "saida" }));
+      if (principal && cartoes.length && passou(dFat)) {
+        // pagamento de fatura: o par do tipo Fatura (o do pagante aparece em Transações; o do cartão, só no painel do cartão)
+        const grupo = id("f"), valor = s.valor(800, 3800);
+        lancamentos.push(base(dFat, "Pagamento fatura", principal.id, fatura.id, valor, "fatura", { pagamento: { grupo, lado: "pagante" } }),
+          base(dFat, "Pagamento fatura", cartoes[0].id, null, valor, "fatura", { perfilId: null, pagamento: { grupo, lado: "cartao" } }));
+      }
     }
 
     // Compra parcelada (às vezes): a parcela atual fica no mês de hoje e o serviço gera as próximas

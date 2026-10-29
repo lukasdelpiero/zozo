@@ -15,7 +15,8 @@ declare global {
   type Moeda = CodigoMoeda;
   type Sentido = "entrada" | "saida";
   type TipoConta = "cartao" | "corrente" | "poupanca" | "investimento" | "emprestimo" | "outros";
-  type TipoLancamento = "regular" | "recorrente" | "interno" | "receita" | "estorno" | "debito";
+  /** "fatura": pagamento de fatura (só o "Pagar fatura" cria; não está nos menus de tipo) */
+  type TipoLancamento = "regular" | "recorrente" | "interno" | "receita" | "estorno" | "debito" | "fatura";
 
   interface PontoSaldo { data: string; saldo: number }
   interface CicloCartao { fechamento: number | null; vencimento: number | null }
@@ -41,8 +42,10 @@ declare global {
     moeda?: Moeda; debito?: boolean; valorParcela?: number; valorTotal?: number; efeito?: Efeito; divisao?: Divisao | null;
     automatico?: boolean; editado?: boolean; ignorados?: string[]; ocorrencia?: string; valorInvalido?: boolean;
     debitado?: { contaId: Id; valor: number };          // formato anterior (2.8–3.1)
-    /** "Pagar fatura": o par débito (conta) + receita (cartão) do pagamento do CARTÃO ao banco (não é cobrança de perfil) */
+    /** Formato anterior do "Pagar fatura" (débito na conta + receita no cartão): convertido para o tipo "fatura" ao abrir */
     pagamentoCartao?: boolean;
+    /** Pagamento de fatura (tipo "fatura"): as duas transações têm o mesmo grupo; "pagante" aparece em Transações, "cartao" não */
+    pagamento?: { grupo: Id; lado: "pagante" | "cartao" };
     /** Receita que quita a fatura de um perfil: o mês ("AAAA-MM") da fatura paga (o perfil é o do lançamento) */
     faturaPerfil?: string;
   }
@@ -65,7 +68,9 @@ declare global {
   /* ---------------- o que as telas recebem ---------------- */
   type ResumoCategoria = { nome: string; icone: string; cor: string | null };
   /** Lançamento como a interface o recebe: com nome da conta, categoria e perfil */
-  type LancamentoTela = Lancamento & { nomeConta: string; ultimos4Digitos: string; categoria: ResumoCategoria | null; perfil: { nome: string; cor: string | null } | null };
+  /** parFatura: no pagamento de fatura, o id da outra transação do par (a do cartão abre a do pagante) */
+  type LancamentoTela = Lancamento & { nomeConta: string; ultimos4Digitos: string; categoria: ResumoCategoria | null; perfil: { nome: string; cor: string | null } | null;
+    parFatura?: Id | null };
   interface ContaTela {
     id: Id; nome: string; ultimos4Digitos: string; tipo: string; tipoInvestimento: string; oculta: boolean; cor: string | null | undefined;
     instituicao: string; limite: number | null; fechamento: number | null; vencimento: number | null; ciclos: Record<string, CicloCartao>;
@@ -119,8 +124,9 @@ declare global {
     gastoMensal: { mes: string; dias: Array<{ data: string; valor: number }>; total: number; orcamento: number; ultimoDia: number };
     contas: RespostaContas; categorias: RespostaCategorias; recorrencias: RespostaRecorrencias; ultimosLancamentos: LancamentoTela[];
   }
+  /** todos: perfil "Todos"; cartaoId: o cartão escolhido (null = todos); consulta: sem ajustes, recebidos, saldo anterior e Pix */
   interface RespostaFatura {
-    perfil: Perfil | null; mes: string; moeda: Moeda;
+    perfil: Perfil | null; todos: boolean; cartaoId: Id | null; consulta: boolean; mes: string; moeda: Moeda;
     lancamentos: LancamentoTela[];
     ajustes: FaturaGuardada;
     periodos: Array<{ contaId: Id; nome: string; ultimos4Digitos: string; inicio: string; fim: string; semFechamento: boolean }>;
@@ -215,7 +221,7 @@ declare global {
     dividirLancamento: { id: Id; grupo: string };
     salvarFatura: { ok: boolean };
     receberFatura: { lancamento: LancamentoTela };
-    pagarFatura: { debito: LancamentoTela; receita: LancamentoTela };
+    pagarFatura: { pagamento: LancamentoTela; cartao: LancamentoTela };
     createConta: { conta: ContaTela };
     updateCicloCartao: { conta: ContaTela };
     updateConta: { conta: ContaTela; id: Id; cor: string | null | undefined };

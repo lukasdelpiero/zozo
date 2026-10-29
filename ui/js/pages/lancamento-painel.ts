@@ -25,12 +25,12 @@
   /** O que o rótulo da recorrência precisa (transação de origem ou a escolha ainda não gravada) */
   type ComRecorrencia = Pick<Lancamento, "recorrencia" | "parcelaAtual" | "parcelaTotal">;
 
-  const NOMES: Record<string, string> = { regular: "Regular", estorno: "Regular", interno: "Transferência", receita: "Receita", debito: "Débito", recorrente: "Recorrente" };
+  const NOMES: Record<string, string> = { regular: "Regular", estorno: "Regular", interno: "Transferência", receita: "Receita", debito: "Débito", recorrente: "Recorrente", fatura: "Fatura" };
 
   /** Tipos para os quais uma transação pode mudar */
   function tiposPermitidos(l: TipoDaTransacao, novo: boolean): string[] {
     if (novo) return ["regular", "interno", "receita", "debito"];
-    if (l.tipo === "recorrente") return [];                           // permanece "Recorrente"
+    if (l.tipo === "recorrente" || l.tipo === "fatura") return [];   // permanece "Recorrente" / "Fatura" (pagamento de fatura)
     if (l.tipo === "regular" || l.tipo === "estorno") return ["regular", "interno", "receita", "debito"];
     if (l.tipo === "interno") return ["interno", "regular", "receita", "debito"];
     if (l.tipo === "receita") return ["receita", "interno", "regular", "debito"];
@@ -39,8 +39,9 @@
   }
   const ehVerde = (d: TipoDaTransacao) => d.tipo === "receita" || d.tipo === "estorno" || (d.tipo === "interno" && d.sentido === "entrada");
   // Débito: como Receita, mas é saída (sem verde) e tem Categoria e Recorrência
-  const temCategoria = (d: TipoDaTransacao) => d.tipo === "regular" || d.tipo === "estorno" || d.tipo === "recorrente" || d.tipo === "debito";
-  const ehDebito = (d: TipoDaTransacao) => d.tipo === "debito" || (d.tipo === "recorrente" && d.debito === true);
+  const temCategoria = (d: TipoDaTransacao) => d.tipo === "regular" || d.tipo === "estorno" || d.tipo === "recorrente" || d.tipo === "debito" || d.tipo === "fatura";
+  // Débito e pagamento de fatura saem de uma conta (cartão não)
+  const ehDebito = (d: TipoDaTransacao) => d.tipo === "debito" || d.tipo === "fatura" || (d.tipo === "recorrente" && d.debito === true);
   const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   function dataLonga(iso: string) {
@@ -207,7 +208,7 @@
 
     /** "Despesa ▾" / "Saída ▾" acima do valor */
     function subtipo() {
-      if (d.tipo === "debito" || d.tipo === "receita" || d.tipo === "recorrente") return null;    // débito é sempre saída: sem rótulo
+      if (d.tipo === "debito" || d.tipo === "receita" || d.tipo === "recorrente" || d.tipo === "fatura") return null;    // débito é sempre saída: sem rótulo
       const regular = d.tipo === "regular" || d.tipo === "estorno";
       const opcoes = regular ? [["regular", "Despesa"], ["estorno", "Estorno"]] : [["saida", "Saída"], ["entrada", "Entrada"]];
       const atual = regular ? d.tipo : d.sentido;
@@ -247,7 +248,7 @@
           const antes = d.contaId; d.contaId = c.id;
           if (novo) desenhar(); else salvar(() => { d.contaId = antes; }).then(reabrir);
         },
-        vazio: ehDebito(d) ? "Nenhuma conta (cartão não vale para débito)" : "Nenhuma conta cadastrada",
+        vazio: ehDebito(d) ? "Nenhuma conta (cartão não vale para " + (d.tipo === "fatura" ? "pagar a fatura)" : "débito)") : "Nenhuma conta cadastrada",
         rodape: [ehDebito(d)
           ? { icone: "mais", label: "Nova conta", onClick: () => novaConta("corrente") }
           : { icone: "mais", label: "Nova conta", submenu: [
@@ -413,7 +414,7 @@
             h("div", { class: ZoZo.pecas.lpPilula }, chipCat, cat ? seta(cat.nome, () => ZoZo.categoriasShared.abrirDetalhe(cat, ctx, { voltar: voltarParaCa })) : null)) : null,
           comPerfis ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Perfil"),
             h("div", { class: ZoZo.pecas.lpPilula }, campoPerfil(), perfil ? seta(perfil.nome, () => ZoZo.perfilShared.abrirDetalhe(perfil, ctx, { voltar: voltarParaCa })) : null)) : null,
-          temCategoria(d) ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Recorrência"),
+          temCategoria(d) && d.tipo !== "fatura" ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Recorrência"),
             h("div", { class: ZoZo.pecas.lpPilula }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
           // Divisão entre perfis: rachada → resumo; senão o "+" (igual ao da recorrência; também em recorrentes já criadas)
           podeDividir ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Divisão"),
@@ -462,7 +463,7 @@
     const abrirDivisao = () => ZoZo.dividir.abrir(gravada, ctx, (id) => { abrir({ id }, ctx, opts); });
     // Dividir: qualquer transação já criada — inclusive recorrente (origem: uma série por parte;
     // ocorrência já lançada: divide só aquele mês, as partes continuam na série)
-    const podeDividir = comPerfis && !novo;
+    const podeDividir = comPerfis && !novo && d.tipo !== "fatura";             // pagamento de fatura não se divide
 
     ctx.detail.open({
       tituloNode: tituloBtn,

@@ -15,7 +15,7 @@
   /** Opções comuns das linhas clicáveis */
   type OpcoesLinha = { onClick?: () => void; selected?: boolean; class?: string };
   type Destacar = (texto: string) => Array<string | { marca: string }>;
-  const MARCAS: Record<string, string> = { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito" };
+  const MARCAS: Record<string, string> = { P: "Parcelado", R: "Recorrente", T: "Transferência", I: "Receita", D: "Débito", F: "Pagamento de fatura" };
 
   const SUBTITULO_CONTA: Record<string, string> = { corrente: "Corrente", poupanca: "Poupança", investimento: "Investimento", emprestimo: "Empréstimo" };
 
@@ -98,7 +98,7 @@
   function LaunchRow(l: LancamentoTela, opts?: OpcoesLinha & { marcado?: boolean; onMarcar?: (marcado: boolean) => void; resumo?: boolean; mostrarData?: boolean; destacar?: Destacar | null }): HTMLElement {
     const o = opts || {};
     const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
-    const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
+    const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : l.tipo === "fatura" ? "F" : null;
     const marcaTitulo = (marca && MARCAS[marca]) || "";
     const resumo = !!o.resumo;
     const V = resumo ? LR.resumo : LR.pagina;
@@ -328,10 +328,13 @@
 
   /* ---------- Lista de lançamentos nos painéis (formato do Copilot) ----------
      Mês (total) → dia → [☐] [T|R|I|P] Nome ........ [ícone da categoria] valor */
-  function ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number }): HTMLElement {
+  function ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number; semMais?: boolean }): HTMLElement {
     const o = opts || {};
-    // valorDe: valor com sinal (ex.: na fatura do cartão, compra negativa e pagamento positivo); o mês soma esses valores
-    const comSinal = (v: number) => h("span", { class: ["money", v > 0 && "money--income"] }, (v > 0 ? "+" : "") + F.moeda(v, { comSinal: true }));
+    // valorDe: valor com sinal; o mês soma esses valores. semMais (fatura do cartão): compra sem sinal; pagamento e
+    // estorno com "−" (em verde: diminuem a dívida). Sem semMais: positivo com "+" em verde.
+    const comSinal = (v: number) => (o.semMais
+      ? h("span", { class: ["money", v < 0 && "money--income"] }, (v < 0 ? "− " : "") + F.moeda(Math.abs(v)))
+      : h("span", { class: ["money", v > 0 && "money--income"] }, (v > 0 ? "+" : "") + F.moeda(v, { comSinal: true })));
     const T = ZoZo.regras.totais;
     const marcados = new Set(ZoZo.store.get().ui.selecionados || []);
     const ordenados = itens.slice().sort((a, b) => b.data.localeCompare(a.data));
@@ -361,7 +364,7 @@
         lista = h("div", { class: ZoZo.pecas.plLista });
         secao.appendChild(lista);
       }
-      const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : null;
+      const marca = l.tipo === "recorrente" ? (l.recorrencia === "parcelada" ? "P" : "R") : l.tipo === "interno" ? "T" : l.tipo === "receita" ? "I" : l.tipo === "debito" ? "D" : l.tipo === "fatura" ? "F" : null;
       const verde = ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
       const marcado = marcados.has(l.id);
       // A linha inteira abre com o mouse; no teclado (e no leitor de tela) quem abre é o botão do nome —

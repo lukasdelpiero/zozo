@@ -144,6 +144,7 @@
     TOKEN_INVALID: "O link que clicou expirou ou é inválido.",
     CODE_REQUIRED: "Digite o código de 6 dígitos do seu aplicativo 2FA.",
     CONFIRMATION_REQUIRED: "Digite EXCLUIR CONTA para confirmar.",
+    PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",
     LOAN_INVALID: "Confira o empréstimo: valores de 0 a 1 trilhão, 1º vencimento numa data válida e de 1 a 600 parcelas.",

@@ -112,6 +112,7 @@
     { value: "regular", label: "Regular" },
     { value: "estorno", label: "Estorno" },
     { value: "recorrente", label: "Recorrente" },
+    { value: "fatura", label: "Fatura" },
   ];
 
   function intervalo(periodo: string | null): [Date, Date] | null {
@@ -137,7 +138,7 @@
   /* ---------------- Pesquisa (busca local: js/core/busca.ts) ----------------
      Os dados são cifrados de ponta a ponta, então a busca roda aqui. Campos e pesos: descrição pesa
      mais; valor e data entram em vários formatos ("1.234,56", "1234", "11/10", "outubro"). */
-  const TIPO_BUSCA: Record<string, string> = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito" };
+  const TIPO_BUSCA: Record<string, string> = { regular: "regular despesa", recorrente: "recorrente", interno: "transferencia", receita: "receita entrada", estorno: "estorno", debito: "debito", fatura: "fatura pagamento" };
   function valorBusca(v: unknown) {
     const n = Math.abs(F.numero(v)), inteiro = Math.trunc(n);
     return [F.moedaEditavel(n), n.toFixed(2).replace(".", ","), n.toFixed(2), String(inteiro), F.moedaEditavel(inteiro).replace(/,00$/, "")].join(" ");

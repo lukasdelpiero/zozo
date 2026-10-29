@@ -498,7 +498,7 @@ declare global {
 
   /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
   interface ZoZoList {
-    ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number }): HTMLElement;
+    ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number; semMais?: boolean }): HTMLElement;
     LaunchRow(l: LancamentoTela, opts?: Record<string, unknown>): HTMLElement;
     AccountRow(c: ContaTela, opts?: Record<string, unknown>): HTMLElement;
     CategoryRow(cat: CategoriaTela, opts?: Record<string, unknown>): HTMLElement;

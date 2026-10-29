@@ -14,7 +14,9 @@
       versao: "3.18.0", quando: "outubro de 2026",
       itens: [
         { icone: "💳", tipo: "melhoria", titulo: "Fatura do cartão mais clara",
-          texto: "Agora você vê a fatura aberta do cartão com a fatura anterior, o pagamento e as compras do mês, tudo somado no final." },
+          texto: "Agora você vê a fatura anterior, as compras do mês e a fatura atual, e o pagamento da fatura aparece como uma transação só." },
+        { icone: "🗂️", tipo: "novo", titulo: "Fatura de todos os perfis",
+          texto: "Na hora de gerar a fatura, escolha Todos para ver o gasto de todos os perfis, ou fique com um cartão só." },
         { icone: "🧾", tipo: "novo", titulo: "Quem já pagou a fatura",
           texto: "Anote quanto cada perfil já te pagou e veja na hora se a fatura está quitada ou quanto ainda falta." },
         { icone: "🔐", tipo: "melhoria", titulo: "Sua conta ainda mais protegida",
@@ -22,7 +24,7 @@
         { icone: "⚡", tipo: "melhoria", titulo: "Transações mais rápidas",
           texto: "Mesmo com muitas transações, abrir, marcar e pesquisar ficou bem mais ágil." },
         { icone: "🛠️", tipo: "correcao", titulo: "Pequenos ajustes",
-          texto: "O mês atual voltou a aparecer nos painéis e na pesquisa, e agora avisamos quando você apaga os dados ou troca a senha." },
+          texto: "A compra feita no dia do fechamento agora entra na fatura certa, e o mês atual voltou a aparecer nos painéis e na pesquisa." },
       ],
     },
   ];

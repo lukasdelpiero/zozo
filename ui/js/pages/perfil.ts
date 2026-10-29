@@ -290,7 +290,7 @@
     // Número: sempre gerado aqui (nunca vem do usuário), fica numérico no Excel
     const numero = (v: number) => v.toFixed(2).replace(".", ",");
     const entra = (l: LancamentoTela) => ZoZo.regras.tiposValorVerde.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada");
-    const tipos: Record<string, string> = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno" };
+    const tipos: Record<string, string> = { regular: "Regular", recorrente: "Recorrente", interno: "Transferência", receita: "Receita", debito: "Débito", estorno: "Estorno", fatura: "Fatura" };
     const freq = ZoZo.servico.FREQUENCIAS;
     const comPerfil = ZoZo.recursos.perfis();             // coluna Perfil só para contas com o recurso
     const linhas = [["Data", "Nome", "Valor"].concat(moeda ? ["Moeda"] : [], ["Tipo", "Conta", "Categoria"], comPerfil ? ["Perfil"] : [], ["Recorrência", "Parcela", "Notas"]).join(";")];
