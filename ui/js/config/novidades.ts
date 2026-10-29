@@ -14,7 +14,7 @@
       versao: "3.18.0", quando: "outubro de 2026",
       itens: [
         { icone: "💬", tipo: "novo", titulo: "Conheça o Zo",
-          texto: "Toque no Z no canto da tela e peça ao Zo para lançar uma compra, criar uma categoria ou resumir o seu mês." },
+          texto: "Toque no Z no canto da tela e peça ao Zo para lançar uma compra, importar o arquivo do seu banco ou resumir o seu mês." },
         { icone: "💳", tipo: "melhoria", titulo: "Fatura do cartão mais clara",
           texto: "Agora você vê a fatura anterior, as compras do mês e a fatura atual, e o pagamento da fatura aparece como uma transação só." },
         { icone: "🗂️", tipo: "novo", titulo: "Fatura de todos os perfis",

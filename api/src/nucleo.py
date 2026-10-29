@@ -100,7 +100,7 @@ CONTA_CAPTCHA, CONTA_JANELA_S = 20, 3600   # 20 falhas/h na conta (todos os IPs)
 CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
 ENTRADAS_POR_IP, ENTRADA_JANELA_S = 30, 600          # logins (certos ou errados) por IP: a senha da demo é pública
 COTA_DADOS, COTA_JANELA_S = 600, 600                 # pedidos às rotas de dados por conta (leituras e gravações)
-ZO_POR_DIA, ZO_JANELA_S = 150, 86400                 # pedidos ao Zo por conta por dia (cada ida à OpenAI conta)
+ZO_POR_DIA, ZO_JANELA_S = 150, 86400                 # pedidos ao Zo por conta por dia (cada ida ao Gemini conta)
 ZO_OFENSAS_POR_DIA = 3                               # mensagens ofensivas/discriminatórias toleradas: depois, o Zo pausa no dia
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
@@ -1200,26 +1200,33 @@ async def _google_identidade(ctx: Contexto) -> Resposta:
 async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     """
     Consentimento (GET/PUT /api/zo/consentimento) e conversa (POST /api/zo). Sessão e prova já conferidas.
-    Sem consentimento registrado, nada vai para a OpenAI. Limite diário por conta. Nenhum conteúdo nos logs.
+    Sem o consentimento do aviso ATUAL (zo.CONSENTIMENTO_VERSAO), nada vai para o Gemini. Limite diário por conta.
+    Nenhum conteúdo nos logs.
     """
     p = ctx.pedido
+    atual = zo.CONSENTIMENTO_VERSAO + "|"
     if p.caminho == "/api/zo/consentimento":
         if p.metodo == "GET":
             linha = await ctx.banco.primeiro("SELECT zo_consentimento FROM contas WHERE email = ?", email)
-            return Resposta(200, {"aceito": bool(linha and linha["zo_consentimento"])})
+            return Resposta(200, {"aceito": bool(linha and str(linha["zo_consentimento"] or "").startswith(atual))})
         aceito = b.get("aceito")
         if set(b) != {"aceito"} or not isinstance(aceito, bool):
             raise Falha(400, "INVALID_REQUEST")
-        quando = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(ctx.agora))) if aceito else ""
+        # guarda QUAL aviso foi aceito e quando: mudou o aviso, o consentimento antigo deixa de valer
+        quando = atual + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(ctx.agora))) if aceito else ""
         await ctx.banco.executar("UPDATE contas SET zo_consentimento = ? WHERE email = ?", quando, email)
         ctx.evento("zo_consentimento_dado" if aceito else "zo_consentimento_retirado", email)
         return Resposta(200, {"aceito": aceito})
     linha = await ctx.banco.primeiro("SELECT zo_consentimento, email_verificado FROM contas WHERE email = ?", email)
-    if not linha or not linha["zo_consentimento"]:
+    if not linha or not str(linha["zo_consentimento"] or "").startswith(atual):
         raise Falha(403, "CONSENT_REQUIRED")
-    chave, modelo = str(ctx.config.get("OPENAI_API_KEY") or "").strip(), str(ctx.config.get("ZO_MODELO") or "").strip()
+    chave, modelo = str(ctx.config.get("GEMINI_API_KEY") or "").strip(), str(ctx.config.get("ZO_MODELO") or "").strip()
     if not chave or not modelo:
         raise Falha(503, "ZO_UNAVAILABLE")
+    try:
+        endereco = zo.url(modelo)
+    except zo.Invalido as ex:
+        raise Falha(503, "ZO_UNAVAILABLE") from ex
     if set(b) != {"mensagens"}:
         raise Falha(400, "INVALID_REQUEST")
     try:
@@ -1234,53 +1241,37 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     if await _contar(ctx, f"zo|{ctx.h(email)}", ZO_POR_DIA, ZO_JANELA_S):
         ctx.evento("zo_limite", email)
         raise Falha(429, "ZO_LIMIT", {"espera": ZO_JANELA_S})
-    cab = {"Authorization": "Bearer " + chave, "Content-Type": "application/json"}
-    # Moderação da fala da pessoa ANTES do modelo: discriminação, ódio e assédio não são tolerados (resposta fixa e,
-    # repetidos, pausa no dia); fala de se machucar recebe a resposta de cuidado. Moderação fora do ar: segue (as
-    # instruções do Zo continuam valendo) e fica registrado.
-    if mensagens[-1]["role"] == "user":
-        marcadas = await _moderar(ctx, email, cab, str(mensagens[-1]["content"]))
-        if marcadas & zo.OFENSA:
-            ctx.evento("zo_ofensa", email, categorias=sorted(marcadas & zo.OFENSA))
-            if await _contar(ctx, chave_ofensa, ZO_OFENSAS_POR_DIA, ZO_JANELA_S):
-                raise Falha(429, "ZO_PAUSED", {"espera": ZO_JANELA_S})
-            return Resposta(200, {"texto": zo.TEXTO_RESPEITO, "chamadas": []})
-        if marcadas & zo.CUIDADO:
-            ctx.evento("zo_cuidado", email)
-            return Resposta(200, {"texto": zo.TEXTO_CUIDADO, "chamadas": []})
     # contexto do dia (Brasília) e dos recursos da conta: o Zo sabe o que pode oferecer
     dia = time.gmtime(int(ctx.agora) - 3 * 3600)
     av = _avancado(ctx, email, linha["email_verificado"])
     contexto = (f"Hoje é {dia.tm_mday:02d}/{dia.tm_mon:02d}/{dia.tm_year} ({time.strftime('%Y-%m-%d', dia)}). "
                 f"Perfis {'disponíveis' if av else 'indisponíveis'} nesta conta. Fatura de perfis {'disponível' if av else 'indisponível'}.")
-    corpo = zo.montar_pedido(modelo, mensagens, contexto, ctx.h(email))
-    status, texto = await ctx.servicos.http_post_json(zo.OPENAI_URL, cab, corpo, zo.LIMITE_RESPOSTA)
+    cab = {"x-goog-api-key": chave, "Content-Type": "application/json"}
+    status, texto = await ctx.servicos.http_post_json(endereco, cab, zo.montar_pedido(mensagens, contexto), zo.LIMITE_RESPOSTA)
     if status != 200:
         ctx.evento("zo_falhou", email, status=status)
-        raise Falha(502, "ZO_FAILED")
+        raise Falha(429, "ZO_BUSY") if status == 429 else Falha(502, "ZO_FAILED")    # 429: cota gratuita do Gemini
     try:
         resposta = zo.ler_resposta(texto)
     except zo.Invalido as ex:
         ctx.evento("zo_resposta_invalida", email)
         raise Falha(502, "ZO_FAILED") from ex
-    # a resposta do Zo também passa pela moderação: nada ofensivo chega à pessoa
-    if resposta["texto"] and (await _moderar(ctx, email, cab, resposta["texto"])) & zo.OFENSA:
+    # Filtro de segurança do Gemini: ódio, assédio e discriminação não são tolerados (resposta fixa e, repetidos,
+    # pausa no dia); outros bloqueios recebem uma recusa neutra; resposta barrada nunca chega à pessoa.
+    bloqueio = resposta.pop("bloqueio")
+    if bloqueio == "ofensa":
+        ctx.evento("zo_ofensa", email)
+        if await _contar(ctx, chave_ofensa, ZO_OFENSAS_POR_DIA, ZO_JANELA_S):
+            raise Falha(429, "ZO_PAUSED", {"espera": ZO_JANELA_S})
+        return Resposta(200, {"texto": zo.TEXTO_RESPEITO, "chamadas": []})
+    if bloqueio == "fora":
+        ctx.evento("zo_bloqueado", email)
+        return Resposta(200, {"texto": zo.TEXTO_FORA, "chamadas": []})
+    if bloqueio == "refeito":
         ctx.evento("zo_resposta_bloqueada", email)
-        resposta = {"texto": zo.TEXTO_REFEITO, "chamadas": []}
+        return Resposta(200, {"texto": zo.TEXTO_REFEITO, "chamadas": []})
     ctx.evento("zo_resposta", email, chamadas=len(resposta["chamadas"]))
     return Resposta(200, resposta)
-
-
-async def _moderar(ctx: Contexto, email: str, cab: Mapping[str, str], texto: str) -> frozenset[str]:
-    """Categorias marcadas pela moderação da OpenAI (gratuita). Fora do ar ou ilegível: nada marcado (registrado)."""
-    status, resposta = await ctx.servicos.http_post_json(zo.MODERACAO_URL, cab, zo.pedido_moderacao(texto), 20_000)
-    try:
-        if status != 200:
-            raise zo.Invalido()
-        return zo.ler_moderacao(resposta)
-    except zo.Invalido:
-        ctx.evento("zo_moderacao_falhou", email, status=status)
-        return frozenset()
 
 
 # ---------------- rotas ----------------

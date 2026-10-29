@@ -83,16 +83,17 @@
     <p>As cópias de segurança do banco feitas antes de você ligar a Proteção avançada ainda contêm a cópia antiga da chave, pelo prazo explicado em <a href="#retencao">Por quanto tempo os dados ficam guardados</a>. Elas são cifradas e guardadas com acesso restrito.</p>
 
     <h2 id="zo">E o Zo, o assistente?</h2>
-    <p>O Zo é opcional. Na primeira conversa ele pede o seu consentimento, e sem ele nada é enviado. Com o consentimento, o seu navegador abre os dados (como sempre) e, a cada pergunta, envia à <strong>OpenAI</strong> (a empresa do ChatGPT), pelo servidor do ZoZo, só o necessário para responder: a sua mensagem, a conversa recente e os trechos dos dados que o Zo consultou (por exemplo, as contas ou as transações de um mês). O seu e-mail, a sua senha e as chaves dos dados não são enviados.</p>
+    <p>O Zo é opcional e <strong>está em fase de testes</strong>. Na primeira conversa ele pede o seu consentimento, e sem ele nada é enviado. Com o consentimento, o seu navegador abre os dados (como sempre) e, a cada pergunta, envia ao <strong>Gemini</strong>, a inteligência artificial do Google, pelo servidor do ZoZo, só o necessário para responder: a sua mensagem, a conversa recente e os trechos dos dados que o Zo consultou (por exemplo, as contas ou as transações de um mês). O seu e-mail, a sua senha e as chaves dos dados não são enviados.</p>
+    <p><strong>Atenção, nesta fase de testes:</strong> o Zo usa o plano gratuito do Gemini. Nesse plano, o Google pode usar o que é enviado para treinar e melhorar os produtos dele, e pessoas da equipe do Google podem ler esse conteúdo, conforme os termos do Google. Por isso, não escreva no chat nada que você não queira compartilhar. Quando a fase de testes terminar, o Zo vai para o plano pago, em que o Google não usa os dados dessa forma, e esta política será atualizada.</p>
     <ul>
       <li>O Zo só grava (cria, edita ou exclui) depois de você tocar em Confirmar no resumo que aparece na conversa.</li>
       <li>Senha, código da verificação em duas etapas, CPF e chave Pix nunca passam pelo chat: para isso o Zo abre a tela segura das Configurações.</li>
-      <li>Cada mensagem sua e cada resposta do Zo passam pela moderação da OpenAI, que identifica ofensa, discriminação e risco à sua segurança. Mensagens ofensivas recebem uma resposta padrão e, se repetidas, o Zo pausa até o dia seguinte. Guardamos só a contagem, nunca o texto.</li>
-      <li>Pedimos à OpenAI que não guarde a conversa para reuso. Pela política da OpenAI, os dados enviados pela API não são usados para treinar modelos e podem ficar guardados por até 30 dias para monitorar abuso, e depois são apagados.</li>
-      <li>O ZoZo não guarda a conversa: ela fica só na tela e some ao fechar a aba ou sair. No servidor guardamos só a data do seu consentimento e a contagem de mensagens do dia, para o limite diário.</li>
-      <li>Você retira o consentimento quando quiser no menu do Zo.</li>
+      <li>Arquivos do banco (CSV ou OFX) que você importa pelo Zo são lidos no seu aparelho e nunca são enviados ao Gemini nem ao servidor do ZoZo. Só as transações que você confirmar entram nos seus dados, cifradas como sempre.</li>
+      <li>Cada mensagem sua e cada resposta do Zo passam pelo filtro de segurança do Gemini, que identifica ofensa e discriminação. Mensagens ofensivas recebem uma resposta padrão e, se repetidas, o Zo pausa até o dia seguinte. Guardamos só a contagem, nunca o texto.</li>
+      <li>O ZoZo não guarda a conversa: ela fica só na tela e some ao fechar a aba ou sair. No servidor guardamos só qual aviso você aceitou, a data, e a contagem de mensagens do dia, para o limite diário.</li>
+      <li>Você retira o consentimento quando quiser no menu do Zo. Se o aviso mudar, o Zo pede o seu consentimento de novo.</li>
     </ul>
-    <p>A OpenAI processa esses dados fora do Brasil, com as garantias contratuais previstas na LGPD (art. 33).</p>
+    <p>O Google processa esses dados fora do Brasil, com as garantias contratuais previstas na LGPD (art. 33).</p>
 
     <h2 id="finalidades">Para que usamos os dados?</h2>
     <ul>
@@ -110,7 +111,7 @@
       <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques e o CAPTCHA (Turnstile) do cadastro e do login.</li>
       <li><strong>Resend:</strong> envio dos e-mails do ZoZo (recebe o seu endereço e o conteúdo do e-mail).</li>
       <li><strong>Google:</strong> só se você escolher "Continuar com Google". Recebemos o seu e-mail confirmado e o seu primeiro nome. A senha do ZoZo continua sendo necessária.</li>
-      <li><strong>OpenAI:</strong> só se você usar o Zo, o assistente, e der o seu consentimento. Recebe os trechos dos seus dados necessários para responder (veja abaixo).</li>
+      <li><strong>Google (Gemini):</strong> só se você usar o Zo, o assistente, e der o seu consentimento. Recebe as suas mensagens e os trechos dos seus dados necessários para responder; na fase de testes, pode usá-los para melhorar os produtos dele (veja abaixo).</li>
       <li><strong>GitHub e Google Drive:</strong> guardam as cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente. Sem a chave, que fica só com o responsável pelo ZoZo, elas não podem ser abertas.</li>
     </ul>
     <p>Esses serviços podem processar dados fora do Brasil, com garantias contratuais de proteção previstas na LGPD (art. 33). Também podemos ter de entregar informações a autoridades, quando a lei ou uma ordem judicial exigir. Mesmo assim, os dados financeiros continuam cifrados.</p>

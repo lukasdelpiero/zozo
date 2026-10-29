@@ -719,7 +719,17 @@ declare global {
   type ResultadoFerramentaZo =
     | { tipo: "leitura"; resultado: string }
     | { tipo: "escrita"; titulo: string; linhas: Array<[string, string]>; confirmar(): Promise<string> }
-    | { tipo: "opcoes"; pergunta: string; opcoes: string[] };
+    | { tipo: "opcoes"; pergunta: string; opcoes: string[] }
+    | { tipo: "arquivo" };
+  /** Importar do banco (data/importar.ts): linhas com o valor COM SINAL, como vieram no arquivo */
+  interface LinhaImportada { data: string; descricao: string; valor: number }
+  interface ResultadoImportacao { formato: "csv" | "ofx"; cartao: boolean; itens: LinhaImportada[]; ignoradas: number }
+  interface ZoZoImportar {
+    ler(texto: string): ResultadoImportacao;
+    decodificar(bytes: ArrayBuffer): string;
+    data(bruto: string): string | null;
+    valor(bruto: string): number | null;
+  }
   interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo>; nomes: string[] }
   /** Ações de tela que a janela do Zo entrega às ferramentas (nada aqui grava dados sem o serviço) */
   interface TelaZo {
@@ -740,6 +750,7 @@ declare global {
     novidades: ZoZoNovidades;
     zo: ZoZoZo;
     zoFerramentas: ZoZoZoFerramentas;
+    importar: ZoZoImportar;
     store: ZoZoStore;
     recursos: ZoZoRecursos;
     log: ZoZoLog;

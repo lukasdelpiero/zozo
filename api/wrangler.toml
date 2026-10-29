@@ -54,9 +54,9 @@ TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 # "Continuar com Google": ID do cliente OAuth (público). Vazio = botão avisa que não está disponível.
 # A chave secreta vai por: npx wrangler secret put GOOGLE_CLIENT_SECRET  — veja docs/AMBIENTE-DE-TESTES.md
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
-# Zo, o assistente: modelo da OpenAI (confira o nome no painel da OpenAI). A chave vai por:
-#   npx wrangler secret put OPENAI_API_KEY   — sem ela o Zo responde "ainda não disponível"
-ZO_MODELO = "gpt-4o-mini"
+# Zo, o assistente: modelo do Gemini (confira o nome no Google AI Studio). A chave vai por:
+#   npx wrangler secret put GEMINI_API_KEY   — sem ela o Zo responde "ainda não disponível"
+ZO_MODELO = "gemini-2.5-flash"
 
 # ================= PRÉVIA (testes antes de publicar) =================
 # Aberta: sem Cloudflare Access e sem lista de e-mails (cadastro livre, com CAPTCHA).
@@ -87,9 +87,9 @@ EMAIL_REMETENTE = "ZoZo <nao-responda@usezozo.com.br>"
 URL_PUBLICA = "https://zozo-previa.zozo-finance-app.workers.dev"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
-# Zo, o assistente: modelo da OpenAI (confira o nome no painel da OpenAI). A chave vai por:
-#   npx wrangler secret put OPENAI_API_KEY   — sem ela o Zo responde "ainda não disponível"
-ZO_MODELO = "gpt-4o-mini"
+# Zo, o assistente: modelo do Gemini (confira o nome no Google AI Studio). A chave vai por:
+#   npx wrangler secret put GEMINI_API_KEY   — sem ela o Zo responde "ainda não disponível"
+ZO_MODELO = "gemini-2.5-flash"
 # FastAPI + Pydantic na frente do núcleo (validação estrita do JSON de cada rota; ver src/app_fastapi.py).
 # Só na prévia por enquanto; aprovado aqui, repetir em [vars] (produção).
 API_FASTAPI = "1"

@@ -178,3 +178,27 @@ test("Zo: telas abrem na hora; exportar e sair pedem confirmação; sem tela, na
   assert.deepEqual(JSON.parse((await semTela.executar("abrir_configuracoes", args({ assunto: "senha" }))).resultado), { erro: "tela_indisponivel" });
   assert.equal(JSON.parse((await zo.executar("transferir_entre_moedas", args({ ids: ["x"], destino: "EUR" }))).resultado).erro, "FEATURE_UNAVAILABLE");
 });
+
+/* ---------------- fase 3: categorizar em lote e importar arquivo ---------------- */
+test("Zo: categorizar em lote propõe pelo histórico e só aplica depois de confirmar", async () => {
+  const { t, zo, cartao, compras, mercado, perfil } = await cenario();
+  const lanc = (descricao, categoriaId) => t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao, valor: 10, tipo: "regular", contaId: cartao.id, categoriaId, perfilId: perfil.id } });
+  await lanc("Supermercado Dia", mercado.id); await lanc("Loja Renner", compras.id);
+  await lanc("SUPERMERCADO DIA", null); await lanc("Supermercado Dia", null); await lanc("Renner", null); await lanc("Algo novo", null);
+  const r = await zo.executar("categorizar_em_lote", "{}");
+  assert.equal(r.tipo, "escrita");
+  assert.equal(r.titulo, "Categorizar 3 transações");
+  const linhas = Object.fromEntries(JSON.parse(JSON.stringify(r.linhas)));
+  assert.equal(linhas["Sem sugestão"], "1 ficam como estão");
+  assert.ok(linhas.Mercado && linhas.Compras);
+  const semCategoria = async () => (await t.req(t.A.getLancamentos)).lancamentos.filter((l) => !l.categoriaId).length;
+  assert.equal(await semCategoria(), 4);                                                   // nada antes do Confirmar
+  assert.equal(JSON.parse(await r.confirmar()).categorizadas, 3);
+  assert.equal(await semCategoria(), 1);
+  assert.deepEqual(JSON.parse((await (await cenario()).zo.executar("categorizar_em_lote", "{}")).resultado), { sem_categoria: 0 });
+});
+
+test("Zo: importar arquivo só mostra o botão (o arquivo é lido no aparelho, nunca vai para o Zo)", async () => {
+  const { zo } = await cenario();
+  assert.deepEqual(JSON.parse(JSON.stringify(await zo.executar("importar_arquivo", args({ caminho: "C:/segredo.csv" })))), { tipo: "arquivo" });
+});

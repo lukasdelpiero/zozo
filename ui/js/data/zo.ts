@@ -1,13 +1,14 @@
 /* =============================================================
    ZoZo — Zo, o assistente: as ferramentas (rodam AQUI, no navegador)
    ------------------------------------------------------------
-   O modelo (OpenAI, pela API do ZoZo) só ESCOLHE uma ferramenta e preenche os argumentos. Quem lê e grava é o
+   O modelo (Gemini, pela API do ZoZo) só ESCOLHE uma ferramenta e preenche os argumentos. Quem lê e grava é o
    serviço de dados, com as mesmas regras da tela. Cada argumento é conferido aqui; nada que vem do modelo é
    executado sem passar por esta lista fechada.
      • leitura: devolve só o necessário (JSON curto) para o Zo responder;
      • gravação: devolve um RESUMO montado com os dados reais (nomes de conta, categoria…), nunca o texto do
        modelo, e só grava quando a pessoa toca em Confirmar (a tela chama confirmar());
      • opções: a tela mostra botões e a escolha volta como mensagem da pessoa;
+     • arquivo: a tela mostra o botão para escolher o CSV/OFX do banco (lido no navegador; o Zo nunca vê o arquivo);
      • tela: abre uma tela do app (fatura, Transações filtradas, Configurações) pelas ações que a janela do Zo
        entrega (opcoes.tela). Senha, 2FA, proteção avançada, apagar dados, excluir conta e chave Pix só pela tela
        segura das Configurações: nada disso passa pelo chat.
@@ -105,18 +106,9 @@
           por_categoria: [...porCat].filter(([, v]) => r2(v) > 0).sort((x, y) => y[1] - x[1]).slice(0, 12).map(([categoria, v]) => ({ categoria, gasto: r2(v) })) };
       },
       sugerir_categoria: async (a) => {
-        // pelo histórico da própria pessoa: mesma descrição vale mais; palavras em comum valem um pouco
-        const alvo = norm(txt(a.descricao)), palavras = alvo.split(/\W+/).filter((p) => p.length >= 3);
-        const pontos = new Map<string, number>();
-        (await lancamentos()).forEach((l) => {
-          if (!l.categoriaId) return;
-          const d = norm(l.descricao);
-          const p = d === alvo ? 5 : palavras.filter((w) => d.includes(w)).length;
-          if (p) pontos.set(l.categoriaId, (pontos.get(l.categoriaId) || 0) + p);
-        });
-        const cats = await categorias();
-        return [...pontos].sort((x, y) => y[1] - x[1]).slice(0, 3).map(([id, p]) => ({ categoria_id: id, nome: (cats.find((c) => c.id === id) || { nome: "" }).nome, pontos: p }))
-          .filter((x) => x.nome);
+        // pelo histórico da própria pessoa (regra no serviço: sugerirCategorias)
+        const r = await req(A.sugerirCategorias, { descricoes: [txt(a.descricao) || ""] });
+        return (r.sugestoes[0] ? r.sugestoes[0].alternativas : []).map((x) => ({ categoria_id: x.categoriaId, nome: x.nome, pontos: x.pontos }));
       },
       consultar_fatura: async (a) => {
         if (!fatura()) return { erro: "FEATURE_UNAVAILABLE" };
@@ -145,9 +137,9 @@
           return n ? { versao: n.versao, quando: n.quando, itens: n.itens.map((i) => i.titulo + ". " + i.texto) } : { itens: [] };
         }
         if (assunto === "termos") return { endereco: "/termos-uso", resumo: "Uso pessoal e gratuito. A senha é a chave dos dados. Você pode exportar, apagar os dados ou excluir a conta quando quiser." };
-        if (assunto === "privacidade") return { endereco: "/politica-privacidade", resumo: "Os dados financeiros são cifrados no seu navegador. O ZoZo não vende dados nem usa publicidade. Com o Zo, trechos dos dados vão à OpenAI só para responder, com o seu consentimento." };
+        if (assunto === "privacidade") return { endereco: "/politica-privacidade", resumo: "Os dados financeiros são cifrados no seu navegador. O ZoZo não vende dados nem usa publicidade. Com o Zo, que está em fase de testes, as mensagens e trechos dos dados vão ao Gemini, do Google, com o seu consentimento, e nesta fase o Google pode usar esse conteúdo para melhorar os produtos dele." };
         if (assunto === "armazenamento") return { resumo: "Os dados financeiros ficam num documento cifrado com AES-256-GCM no seu navegador, com uma chave que nasce da sua senha. O servidor guarda só a versão cifrada e as 10 versões anteriores. Por padrão há uma cópia da chave para recuperar a senha pelo e-mail; com a Proteção avançada essa cópia não existe." };
-        return { resumo: "O Zo cria, consulta, edita e exclui transações, contas, categorias, recorrências e perfis, faz resumos e tira dúvidas sobre o ZoZo. Antes de gravar, ele sempre pede a sua confirmação." };
+        return { resumo: "O Zo cria, consulta, edita e exclui transações, contas, categorias, recorrências e perfis, cuida das faturas de perfis, importa arquivos CSV e OFX do banco, categoriza em lote, faz resumos e tira dúvidas sobre o ZoZo. Antes de gravar, ele sempre pede a sua confirmação." };
       },
     };
 
@@ -336,6 +328,32 @@
           ["Atenção", "Parcelas, recorrências e divisões vão inteiras. O valor fica igual, sem conversão."]],
         () => req(A.transferirMoeda, { ids: achadas.map((l) => l.id), destino }));
       },
+      categorizar_em_lote: async (a) => {
+        // sem categoria e de um tipo que usa categoria (despesa, estorno, débito, recorrente); nunca pagamento de fatura
+        const de = data(a.de), ate = data(a.ate);
+        const sem = (await lancamentos()).filter((l) => !l.categoriaId && COM_CATEGORIA.includes(l.tipo) && (!de || l.data >= de) && (!ate || l.data <= ate)).slice(0, 500);
+        if (!sem.length) return { tipo: "leitura", resultado: json({ sem_categoria: 0 }) };
+        const r = await req(A.sugerirCategorias, { descricoes: sem.map((l) => l.descricao) });
+        const grupos = new Map<Id, { nome: string; ids: Id[]; exemplos: string[] }>();
+        let semSugestao = 0;
+        sem.forEach((l, i) => {
+          const s = r.sugestoes[i];
+          if (!s || !s.categoriaId || !s.nome) { semSugestao += 1; return; }
+          const g = grupos.get(s.categoriaId) || { nome: s.nome, ids: [], exemplos: [] };
+          g.ids.push(l.id);
+          if (g.exemplos.length < 3 && !g.exemplos.includes(l.descricao)) g.exemplos.push(l.descricao);
+          grupos.set(s.categoriaId, g);
+        });
+        if (!grupos.size) return { tipo: "leitura", resultado: json({ sem_categoria: sem.length, com_sugestao: 0 }) };
+        const linhas: Array<[string, string]> = [...grupos.values()].slice(0, 12).map((g) => [g.nome, g.exemplos.join(", ") + (g.ids.length > g.exemplos.length ? " e mais " + (g.ids.length - g.exemplos.length) : "")]);
+        if (grupos.size > 12) linhas.push(["E mais", (grupos.size - 12) + " categorias"]);
+        if (semSugestao) linhas.push(["Sem sugestão", semSugestao + " ficam como estão"]);
+        const n = sem.length - semSugestao;
+        return escrita("Categorizar " + n + (n === 1 ? " transação" : " transações"), linhas, async () => {
+          for (const [categoriaId, g] of grupos) await req(A.updateLancamentosEmLote, { ids: g.ids, categoriaId });
+          return { categorizadas: sem.length - semSugestao, sem_sugestao: semSugestao };
+        });
+      },
       exportar_transacoes: async () => {
         const tela = opcoes.tela;
         if (!tela) return semTela();
@@ -400,6 +418,7 @@
     async function executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo> {
       const a = ler(argumentos);
       try {
+        if (nome === "importar_arquivo") return { tipo: "arquivo" };
         if (nome === "oferecer_opcoes") {
           const opcoesLista = Array.isArray(a.opcoes) ? a.opcoes.map((o) => txt(o, 80)).filter((o): o is string => !!o).slice(0, 12) : [];
           return { tipo: "opcoes", pergunta: txt(a.pergunta) || "", opcoes: opcoesLista };
@@ -410,7 +429,7 @@
         return { tipo: "leitura", resultado: json({ erro: "ferramenta_desconhecida" }) };
       } catch (e) { return { tipo: "leitura", resultado: erroDe(e) }; }
     }
-    return { executar, nomes: Object.keys(LEITURA).concat(Object.keys(ESCRITA), Object.keys(TELA), ["oferecer_opcoes"]) };
+    return { executar, nomes: Object.keys(LEITURA).concat(Object.keys(ESCRITA), Object.keys(TELA), ["oferecer_opcoes", "importar_arquivo"]) };
   }
 
   const api: ZoZoZoFerramentas = { criar };

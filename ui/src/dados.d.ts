@@ -146,6 +146,7 @@ declare global {
     getContaHistorico: { conta: ContaTela; diferenca: number; serie: Array<{ data: string; valor: number }> };
     getExtratoConta: ExtratoConta;
     getCategoriaSerie: { meses: Array<{ mes: string; gasto: number }>; reservado: number };
+    sugerirCategorias: { sugestoes: Array<{ categoriaId: Id | null; nome: string | null; alternativas: Array<{ categoriaId: Id; nome: string; pontos: number }> }> };
     getSerieRecorrencia: { pontos: Array<{ mes: string; data: string; valor: number; pago: boolean; futuro: boolean }>; lancamentos: LancamentoTela[] };
     getDashboard: RespostaDashboard;
     getBoletoData: RespostaFatura;
@@ -163,7 +164,7 @@ declare global {
     | "createPerfil" | "updatePerfil" | "deletePerfil" | "arquivarPerfil"
     | "updateLancamentosEmLote" | "deleteLancamentos" | "updateConfig"
     | "pagarRecorrencia" | "encerrarRecorrencia" | "excluirRecorrencia" | "tornarRecorrente" | "vincularRecorrencia" | "desvincularRecorrencia"
-    | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura"
+    | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura" | "importarLancamentos"
     | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
   /* ---------------- Zo, o assistente ---------------- */
@@ -231,6 +232,7 @@ declare global {
     salvarFatura: { ok: boolean };
     receberFatura: { lancamento: LancamentoTela };
     pagarFatura: { pagamento: LancamentoTela; cartao: LancamentoTela };
+    importarLancamentos: { importados: number; repetidos: number };
     createConta: { conta: ContaTela };
     updateCicloCartao: { conta: ContaTela };
     updateConta: { conta: ContaTela; id: Id; cor: string | null | undefined };

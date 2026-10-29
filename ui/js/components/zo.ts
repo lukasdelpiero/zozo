@@ -2,7 +2,7 @@
    ZoZo — Zo, o assistente (botão flutuante + janela de conversa)
    ------------------------------------------------------------
    Botão no canto inferior direito (vidro, com o Z). Ao tocar, abre a janela no mesmo canto e o botão some.
-   Na primeira conversa vem o aviso de consentimento: sem ele nada vai para a OpenAI (o servidor também recusa).
+   Na primeira conversa vem o aviso de consentimento: sem ele nada vai para o Gemini (o servidor também recusa).
    Cada ida ao Zo leva a conversa recente; as ferramentas rodam aqui (data/zo.ts). Gravação só depois do
    Confirmar no cartão de resumo (montado com os dados reais). Texto sempre como texto (nada de HTML).
    A conversa fica só na memória desta aba: sai ao fechar a aba ou sair da conta.
@@ -62,12 +62,16 @@
       s("path", { d: "M 320 320 H 704 L 320 704 H 704", fill: "none", stroke: "url(#" + id + ")", "stroke-width": 160, "stroke-linecap": "round", "stroke-linejoin": "round" }));
   }
 
-  const CONSENTIMENTO = "Antes de começar, preciso do seu consentimento. Para ajudar você, o Zo lê e, quando você confirma, altera os seus dados no ZoZo. "
-    + "A cada pergunta, só os trechos necessários são enviados à OpenAI, a empresa do ChatGPT, para gerar a resposta. "
-    + "A OpenAI não usa esses dados para treinar modelos e o ZoZo não vende nem usa os seus dados fora desta finalidade. "
-    + "Você pode retirar o consentimento quando quiser no menu do Zo.";
+  // Aviso do plano gratuito do Gemini (fase de testes). Mudou o texto? Suba zo.CONSENTIMENTO_VERSAO no servidor.
+  const CONSENTIMENTO = "Antes de começar, preciso do seu consentimento. O Zo está em fase de testes. Para ajudar você, ele lê e, quando você confirma, altera os seus dados no ZoZo. "
+    + "A cada pergunta, a sua mensagem e só os trechos dos dados necessários são enviados ao Gemini, a inteligência artificial do Google, para gerar a resposta. "
+    + "Nesta fase de testes, o Google pode usar esse conteúdo para treinar e melhorar os produtos dele, e pessoas da equipe do Google podem ler. "
+    + "Por isso, não escreva no chat nada que você não queira compartilhar. "
+    + "O ZoZo não vende nem usa os seus dados fora desta finalidade, e você pode retirar o consentimento quando quiser no menu do Zo.";
   const SEM_CONSENTIMENTO = "Tudo bem. Sem o seu consentimento eu não consigo continuar. Se mudar de ideia, é só tocar em Rever o aviso.";
-  const BOAS_VINDAS = "Oi, eu sou o Zo. Posso criar, consultar e editar transações, contas, categorias, recorrências e perfis, fazer resumos e tirar dúvidas sobre o ZoZo. Como posso ajudar?";
+  const BOAS_VINDAS = "Oi, eu sou o Zo. Posso criar, consultar e editar transações, contas, categorias, recorrências e perfis, importar o arquivo do seu banco, fazer resumos e tirar dúvidas sobre o ZoZo. Como posso ajudar?";
+  const MAX_ARQUIVO = 2 * 1024 * 1024;              // 2 MB: um extrato ou fatura cabe com folga
+  const MAX_IMPORTAR = 500;                         // linhas por importação (o serviço confere o mesmo limite)
 
   let ctx: ContextoApp | null = null;
   let fab: HTMLButtonElement | null = null;
@@ -111,13 +115,18 @@
   }
 
   /* ---------------- janela ---------------- */
-  let logEl: HTMLElement, campo: HTMLTextAreaElement, enviarBtn: HTMLButtonElement;
+  let logEl: HTMLElement, campo: HTMLTextAreaElement, enviarBtn: HTMLButtonElement, anexarBtn: HTMLButtonElement, arquivoEl: HTMLInputElement;
   function abrir() {
     if (!permitido() || janela) return;
     if (fab) { fab.remove(); fab = null; }
     logEl = h("div", { class: Z.log, role: "log", "aria-live": "polite", "aria-label": "Conversa com o Zo", tabindex: "0" });
     campo = h("textarea", { class: Z.campo, rows: "1", maxlength: "2000", placeholder: "Mensagem", "aria-label": "Mensagem para o Zo" }) as HTMLTextAreaElement;
     enviarBtn = h("button", { type: "button", class: Z.enviar, "aria-label": "Enviar", onClick: enviar }, icon("enviar", { size: 18, stroke: 2.25 })) as HTMLButtonElement;
+    // anexar o arquivo do banco (CSV ou OFX): lido aqui, nunca enviado ao Zo
+    arquivoEl = h("input", { type: "file", accept: ".csv,.ofx,.txt,text/csv,application/x-ofx", class: "tw:sr-only", tabindex: "-1", "aria-hidden": "true" }) as HTMLInputElement;
+    arquivoEl.addEventListener("change", () => { const f = arquivoEl.files && arquivoEl.files[0]; arquivoEl.value = ""; if (f) void importarArquivo(f); });
+    anexarBtn = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Importar arquivo do banco (CSV ou OFX)",
+      title: "Importar arquivo do banco", onClick: () => arquivoEl.click() }, icon("clipe", { size: 18 })) as HTMLButtonElement;
     campo.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } });
     campo.addEventListener("input", () => { campo.style.height = "auto"; campo.style.height = Math.min(campo.scrollHeight, 112) + "px"; atualizarEnvio(); });
     const menuBtn = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Opções do Zo", "aria-haspopup": "menu" }, icon("opcoes", { size: 18 })) as HTMLButtonElement;
@@ -132,7 +141,7 @@
         h("div", { class: Z.acoesTopo }, menuBtn,
           h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Fechar o Zo", onClick: fechar }, icon("fechar", { size: 18 })))),
       logEl,
-      h("footer", { class: Z.rodape }, h("div", { class: Z.caixa }, campo, enviarBtn)));
+      h("footer", { class: Z.rodape }, h("div", { class: Z.caixa }, anexarBtn, campo, enviarBtn), arquivoEl));
     janela.addEventListener("keydown", (e) => { if (e.key === "Escape" && !document.querySelector(".menu")) { e.preventDefault(); fechar(); } });
     raiz().appendChild(janela);
     requestAnimationFrame(() => campo.focus());
@@ -147,6 +156,7 @@
   function atualizarEnvio() {
     const bloqueado = ocupado || aceito !== true;
     campo.disabled = aceito !== true;
+    anexarBtn.disabled = aceito !== true;
     enviarBtn.disabled = bloqueado || !campo.value.trim();
   }
 
@@ -276,6 +286,13 @@
           let resultado: string;
           if (res.tipo === "leitura") resultado = res.resultado;
           else if (res.tipo === "opcoes") { digitando(false); mostrarOpcoes(res.pergunta, res.opcoes); resultado = '{"mostrado":true,"aguardando":"escolha da pessoa"}'; esperarPessoa = true; }
+          else if (res.tipo === "arquivo") {
+            digitando(false);
+            const escolher = h("button", { type: "button", class: Z.opcao, onClick: () => arquivoEl.click() }, "Escolher arquivo CSV ou OFX");
+            logEl.appendChild(h("div", { class: Z.botoes }, escolher)); rolar();
+            resultado = '{"mostrado":true,"aguardando":"a pessoa escolher o arquivo, que é lido e importado no aparelho dela"}';
+            esperarPessoa = true;
+          }
           else {
             digitando(false);
             const decisao = await confirmar(res.titulo, res.linhas);
@@ -347,6 +364,93 @@
     } }, o) as HTMLButtonElement);
     logEl.appendChild(h("div", { class: Z.botoes, role: "group", "aria-label": pergunta || "Opções" }, botoes)); rolar();
     cancelarPendente = () => { botoes.forEach((b) => { b.disabled = true; }); cancelarPendente = null; };
+  }
+
+  /* ---------------- importar arquivo do banco (CSV/OFX) ----------------
+     Tudo aqui no aparelho: o arquivo é lido, a pessoa confere linha por linha (conta, perfil, categoria sugerida
+     pelo histórico, o que entra) e o serviço grava tudo de uma vez (importarLancamentos), sem repetir o que já existe. */
+  async function importarArquivo(arquivo: File) {
+    if (!ctx || !janela) return;
+    const c = ctx;
+    if (arquivo.size > MAX_ARQUIVO) { nota("Esse arquivo é grande demais. Use o CSV ou o OFX de um mês."); return; }
+    let lido: ResultadoImportacao;
+    try { lido = ZoZo.importar.ler(ZoZo.importar.decodificar(await arquivo.arrayBuffer())); }
+    catch (e) { nota("Não consegui ler esse arquivo. Use o CSV ou o OFX que o banco exporta."); return; }
+    if (!lido.itens.length) { nota("Não encontrei transações nesse arquivo. Use o CSV ou o OFX que o banco exporta."); return; }
+    const itens = lido.itens.slice(0, MAX_IMPORTAR);
+    if (lido.itens.length > MAX_IMPORTAR) nota("O arquivo tem " + lido.itens.length + " linhas. Vou mostrar as " + MAX_IMPORTAR + " primeiras.");
+    const [contasR, catsR, perfisR, sug] = await Promise.all([
+      c.bridge.request(A.getContas), c.bridge.request(A.getCategorias),
+      ZoZo.recursos.perfis() ? c.bridge.request(A.getPerfis) : Promise.resolve(null),
+      c.bridge.request(A.sugerirCategorias, { descricoes: itens.map((x) => x.descricao) }),
+    ]).catch((e: ErroPonte) => { nota(e.friendly || FR.OPERATION_FAILED); return [null, null, null, null] as const; });
+    if (!contasR || !catsR || !sug) return;
+    const contas = contasR.contas.filter((x) => !x.oculta && ["cartao", "corrente", "poupanca", "outros"].includes(x.tipo));
+    if (!contas.length) { nota("Cadastre antes a conta ou o cartão do arquivo."); return; }
+    const cats = catsR.categorias.filter((x) => x.status === "regular");
+    const perfis = perfisR ? perfisR.perfis.filter((p) => !p.arquivado) : [];
+    // cartão: o sinal das compras varia por banco; vale o que mais aparece (a maioria das linhas são compras)
+    const positivos = itens.filter((x) => x.valor > 0).length;
+    const compraPositiva = positivos >= itens.length - positivos;
+    const padrao = contas.find((x) => x.tipo === "cartao" && lido.cartao) || contas.find((x) => (positivos > 0 && x.tipo === "cartao")) || contas[0];
+
+    const contaSel = ZoZo.ui.Select(contas.map((x) => ({ value: x.id, label: x.nome + (x.ultimos4Digitos ? " " + x.ultimos4Digitos : "") })), { value: padrao.id, ariaLabel: "Conta do arquivo" }) as HTMLSelectElement;
+    const perfilSel = perfis.length ? ZoZo.ui.Select([{ value: "", label: "Escolha o perfil" }].concat(perfis.map((p) => ({ value: p.id, label: p.nome }))), { ariaLabel: "Perfil das transações" }) as HTMLSelectElement : null;
+    const linhasEl = h("ul", { class: "tw:m-0 tw:p-0 tw:list-none tw:max-h-64 tw:overflow-y-auto tw:flex tw:flex-col tw:gap-1.5", "aria-label": "Transações do arquivo" });
+    const resumoEl = h("p", { class: "tw:m-0 tw:text-[13px] tw:text-zz-secondary" });
+    const importarBtn = h("button", { type: "button", class: Z.opcao }) as HTMLButtonElement;
+    const cancelarBtn = h("button", { type: "button", class: Z.opcao }, "Cancelar") as HTMLButtonElement;
+    type Linha = { item: LinhaImportada; marcado: HTMLInputElement; categoria: HTMLSelectElement; tipo: string };
+    let linhas: Linha[] = [];
+    const nomesTipo: Record<string, string> = { regular: "Compra", estorno: "Crédito", debito: "Débito", receita: "Receita" };
+    const desenhar = () => {
+      const conta = contas.find((x) => x.id === contaSel.value) || padrao;
+      linhas = itens.map((item, i) => {
+        const tipo = conta.tipo === "cartao" ? ((item.valor > 0) === compraPositiva ? "regular" : "estorno") : (item.valor < 0 ? "debito" : "receita");
+        const marcado = h("input", { type: "checkbox", class: "tw:size-4 tw:flex-none tw:accent-zz-primary", "aria-label": "Importar " + item.descricao }) as HTMLInputElement;
+        marcado.checked = tipo !== "estorno";                        // crédito no cartão costuma ser o pagamento: fica de fora, a não ser que marque
+        marcado.addEventListener("change", contar);
+        const s = sug.sugestoes[i];
+        const categoria = ZoZo.ui.Select([{ value: "", label: "Sem categoria" }].concat(cats.map((k) => ({ value: k.id, label: k.nome }))),
+          { value: s && s.categoriaId ? s.categoriaId : "", ariaLabel: "Categoria de " + item.descricao, class: "tw:max-w-[140px] tw:h-7! tw:text-[13px]!" }) as HTMLSelectElement;
+        return { item, marcado, categoria, tipo };
+      });
+      mount(linhasEl, linhas.map((l) => h("li", { class: "tw:flex tw:items-center tw:gap-2 tw:text-[13px]" },
+        l.marcado,
+        h("span", { class: "tw:flex-none tw:w-11 tw:text-zz-secondary" }, l.item.data.slice(8, 10) + "/" + l.item.data.slice(5, 7)),
+        h("span", { class: "tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap", title: l.item.descricao }, l.item.descricao),
+        h("span", { class: ["tw:flex-none money", (l.tipo === "estorno" || l.tipo === "receita") && "money--income"], title: nomesTipo[l.tipo] },
+          (l.tipo === "estorno" || l.tipo === "receita" ? "− " : "") + ZoZo.format.moeda(Math.abs(l.item.valor))),
+        l.categoria)));
+      contar();
+    };
+    function contar() {
+      const n = linhas.filter((l) => l.marcado.checked).length;
+      importarBtn.textContent = "Importar " + n;
+      importarBtn.disabled = !n;
+      resumoEl.textContent = itens.length + " linhas no arquivo" + (lido.ignoradas ? ", " + lido.ignoradas + " sem data ou valor ficaram de fora" : "")
+        + ". As categorias vêm do seu histórico. Créditos no cartão (como o pagamento da fatura) começam desmarcados.";
+    }
+    contaSel.addEventListener("change", desenhar);
+    const cartao = h("div", { class: Z.cartao, role: "group", "aria-label": "Importar " + arquivo.name },
+      h("p", { class: Z.cartaoTitulo }, "Importar " + arquivo.name),
+      h("div", { class: "tw:flex tw:flex-wrap tw:gap-2" }, contaSel, perfilSel), resumoEl, linhasEl,
+      h("div", { class: Z.botoes }, importarBtn, cancelarBtn));
+    logEl.appendChild(cartao); rolar();
+    desenhar();
+    const travar = () => { [importarBtn, cancelarBtn, contaSel, ...(perfilSel ? [perfilSel] : [])].forEach((x) => { x.disabled = true; }); linhas.forEach((l) => { l.marcado.disabled = true; l.categoria.disabled = true; }); };
+    cancelarBtn.addEventListener("click", () => { travar(); nota("Importação cancelada"); });
+    importarBtn.addEventListener("click", () => {
+      if (perfilSel && !perfilSel.value) { nota("Escolha o perfil das transações."); perfilSel.focus(); return; }
+      const escolhidas = linhas.filter((l) => l.marcado.checked).map((l) => ({ data: l.item.data, descricao: l.item.descricao, valor: Math.abs(l.item.valor), tipo: l.tipo, categoriaId: l.categoria.value || null }));
+      travar();
+      c.bridge.request(A.importarLancamentos, { contaId: contaSel.value, perfilId: perfilSel ? perfilSel.value : null, itens: escolhidas }).then((r) => {
+        const conta = contas.find((x) => x.id === contaSel.value);
+        nota("Importei " + r.importados + (r.importados === 1 ? " transação" : " transações") + " em " + (conta ? conta.nome : "conta") + "."
+          + (r.repetidos ? " " + r.repetidos + " já existiam e ficaram de fora." : ""));
+        return c.recarregarTudo();
+      }).catch((e: ErroPonte) => { nota(e.friendly || FR.OPERATION_FAILED); importarBtn.disabled = false; cancelarBtn.disabled = false; contaSel.disabled = false; if (perfilSel) perfilSel.disabled = false; linhas.forEach((l) => { l.marcado.disabled = false; l.categoria.disabled = false; }); });
+    });
   }
 
   const api: ZoZoZo = { montar, abrir, fechar };

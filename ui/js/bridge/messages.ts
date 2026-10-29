@@ -73,6 +73,7 @@
     getContaHistorico: "getContaHistorico",
     getExtratoConta: "getExtratoConta",
     getCategoriaSerie: "getCategoriaSerie",
+    sugerirCategorias: "sugerirCategorias",
     getSerieRecorrencia: "getSerieRecorrencia",
     arquivarPerfil: "arquivarPerfil",
     getConfig: "getConfig",
@@ -90,6 +91,7 @@
     // Fatura (antigo boleto; o PDF é gerado pela impressão do navegador) e pagamento da fatura do cartão
     getBoletoData: "getBoletoData",
     pagarFatura: "pagarFatura",
+    importarLancamentos: "importarLancamentos",
     salvarFatura: "salvarFatura",       // ajustes da fatura de um perfil
     receberFatura: "receberFatura",     // pagamento recebido da fatura de um perfil
 
@@ -151,6 +153,9 @@
     ZO_PAUSED: "O Zo fez uma pausa por hoje por causa de mensagens ofensivas. Amanhã ele volta a responder.",
     ZO_UNAVAILABLE: "O Zo ainda não está disponível. Tente de novo mais tarde.",
     ZO_FAILED: "O Zo não conseguiu responder agora. Tente de novo em instantes.",
+    IMPORT_ACCOUNT: "Escolha uma conta da moeda atual para importar.",
+    IMPORT_INVALID: "O arquivo tem uma linha que não deu para importar. Nada foi importado: confira o arquivo e tente de novo.",
+    ZO_BUSY: "O Zo está com muitos pedidos agora. Tente de novo em alguns minutos.",
     PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",

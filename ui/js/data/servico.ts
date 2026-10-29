@@ -944,6 +944,26 @@
         lancamentos: doCiclo.map((l, i) => Object.assign(enriquecer(l), { naFatura: efeitos[i] })).sort(ordem),
       };
     },
+    /**
+     * Categoria provável de cada descrição, pelo histórico da própria pessoa (nada sai do navegador): a mesma
+     * descrição vale mais; palavras em comum valem um pouco. Na ordem pedida; sem sugestão = categoriaId null.
+     */
+    [A.sugerirCategorias]: (d) => {
+      const lista: unknown[] = Array.isArray(d.descricoes) ? d.descricoes.slice(0, 1000) : [];
+      const ativas = new Map(doc.categorias.filter((c) => c.status === "regular" && moedaDe(c) === moedaAtual()).map((c) => [c.id, c] as const));
+      const historico = doc.lancamentos.filter((l) => l.categoriaId && ativas.has(l.categoriaId)).map((l) => ({ chave: chaveDescricao(l.descricao), cat: l.categoriaId as Id }));
+      return { sugestoes: lista.map((bruto) => {
+        const alvo = chaveDescricao(bruto), palavras = alvo.split(" ").filter((w) => w.length >= 3 && !PALAVRAS_COMUNS.has(w));
+        const pontos = new Map<Id, number>();
+        if (alvo) historico.forEach((h) => {
+          const p = h.chave === alvo ? 5 : palavras.filter((w) => h.chave.split(" ").includes(w)).length;
+          if (p) pontos.set(h.cat, (pontos.get(h.cat) || 0) + p);
+        });
+        const ordem = [...pontos].sort((x, y) => y[1] - x[1]).slice(0, 3);
+        const alternativas = ordem.map(([id, p]) => ({ categoriaId: id, nome: (ativas.get(id) as Categoria).nome, pontos: p }));
+        return { categoriaId: alternativas.length ? alternativas[0].categoriaId : null, nome: alternativas.length ? alternativas[0].nome : null, alternativas };
+      }) };
+    },
     [A.getCategoriaSerie]: (d) => {
       // Últimos 12 meses de gasto: de uma categoria ou de todas as regulares (id vazio)
       const alvo = d.categoriaId ? doc.categorias.filter((c) => c.id === d.categoriaId) : doc.categorias.filter((c) => c.status === "regular");
@@ -1029,6 +1049,12 @@
       };
     },
   };
+
+  /** Descrição comparável: sem acento, minúsculas, sem números, parcela ("2/10") nem símbolos */
+  const chaveDescricao = (v: unknown) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/\d+\s*\/\s*\d+/g, " ").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  /** Palavras que aparecem em quase tudo (não ajudam a escolher a categoria) */
+  const PALAVRAS_COMUNS = new Set(["compra", "pagamento", "parcela", "parcelado", "debito", "credito", "cartao", "pix", "transferencia", "com", "para", "das", "dos", "ltda"]);
 
   /* ---------------- Fatura de perfis (cobrança) ----------------
      • Entram as transações do perfil (ou de todos) em cartão de crédito (empréstimo não). Cartão com fechamento: as
@@ -1408,6 +1434,34 @@
       doc.lancamentos.push(l);
       contarDemo("pagamento");
       return { lancamento: enriquecer(l) };
+    },
+    /**
+     * Importar transações de um arquivo do banco (CSV/OFX, lido no navegador): tudo ou nada. Cada item passa pelas
+     * mesmas regras de uma transação nova (lerLancamento). Cartão: compras e estornos; outras contas: débito e
+     * receita. O que já existe na conta (mesma data, valor e descrição) fica de fora, na mesma quantidade.
+     */
+    [A.importarLancamentos]: (d) => {
+      const conta = doc.contas.find((c) => c.id === d.contaId);
+      if (!conta || moedaDe(conta) !== moedaAtual()) throw erro("IMPORT_ACCOUNT");
+      const itens: Dados[] = Array.isArray(d.itens) ? d.itens : [];
+      if (!itens.length || itens.length > 500) throw erro("IMPORT_INVALID");
+      const permitidos = conta.tipo === "cartao" ? ["regular", "estorno"] : ["debito", "receita"];
+      const chave = (data: string, valor: number, descricao: string) => data + "|" + Math.round(valor * 100) + "|" + chaveDescricao(descricao);
+      const existentes = new Map<string, number>();
+      doc.lancamentos.forEach((l) => { if (l.contaId === conta.id) { const k = chave(l.data, l.valor, l.descricao); existentes.set(k, (existentes.get(k) || 0) + 1); } });
+      // tudo é conferido ANTES de gravar qualquer coisa: um item ruim recusa o arquivo inteiro
+      const novos: Lancamento[] = [];
+      let repetidos = 0;
+      itens.forEach((it) => {
+        if (!objeto(it) || !permitidos.includes(it.tipo)) throw erro("IMPORT_INVALID");
+        const l = Object.assign({ id: novoId("l") }, lerLancamento({ data: it.data, descricao: it.descricao, valor: it.valor, tipo: it.tipo, contaId: conta.id,
+          categoriaId: it.categoriaId || null, perfilId: d.perfilId || null, notas: "Importada de arquivo do banco." }, null));
+        const k = chave(l.data, l.valor, l.descricao), ja = existentes.get(k) || 0;
+        if (ja > 0) { existentes.set(k, ja - 1); repetidos += 1; return; }
+        novos.push(l);
+      });
+      novos.forEach((l) => doc.lancamentos.push(l));
+      return { importados: novos.length, repetidos };
     },
     [A.pagarFatura]: (d) => {
       conferirLimiteDemo("pagamento");

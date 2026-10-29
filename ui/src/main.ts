@@ -29,6 +29,7 @@ import "../js/bridge/host-web.ts";
 import "../js/data/pix.ts";
 import "../js/data/demo.ts";
 import "../js/data/servico.ts";
+import "../js/data/importar.ts";                 // ler CSV/OFX do banco (no navegador)
 import "../js/data/zo.ts";                       // Zo: ferramentas (rodam no navegador, pelo serviço de dados)
 
 // Bridge: transporte

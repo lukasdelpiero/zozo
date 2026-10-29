@@ -88,9 +88,9 @@ if ($nomes -notcontains "RESEND_API_KEY") {
   # produção exige o e-mail (EMAIL_OBRIGATORIO no wrangler.toml): sem ele o cadastro seria recusado
   if ($Ambiente -eq "producao") { Parar "Configure o RESEND_API_KEY e publique de novo: nada foi publicado." }
 }
-if ($nomes -notcontains "OPENAI_API_KEY") {
-  Write-Host "   Aviso: OPENAI_API_KEY não configurado — o Zo (assistente) fica desligado." -ForegroundColor Yellow
-  Write-Host "   Para ligar: npx wrangler secret put OPENAI_API_KEY $($extra -join ' ')  (chave em platform.openai.com › API keys, com limite de gasto)" -ForegroundColor Yellow
+if ($nomes -notcontains "GEMINI_API_KEY") {
+  Write-Host "   Aviso: GEMINI_API_KEY não configurado — o Zo (assistente) fica desligado." -ForegroundColor Yellow
+  Write-Host "   Para ligar: npx wrangler secret put GEMINI_API_KEY $($extra -join ' ')  (chave em aistudio.google.com › Get API key)" -ForegroundColor Yellow
 }
 if ($nomes -notcontains "RECURSOS_CAMBIO") {
   Write-Host "   Aviso: RECURSOS_CAMBIO não configurado — levar transações entre moedas fica só para a demonstração e as contas de RECURSOS_AVANCADOS." -ForegroundColor Yellow
