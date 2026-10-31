@@ -101,7 +101,7 @@ CONTA_CAPTCHA, CONTA_JANELA_S = 20, 3600   # 20 falhas/h na conta (todos os IPs)
 CADASTROS_POR_IP, CADASTRO_JANELA_S = 5, 3600
 ENTRADAS_POR_IP, ENTRADA_JANELA_S = 30, 600          # logins (certos ou errados) por IP: a senha da demo é pública
 COTA_DADOS, COTA_JANELA_S = 600, 600                 # pedidos às rotas de dados por conta (leituras e gravações)
-ZO_POR_DIA, ZO_JANELA_S = 150, 86400                 # pedidos ao Zo por conta por dia (cada ida ao Gemini conta)
+ZO_POR_DIA, ZO_JANELA_S = 150, 86400                 # pedidos ao Zo por conta por dia (cada ida ao modelo conta)
 ZO_OFENSAS_POR_DIA = 3                               # mensagens ofensivas/discriminatórias toleradas: depois, o Zo pausa no dia
 CONSULTAS_POR_IP, CONSULTA_JANELA_S = 60, 60
 
@@ -1201,7 +1201,7 @@ async def _google_identidade(ctx: Contexto) -> Resposta:
 async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     """
     Consentimento (GET/PUT /api/zo/consentimento) e conversa (POST /api/zo). Sessão e prova já conferidas.
-    Sem o consentimento do aviso ATUAL (zo.CONSENTIMENTO_VERSAO), nada vai para o Gemini. Limite diário por conta.
+    Sem o consentimento do aviso ATUAL (zo.CONSENTIMENTO_VERSAO), nada vai para o Groq. Limite diário por conta.
     Nenhum conteúdo nos logs.
     """
     p = ctx.pedido
@@ -1221,11 +1221,11 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     linha = await ctx.banco.primeiro("SELECT zo_consentimento, email_verificado FROM contas WHERE email = ?", email)
     if not linha or not str(linha["zo_consentimento"] or "").startswith(atual):
         raise Falha(403, "CONSENT_REQUIRED")
-    chave, modelo = str(ctx.config.get("GEMINI_API_KEY") or "").strip(), str(ctx.config.get("ZO_MODELO") or "").strip()
+    chave, modelo = str(ctx.config.get("GROQ_API_KEY") or "").strip(), str(ctx.config.get("ZO_MODELO") or "").strip()
     if not chave or not modelo:
         raise Falha(503, "ZO_UNAVAILABLE")
     try:
-        endereco = zo.url(modelo)
+        modelos = zo.modelos(modelo)
     except zo.Invalido as ex:
         raise Falha(503, "ZO_UNAVAILABLE") from ex
     if set(b) != {"mensagens"}:
@@ -1247,27 +1247,41 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     av = _avancado(ctx, email, linha["email_verificado"])
     contexto = (f"Hoje é {dia.tm_mday:02d}/{dia.tm_mon:02d}/{dia.tm_year} ({time.strftime('%Y-%m-%d', dia)}). "
                 f"Perfis {'disponíveis' if av else 'indisponíveis'} nesta conta. Fatura de perfis {'disponível' if av else 'indisponível'}.")
-    cab = {"x-goog-api-key": chave, "Content-Type": "application/json"}
-    # Tempo limite: o Gemini já levou 126 s e o navegador desistiu antes, com o erro genérico. Passou do limite,
-    # a pessoa recebe na hora o aviso do Zo (a chamada que ficou para trás é descartada).
+    cab = {"Authorization": "Bearer " + chave, "Content-Type": "application/json"}
+    # Tempo limite TOTAL: o modelo já levou 126 s e o navegador desistiu antes, com o erro genérico. Passou do
+    # limite, a pessoa recebe na hora o aviso do Zo (a chamada que ficou para trás é descartada).
+    # Falhou (sobrecarga, chamada de ferramenta malformada, modelo fora do ar): tenta o próximo da lista
+    # (ZO_MODELO = "principal,reserva"); com um só modelo, tenta ele de novo uma vez. Tudo no mesmo tempo limite.
     inicio = time.monotonic()
-    try:
-        status, texto = await asyncio.wait_for(
-            ctx.servicos.http_post_json(endereco, cab, zo.montar_pedido(mensagens, contexto, modelo), zo.LIMITE_RESPOSTA), zo.TEMPO_LIMITE_S)
-    except TimeoutError as ex:
-        ctx.evento("zo_demorou", email, ms=int((time.monotonic() - inicio) * 1000))
-        raise Falha(504, "ZO_TIMEOUT") from ex
-    ctx.evento("zo_tempo", email, ms=int((time.monotonic() - inicio) * 1000), status=status)
+    tentativas = modelos if len(modelos) > 1 else modelos * 2
+    status, texto = 0, ""
+    for i, nome in enumerate(tentativas):
+        resta = zo.TEMPO_LIMITE_S - (time.monotonic() - inicio)
+        if i and resta < 1:                               # sem tempo para outra tentativa
+            break
+        if i and nome == tentativas[i - 1]:
+            await asyncio.sleep(0.5)
+        comeco = time.monotonic()
+        try:
+            status, texto = await asyncio.wait_for(
+                ctx.servicos.http_post_json(zo.GROQ_URL, cab, zo.montar_pedido(mensagens, contexto, nome), zo.LIMITE_RESPOSTA), resta)
+        except TimeoutError as ex:
+            ctx.evento("zo_demorou", email, ms=int((time.monotonic() - inicio) * 1000), modelo=nome)
+            raise Falha(504, "ZO_TIMEOUT") from ex
+        ctx.evento("zo_tempo", email, ms=int((time.monotonic() - comeco) * 1000), status=status, modelo=nome)
+        if status == 200:
+            break
+        ctx.evento("zo_falhou", email, status=status, modelo=nome, motivo=zo.motivo_erro(texto))
     if status != 200:
-        ctx.evento("zo_falhou", email, status=status)
-        raise Falha(429, "ZO_BUSY") if status == 429 else Falha(502, "ZO_FAILED")    # 429: cota gratuita do Gemini
+        # 429: limite do plano; 498 e 503: Groq sem capacidade no momento (passam: tentar de novo em instantes)
+        raise Falha(429, "ZO_BUSY") if status in (429, 498, 503) else Falha(502, "ZO_FAILED")
     try:
         resposta = zo.ler_resposta(texto)
     except zo.Invalido as ex:
         ctx.evento("zo_resposta_invalida", email)
         raise Falha(502, "ZO_FAILED") from ex
-    # Filtro de segurança do Gemini: ódio, assédio e discriminação não são tolerados (resposta fixa e, repetidos,
-    # pausa no dia); outros bloqueios recebem uma recusa neutra; resposta barrada nunca chega à pessoa.
+    # Bloqueio por categoria (zo.BARRAR): ódio, palavrão e conteúdo sexual não são tolerados (resposta fixa e,
+    # repetidos, pausa no dia); política e fora do tema recebem uma recusa neutra; resposta barrada nunca chega à pessoa.
     bloqueio = resposta.pop("bloqueio")
     if bloqueio == "ofensa":
         ctx.evento("zo_ofensa", email)

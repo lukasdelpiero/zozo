@@ -169,7 +169,7 @@
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
     if (r.status === 429) throw erro(["ZO_LIMIT", "ZO_PAUSED", "ZO_BUSY"].includes(codigo) ? codigo : "TOO_MANY_ATTEMPTS", extra);
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
-    if (["ZO_UNAVAILABLE", "ZO_FAILED", "ZO_TIMEOUT"].includes(codigo)) throw erro(codigo); // Zo desligado, Gemini fora ou lento demais
+    if (["ZO_UNAVAILABLE", "ZO_FAILED", "ZO_TIMEOUT"].includes(codigo)) throw erro(codigo); // Zo desligado, modelo fora ou lento demais
     throw erro("STORAGE_UNAVAILABLE");
   }
   const parametros = (email: string) => api("GET", "/conta/parametros?email=" + encodeURIComponent(normalizarEmail(email)));
@@ -837,7 +837,7 @@
       return ACOES.getProtecao({});
     },
 
-    /* ---- Zo, o assistente: consentimento e conversa (a API leva ao Gemini; as ferramentas rodam aqui, no navegador) ---- */
+    /* ---- Zo, o assistente: consentimento e conversa (a API leva ao Groq; as ferramentas rodam aqui, no navegador) ---- */
     async zoConsentimento(d) {
       const s = exigirConta();
       const aceito = d && typeof d.aceito === "boolean" ? d.aceito : undefined;

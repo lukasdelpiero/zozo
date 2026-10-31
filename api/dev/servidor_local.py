@@ -18,9 +18,10 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
   ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
-  ZOZO_DEV_ZO=simulado     Zo sem o Gemini: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
-                           "senha" e "orçamento" usam as ferramentas da fase 2, "importar", "categorizar"; "OFENSA-TESTE" cai no filtro)
-  ZOZO_DEV_GEMINI_KEY / ZOZO_DEV_ZO_MODELO   Zo com o Gemini de verdade (plano gratuito: use só dados de teste)
+  ZOZO_DEV_ZO=simulado     Zo sem o Groq: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
+                           "senha" e "orçamento" usam as ferramentas da fase 2, "importar", "categorizar"; "OFENSA-TESTE"
+                           e "POLITICA-TESTE" caem no bloqueio; o resto ecoa a mensagem JÁ MASCARADA)
+  ZOZO_DEV_GROQ_KEY / ZOZO_DEV_ZO_MODELO   Zo com o Groq de verdade (use só dados de teste)
 """
 import asyncio
 import http.server
@@ -77,41 +78,48 @@ CONFIG.update({
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 })
 if os.environ.get("ZOZO_DEV_ZO") == "simulado":
-    CONFIG.update({"GEMINI_API_KEY": "simulado", "ZO_MODELO": "simulado"})
-elif os.environ.get("ZOZO_DEV_GEMINI_KEY"):
-    CONFIG.update({"GEMINI_API_KEY": os.environ["ZOZO_DEV_GEMINI_KEY"], "ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "gemini-2.5-flash")})
+    CONFIG.update({"GROQ_API_KEY": "simulado", "ZO_MODELO": "simulado"})
+elif os.environ.get("ZOZO_DEV_GROQ_KEY"):
+    CONFIG.update({"GROQ_API_KEY": os.environ["ZOZO_DEV_GROQ_KEY"], "ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "openai/gpt-oss-20b")})
 
 
 def _zo_simulado(corpo):
-    """Resposta fixa no formato do Gemini: o bastante para testar a janela, a leitura, a confirmação e as telas."""
-    ultima = json.loads(corpo)["contents"][-1]
-    parte = ultima["parts"][0]
-    texto = str(parte.get("text") or "").lower()
-    chamar = lambda nome, args: {"functionCall": {"name": nome, "args": args}}   # noqa: E731
-    if "functionResponse" in parte:
-        partes = [{"text": "Pronto. Modo simulado do Zo. Posso ajudar em mais alguma coisa?"}]
-    elif "ofensa-teste" in texto:                     # o filtro de segurança barra a fala
-        return 200, json.dumps({"promptFeedback": {"blockReason": "SAFETY",
-                                                   "safetyRatings": [{"category": "HARM_CATEGORY_HATE_SPEECH", "probability": "HIGH", "blocked": True}]}})
+    """Resposta fixa no formato do Groq (OpenAI): o bastante para testar a janela, a leitura, a confirmação e as telas."""
+    ultima = json.loads(corpo)["messages"][-1]
+    texto = str(ultima.get("content") or "").lower()
+    chamadas = []
+
+    def chamar(nome, args):
+        chamadas.append({"id": "sim" + secrets.token_hex(4), "type": "function", "function": {"name": nome, "arguments": json.dumps(args)}})
+    fala = None
+    if ultima["role"] == "tool":
+        fala = "Pronto. Modo simulado do Zo. Posso ajudar em mais alguma coisa?"
+    elif "ofensa-teste" in texto:                     # cai no bloqueio por categoria
+        chamar("barrar_mensagem", {"motivo": "odio"})
+    elif "politica-teste" in texto:
+        chamar("barrar_mensagem", {"motivo": "politica"})
     elif "conta" in texto:
-        partes = [chamar("listar_contas", {})]
+        chamar("listar_contas", {})
     elif "teste" in texto:
-        partes = [chamar("criar_categoria", {"nome": "Teste do Zo", "icone": "🧪"})]
+        chamar("criar_categoria", {"nome": "Teste do Zo", "icone": "🧪"})
     elif "filtr" in texto:
-        partes = [chamar("filtrar_transacoes", {"texto": "itaú", "periodo": "mes"})]
+        chamar("filtrar_transacoes", {"texto": "itaú", "periodo": "mes"})
     elif "senha" in texto:
-        partes = [chamar("abrir_configuracoes", {"assunto": "senha"})]
+        chamar("abrir_configuracoes", {"assunto": "senha"})
     elif "orçamento" in texto or "orcamento" in texto:
-        partes = [chamar("configurar", {"orcamento": False})]
+        chamar("configurar", {"orcamento": False})
     elif "importa" in texto:
-        partes = [chamar("importar_arquivo", {})]
+        chamar("importar_arquivo", {})
     elif "categoriz" in texto:
-        partes = [chamar("categorizar_em_lote", {})]
+        chamar("categorizar_em_lote", {})
     elif "opç" in texto or "opc" in texto:
-        partes = [chamar("oferecer_opcoes", {"pergunta": "Qual opção?", "opcoes": ["Primeira", "Segunda"]})]
+        chamar("oferecer_opcoes", {"pergunta": "Qual opção?", "opcoes": ["Primeira", "Segunda"]})
     else:
-        partes = [{"text": "Modo simulado do Zo. Recebi a sua mensagem."}]
-    return 200, json.dumps({"candidates": [{"content": {"role": "model", "parts": partes}, "finishReason": "STOP"}]})
+        fala = "Modo simulado do Zo. Recebi a sua mensagem: " + str(ultima.get("content") or "")[:200]
+    mensagem = {"role": "assistant", "content": fala}
+    if chamadas:
+        mensagem["tool_calls"] = chamadas
+    return 200, json.dumps({"choices": [{"index": 0, "message": mensagem, "finish_reason": "tool_calls" if chamadas else "stop"}]})
 
 
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
@@ -149,8 +157,8 @@ class Servicos:
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
 
     async def http_post_json(self, url, cabecalhos, corpo, limite=2000):
-        if url.startswith("https://generativelanguage.googleapis.com/"):
-            if CONFIG.get("GEMINI_API_KEY") == "simulado":
+        if url.startswith("https://api.groq.com/"):
+            if CONFIG.get("GROQ_API_KEY") == "simulado":
                 return _zo_simulado(corpo)
             status, texto = await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=corpo.encode("utf-8"), headers=cabecalhos, method="POST"))
             return status, texto[:limite]

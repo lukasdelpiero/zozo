@@ -24,8 +24,12 @@ async function cenario({ perfis = true } = {}) {
 test("Zo: os nomes das ferramentas são os mesmos do servidor (api/src/zo.py)", async () => {
   const { zo } = await cenario();
   const fonte = readFileSync(new URL("../../api/src/zo.py", import.meta.url), "utf8");
-  const doServidor = [...fonte.matchAll(/_f\("([a-z_]+)"/g)].map((m) => m[1]).sort();
+  // só a lista FERRAMENTAS (o bloqueio por categoria, BARRAR, é só do servidor e o navegador nunca o executa)
+  const lista = fonte.slice(fonte.indexOf("FERRAMENTAS: list"), fonte.indexOf("NOMES = frozenset"));
+  const doServidor = [...lista.matchAll(/_f\("([a-z_]+)"/g)].map((m) => m[1]).sort();
+  assert.ok(doServidor.length > 20);
   assert.deepEqual([...zo.nomes].sort(), doServidor);
+  assert.ok(!zo.nomes.includes("barrar_mensagem"));
 });
 
 test("Zo: compra parcelada só grava depois de confirmar; falta de categoria vira pergunta", async () => {

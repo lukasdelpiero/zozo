@@ -54,9 +54,12 @@ TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 # "Continuar com Google": ID do cliente OAuth (público). Vazio = botão avisa que não está disponível.
 # A chave secreta vai por: npx wrangler secret put GOOGLE_CLIENT_SECRET  — veja docs/AMBIENTE-DE-TESTES.md
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
-# Zo, o assistente: modelo do Gemini (confira o nome no Google AI Studio). A chave vai por:
-#   npx wrangler secret put GEMINI_API_KEY   — sem ela o Zo responde "ainda não disponível"
-ZO_MODELO = "gemini-3.8-flash"
+# Zo, o assistente: modelo no Groq (confira o nome em console.groq.com/docs/models). A chave vai por:
+#   npx wrangler secret put GROQ_API_KEY   — sem ela o Zo responde "ainda não disponível"
+# Ligue a Retenção Zero de Dados (ZDR) em console.groq.com › Settings › Data Controls (a política promete isso).
+# O llama-3.1-8b-instant foi desativado nos planos Free e Developer em 16/08/2026 (só Enterprise); o Groq indica o
+# gpt-oss-20b no lugar. Com o plano Enterprise, troque para "llama-3.1-8b-instant". Reserva: "principal,reserva".
+ZO_MODELO = "openai/gpt-oss-20b"
 
 # ================= PRÉVIA (testes antes de publicar) =================
 # Aberta: sem Cloudflare Access e sem lista de e-mails (cadastro livre, com CAPTCHA).
@@ -87,9 +90,12 @@ EMAIL_REMETENTE = "ZoZo <nao-responda@usezozo.com.br>"
 URL_PUBLICA = "https://zozo-previa.zozo-finance-app.workers.dev"
 TURNSTILE_SITE_KEY = "0x4AAAAAAFQjiDFKjsHDDIAe"
 GOOGLE_CLIENT_ID = "394306363074-rbl4kj74ebao8l4t4pdao27ut4vjel67.apps.googleusercontent.com"
-# Zo, o assistente: modelo do Gemini (confira o nome no Google AI Studio). A chave vai por:
-#   npx wrangler secret put GEMINI_API_KEY   — sem ela o Zo responde "ainda não disponível"
-ZO_MODELO = "gemini-3.8-flash"
+# Zo, o assistente: modelo no Groq (confira o nome em console.groq.com/docs/models). A chave vai por:
+#   npx wrangler secret put GROQ_API_KEY   — sem ela o Zo responde "ainda não disponível"
+# Ligue a Retenção Zero de Dados (ZDR) em console.groq.com › Settings › Data Controls (a política promete isso).
+# O llama-3.1-8b-instant foi desativado nos planos Free e Developer em 16/08/2026 (só Enterprise); o Groq indica o
+# gpt-oss-20b no lugar. Com o plano Enterprise, troque para "llama-3.1-8b-instant". Reserva: "principal,reserva".
+ZO_MODELO = "openai/gpt-oss-20b"
 # FastAPI + Pydantic na frente do núcleo (validação estrita do JSON de cada rota; ver src/app_fastapi.py).
 # Só na prévia por enquanto; aprovado aqui, repetir em [vars] (produção).
 API_FASTAPI = "1"
