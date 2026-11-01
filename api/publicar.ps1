@@ -29,7 +29,7 @@ Write-Host "1/6 Testes automáticos..." -ForegroundColor Cyan
 # uv run: usa o ambiente do projeto (FastAPI/Pydantic nas mesmas versões do Worker; mypy do grupo dev)
 uv run python -m unittest discover -s tests
 if ($LASTEXITCODE -ne 0) { Parar "Testes da API falharam: nada foi publicado." }
-uv run mypy
+uv run python -m mypy        # "python -m": os atalhos .exe do .venv podem guardar o caminho antigo da pasta (ZoZo → app)
 if ($LASTEXITCODE -ne 0) { Parar "Erros de tipo no back-end (mypy): nada foi publicado." }
 Push-Location ..
 # Dependências da interface exatamente como no package-lock.json (sem scripts de instalação: .npmrc)
@@ -135,7 +135,7 @@ npx wrangler d1 migrations apply $banco --remote @extra
 if ($LASTEXITCODE -ne 0) { Parar "Falha nas migrações: nada foi publicado." }
 
 Write-Host "6/6 Publicando ($Ambiente)..." -ForegroundColor Cyan
-uv run pywrangler deploy @extra
+uv run python -m pywrangler deploy @extra
 # As migrações acima já valeram no banco: por isso elas são sempre aditivas (a versão anterior do site continua funcionando)
 if ($LASTEXITCODE -ne 0) { Parar "Falha ao publicar o código. Atenção: as migrações do banco JÁ foram aplicadas (são compatíveis com a versão no ar). Corrija e publique de novo." }
 Write-Host ""
