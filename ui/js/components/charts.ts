@@ -188,13 +188,16 @@
           : validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
         // Início, meio e fim — sem repetir (séries curtas) e sem o do meio quando não cabe entre os outros dois
         const ultimo = ref.length - 1, meio = Math.floor(ultimo / 2);
+        // gráfico puxado até a borda do card (margem esquerda negativa): a linha encosta, a 1ª data fica alinhada ao texto
+        const recuo = Math.max(0, -parseFloat(getComputedStyle(container).marginLeft) || 0);
         const indices = ultimo <= 0 ? [0] : (meio > 0 && meio < ultimo && iw >= 240) ? [0, meio, ultimo] : [0, ultimo];
         indices.forEach((i) => {
           if (!ref[i]) return;
           const dt = F.parseData(ref[i].data) || new Date();
           const ancora = i === 0 ? "start" : i === ultimo ? "end" : "middle";
-          if (o.rotuloX) tela.appendChild(s("text", { x: x(i, ref.length), y: H - 6, class: P.graficoRotulo, "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
-          else rotuloDuasLinhas(tela, x(i, ref.length), H - 2, String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()), String(dt.getFullYear()), ancora);
+          const xr = x(i, ref.length) + (i === 0 ? recuo : 0);
+          if (o.rotuloX) tela.appendChild(s("text", { x: xr, y: H - 6, class: P.graficoRotulo, "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
+          else rotuloDuasLinhas(tela, xr, H - 2, String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()), String(dt.getFullYear()), ancora);
         });
       }
 

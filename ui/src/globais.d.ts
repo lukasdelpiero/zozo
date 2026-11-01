@@ -683,6 +683,8 @@ declare global {
   interface OpcoesCardContas {
     intervalo?: string; embedded?: boolean; compact?: boolean; filtros?: boolean; alturaGrafico?: number;
     chaveIntervalo?: string; rotuloFiltro?: string;
+    /** classes do gráfico (ex.: a margem negativa que o leva até a borda esquerda do card de quem embute) */
+    classeGrafico?: string;
   }
   interface OpcoesPainelConta { editandoCiclo?: boolean; voltar?: () => void }
   interface ZoZoContasShared {

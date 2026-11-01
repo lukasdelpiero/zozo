@@ -32,6 +32,7 @@
     valor: "money tw:text-[28px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center tw:area460:text-[17px]",
     valorEmbutido: "money tw:text-[1.5rem] tw:font-[550] tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center",
     grafico: "tw:relative tw:mb-2",
+    graficoNaBorda: "tw:-ml-6",                         // o gráfico encosta na borda esquerda do card (só a esquerda)
     filtros: "tw:flex tw:justify-center",
     // painel: 4 últimos dígitos editáveis no lugar (sem borda, fundo transparente)
     digitos: "tw:[field-sizing:content] tw:min-w-[3ch] tw:max-w-[5ch] tw:p-0 tw:[border:0] tw:rounded-sm tw:bg-transparent tw:text-inherit tw:text-[15px] tw:font-[550] "
@@ -73,7 +74,7 @@
     const resumo = contas.resumo;
     const intervalo = o.intervalo || ui.intervaloContas;
     const serie = UI.recortarSerie(resumo.serie, intervalo);
-    const chart = h("div", { class: T.grafico });
+    const chart = h("div", { class: [T.grafico, o.classeGrafico || (!o.embedded && T.graficoNaBorda)] });
     const css = getComputedStyle(document.documentElement);
     const ativos = metade(T.pontoAtivos, "Ativos", resumo.ativos, !!o.embedded, false);
     const passivos = metade(T.pontoPassivos, "Passivos", resumo.passivos, !!o.embedded, true);

@@ -56,6 +56,8 @@
     gastoPalavra: "tw:font-semibold",
     gastoNota: "tw:text-zz-cinza tw:text-[.9375rem] tw:font-[550]",
     grafico: "tw:relative tw:mb-2",
+    // Patrimônio total: o gráfico encosta na borda esquerda do card (a margem negativa = o padding do card)
+    graficoNaBorda: "tw:-ml-5 tw:na-tela:baixa860:-ml-4",
     // Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado
     tops: "tw:flex tw:flex-col tw:-mx-5 tw:na-tela:min-h-0 tw:na-tela:overflow-hidden",
     top: "tw:grid tw:grid-cols-[16px_26px_minmax(0,1fr)_auto_112px] tw:gap-2.5 tw:items-center tw:min-h-9 tw:px-5 tw:text-[15px] tw:font-[450] "
@@ -227,7 +229,7 @@
 
       const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"), true,
         ZoZo.contasShared.ContasChartCard(d.contas, state.ui, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
-          intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
+          intervalo: state.ui.intervaloPatrimonio || "3M", classeGrafico: T.graficoNaBorda, chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
       const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"), false,

@@ -22,7 +22,7 @@
     metade: "tw:flex tw:flex-col tw:items-center tw:gap-1 tw:text-center",
     legenda: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-secondary tw:text-[13px] tw:font-medium",
     valor: "money tw:text-[28px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center tw:area460:text-[17px]",
-    grafico: "tw:relative tw:mb-2",
+    grafico: "tw:relative tw:mb-2 tw:-ml-6",           // encosta na borda esquerda do card (só a esquerda)
     filtros: "tw:flex tw:justify-center",
   };
 
