@@ -13,6 +13,7 @@ import "./estilos.css";
 import "../js/core/dom.ts";
 import "../js/core/simbolos.ts";               // "R$" e "%" menores, no alto do número (em toda a tela)
 import "../js/core/icons.ts";
+import "../js/core/captura.ts";               // elemento da tela em PNG (fatura, páginas de Design)
 import "../js/core/format.ts";
 import "../js/core/busca.ts";
 import "../js/core/state.ts";
@@ -56,6 +57,7 @@ import "../js/components/detail-panel.ts";
 import "../js/components/verificacao.ts";
 import "../js/components/auth.ts";
 import "../js/components/novidades.ts";
+import "../js/components/demonstracao.ts";        // conta demo: Alt + Shift + D (avisos e painel)
 import "../js/components/zo.ts";                 // Zo: botão flutuante e janela de conversa
 
 // Páginas

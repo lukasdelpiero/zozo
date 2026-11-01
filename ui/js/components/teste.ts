@@ -54,6 +54,7 @@
     botao.addEventListener("click", () => abrir(ctx, app));
     document.body.appendChild(botao);
     ancora = botao;
+    ZoZo.demonstracao.aplicarPainel();          // a demo pode ter escondido o botão (Alt + Shift + D)
   }
 
   /* ---------- dados de exemplo (da conta aberta) ---------- */
@@ -62,6 +63,127 @@
   const categorias = async (ctx: ContextoApp) => (await ctx.loadData("categorias", A.getCategorias)).categorias;
   const perfis = async (ctx: ContextoApp) => (await ctx.loadData("perfis", A.getPerfis)).perfis;
   const recorrencias = async (ctx: ContextoApp) => (await ctx.loadData("recorrencias", A.getRecorrencias)).recorrencias;
+
+  /* ---------- catálogo: tudo o que o painel abre (o Design fotografa a mesma lista) ----------
+     Ao criar uma tela, painel, janela ou menu novo no app, acrescente-o aqui. */
+  type TipoItem = "tela" | "painel" | "janela" | "menu" | "externo";
+  type ItemCatalogo = { secao: string; sub?: string; rotulo: string; tipo: TipoItem; abrir: () => unknown; conta?: boolean };
+  const achar = <X>(itens: X[], teste: (x: X) => boolean, oque: string): X => {
+    const x = itens.find(teste);
+    if (!x) throw new Error("Não há " + oque + " nesta conta (carregue os dados de exemplo).");
+    return x;
+  };
+  function catalogo(ctx: ContextoApp): ItemCatalogo[] {
+    /** Painel lateral só aparece nas páginas que têm a coluna dele (no Dashboard não): vai à página antes */
+    const naPagina = (rota: string, acao: () => unknown) => () => { ctx.router.navigate(rota); return new Promise((ok) => setTimeout(ok, 450)).then(acao); };
+    const primeira = async <X>(fn: () => Promise<X[]>, oque: string) => achar(await fn(), () => true, oque);
+    const regular = async () => achar(await lancamentos(ctx), (l) => l.tipo === "regular", "transação regular");
+    const cartao = async () => achar(await contas(ctx), (c) => c.tipo === "cartao", "cartão de crédito");
+    const itens: ItemCatalogo[] = [];
+    const add = (secao: string, sub: string | undefined, tipo: TipoItem, rotulo: string, abrir: () => unknown, conta = true) => { itens.push({ secao, sub, rotulo, tipo, abrir, conta }); };
+
+    // Telas
+    ([["dashboard", "Dashboard"], ["lancamentos", "Transações"], ["contas", "Contas"], ["investimentos", "Investimentos"],
+      ["categorias", "Categorias"], ["recorrencias", "Recorrências"], ["perfil", "Perfis"]] as Array<[string, string]>)
+      .forEach(([rota, rotulo]) => add("Telas", undefined, "tela", rotulo, () => ctx.router.navigate(rota)));
+    add("Telas", undefined, "janela", "Fatura (boleto)", () => ZoZo.boleto.open(ctx, {}));
+    add("Telas", undefined, "externo", "Sobre o ZoZo (página pública)", () => { window.open("/sobre", "_blank", "noopener"); });
+    add("Telas", undefined, "externo", "Termos de uso", () => { window.open("/termos-uso", "_blank", "noopener"); });
+    add("Telas", undefined, "externo", "Política de privacidade", () => { window.open("/politica-privacidade", "_blank", "noopener"); });
+
+    // Painéis laterais
+    const P = "Painéis laterais";
+    add(P, "Transações", "painel", "Nova transação", naPagina("lancamentos", () => ZoZo.lancamentosShared.abrirFormulario(null, ctx)));
+    ([["regular", "Despesa", (l: LancamentoTela) => l.tipo === "regular"], ["receita", "Receita", (l: LancamentoTela) => l.tipo === "receita"],
+      ["estorno", "Estorno", (l: LancamentoTela) => l.tipo === "estorno"], ["débito", "Débito", (l: LancamentoTela) => l.tipo === "debito"],
+      ["transferência", "Transferência", (l: LancamentoTela) => l.tipo === "interno"], ["pagamento de fatura", "Fatura", (l: LancamentoTela) => l.tipo === "fatura"],
+      ["recorrente", "Recorrente", (l: LancamentoTela) => l.tipo === "recorrente" && l.recorrencia !== "parcelada"],
+      ["parcelada", "Parcelada", (l: LancamentoTela) => l.recorrencia === "parcelada"], ["dividida", "Dividida", (l: LancamentoTela) => !!l.divisao],
+    ] as Array<[string, string, (l: LancamentoTela) => boolean]>).forEach(([tipo, rotulo, teste]) =>
+      add(P, "Transações", "painel", rotulo, naPagina("lancamentos", async () => ZoZo.lancamentosShared.abrirVisualizacao(achar(await lancamentos(ctx), teste, "transação do tipo " + tipo), ctx))));
+    const tipoConta = (sec: string, sub: string | undefined, tipo: string, rotulo: string, opts?: OpcoesPainelConta) =>
+      add(sec, sub, "painel", rotulo, naPagina(tipo === "investimento" ? "investimentos" : "contas", async () => ZoZo.contasShared.abrirDetalheConta(
+        achar(await contas(ctx), (c) => c.tipo === tipo, "conta do tipo " + tipo), ctx, opts)));
+    tipoConta(P, "Contas", "corrente", "Conta corrente"); tipoConta(P, "Contas", "poupanca", "Poupança"); tipoConta(P, "Contas", "cartao", "Cartão de crédito");
+    tipoConta(P, "Contas", "cartao", "Cartão: editar fechamento", { editandoCiclo: true }); tipoConta(P, "Contas", "investimento", "Investimento");
+    tipoConta(P, "Contas", "emprestimo", "Empréstimo"); tipoConta(P, "Contas", "outros", "Outros");
+    const S = "Categorias, recorrências e perfis";
+    add(P, S, "painel", "Categoria", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(await primeira(() => categorias(ctx), "categoria"), ctx)));
+    add(P, S, "painel", "Categoria: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(
+      achar(await categorias(ctx), (c) => c.status === "regular", "categoria regular"), ctx, { editandoOrcamento: true })));
+    add(P, S, "painel", "Categoria: editar (formulário)", naPagina("categorias", async () => ZoZo.categoriasShared.abrirFormCategoria(ctx, await primeira(() => categorias(ctx), "categoria"))));
+    add(P, S, "painel", "Grupo de categorias", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c) => !!c.grupo, "grupo").grupo!, ctx)));
+    add(P, S, "painel", "Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c) => !!c.grupo, "grupo").grupo!, ctx, { editando: true })));
+    add(P, S, "painel", "Recorrência", naPagina("recorrencias", async () => ZoZo.recorrenciasShared.abrirDetalhe(await primeira(() => recorrencias(ctx), "recorrência"), ctx)));
+    add(P, S, "painel", "Perfil", naPagina("perfil", async () => ZoZo.perfilShared.abrirDetalhe(await primeira(() => perfis(ctx), "perfil"), ctx)));
+    add(P, S, "painel", "Perfil: editar (formulário)", naPagina("perfil", async () => ZoZo.perfilShared.abrirFormPerfil(ctx, await primeira(() => perfis(ctx), "perfil"))));
+
+    // Janelas
+    const J = "Janelas (todos os passos)";
+    ([["corrente", "Nova conta: banco"], ["cartao", "Nova conta: cartão"], ["investimento", "Nova conta: investimento"],
+      ["emprestimo", "Nova conta: empréstimo"], ["outros", "Nova conta: outros"]] as Array<[string, string]>)
+      .forEach(([tipo, rotulo]) => add(J, "Contas", "janela", rotulo, () => ZoZo.modais.novaConta(ctx, tipo, {})));
+    add(J, "Contas", "janela", "Pagar fatura", async () => ZoZo.modais.pagarFatura(ctx, await cartao()));
+    add(J, "Contas", "janela", "Zo (assistente)", () => ZoZo.zo.abrir());
+    // abre a fatura do 1º perfil e, com os dados carregados, a janela do pagamento recebido
+    add(J, "Contas", "janela", "Fatura: pagamento recebido", async () => ZoZo.boleto.open(ctx, { perfilId: (await primeira(() => perfis(ctx), "perfil")).id, receber: true }));
+    add(J, "Categorias e perfis", "janela", "Nova categoria", () => ZoZo.modais.novaCategoria(ctx, {}));
+    add(J, "Categorias e perfis", "janela", "Criar grupo", () => ZoZo.modais.criarGrupo(() => undefined));
+    add(J, "Categorias e perfis", "janela", "Novo perfil", () => ZoZo.modais.novoPerfil(ctx, {}));
+    const TR = "Transações e recorrências";
+    add(J, TR, "janela", "Nova recorrência: 1. escolher transação", () => ZoZo.modais.novaRecorrencia(ctx));
+    add(J, TR, "janela", "Nova recorrência: 2. frequência", async () => ZoZo.modais.frequencia(ctx, (await regular()).id, {}));
+    add(J, TR, "janela", "Dividir transação", async () => ZoZo.dividir.abrir(await regular(), ctx));
+    add(J, TR, "janela", "Transferir entre moedas", () => ZoZo.cambio.abrirTransferencia(ctx));
+    const CC = "Configurações e confirmações";
+    add(J, CC, "janela", "Configurações: Geral", () => ZoZo.configuracoes.abrir(ctx, "geral"));
+    add(J, CC, "janela", "Configurações: Conta", () => ZoZo.configuracoes.abrir(ctx, "conta"));
+    add(J, CC, "janela", "Configurações: Sobre", () => ZoZo.configuracoes.abrir(ctx, "sobre"));
+    add(J, CC, "janela", "2FA: ativar (passo a passo)", () => {
+      ZoZo.configuracoes.abrir(ctx, "conta");
+      setTimeout(() => { const b = Array.from(document.querySelectorAll<HTMLButtonElement>(".modal button")).find((x) => /Ativar 2FA|Desativar 2FA/.test(x.textContent || "")); if (b) b.click(); }, 400);
+    });
+    add(J, CC, "janela", "2FA: desativar (código)", () => ZoZo.configuracoes.desativar2FA(ctx));
+    add(J, CC, "janela", "Novidades da versão (O que há de novo)", () => ZoZo.novidades.abrir(), false);
+    const CA = "Confirmações de ação (os textos de cada uma; confirmar aqui não faz nada)";
+    CONFIRMACOES.forEach(([rotulo, titulo, mensagem, opts]) => add(J, CA, "janela", rotulo, () => ZoZo.feedback.confirmarExclusao(titulo, mensagem, opts), false));
+    CONFIRMACOES_SENHA.forEach(([rotulo, cfg]) => add(J, "Confirmações com senha", "janela", rotulo, () => ZoZo.modais.confirmarComSenha(cfg), false));
+    ACOES_SEM_VOLTA.forEach(([rotulo, cfg]) => add(J, "Ações sem volta (frase, senha e código do 2FA; confirmar aqui não faz nada)", "janela", rotulo,
+      () => ZoZo.modais.confirmarSeguro(Object.assign({ executar: () => Promise.resolve() }, cfg)), false));
+
+    // Menus (abrem no botão "Modo teste")
+    const M = "Menus";
+    add(M, undefined, "menu", "Menu completo (ícone, marcado, seção, submenu, perigoso)", () => ancora && ZoZo.menu.abrir(ancora, [
+      { icone: "mais", label: "Item com ícone", onClick: () => undefined },
+      { label: "Item marcado", check: true, onClick: () => undefined },
+      { label: "Item não marcado", check: false, onClick: () => undefined },
+      { secao: "Seção" },
+      { label: "Com submenu", submenu: [{ label: "Opção 1", onClick: () => undefined }, { label: "Opção 2", onClick: () => undefined }] },
+      { label: "Desabilitado", desabilitado: true, onClick: () => undefined },
+      { separador: true },
+      { label: "Excluir", perigo: true, onClick: () => undefined },
+    ], { posicao: "acima", checkEsquerda: true, largura: 260, label: "Menu de exemplo" }), false);
+    add(M, undefined, "menu", "Contas", async () => ancora && ZoZo.menu.contas(ancora, { contas: await contas(ctx), atual: null, aoEscolher: () => undefined, posicao: "acima" }));
+    add(M, undefined, "menu", "Perfis", async () => ancora && ZoZo.menu.perfis(ancora, ctx, { perfis: await perfis(ctx), atual: null, aoEscolher: () => undefined, posicao: "acima" }));
+    add(M, undefined, "menu", "Calendário", () => ancora && ZoZo.calendario.abrir(ancora, F.iso(new Date()), () => undefined, { posicao: "acima" }), false);
+    add(M, undefined, "menu", "Emojis", () => ancora && ZoZo.emojiPicker.abrir(ancora, { atual: "📦", aoEscolher: () => undefined, posicao: "acima" }), false);
+
+    // Gráficos
+    const G = "Gráficos";
+    add(G, undefined, "janela", "Galeria de gráficos", () => galeriaGraficos(), false);
+    add(G, undefined, "tela", "Dashboard (gasto e patrimônio)", () => ctx.router.navigate("dashboard"));
+    add(G, undefined, "tela", "Contas (ativos × passivos)", () => ctx.router.navigate("contas"));
+    tipoConta(G, undefined, "corrente", "Painel da conta (saldo)");
+    add(G, undefined, "painel", "Painel da categoria (barras)", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(await primeira(() => categorias(ctx), "categoria"), ctx)));
+    add(G, undefined, "tela", "Categorias (rosca)", () => ctx.router.navigate("categorias"));
+    add(G, undefined, "tela", "Investimentos", () => ctx.router.navigate("investimentos"));
+    add("Componentes", undefined, "janela", "Galeria de componentes (botões, pílulas, campos, estados)", () => galeriaComponentes(), false);
+    return itens;
+  }
+
+  /** Páginas de Design: abrem numa guia nova (#design/…), geradas do próprio app */
+  const DESIGN: Array<[string, string]> = [["janelas", "Janelas"], ["elementos", "Elementos"], ["tipografia", "Tipografia"],
+    ["medidas", "Medidas, espaços e movimento"], ["cores", "Cores"], ["regras", "Regras gerais"], ["icones", "Ícones"]];
 
   function abrir(ctx: ContextoApp, app: AcoesApp) {
     const area = h("div", { class: C.corpo });
@@ -77,13 +199,6 @@
       fechar();
       setTimeout(() => Promise.resolve().then(acao).catch((e: Partial<ErroPonte>) => avisar((e && (e.friendly || e.message)) || "Não deu para abrir.")), 220);
     });
-    /** Painel lateral só aparece nas páginas que têm a coluna dele (no Dashboard não): vai à página antes */
-    const naPagina = (rota: string, acao: () => unknown) => () => { ctx.router.navigate(rota); return new Promise((ok) => setTimeout(ok, 450)).then(acao); };
-    const achar = <X>(itens: X[], teste: (x: X) => boolean, oque: string): X => {
-      const x = itens.find(teste);
-      if (!x) throw new Error("Não há " + oque + " nesta conta (carregue os dados de exemplo).");
-      return x;
-    };
     const secao = (titulo: string, aberta: boolean, ...filhos: Array<HTMLElement | null>) =>
       h("details", { class: C.secao, open: aberta || undefined }, h("summary", { class: C.resumo }, titulo), h("div", { class: C.grupo }, ...filhos));
     const sub = (texto: string) => h("p", { class: C.subtitulo }, texto);
@@ -96,14 +211,14 @@
       const simular = ZoZo.modais.Interruptor("Simular cadastro e login sem servidor", e.simulacao, (v) => {
         T!.simular(v); app.entradaMudou(); desenhar();
       });
-      const tipoLanc = (tipo: string, rotulo: string, teste: (l: LancamentoTela) => boolean) =>
-        ir(rotulo, naPagina("lancamentos", async () => ZoZo.lancamentosShared.abrirVisualizacao(achar(await lancamentos(ctx), teste, "transação do tipo " + tipo), ctx)));
-      const tipoConta = (tipo: string, rotulo: string, opts?: OpcoesPainelConta) =>
-        ir(rotulo, naPagina(tipo === "investimento" ? "investimentos" : "contas", async () => ZoZo.contasShared.abrirDetalheConta(
-          achar(await contas(ctx), (c) => c.tipo === tipo, "conta do tipo " + tipo), ctx, opts)));
-      const primeira = async <X>(fn: () => Promise<X[]>, oque: string) => achar(await fn(), () => true, oque);
-      const regular = async () => achar(await lancamentos(ctx), (l) => l.tipo === "regular", "transação regular");
-      const cartao = async () => achar(await contas(ctx), (c) => c.tipo === "cartao", "cartão de crédito");
+      const cat = catalogo(ctx);
+      /** Seção do painel a partir do catálogo: um subtítulo por grupo e os botões de cada item */
+      const doCatalogo = (titulo: string, aberta: boolean, ...antes: Array<HTMLElement | null>) => {
+        const itens = cat.filter((i) => i.secao === titulo);
+        const subs = Array.from(new Set(itens.map((i) => i.sub || "")));
+        return secao(titulo, aberta, ...antes, ...subs.flatMap((s) => [s ? sub(s) : null,
+          linha(...itens.filter((i) => (i.sub || "") === s).map((i) => ir(i.rotulo, i.abrir, i.conta !== false)))]));
+      };
 
       mount(area,
         h("dl", { class: C.estado }, ...linhas.flatMap(([r, v]) => [h("dt", { class: C.rotulo }, r), h("dd", { class: C.valor }, v)])),
@@ -115,14 +230,7 @@
             ZoZo.servico.reset(); ctx.recarregarTudo(); fechar();
           }) : null),
 
-        secao("Telas", true,
-          linha(...([["dashboard", "Dashboard"], ["lancamentos", "Transações"], ["contas", "Contas"], ["investimentos", "Investimentos"],
-            ["categorias", "Categorias"], ["recorrencias", "Recorrências"], ["perfil", "Perfis"]] as Array<[string, string]>)
-            .map(([rota, rotulo]) => ir(rotulo, () => ctx.router.navigate(rota))),
-          ir("Fatura (boleto)", () => ZoZo.boleto.open(ctx, {})),
-          ir("Sobre o ZoZo (página pública)", () => { window.open("/sobre", "_blank", "noopener"); }),
-          ir("Termos de uso", () => { window.open("/termos-uso", "_blank", "noopener"); }),
-          ir("Política de privacidade", () => { window.open("/politica-privacidade", "_blank", "noopener"); }))),
+        doCatalogo("Telas", true),
 
         secao("Etapas da entrada", false,
           logado() ? h("p", { class: C.nota }, "Abrir uma etapa da entrada encerra a sessão desta aba.") : null,
@@ -136,99 +244,17 @@
             ["novaSenhaSemCopia", "Nova senha (sem cópia da chave)"], ["novaSenhaRestaurada", "Nova senha (cópia anterior)"]] as Array<[string, string]>)
             .map(([nome, rotulo]) => ir(rotulo, () => app.tela(nome), false)))),
 
-        secao("Painéis laterais", false,
-          sub("Transações"),
-          linha(ir("Nova transação", naPagina("lancamentos", () => ZoZo.lancamentosShared.abrirFormulario(null, ctx))),
-            tipoLanc("regular", "Despesa", (l) => l.tipo === "regular"),
-            tipoLanc("receita", "Receita", (l) => l.tipo === "receita"),
-            tipoLanc("estorno", "Estorno", (l) => l.tipo === "estorno"),
-            tipoLanc("débito", "Débito", (l) => l.tipo === "debito"),
-            tipoLanc("transferência", "Transferência", (l) => l.tipo === "interno"),
-            tipoLanc("pagamento de fatura", "Fatura", (l) => l.tipo === "fatura"),
-            tipoLanc("recorrente", "Recorrente", (l) => l.tipo === "recorrente" && l.recorrencia !== "parcelada"),
-            tipoLanc("parcelada", "Parcelada", (l) => l.recorrencia === "parcelada"),
-            tipoLanc("dividida", "Dividida", (l) => !!l.divisao)),
-          sub("Contas"),
-          linha(tipoConta("corrente", "Conta corrente"), tipoConta("poupanca", "Poupança"), tipoConta("cartao", "Cartão de crédito"),
-            tipoConta("cartao", "Cartão: editar fechamento", { editandoCiclo: true }), tipoConta("investimento", "Investimento"),
-            tipoConta("emprestimo", "Empréstimo"), tipoConta("outros", "Outros")),
-          sub("Categorias, recorrências e perfis"),
-          linha(
-            ir("Categoria", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(await primeira(() => categorias(ctx), "categoria"), ctx))),
-            ir("Categoria: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(
-              achar(await categorias(ctx), (c) => c.status === "regular", "categoria regular"), ctx, { editandoOrcamento: true }))),
-            ir("Categoria: editar (formulário)", naPagina("categorias", async () => ZoZo.categoriasShared.abrirFormCategoria(ctx, await primeira(() => categorias(ctx), "categoria")))),
-            ir("Grupo de categorias", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c) => !!c.grupo, "grupo").grupo!, ctx))),
-            ir("Grupo: editar orçamento", naPagina("categorias", async () => ZoZo.categoriasShared.abrirGrupo(achar(await categorias(ctx), (c) => !!c.grupo, "grupo").grupo!, ctx, { editando: true }))),
-            ir("Recorrência", naPagina("recorrencias", async () => ZoZo.recorrenciasShared.abrirDetalhe(await primeira(() => recorrencias(ctx), "recorrência"), ctx))),
-            ir("Perfil", naPagina("perfil", async () => ZoZo.perfilShared.abrirDetalhe(await primeira(() => perfis(ctx), "perfil"), ctx))),
-            ir("Perfil: editar (formulário)", naPagina("perfil", async () => ZoZo.perfilShared.abrirFormPerfil(ctx, await primeira(() => perfis(ctx), "perfil")))))),
+        doCatalogo("Painéis laterais", false),
+        doCatalogo("Janelas (todos os passos)", false),
+        doCatalogo("Menus", false,
+          h("p", { class: C.nota }, "Abrem no botão \"Modo teste\". Os menus próprios de cada tela abrem pelos botões dela (abra a tela ou o painel acima).")),
+        doCatalogo("Gráficos", false),
+        doCatalogo("Componentes", false),
 
-        secao("Janelas (todos os passos)", false,
-          sub("Contas"),
-          linha(...([["corrente", "Nova conta: banco"], ["cartao", "Nova conta: cartão"], ["investimento", "Nova conta: investimento"],
-            ["emprestimo", "Nova conta: empréstimo"], ["outros", "Nova conta: outros"]] as Array<[string, string]>)
-            .map(([tipo, rotulo]) => ir(rotulo, () => ZoZo.modais.novaConta(ctx, tipo, {}))),
-            ir("Pagar fatura", async () => ZoZo.modais.pagarFatura(ctx, await cartao())),
-            ir("Zo (assistente)", () => ZoZo.zo.abrir()),
-            // abre a fatura do 1º perfil e, com os dados carregados, a janela do pagamento recebido
-            ir("Fatura: pagamento recebido", async () => ZoZo.boleto.open(ctx, { perfilId: (await primeira(() => perfis(ctx), "perfil")).id, receber: true }))),
-          sub("Categorias e perfis"),
-          linha(ir("Nova categoria", () => ZoZo.modais.novaCategoria(ctx, {})),
-            ir("Criar grupo", () => ZoZo.modais.criarGrupo(() => undefined)),
-            ir("Novo perfil", () => ZoZo.modais.novoPerfil(ctx, {}))),
-          sub("Transações e recorrências"),
-          linha(ir("Nova recorrência: 1. escolher transação", () => ZoZo.modais.novaRecorrencia(ctx)),
-            ir("Nova recorrência: 2. frequência", async () => ZoZo.modais.frequencia(ctx, (await regular()).id, {})),
-            ir("Dividir transação", async () => ZoZo.dividir.abrir(await regular(), ctx)),
-            ir("Transferir entre moedas", () => ZoZo.cambio.abrirTransferencia(ctx))),
-          sub("Configurações e confirmações"),
-          linha(ir("Configurações: Geral", () => ZoZo.configuracoes.abrir(ctx, "geral")),
-            ir("Configurações: Conta", () => ZoZo.configuracoes.abrir(ctx, "conta")),
-            ir("Configurações: Sobre", () => ZoZo.configuracoes.abrir(ctx, "sobre")),
-            ir("2FA: ativar (passo a passo)", () => {
-              ZoZo.configuracoes.abrir(ctx, "conta");
-              setTimeout(() => { const b = Array.from(document.querySelectorAll<HTMLButtonElement>(".modal button")).find((x) => /Ativar 2FA|Desativar 2FA/.test(x.textContent || "")); if (b) b.click(); }, 400);
-            }),
-            ir("2FA: desativar (código)", () => ZoZo.configuracoes.desativar2FA(ctx))),
-          linha(ir("Novidades da versão (O que há de novo)", () => ZoZo.novidades.abrir(), false)),
-          sub("Confirmações de ação (os textos de cada uma; confirmar aqui não faz nada)"),
-          linha(...CONFIRMACOES.map(([rotulo, titulo, mensagem, opts]) =>
-            ir(rotulo, () => ZoZo.feedback.confirmarExclusao(titulo, mensagem, opts), false))),
-          sub("Confirmações com senha"),
-          linha(...CONFIRMACOES_SENHA.map(([rotulo, cfg]) => ir(rotulo, () => ZoZo.modais.confirmarComSenha(cfg), false))),
-          sub("Ações sem volta (frase, senha e código do 2FA; confirmar aqui não faz nada)"),
-          linha(...ACOES_SEM_VOLTA.map(([rotulo, cfg]) => ir(rotulo, () => ZoZo.modais.confirmarSeguro(Object.assign({ executar: () => Promise.resolve() }, cfg)), false)))),
-
-        secao("Menus", false,
-          h("p", { class: C.nota }, "Abrem no botão \"Modo teste\". Os menus próprios de cada tela abrem pelos botões dela (abra a tela ou o painel acima)."),
-          linha(
-            ir("Menu completo (ícone, marcado, seção, submenu, perigoso)", () => ancora && ZoZo.menu.abrir(ancora, [
-              { icone: "mais", label: "Item com ícone", onClick: () => undefined },
-              { label: "Item marcado", check: true, onClick: () => undefined },
-              { label: "Item não marcado", check: false, onClick: () => undefined },
-              { secao: "Seção" },
-              { label: "Com submenu", submenu: [{ label: "Opção 1", onClick: () => undefined }, { label: "Opção 2", onClick: () => undefined }] },
-              { label: "Desabilitado", desabilitado: true, onClick: () => undefined },
-              { separador: true },
-              { label: "Excluir", perigo: true, onClick: () => undefined },
-            ], { posicao: "acima", checkEsquerda: true, largura: 260, label: "Menu de exemplo" }), false),
-            ir("Contas", async () => ancora && ZoZo.menu.contas(ancora, { contas: await contas(ctx), atual: null, aoEscolher: () => undefined, posicao: "acima" })),
-            ir("Perfis", async () => ancora && ZoZo.menu.perfis(ancora, ctx, { perfis: await perfis(ctx), atual: null, aoEscolher: () => undefined, posicao: "acima" })),
-            ir("Calendário", () => ancora && ZoZo.calendario.abrir(ancora, F.iso(new Date()), () => undefined, { posicao: "acima" }), false),
-            ir("Emojis", () => ancora && ZoZo.emojiPicker.abrir(ancora, { atual: "📦", aoEscolher: () => undefined, posicao: "acima" }), false))),
-
-        secao("Gráficos", false,
-          linha(ir("Galeria de gráficos", () => galeriaGraficos(), false),
-            ir("Dashboard (gasto e patrimônio)", () => ctx.router.navigate("dashboard")),
-            ir("Contas (ativos × passivos)", () => ctx.router.navigate("contas")),
-            tipoConta("corrente", "Painel da conta (saldo)"),
-            ir("Painel da categoria (barras)", naPagina("categorias", async () => ZoZo.categoriasShared.abrirDetalhe(await primeira(() => categorias(ctx), "categoria"), ctx))),
-            ir("Categorias (rosca)", () => ctx.router.navigate("categorias")),
-            ir("Investimentos", () => ctx.router.navigate("investimentos")))),
-
-        secao("Componentes", false,
-          linha(ir("Galeria de componentes (botões, pílulas, campos, estados)", () => galeriaComponentes(), false))),
+        secao("Design", false,
+          h("p", { class: C.nota }, "Cada página abre numa guia nova e é gerada do próprio app (tokens, componentes e ícones de verdade), para repassar ao Claude. "
+            + "Todas baixam em Markdown; as janelas também em PNG."),
+          linha(...DESIGN.map(([id, rotulo]) => botaoCmd(rotulo, () => { window.open("/#design/" + id, "_blank", "noopener"); })))),
 
         secao("Conta sem servidor", false, simular,
           h("p", { class: C.nota }, "Ligado: o cadastro cria uma conta vazia e o login entra com dados de exemplo, tudo só nesta aba (nada vai ao servidor). "
@@ -295,6 +321,10 @@
     });
   }
   function galeriaGraficos() {
+    ZoZo.feedback.modal({ title: "Galeria de gráficos", body: graficos(), class: C.janela });
+  }
+  /** Os gráficos com dados de exemplo (desenhados logo depois de entrarem na página) */
+  function graficos(): HTMLElement {
     const css = getComputedStyle(document.documentElement);
     const cor = (v: string) => css.getPropertyValue(v).trim();
     const bloco = (titulo: string) => { const g = h("div"); return { el: h("div", { class: C.blocoGrafico }, h("p", { class: C.subtitulo }, titulo), g), g }; };
@@ -302,7 +332,6 @@
     const tracejada = bloco("Gasto × orçamento (tracejada)"), filtro = bloco("Modo filtro (passe o mouse: data em cima e o resto esmaecido)");
     const declive = bloco("Cor pela inclinação (sobe verde, desce vermelho)"), rosca = bloco("Rosca"), barras = bloco("Barras (meses, com limite)");
     const corpo = h("div", { class: C.galeria }, sobe.el, desce.el, duas.el, tracejada.el, filtro.el, declive.el, rosca.el, barras.el);
-    ZoZo.feedback.modal({ title: "Galeria de gráficos", body: corpo, class: C.janela });
     setTimeout(() => {
       ZoZo.charts.renderLineChart(sobe.g, [{ name: "Saldo", color: cor("--color-chart-up"), points: serie(30, 1000, 25, 60) }], { height: 150, ariaLabel: "Exemplo subindo" });
       ZoZo.charts.renderLineChart(desce.g, [{ name: "Saldo", color: cor("--color-chart-down"), points: serie(30, 2000, -20, 50) }], { height: 150, ariaLabel: "Exemplo descendo" });
@@ -327,10 +356,15 @@
         return { valor: 300 + Math.round(Math.abs(Math.sin(i)) * 500), rotuloMes: F.mesAbrev(d.getMonth()), rotuloAno: String(d.getFullYear()), destaque: i === 11 };
       }), { height: 170, limite: 600, ariaLabel: "Exemplo de barras", nomeValor: "Gasto" });
     }, 60);
+    return corpo;
   }
 
   /* ---------- galeria de componentes ---------- */
   function galeriaComponentes() {
+    ZoZo.feedback.modal({ title: "Galeria de componentes", body: componentes(), class: C.janela });
+  }
+  /** Todos os componentes (botões, pílulas, etiquetas, valores, campos, barras, filtros e estados) */
+  function componentes(): HTMLElement {
     const P = ZoZo.pecas;
     const bloco = (titulo: string, ...itens: Array<HTMLElement | null>) => h("section", { class: C.grupo }, h("p", { class: C.subtitulo }, titulo), h("div", { class: C.linhaGaleria }, ...itens));
     const variantes: Array<[string, OpcoesBotao["variant"]]> = [["Primário", "primary"], ["Secundário", "secondary"], ["Perigo", "danger"], ["Perigo discreto", "danger-ghost"], ["Texto", "text"]];
@@ -361,10 +395,13 @@
       bloco("Estados", h("div", { class: "tw:w-[220px]" }, UI.EmptyState("Nada por aqui.", { icon: "categorias" })),
         h("div", { class: "tw:w-[220px]" }, UI.ErrorState("Algo deu errado.", () => undefined)),
         h("div", { class: "tw:w-[220px]" }, UI.Skeleton(3, { short: true }))));
-    ZoZo.feedback.modal({ title: "Galeria de componentes", body: corpo, class: C.janela });
+    return corpo;
   }
 
-  ZoZo.teste = { iniciar };
+  /** Botão "Modo teste" visível ou não (a demonstração pode escondê-lo: Alt + Shift + D) */
+  function mostrarBotao(sim: boolean) { if (ancora) ancora.hidden = !sim; }
+
+  ZoZo.teste = { iniciar, catalogo, mostrarBotao, componentes, graficos };
 })(window.ZoZo);
 
 export {};   // módulo: carregado sob demanda por app.ts (import dinâmico)

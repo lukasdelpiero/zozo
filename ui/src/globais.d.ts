@@ -37,6 +37,8 @@ declare global {
     email?: string;
     doisFatores?: boolean;
     demo?: boolean;
+    /** é a conta de demonstração, mesmo no modo teste (onde ela aparece como conta completa): atalho Alt + Shift + D */
+    contaDemo?: boolean;
     recursos?: Partial<Record<RecursoConta, boolean>>;
     teste?: boolean;          // ambiente de teste (local ou prévia)
     simulada?: boolean;       // conta simulada sem servidor (modo de teste)
@@ -74,6 +76,8 @@ declare global {
     /** grupos de categoria abertos no Dashboard; contas ocultas à mostra (por grupo) em Contas */
     dashGruposAbertos?: Record<string, boolean>;
     mostrarOcultas?: Record<string, boolean>;
+    /** conta demo: avisos de demonstração visíveis (Alt + Shift + D) */
+    avisosDemo?: boolean;
     [outro: string]: unknown;
   }
   interface EstadoZoZo {
@@ -749,7 +753,18 @@ declare global {
   interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }
   interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
 
+  /** js/core/captura.ts — elemento da tela em PNG, sem biblioteca (fatura e páginas de Design) */
+  interface ZoZoCaptura {
+    png(el: HTMLElement, nomeArquivo: string, opts?: { fundo?: string; escala?: number; semSombra?: boolean }): Promise<void>;
+    baixar(conteudo: Blob, nomeArquivo: string): void;
+  }
+  interface ItemCatalogoTeste { secao: string; sub?: string; rotulo: string; tipo: "tela" | "painel" | "janela" | "menu" | "externo"; abrir(): unknown; conta?: boolean }
   interface ZoZoGlobal {
+    captura: ZoZoCaptura;
+    /** js/components/demonstracao.ts — conta demo: avisos e botão do painel (Alt + Shift + D) */
+    demonstracao: { avisos(): boolean; abrir(): void; aplicarPainel(): void };
+    /** páginas de Design (só modo teste, components/design.ts, carregado sob demanda) */
+    design?: { mostrar(secao: string, ctx: ContextoApp): Promise<void> };
     dom: ZoZoDom;
     notasVersao: readonly NotaVersao[];
     novidades: ZoZoNovidades;
@@ -796,7 +811,15 @@ declare global {
     /** js/core/simbolos.ts — "R$" e "%" menores e no alto do número */
     simbolos?: { realcar(raiz: Node): void };
     /** js/components/teste.ts — painel de testes (só existe com testeHost) */
-    teste?: { iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void; entrarSimulado(): Promise<unknown> }): void };
+    teste?: {
+      iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void; entrarSimulado(): Promise<unknown> }): void;
+      /** tudo o que o painel abre (telas, painéis, janelas, menus, gráficos): o Design fotografa a mesma lista */
+      catalogo(ctx: ContextoApp): ItemCatalogoTeste[];
+      mostrarBotao(sim: boolean): void;
+      /** galerias do painel, também usadas pela página de Design › Elementos */
+      componentes(): HTMLElement;
+      graficos(): HTMLElement;
+    };
     servico: ZoZoServico;
     auth: ZoZoAuth;
     demo: ZoZoDemo;

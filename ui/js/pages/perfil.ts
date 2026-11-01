@@ -808,7 +808,7 @@
                 return ctx.bridge.request(A.updateUser, { nomeUsuario: v, email: u.email, senhaAtual: senha });
               }).then((sessao) => { store.set({ session: { user: sessao.user || null } }); ctx.toast("Nome alterado."); }) })),
           linhaConfig("E-mail", null, h("span", { class: CF.leitura }, u.email || "")),
-          demo ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
+          demo && ZoZo.demonstracao.avisos() ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
           // Senha: título em cima e, abaixo, senha atual · nova senha · Alterar (sem espremer o título ao lado)
           demo ? null : h("div", { class: P.cfgLinhaBloco },
             h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Alterar senha")),

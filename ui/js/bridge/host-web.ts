@@ -468,7 +468,7 @@
   // No ambiente de teste a demo (e a conta simulada) aparece como conta completa: todos os recursos e opções
   const usuario = () => (sessao ? { nomeUsuario: sessao.nome, email: sessao.email, doisFatores: sessao.doisFatores,
     demo: sessao.demo && !TESTE, recursos: Object.assign({}, TESTE && (sessao.demo || sessao.simulada) ? TUDO : sessao.recursos),
-    teste: TESTE, simulada: !!sessao.simulada } : null);
+    teste: TESTE, simulada: !!sessao.simulada, contaDemo: sessao.demo === true } : null);
   const sessaoData = () => ({ authenticated: !!sessao, user: usuario() });
   function exigirSessao(): Sessao { if (!sessao) throw erro("SESSION_EXPIRED"); return sessao; }
   /** Conta real (a demo não troca senha, nome, 2FA, nem apaga ou exclui; o servidor também recusa); no ambiente de teste também a demo e a simulada (quem chama simula a ação) */

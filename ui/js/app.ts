@@ -621,16 +621,36 @@
   ZoZo.zo.montar(ctx);                           // Zo: botão flutuante quando há sessão (some ao sair e na demo)
 
   // painel de testes: só no endereço local e na prévia, num pacote à parte (o site publicado não o baixa)
-  if (ZoZo.testeHost) import("./components/teste").then(() => ZoZo.teste && ZoZo.teste.iniciar(ctx, {
-    tela: telaTeste,
-    entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
-    sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
-    // conta simulada com dados de exemplo (sem servidor): o painel precisa de dados para abrir painéis e janelas
-    entrarSimulado: () => {
-      if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
-      return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r) => entrar(r));
-    },
-  })).catch(() => null);
+  // conta simulada com dados de exemplo (sem servidor): o painel e o Design precisam de dados para abrir painéis e janelas
+  const entrarSimulado = () => {
+    if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
+    return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r) => entrar(r));
+  };
+  // páginas de Design (#design/<seção>): guia aberta pelo painel. Lida antes do boot, que limpa o endereço com sessão aberta.
+  const designPedido = () => { const m = /^#design\/([a-z]+)$/.exec(location.hash); return m ? m[1] : null; };
+  const designInicial = ZoZo.testeHost ? designPedido() : null;
+  function abrirDesign(secao: string) {
+    const pronto = () => new Promise<void>((ok) => {          // espera o boot decidir a sessão
+      const ver = () => { if (store.get().session.status !== "loading") { ok(); return true; } return false; };
+      if (ver()) return;
+      const t0 = Date.now(), id = setInterval(() => { if (ver() || Date.now() - t0 > 10000) { clearInterval(id); ok(); } }, 150);
+    });
+    import("./components/design").then(() => pronto())
+      .then(() => (secao === "janelas" && !store.get().session.authenticated ? entrarSimulado() : null))
+      .then(() => ZoZo.design && ZoZo.design.mostrar(secao, ctx))
+      .catch(() => ctx.toast("Não deu para abrir a página de design.", { tone: "error" }));
+  }
+  if (ZoZo.testeHost) import("./components/teste").then(() => {
+    if (!ZoZo.teste) return;
+    ZoZo.teste.iniciar(ctx, {
+      tela: telaTeste,
+      entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
+      sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
+      entrarSimulado,
+    });
+    if (designInicial) abrirDesign(designInicial);
+    window.addEventListener("hashchange", () => { const s = designPedido(); if (s) abrirDesign(s); });
+  }).catch(() => null);
 
   boot();
 })(window.ZoZo);
