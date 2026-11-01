@@ -69,6 +69,30 @@ class CodigoDoisFatores(Modelo):
     codigo: Codigo
 
 
+B64Url = Annotated[str, StringConstraints(min_length=1, max_length=16000, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+class RegistroWebAuthn(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=1400, pattern=r"^[A-Za-z0-9_-]+$")]
+    clientDataJSON: B64Url
+    attestationObject: B64Url
+    nome: Annotated[str, StringConstraints(min_length=1, max_length=80)]
+    prf: bool = False
+
+
+class ConfirmacaoWebAuthn(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=1400, pattern=r"^[A-Za-z0-9_-]+$")]
+    clientDataJSON: B64Url
+    authenticatorData: B64Url
+    signature: Annotated[str, StringConstraints(min_length=1, max_length=1024, pattern=r"^[A-Za-z0-9_-]+$")]
+    userHandle: Annotated[str, StringConstraints(max_length=200)] | None = None
+
+
+class RemoverChave(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=1400)]
+    codigo: Codigo | None = None
+
+
 class CodigoAtual(Modelo):
     codigo: Codigo | None = None                  # código atual (aplicativo ou backup)
 
@@ -204,6 +228,10 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,
     ("POST", "/api/2fa/desativar"): CodigoDoisFatores,
     ("POST", "/api/2fa/codigos"): CodigoAtual,
+    ("POST", "/api/webauthn/registro/opcoes"): CodigoAtual,
+    ("POST", "/api/webauthn/registro"): RegistroWebAuthn,
+    ("POST", "/api/webauthn/confirmacao"): ConfirmacaoWebAuthn,
+    ("DELETE", "/api/webauthn/chaves"): RemoverChave,
     ("POST", "/api/zo"): ZoConversa,
     ("PUT", "/api/zo/consentimento"): ZoConsentimento,
 }

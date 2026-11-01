@@ -147,6 +147,13 @@ def codigos_backup_gerados(nome: str | None, agora: float) -> Mensagem:
                    rodape="Não foi você? Troque sua senha e gere códigos novos.")
 
 
+def chave_acesso(nome: str | None, agora: float, aparelho: str, adicionada: bool) -> Mensagem:
+    acao = "adicionada" if adicionada else "removida"
+    return _montar("Biometria " + acao, _ola(nome),
+                   [f"A biometria ou chave de acesso \"{aparelho}\" foi {acao} na sua conta do ZoZo em {_quando(agora)} (horário de Brasília)."],
+                   rodape="Não foi você? Troque sua senha e confira as chaves em Configurações › Conta.")
+
+
 def conta_excluida(nome: str | None, agora: float) -> Mensagem:
     return _montar("Sua conta do ZoZo foi excluída", _ola(nome),
                    [f"A sua conta no ZoZo foi excluída em {_quando(agora)} (horário de Brasília).",

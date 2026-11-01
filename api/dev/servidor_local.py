@@ -152,6 +152,14 @@ class Servicos:
     async def http_get(self, url, cabecalhos):
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, headers=cabecalhos))
 
+    async def verificar_assinatura(self, alg, jwk, dados, assinatura):
+        # WebAuthn local (biometria em http://localhost): Python puro; no Worker é o WebCrypto
+        import assinatura_local
+        try:
+            return assinatura_local.verificar(alg, jwk, dados, assinatura)
+        except (KeyError, ValueError, TypeError):
+            return False
+
     async def http_post(self, url, campos):
         dados = urllib.parse.urlencode(campos).encode("utf-8")
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))

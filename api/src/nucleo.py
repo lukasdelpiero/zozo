@@ -60,6 +60,7 @@ from urllib.parse import parse_qs, urlsplit
 import emails
 import google
 import totp
+import webauthn
 import zo
 
 LIMITE_CORPO = 2_100_000        # bytes do pedido
@@ -133,10 +134,13 @@ class Banco(Protocol):
 
 
 class Servicos(Protocol):
-    """Pedidos HTTP para fora (Turnstile, Google, Resend, lista de senhas vazadas)."""
+    """Pedidos HTTP para fora (Turnstile, Google, Resend, lista de senhas vazadas) e assinaturas do WebAuthn."""
     async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]: ...
     async def http_post(self, url: str, campos: Mapping[str, str]) -> tuple[int, str]: ...
     async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str, limite: int = 2000) -> tuple[int, str]: ...
+    async def verificar_assinatura(self, alg: int, jwk: Mapping[str, str], dados: bytes, assinatura: bytes) -> bool:
+        """ES256 (assinatura r ‖ s) ou RS256 (PKCS#1 v1.5) com SHA-256. Nunca lança: chave ou assinatura ruim = False."""
+        ...
 
 
 Config = Mapping[str, Any]                # SEGREDO, chaves, listas de recursos… (ver o topo do arquivo)
@@ -1214,6 +1218,136 @@ async def _google_identidade(ctx: Contexto) -> Resposta:
     existe = await ctx.banco.primeiro("SELECT 1 AS x FROM contas WHERE email = ? AND confirmacao_pendente = 0", c["m"])
     return Resposta(200, {"email": c["m"], "nome": c.get("nm") or "", "contaExiste": bool(existe)})
 
+# ---------------- biometria e chaves de acesso (WebAuthn; regras em webauthn.py) ----------------
+def _rp(ctx: Contexto) -> tuple[str, str]:
+    """rpId (o domínio, sem porta) e a origem esperada no clientDataJSON."""
+    return ctx.pedido.host.split(":")[0], _origem(ctx)
+
+
+async def _desafio_webauthn(ctx: Contexto, email: str, finalidade: str) -> bytes:
+    """Desafio novo (só o SHA-256 vai ao banco): troca o anterior da mesma finalidade e limpa os vencidos."""
+    d = webauthn.novo_desafio()
+    await ctx.banco.lote([
+        ("DELETE FROM desafios_webauthn WHERE email = ? AND (finalidade = ? OR expira < ?)", (email, finalidade, int(ctx.agora))),
+        ("INSERT INTO desafios_webauthn (hash, email, finalidade, expira) VALUES (?, ?, ?, ?)",
+         (webauthn.hash_desafio(d), email, finalidade, int(ctx.agora) + webauthn.TEMPO_DESAFIO_S))])
+    return d
+
+
+async def _usar_desafio_webauthn(ctx: Contexto, email: str, finalidade: str, desafio: bytes) -> bool:
+    """Uso único: apagar e conferir na mesma operação (dois pedidos com o mesmo desafio, só um passa)."""
+    n = await ctx.banco.executar("DELETE FROM desafios_webauthn WHERE hash = ? AND email = ? AND finalidade = ? AND expira >= ?",
+                                 webauthn.hash_desafio(desafio), email, finalidade, int(ctx.agora))
+    return n == 1
+
+
+def _nome_chave(v: object) -> str:
+    nome = " ".join(str(v).split())[:40] if isinstance(v, str) else ""
+    if not nome or not nome.isprintable():
+        raise Falha(400, "INVALID_REQUEST")
+    return nome
+
+
+async def _webauthn(ctx: Contexto, email: str, conta: Linha, b: Json) -> Resposta:
+    """
+    Biometria e chaves de acesso. Registrar e remover pedem, com 2FA, o código atual (como as outras ações sem volta);
+    sem 2FA bastam a sessão e a prova da senha. Confirmar (biometria) tem o mesmo bloqueio do código: 5 erros → 15 min.
+    """
+    m, c = ctx.pedido.metodo, ctx.pedido.caminho
+    rp_id, origem = _rp(ctx)
+    if c == "/api/webauthn/chaves" and m == "GET":
+        linhas = await ctx.banco.todos(
+            "SELECT id, nome, prf, criado_em AS criadoEm, usado_em AS usadoEm FROM chaves_acesso WHERE email = ? ORDER BY criado_em", email)
+        return Resposta(200, {"chaves": [{"id": x["id"], "nome": x["nome"], "prf": bool(x["prf"]), "criadoEm": x["criadoEm"], "usadoEm": x["usadoEm"]}
+                                         for x in linhas]})
+
+    if c == "/api/webauthn/chaves" and m == "DELETE":
+        if set(b) - {"id", "codigo"} or not isinstance(b.get("id"), str):
+            raise Falha(400, "INVALID_REQUEST")
+        await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
+        linha = await ctx.banco.primeiro("SELECT nome FROM chaves_acesso WHERE id = ? AND email = ?", b["id"], email)
+        if not linha or await ctx.banco.executar("DELETE FROM chaves_acesso WHERE id = ? AND email = ?", b["id"], email) != 1:
+            raise Falha(404, "NOT_FOUND")                       # nunca a chave de outra conta
+        ctx.evento("webauthn_chave_removida", email)
+        await _avisar(ctx, email, emails.chave_acesso(conta["nome"], ctx.agora, linha["nome"], False), "email_aviso_webauthn")
+        return Resposta(200, {"removida": True})
+
+    if c == "/api/webauthn/registro/opcoes":
+        # o código atual (com 2FA) é pedido ANTES de o aparelho criar a credencial: nada fica pela metade no aparelho
+        if set(b) - {"codigo"}:
+            raise Falha(400, "INVALID_REQUEST")
+        await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
+        existentes = [x["id"] for x in await ctx.banco.todos("SELECT id FROM chaves_acesso WHERE email = ?", email)]
+        if len(existentes) >= webauthn.MAX_CHAVES:
+            raise Falha(409, "WEBAUTHN_LIMIT")
+        d = await _desafio_webauthn(ctx, email, "registro")
+        return Resposta(200, webauthn.opcoes_registro(d, rp_id, email, conta["nome"], ctx.segredo, existentes))
+
+    if c == "/api/webauthn/registro":
+        if set(b) - {"id", "clientDataJSON", "attestationObject", "nome", "prf"} or not isinstance(b.get("prf", False), bool):
+            raise Falha(400, "INVALID_REQUEST")
+        nome = _nome_chave(b.get("nome"))
+        try:
+            r = webauthn.ler_registro(b, rp_id, origem)
+        except webauthn.Invalido as ex:
+            ctx.evento("webauthn_registro_recusado", email)
+            raise Falha(400, "WEBAUTHN_INVALID") from ex
+        if not await _usar_desafio_webauthn(ctx, email, "registro", r["desafio"]):
+            ctx.evento("webauthn_registro_recusado", email)
+            raise Falha(400, "WEBAUTHN_INVALID")
+        if await ctx.banco.primeiro("SELECT 1 AS x FROM chaves_acesso WHERE id = ?", r["id"]):
+            raise Falha(409, "WEBAUTHN_EXISTS")
+        await _lote_atomico(ctx.banco, [
+            ("INSERT INTO chaves_acesso (id, email, chave, alg, contador, nome, prf) SELECT ?, ?, ?, ?, ?, ?, ? "
+             "WHERE (SELECT count(*) FROM chaves_acesso WHERE email = ?) < ?",
+             (r["id"], email, json.dumps(r["jwk"], separators=(",", ":")), r["alg"], r["contador"], nome, 1 if b.get("prf") else 0,
+              email, webauthn.MAX_CHAVES)),
+            _GUARDA, _LIMPA_GUARDA])
+        ctx.evento("webauthn_chave_registrada", email, alg=r["alg"])
+        await _avisar(ctx, email, emails.chave_acesso(conta["nome"], ctx.agora, nome, True), "email_aviso_webauthn")
+        return Resposta(200, {"id": r["id"], "nome": nome})
+
+    if c == "/api/webauthn/confirmacao/opcoes":
+        ids = [x["id"] for x in await ctx.banco.todos("SELECT id FROM chaves_acesso WHERE email = ?", email)]
+        if not ids:
+            raise Falha(409, "WEBAUTHN_NONE")
+        d = await _desafio_webauthn(ctx, email, "confirmacao")
+        return Resposta(200, webauthn.opcoes_confirmacao(d, rp_id, ids))
+
+    if c == "/api/webauthn/confirmacao":
+        if set(b) - {"id", "clientDataJSON", "authenticatorData", "signature", "userHandle"}:
+            raise Falha(400, "INVALID_REQUEST")
+        chave = f"webauthn|{ctx.h(email)}"
+        reserva = await _reservar(ctx, chave)
+        if not reserva:
+            raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
+        ok = False
+        try:
+            a = webauthn.ler_confirmacao(b, rp_id, origem)
+            linha = await ctx.banco.primeiro("SELECT chave, alg, contador FROM chaves_acesso WHERE id = ? AND email = ?", a["id"], email)
+            if linha and await _usar_desafio_webauthn(ctx, email, "confirmacao", a["desafio"]):
+                alg = int(linha["alg"])
+                assinatura = webauthn.der_para_raw(a["assinatura"]) if alg == webauthn.ES256 else a["assinatura"]
+                antes, agora_ = int(linha["contador"]), int(a["contador"])
+                clonada = (antes or agora_) and agora_ <= antes      # contador que não sobe: cópia da credencial
+                if clonada:
+                    ctx.evento("webauthn_contador_suspeito", email)
+                elif await ctx.servicos.verificar_assinatura(alg, json.loads(linha["chave"]), a["assinado"], assinatura):
+                    ok = await ctx.banco.executar(
+                        f"UPDATE chaves_acesso SET contador = ?, usado_em = {_AGORA_SQL} WHERE id = ? AND email = ? AND contador = ?",
+                        agora_, a["id"], email, antes) == 1
+        except webauthn.Invalido:
+            ok = False
+        if not ok:
+            ctx.evento("webauthn_confirmacao_recusada", email, tentativa=reserva["falhas"])
+            raise Falha(401, "WEBAUTHN_INVALID", {"espera": reserva["bloqueado_ate"] - ctx.agora} if reserva["bloqueado_ate"] > ctx.agora else {})
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
+        ctx.evento("webauthn_confirmado", email)
+        return Resposta(200, {"confirmado": True})
+
+    raise Falha(404, "NOT_FOUND")
+
+
 # ---------------- Zo, o assistente (regras em zo.py) ----------------
 async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     """
@@ -1321,10 +1455,12 @@ _PROTEGIDAS = {
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
     ("GET", "/api/2fa/codigos"), ("POST", "/api/2fa/codigos"),
+    ("GET", "/api/webauthn/chaves"), ("DELETE", "/api/webauthn/chaves"), ("POST", "/api/webauthn/registro/opcoes"), ("POST", "/api/webauthn/registro"),
+    ("POST", "/api/webauthn/confirmacao/opcoes"), ("POST", "/api/webauthn/confirmacao"),
     ("GET", "/api/custodia"), ("POST", "/api/custodia/chave"), ("PUT", "/api/custodia"), ("PUT", "/api/conta/protecao"),
     ("POST", "/api/zo"), ("GET", "/api/zo/consentimento"), ("PUT", "/api/zo/consentimento"),
 }
-_SEM_CORPO = {"/api/2fa/iniciar", "/api/custodia/chave"}
+_SEM_CORPO = {"/api/2fa/iniciar", "/api/custodia/chave", "/api/webauthn/confirmacao/opcoes"}
 
 
 async def _rota(ctx: Contexto) -> Resposta:
@@ -1403,6 +1539,8 @@ async def _rota(ctx: Contexto) -> Resposta:
 
     if c.startswith("/api/zo"):
         return await _zo(ctx, email, b)
+    if c.startswith("/api/webauthn/"):
+        return await _webauthn(ctx, email, conta, b)
 
     if c == "/api/conta/nome":
         nome = _nome(b.get("nome"))
@@ -1485,6 +1623,8 @@ async def _rota(ctx: Contexto) -> Resposta:
             ("DELETE FROM custodia WHERE email = ?", (email,)),
             ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,)),
             ("DELETE FROM codigos_backup WHERE email = ?", (email,)),
+            ("DELETE FROM chaves_acesso WHERE email = ?", (email,)),
+            ("DELETE FROM desafios_webauthn WHERE email = ?", (email,)),
             ("DELETE FROM documentos WHERE email = ?", (email,)),
             ("DELETE FROM sessoes WHERE email = ?", (email,)),
             ("DELETE FROM contas WHERE email = ?", (email,)),

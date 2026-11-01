@@ -472,6 +472,53 @@
       h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, UI.Button("Gerar novos", { size: "sm", onClick: () => gerarCodigosBackup(ctx, atualizar) })));
   }
 
+  /** Nome sugerido para a biometria deste aparelho (a pessoa vê na lista e no e-mail de aviso) */
+  function nomeDoAparelho(): string {
+    const ua = navigator.userAgent;
+    return /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Celular Android"
+      : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "Este aparelho";
+  }
+
+  /**
+   * Biometria e chaves de acesso (WebAuthn): lista, adicionar e remover. Com 2FA, adicionar e remover pedem o código atual.
+   * Serve para confirmar ações sem volta e relatórios do Zo em contas sem 2FA (o servidor confere cada assinatura).
+   */
+  function linhaBiometria(ctx: ContextoApp, u: UsuarioSessao) {
+    const P = ZoZo.pecas;
+    const sub = h("span", { class: P.cfgSub }, "Confirme ações sem volta com a digital, o rosto ou o PIN do aparelho.");
+    const lista = h("ul", { class: "tw:m-0 tw:mt-2 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-1.5 tw:empty:hidden", "aria-label": "Biometrias cadastradas" });
+    // o servidor grava em UTC: a data mostrada é a do aparelho (no fim da noite, UTC já é o dia seguinte)
+    const dataBr = (iso: string | null) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : ""; };
+    const desenhar = () => ctx.bridge.request(A.listarBiometrias).then((r) => mount(lista, r.chaves.map((c) => h("li", { class: "tw:flex tw:items-center tw:justify-between tw:gap-3 tw:text-[13px] tw:text-zz-text" },
+      h("span", null, c.nome, h("span", { class: "tw:text-zz-secondary" }, " · cadastrada em " + dataBr(c.criadoEm) + (c.usadoEm ? " · usada em " + dataBr(c.usadoEm) : ""))),
+      UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => remover(c) }))))).catch(() => null);
+    const remover = (c: BiometriaTela) => ZoZo.modais.confirmarSeguro({ titulo: "Remover biometria?", botao: "Remover", codigo2FA: !!u.doisFatores,
+      mensagem: "\u201C" + c.nome + "\u201D deixa de servir para confirmar ações no ZoZo." + (u.doisFatores ? " Para confirmar, digite o código atual do seu aplicativo 2FA." : ""),
+      executar: ({ codigo }) => ctx.bridge.request(A.removerBiometria, { id: c.id, codigo }).then(() => undefined) })
+      .then((feito) => { if (feito) { ctx.toast("Biometria removida."); desenhar(); } });
+    const cadastrar = (codigo?: string) => ctx.bridge.request(A.registrarBiometria, { nome: nomeDoAparelho(), codigo }, { timeout: 180000 })
+      .then(() => { ctx.toast("Biometria cadastrada."); desenhar(); });
+    const adicionar = UI.Button("Adicionar", { size: "sm", onClick: () => {
+      if (u.doisFatores) {
+        ZoZo.modais.confirmarSeguro({ titulo: "Cadastrar biometria?", botao: "Continuar", codigo2FA: true,
+          mensagem: "Para cadastrar a biometria deste aparelho, digite o código atual do seu aplicativo 2FA. Depois, o aparelho pede a digital, o rosto ou o PIN.",
+          executar: ({ codigo }) => cadastrar(codigo) });
+        return;
+      }
+      cadastrar().catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+    } });
+    ctx.bridge.request(A.biometriaDisponivel).then((d) => {
+      if (d.disponivel) return;
+      adicionar.disabled = true;
+      sub.textContent = "Este navegador ou aparelho não oferece biometria nem chave de acesso.";
+    }).catch(() => null);
+    desenhar();
+    return h("div", { class: P.cfgLinhaBloco },
+      h("div", { class: "tw:flex tw:items-start tw:justify-between tw:gap-3" },
+        h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Biometria e chaves de acesso"), sub), adicionar),
+      lista);
+  }
+
   /** Desativar o 2FA pede um código ATUAL do aplicativo (o servidor confere): sessão aberta não basta */
   function desativar2FA(ctx: ContextoApp) {
     const erro = h("p", { class: [P2.erro, "tw:text-center"], role: "alert" });
@@ -767,6 +814,7 @@
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
           demo || !u.doisFatores ? null : linhaCodigosBackup(ctx),
+          demo ? null : linhaBiometria(ctx, u),
           demo ? null : linhaProtecao(ctx),
           h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda || "BRL"] || "Real") : "Exportar todas as transações",

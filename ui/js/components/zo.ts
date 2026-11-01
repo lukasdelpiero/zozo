@@ -334,6 +334,16 @@
       exportar: () => new Promise<void>((resolver) => { ZoZo.exportarCsv(c, h("button", { type: "button" }) as HTMLButtonElement); setTimeout(resolver, 700); }),
       sair: () => { fechar(); c.logout(); },
       seguranca: () => c.bridge.request(A.getProtecao).then((p) => ({ doisFatores: !!(ZoZo.store.get().session.user || {}).doisFatores, protecaoAvancada: p.avancada })),
+      // conta com 2FA já entrou com o segundo fator; sem 2FA, a biometria confirma (o servidor confere a assinatura)
+      verificarIdentidade: async () => {
+        if ((ZoZo.store.get().session.user || {}).doisFatores) return "ok";
+        const lista = await c.bridge.request(A.listarBiometrias).catch(() => ({ chaves: [] }));
+        if (!lista.chaves.length) return "sem_metodo";
+        return c.bridge.request(A.confirmarBiometria, undefined, { timeout: 180000 }).then(() => "ok" as const, (e: ErroPonte) => {
+          if (e.code !== "WEBAUTHN_CANCELLED") c.toast(e.friendly, { tone: "error" });
+          return "negado" as const;
+        });
+      },
     };
   }
 

@@ -26,6 +26,7 @@ import google  # noqa: E402
 import nucleo  # noqa: E402
 import totp  # noqa: E402
 import zo  # noqa: E402
+import assinatura_local  # noqa: E402
 from banco_sqlite import MIGRACOES, BancoSqlite, aplicar_migracoes, conectar  # noqa: E402
 
 EMAIL = "ana@exemplo.com"
@@ -119,6 +120,12 @@ class FakeServicos:
         return 404, ""
 
     google_token = None        # resposta do endpoint de token do Google (falso)
+
+    async def verificar_assinatura(self, alg, jwk, dados, assinatura):
+        try:
+            return assinatura_local.verificar(alg, jwk, dados, assinatura)
+        except (KeyError, ValueError, TypeError):
+            return False
 
     async def http_post_json(self, url, cabecalhos, corpo, limite=2000):
         self.chamadas.append((url, dict(cabecalhos)))
@@ -1888,6 +1895,204 @@ class TesteZo(Base):
         self.assertEqual(self.falar(u, cli=anonimo)[0], 401)
         self.assertEqual(self.falar(u, prova_=prova())[1]["erro"], "WRONG_PASSWORD")
         self.assertEqual(self.serv.groq, [])
+
+
+def b64u(dados):
+    return base64.urlsafe_b64encode(dados).decode("ascii").rstrip("=")
+
+
+class Autenticador:
+    """Celular, Windows Hello ou chave de segurança de mentira: chave real (P-256 ou RSA), CBOR e authenticatorData reais."""
+    _rsa = None
+
+    def __init__(self, rsa=False, rp="zozo.exemplo.com", origem="https://zozo.exemplo.com"):
+        if rsa and Autenticador._rsa is None:
+            Autenticador._rsa = assinatura_local.ChaveRSA()                     # gerar RSA em Python puro leva segundos: uma só
+        self.chave = Autenticador._rsa if rsa else assinatura_local.ChaveEC()
+        self.cid, self.contador, self.rp, self.origem = os.urandom(32), 0, rp, origem
+
+    def _cliente(self, tipo, desafio, **extra):
+        return json.dumps(dict({"type": tipo, "challenge": desafio, "origin": self.origem, "crossOrigin": False}, **extra)).encode()
+
+    def _dados(self, flags, credencial):
+        d = hashlib.sha256(self.rp.encode()).digest() + bytes([flags]) + self.contador.to_bytes(4, "big")
+        if credencial:
+            d += bytes(16) + len(self.cid).to_bytes(2, "big") + self.cid + assinatura_local.cbor(self.chave.cose())
+        return d
+
+    def criar(self, opcoes, flags=0x45, tipo="webauthn.create", nome="Celular", **extra):
+        ad = self._dados(flags, True)
+        return {"id": b64u(self.cid), "clientDataJSON": b64u(self._cliente(tipo, opcoes["challenge"], **extra)),
+                "attestationObject": b64u(assinatura_local.cbor({"fmt": "none", "attStmt": {}, "authData": ad})), "nome": nome, "prf": True}
+
+    def assinar(self, opcoes, flags=0x05, passo=1, tipo="webauthn.get", chave=None, **extra):
+        self.contador += passo
+        ad, cd = self._dados(flags, False), self._cliente(tipo, opcoes["challenge"], **extra)
+        sig = (chave or self.chave).assinar(ad + hashlib.sha256(cd).digest())
+        return {"id": b64u(self.cid), "clientDataJSON": b64u(cd), "authenticatorData": b64u(ad), "signature": b64u(sig)}
+
+
+class TesteWebAuthn(Base):
+    """Biometria e chaves de acesso: o servidor confere desafio, origem, domínio, biometria (UV), contador e assinatura."""
+
+    def opcoes_registro(self, **corpo):
+        st, r = self.api("POST", "/api/webauthn/registro/opcoes", corpo, prova=self.prova)
+        self.assertEqual(st, 200, r)
+        return r
+
+    def registrar(self, aut, **extra):
+        return self.api("POST", "/api/webauthn/registro", aut.criar(self.opcoes_registro(), **extra), prova=self.prova)
+
+    def opcoes_confirmacao(self, cli=None, pv=None):
+        return (cli or self.api)("POST", "/api/webauthn/confirmacao/opcoes", prova=pv or self.prova)
+
+    def confirmar(self, corpo, cli=None, pv=None):
+        return (cli or self.api)("POST", "/api/webauthn/confirmacao", corpo, prova=pv or self.prova)
+
+    def test_registrar_e_confirmar_com_biometria(self):
+        op = self.opcoes_registro()
+        self.assertEqual(op["rp"], {"id": "zozo.exemplo.com", "name": "ZoZo"})
+        self.assertEqual(op["authenticatorSelection"]["userVerification"], "required")          # biometria ou PIN, sempre
+        self.assertEqual(op["attestation"], "none")
+        self.assertEqual([x["alg"] for x in op["pubKeyCredParams"]], [-7, -257])
+        self.assertNotIn(EMAIL, op["user"]["id"])                                                # id da pessoa sem o e-mail
+        aut = Autenticador()
+        st, r = self.api("POST", "/api/webauthn/registro", aut.criar(op), prova=self.prova)
+        self.assertEqual((st, r["nome"]), (200, "Celular"))
+        guardada = self.con.execute("SELECT chave, alg, prf FROM chaves_acesso WHERE email = ?", (EMAIL,)).fetchone()
+        self.assertEqual((json.loads(guardada[0])["kty"], guardada[1], guardada[2]), ("EC", -7, 1))        # só a chave PÚBLICA
+        st, lista = self.api("GET", "/api/webauthn/chaves", prova=self.prova)
+        self.assertEqual([(c["nome"], c["prf"], c["usadoEm"]) for c in lista["chaves"]], [("Celular", True, None)])
+        # o mesmo desafio não registra de novo; a credencial já cadastrada fica de fora das opções
+        self.assertEqual(self.api("POST", "/api/webauthn/registro", aut.criar(op), prova=self.prova), (400, {"erro": "WEBAUTHN_INVALID"}))
+        self.assertEqual(self.opcoes_registro()["excludeCredentials"], [{"type": "public-key", "id": b64u(aut.cid)}])
+        # confirmar
+        st, oc = self.opcoes_confirmacao()
+        self.assertEqual((st, oc["userVerification"], oc["allowCredentials"][0]["id"]), (200, "required", b64u(aut.cid)))
+        assinado = aut.assinar(oc)
+        self.assertEqual(self.confirmar(assinado), (200, {"confirmado": True}))
+        self.assertEqual(self.confirmar(assinado)[0], 401)                                       # a mesma assinatura não serve de novo
+        self.assertIsNotNone(self.con.execute("SELECT usado_em FROM chaves_acesso").fetchone()[0])
+        self.assertIn('"webauthn_confirmado"', " ".join(self.api.logs))
+        self.assertNotIn(b64u(aut.cid), " ".join(self.api.logs))
+
+    def test_windows_hello_rs256(self):
+        aut = Autenticador(rsa=True)
+        self.assertEqual(self.registrar(aut)[0], 200)
+        self.assertEqual(self.con.execute("SELECT alg FROM chaves_acesso").fetchone()[0], -257)
+        self.assertEqual(self.confirmar(aut.assinar(self.opcoes_confirmacao()[1]))[0], 200)
+
+    def test_registro_fora_das_regras_e_recusado(self):
+        aut = Autenticador()
+        casos = {
+            "outro site (rpId)": lambda op: Autenticador(rp="zozo.golpe.com").criar(op),
+            "outra origem": lambda op: Autenticador(origem="https://zozo.golpe.com").criar(op),
+            "sem biometria (UV)": lambda op: aut.criar(op, flags=0x41),
+            "sem toque (UP)": lambda op: aut.criar(op, flags=0x44),
+            "tipo errado": lambda op: aut.criar(op, tipo="webauthn.get"),
+            "dentro de iframe": lambda op: aut.criar(op, crossOrigin=True),
+            "desafio inventado": lambda op: aut.criar({"challenge": b64u(os.urandom(32))}),
+            "id diferente do authData": lambda op: dict(aut.criar(op), id=b64u(os.urandom(32))),
+            "atestado ilegível": lambda op: dict(aut.criar(op), attestationObject=b64u(b"\xff\x00")),
+            "base64 torto": lambda op: dict(aut.criar(op), clientDataJSON="não é base64!"),
+        }
+        for nome, montar in casos.items():
+            st, r = self.api("POST", "/api/webauthn/registro", montar(self.opcoes_registro()), prova=self.prova)
+            self.assertEqual((st, r.get("erro")), (400, "WEBAUTHN_INVALID"), nome)
+        for corpo in (dict(aut.criar(self.opcoes_registro()), nome="  "), dict(aut.criar(self.opcoes_registro()), x=1),
+                      dict(aut.criar(self.opcoes_registro()), prf="sim")):
+            self.assertEqual(self.api("POST", "/api/webauthn/registro", corpo, prova=self.prova)[0], 400)
+        self.assertEqual(self.con.execute("SELECT count(*) FROM chaves_acesso").fetchone()[0], 0)
+        # sem a prova da senha, nada
+        self.assertEqual(self.api("POST", "/api/webauthn/registro/opcoes", {}, prova=prova())[0], 403)
+        self.assertEqual(Cliente(self.banco)("POST", "/api/webauthn/registro/opcoes", {}, prova=self.prova)[0], 401)
+
+    def test_confirmacao_fora_das_regras_e_recusada(self):
+        aut = Autenticador()
+        self.registrar(aut)
+        self.assertEqual(self.opcoes_confirmacao(pv=prova())[0], 403)
+        outra = assinatura_local.ChaveEC()
+        casos = {
+            "assinada por outra chave": lambda op: aut.assinar(op, chave=outra),
+            "sem biometria (UV)": lambda op: aut.assinar(op, flags=0x01),
+            "outra origem": lambda op: aut.assinar(op, origin="https://zozo.golpe.com"),
+            "tipo errado": lambda op: aut.assinar(op, tipo="webauthn.create"),
+            "desafio inventado": lambda op: aut.assinar({"challenge": b64u(os.urandom(32))}),
+            "credencial desconhecida": lambda op: dict(aut.assinar(op), id=b64u(os.urandom(32))),
+            "assinatura adulterada": lambda op: dict(aut.assinar(op), signature=b64u(b"\x30\x06\x02\x01\x01\x02\x01\x01")),
+        }
+        for nome, montar in casos.items():
+            st, oc = self.opcoes_confirmacao()
+            self.assertEqual(self.confirmar(montar(oc))[0], 401, nome)
+            self.con.execute("DELETE FROM limites")
+        # contador que não sobe: credencial clonada
+        self.assertEqual(self.confirmar(aut.assinar(self.opcoes_confirmacao()[1], passo=5))[0], 200)
+        self.assertEqual(self.confirmar(aut.assinar(self.opcoes_confirmacao()[1], passo=-2))[0], 401)
+        self.assertIn('"webauthn_contador_suspeito"', " ".join(self.api.logs))
+        self.assertEqual(self.confirmar(dict(aut.assinar(self.opcoes_confirmacao()[1], passo=10), x=1))[0], 400)
+
+    def test_credencial_de_outra_conta_nao_serve(self):
+        aut = Autenticador()
+        self.registrar(aut)
+        outro = Cliente(self.banco, ip="198.51.100.60")
+        pv = prova()
+        self.cadastrar(outro, OUTRO, pv)
+        self.assertEqual(self.opcoes_confirmacao(cli=outro, pv=pv), (409, {"erro": "WEBAUTHN_NONE"}))
+        _, oc = self.opcoes_confirmacao()                                                      # desafio da Ana
+        self.assertEqual(self.confirmar(aut.assinar(oc), cli=outro, pv=pv)[0], 401)           # a credencial da Ana na conta do outro
+        self.assertEqual(outro("GET", "/api/webauthn/chaves", prova=pv), (200, {"chaves": []}))
+        self.assertEqual(outro("DELETE", "/api/webauthn/chaves", {"id": b64u(aut.cid)}, prova=pv), (404, {"erro": "NOT_FOUND"}))
+        self.assertEqual(self.con.execute("SELECT count(*) FROM chaves_acesso").fetchone()[0], 1)
+
+    def test_confirmacao_bloqueia_apos_5_erros(self):
+        aut = Autenticador()
+        self.registrar(aut)
+        for _ in range(5):
+            self.confirmar(aut.assinar(self.opcoes_confirmacao()[1], chave=assinatura_local.ChaveEC()))
+        st, r = self.confirmar(aut.assinar(self.opcoes_confirmacao()[1]))
+        self.assertEqual(st, 429)                                                              # bloqueado mesmo com a biometria certa
+
+    def test_limite_de_chaves_remover_e_excluir_a_conta(self):
+        for i in range(10):
+            self.assertEqual(self.registrar(Autenticador(), nome=f"Aparelho {i}")[0], 200)
+        self.assertEqual(self.api("POST", "/api/webauthn/registro/opcoes", {}, prova=self.prova), (409, {"erro": "WEBAUTHN_LIMIT"}))
+        primeira = self.api("GET", "/api/webauthn/chaves", prova=self.prova)[1]["chaves"][0]["id"]
+        self.assertEqual(self.api("DELETE", "/api/webauthn/chaves", {"id": primeira}, prova=self.prova), (200, {"removida": True}))
+        self.assertEqual(self.api("DELETE", "/api/webauthn/chaves", {"id": primeira}, prova=self.prova)[0], 404)
+        self.assertEqual(self.registrar(Autenticador())[0], 200)
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}, prova=self.prova)[0], 204)
+        for tabela in ("chaves_acesso", "desafios_webauthn"):
+            self.assertEqual(self.con.execute(f"SELECT count(*) FROM {tabela}").fetchone()[0], 0, tabela)
+
+    def test_com_2fa_registrar_e_remover_pedem_o_codigo_atual(self):
+        self.api("POST", "/api/2fa/iniciar", prova=self.prova)
+        linha = lambda: self.con.execute("SELECT totp_segredo, totp_pendente FROM contas WHERE email = ?", (EMAIL,)).fetchone()
+        segredo = lambda: totp.decifrar(linha()[0] or linha()[1], SEGREDO)
+        codigo = lambda: totp.codigo(segredo(), self.api.agora // 30)
+        self.assertEqual(self.api("POST", "/api/2fa/confirmar", {"codigo": codigo()}, prova=self.prova)[0], 200)
+        self.api.agora += 60
+        self.assertEqual(self.api("POST", "/api/webauthn/registro/opcoes", {}, prova=self.prova)[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(self.api("POST", "/api/webauthn/registro/opcoes", {"codigo": "000000"}, prova=self.prova)[1]["erro"], "CODE_INVALID")
+        self.con.execute("DELETE FROM limites")
+        aut = Autenticador()
+        st, op = self.api("POST", "/api/webauthn/registro/opcoes", {"codigo": codigo()}, prova=self.prova)
+        self.assertEqual(st, 200)
+        self.assertEqual(self.api("POST", "/api/webauthn/registro", aut.criar(op), prova=self.prova)[0], 200)
+        self.api.agora += 30
+        self.assertEqual(self.api("DELETE", "/api/webauthn/chaves", {"id": b64u(aut.cid)}, prova=self.prova)[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(self.api("DELETE", "/api/webauthn/chaves", {"id": b64u(aut.cid), "codigo": codigo()}, prova=self.prova)[0], 200)
+
+    def test_leitores_de_formato_nao_quebram_com_lixo(self):
+        import webauthn
+        for lixo in (b"", b"\x1f", b"\xbf", b"\x5a\xff\xff\xff\xff", b"\xa1\x01", bytes([0x81] * 20) + b"\x00", b"\xf8\x00"):
+            with self.assertRaises(webauthn.Invalido):
+                webauthn.cbor(lixo)
+        for lixo in (b"", b"\x30", b"\x30\x02\x02\x00", b"\x30\x06\x02\x01\x01\x02\x02\x01"):
+            with self.assertRaises(webauthn.Invalido):
+                webauthn.der_para_raw(lixo)
+        for chave in ({1: 2, 3: -7, -1: 2, -2: bytes(32), -3: bytes(32)}, {1: 3, 3: -257, -1: bytes(128), -2: b"\x01\x00\x01"}, {1: 1, 3: -8}, "x"):
+            with self.assertRaises(webauthn.Invalido):
+                webauthn.cose_para_jwk(chave)
 
 
 class TesteVersaoDocumento(Base):

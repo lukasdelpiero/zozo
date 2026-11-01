@@ -61,6 +61,7 @@
     email: string; nome: string; chave: CryptoKey; prova: string; envelope: string; versao: number;
     doisFatores: boolean; demo: boolean; recursos: RecursosConta;
     simulada?: boolean;                        // modo de teste: conta sem servidor (só nesta aba)
+    biometrias?: BiometriaTela[];              // modo de teste: biometrias simuladas
   };
 
   let sessao: Sessao | null = null;
@@ -857,6 +858,84 @@
     },
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */
+    /* ---- biometria e chaves de acesso (WebAuthn): o servidor confere tudo; aqui só a conversa com o aparelho ---- */
+    async biometriaDisponivel() {
+      const PKC = window.PublicKeyCredential;
+      if (!PKC || !navigator.credentials || typeof navigator.credentials.create !== "function") return { disponivel: false, plataforma: false };
+      const plataforma = await PKC.isUserVerifyingPlatformAuthenticatorAvailable().catch(() => false);
+      return { disponivel: true, plataforma: !!plataforma };
+    },
+    async listarBiometrias() {
+      const s = exigirConta();
+      if (simulada(s)) return { chaves: (s.biometrias || []).slice() };
+      const r = await comProvaDaSessao(() => api("GET", "/webauthn/chaves", undefined, s.prova));
+      const lista: unknown[] = r && Array.isArray(r.chaves) ? r.chaves : [];
+      return { chaves: lista.filter((c): c is Record<string, unknown> => !!c && typeof c === "object").map((c) => ({
+        id: String(c.id || ""), nome: String(c.nome || "").slice(0, 40), prf: c.prf === true,
+        criadoEm: typeof c.criadoEm === "string" ? c.criadoEm : null, usadoEm: typeof c.usadoEm === "string" ? c.usadoEm : null })).filter((c) => /^[A-Za-z0-9_-]{16,1400}$/.test(c.id)) };
+    },
+    async registrarBiometria(d) {
+      const s = exigirConta();
+      const nome = String((d && d.nome) || "").trim().slice(0, 40) || "Este aparelho";
+      if (simulada(s)) {
+        s.biometrias = (s.biometrias || []).concat({ id: b64url(aleatorio(32)), nome, prf: true, criadoEm: new Date().toISOString(), usadoEm: null });
+        return { nome };
+      }
+      if (!window.PublicKeyCredential || !navigator.credentials) throw erro("WEBAUTHN_UNSUPPORTED");
+      // 1) opções do servidor (com 2FA, o código atual vai aqui: nada é criado no aparelho antes de conferir)
+      const op = await comProvaDaSessao(() => api("POST", "/webauthn/registro/opcoes", d && d.codigo ? { codigo: String(d.codigo) } : {}, s.prova));
+      if (!op || typeof op.challenge !== "string" || !op.rp || !op.user) throw erro("OPERATION_FAILED");
+      // 2) o aparelho cria a credencial (biometria ou PIN); PRF pedido já agora para, no futuro, entrar sem senha
+      let cred: PublicKeyCredential | null;
+      try {
+        cred = await navigator.credentials.create({ publicKey: {
+          challenge: de64url(op.challenge), rp: { id: String(op.rp.id), name: String(op.rp.name) },
+          user: { id: de64url(op.user.id), name: String(op.user.name), displayName: String(op.user.displayName) },
+          pubKeyCredParams: (op.pubKeyCredParams || []).map((p: { alg: number }) => ({ type: "public-key" as const, alg: Number(p.alg) })),
+          authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+          excludeCredentials: (op.excludeCredentials || []).map((c: { id: string }) => ({ type: "public-key" as const, id: de64url(c.id) })),
+          attestation: "none", timeout: Number(op.timeout) || 120000,
+          extensions: { prf: {} } as AuthenticationExtensionsClientInputs,
+        } }) as PublicKeyCredential | null;
+      } catch (e) { throw erroDoAparelho(e); }
+      if (!cred) throw erro("WEBAUTHN_CANCELLED");
+      const resp = cred.response as AuthenticatorAttestationResponse;
+      const ext = cred.getClientExtensionResults() as { prf?: { enabled?: boolean } };
+      const r = await comProvaDaSessao(() => api("POST", "/webauthn/registro", {
+        id: cred.id, clientDataJSON: b64url(new Uint8Array(resp.clientDataJSON)), attestationObject: b64url(new Uint8Array(resp.attestationObject)),
+        nome, prf: !!(ext.prf && ext.prf.enabled) }, s.prova));
+      return { nome: String((r && r.nome) || nome) };
+    },
+    async removerBiometria(d) {
+      const s = exigirConta();
+      const id = String((d && d.id) || "");
+      if (!/^[A-Za-z0-9_-]{16,1400}$/.test(id)) throw erro("OPERATION_FAILED");
+      if (simulada(s)) { s.biometrias = (s.biometrias || []).filter((c) => c.id !== id); return { removida: true }; }
+      await comProvaDaSessao(() => api("DELETE", "/webauthn/chaves", d && d.codigo ? { id, codigo: String(d.codigo) } : { id }, s.prova));
+      return { removida: true };
+    },
+    /** Confirmar com biometria (ações sem volta e relatórios do Zo, para quem não usa 2FA): o servidor confere a assinatura */
+    async confirmarBiometria() {
+      const s = exigirConta();
+      if (simulada(s)) { if (!(s.biometrias || []).length) throw erro("WEBAUTHN_NONE"); return { confirmado: true }; }
+      if (!window.PublicKeyCredential || !navigator.credentials) throw erro("WEBAUTHN_UNSUPPORTED");
+      const op = await comProvaDaSessao(() => api("POST", "/webauthn/confirmacao/opcoes", undefined, s.prova));
+      if (!op || typeof op.challenge !== "string") throw erro("OPERATION_FAILED");
+      let cred: PublicKeyCredential | null;
+      try {
+        cred = await navigator.credentials.get({ publicKey: {
+          challenge: de64url(op.challenge), rpId: String(op.rpId), userVerification: "required", timeout: Number(op.timeout) || 120000,
+          allowCredentials: (op.allowCredentials || []).map((c: { id: string }) => ({ type: "public-key" as const, id: de64url(c.id) })),
+        } }) as PublicKeyCredential | null;
+      } catch (e) { throw erroDoAparelho(e); }
+      if (!cred) throw erro("WEBAUTHN_CANCELLED");
+      const resp = cred.response as AuthenticatorAssertionResponse;
+      await comProvaDaSessao(() => api("POST", "/webauthn/confirmacao", {
+        id: cred.id, clientDataJSON: b64url(new Uint8Array(resp.clientDataJSON)),
+        authenticatorData: b64url(new Uint8Array(resp.authenticatorData)), signature: b64url(new Uint8Array(resp.signature)) }, s.prova));
+      return { confirmado: true };
+    },
+
     /* códigos de backup: só o formato "XXXXX-XXXXX" (Base32 de Crockford) passa para a tela */
     async iniciar2FA() {
       const s = exigirConta();
@@ -899,6 +978,26 @@
       return sessaoData();
     },
   };
+
+  /** base64url (WebAuthn) ⇄ bytes */
+  function b64url(b: Uint8Array): string {
+    let s = "";
+    b.forEach((x) => { s += String.fromCharCode(x); });
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function de64url(t: unknown): Uint8Array<ArrayBuffer> {
+    const s = String(t || "");
+    if (!/^[A-Za-z0-9_-]+$/.test(s)) throw erro("OPERATION_FAILED");
+    const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  }
+  /** Erro do aparelho → código da ponte: cancelou ou demorou (NotAllowedError), já cadastrado, sem suporte */
+  function erroDoAparelho(e: unknown) {
+    const nome = e && typeof e === "object" && "name" in e ? String((e as { name: unknown }).name) : "";
+    if (nome === "InvalidStateError") return erro("WEBAUTHN_EXISTS");
+    if (nome === "NotSupportedError" || nome === "SecurityError") return erro("WEBAUTHN_UNSUPPORTED");
+    return erro("WEBAUTHN_CANCELLED");
+  }
 
   /** Códigos de backup vindos do servidor: só os que têm o formato "XXXXX-XXXXX" (no máximo dez) */
   function listaDeCodigos(v: unknown): string[] {

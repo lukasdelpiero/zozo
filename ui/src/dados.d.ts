@@ -158,7 +158,7 @@ declare global {
     | "getSession" | "registerUser" | "reenviarConfirmacao" | "conferirLink" | "pedirRecuperacao" | "abrirRecuperacao" | "concluirRecuperacao"
     | "getProtecao" | "setProtecao" | "repararRecuperacao" | "zoConsentimento" | "zoConversar" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
     | "createLancamento" | "updateLancamento" | "deleteLancamento" | "updateUser" | "changePassword" | "wipeUserData" | "deleteUser"
-    | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "statusCodigosBackup" | "gerarCodigosBackup" | "loadUserData" | "saveUserData"
+    | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "statusCodigosBackup" | "gerarCodigosBackup" | "biometriaDisponivel" | "listarBiometrias" | "registrarBiometria" | "removerBiometria" | "confirmarBiometria" | "loadUserData" | "saveUserData"
     | "createConta" | "updateConta" | "updateCicloCartao" | "deleteConta"
     | "createCategoria" | "updateCategoria" | "deleteCategoria" | "createCategoriasSugeridas"
     | "createPerfil" | "updatePerfil" | "deletePerfil" | "arquivarPerfil"
@@ -177,6 +177,8 @@ declare global {
   /** Por que a recuperação não traz os dados: escolha da pessoa, cópia ainda não guardada, cópia que não abre, dados ilegíveis */
   type MotivoRecuperacao = "avancada" | "sem_copia" | "copia_invalida" | "dados_ilegiveis";
   /** Sessão como a interface a recebe; doisFatores sem authenticated = falta o código do 2FA */
+  /** Biometria ou chave de acesso cadastrada (só o nome e as datas; a chave pública fica no servidor) */
+  interface BiometriaTela { id: string; nome: string; prf: boolean; criadoEm: string | null; usadoEm: string | null }
   interface RespostaSessao { authenticated: boolean; user?: UsuarioSessao | null; email?: string; doisFatores?: boolean }
   interface RespostasHost {
     getArmazenamento: { available: boolean; turnstile?: string | null; google?: boolean; desafio?: boolean };
@@ -217,6 +219,12 @@ declare global {
     desativar2FA: RespostaSessao;
     statusCodigosBackup: { restantes: number };
     gerarCodigosBackup: { codigosBackup: string[] };
+    /** plataforma: o próprio aparelho tem biometria ou PIN (Windows Hello, Touch ID, desbloqueio do celular) */
+    biometriaDisponivel: { disponivel: boolean; plataforma: boolean };
+    listarBiometrias: { chaves: BiometriaTela[] };
+    registrarBiometria: { nome: string };
+    removerBiometria: { removida: boolean };
+    confirmarBiometria: { confirmado: boolean };
   }
   /** Gravações do serviço → resposta (o serviço é conferido contra esta tabela) */
   interface RespostasEscrita {

@@ -739,6 +739,8 @@ declare global {
     exportar(): Promise<void>;
     sair(): void;
     seguranca(): Promise<{ doisFatores: boolean; protecaoAvancada: boolean }>;
+    /** Antes do que não tem volta: "ok" (2FA ligado ou biometria confirmada), "negado" ou "sem_metodo" (nem 2FA nem biometria) */
+    verificarIdentidade(): Promise<"ok" | "negado" | "sem_metodo">;
   }
   interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo }
   interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }

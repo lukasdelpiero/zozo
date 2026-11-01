@@ -10,14 +10,14 @@ import { carregar } from "./carregar.mjs";
 const hoje = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const args = (o) => JSON.stringify(o);
 
-async function cenario({ perfis = true } = {}) {
+async function cenario({ perfis = true, tela } = {}) {
   const t = carregar({ recursos: { perfis, boleto: perfis, pix: perfis, cambio: false } });
   const { conta: cartao } = await t.req(t.A.createConta, { conta: { nome: "Nubank", tipo: "cartao", saldo: 0 } });
   const { conta: banco } = await t.req(t.A.createConta, { conta: { nome: "Itaú", tipo: "corrente", saldo: 1000 } });
   const { categoria: compras } = await t.req(t.A.createCategoria, { categoria: { nome: "Compras", icone: "🛍️", reservado: 500 } });
   const { categoria: mercado } = await t.req(t.A.createCategoria, { categoria: { nome: "Mercado", icone: "🛒" } });
   const perfil = perfis ? (await t.req(t.A.createPerfil, { perfil: { nome: "Ana" } })).perfil : null;
-  const zo = t.Z.zoFerramentas.criar((acao, dados) => t.req(acao, dados), { perfis: () => perfis });
+  const zo = t.Z.zoFerramentas.criar((acao, dados) => t.req(acao, dados), tela ? { perfis: () => perfis, tela } : { perfis: () => perfis });
   return { t, zo, cartao, banco, compras, mercado, perfil };
 }
 
@@ -91,15 +91,34 @@ test("Zo: editar e excluir só depois de confirmar; categoria mantém o orçamen
   assert.equal((await t.req(t.A.getLancamentos)).lancamentos[0].valor, 40);                 // ainda não confirmou
   await ed.confirmar();
   assert.equal((await t.req(t.A.getLancamentos)).lancamentos[0].valor, 55);
+  // excluir é sem volta: sem tela para confirmar a identidade, nada é apagado (falha fechada)
   const ex = await zo.executar("excluir_transacao", args({ id: lancamento.id }));
   assert.equal(ex.tipo, "escrita");
+  assert.equal(JSON.parse(await ex.confirmar()).erro, "VERIFICACAO_NEGADA");
   assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 1);
-  await ex.confirmar();
-  assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, 0);
   const cat = await zo.executar("editar_categoria", args({ id: compras.id, nome: "Compras online" }));
   await cat.confirmar();
   const depois = (await t.req(t.A.getCategorias)).categorias.find((c) => c.id === compras.id);
   assert.deepEqual([depois.nome, depois.reservado, depois.icone], ["Compras online", 500, "🛍️"]);
+});
+
+test("Zo: sem 2FA, excluir e relatórios pedem a biometria antes; negada ou sem biometria, nada acontece", async () => {
+  for (const [resposta, erro, apagou] of [["ok", null, true], ["negado", "VERIFICACAO_NEGADA", false], ["sem_metodo", "VERIFICACAO_NECESSARIA", false]]) {
+    const pedidos = [];
+    const tela = Object.assign(telaFalsa().tela, { verificarIdentidade: async () => { pedidos.push(1); return resposta; } });
+    const { t, zo, cartao, compras, perfil } = await cenario({ tela });
+    const { lancamento } = await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Cinema", valor: 40, tipo: "regular", contaId: cartao.id, categoriaId: compras.id, perfilId: perfil.id } });
+    const ex = await zo.executar("excluir_transacao", args({ id: lancamento.id }));
+    assert.equal(pedidos.length, 0, "a biometria só é pedida no Confirmar");
+    const r = JSON.parse(await ex.confirmar());
+    assert.equal(pedidos.length, 1);
+    assert.equal(r.erro || null, erro, resposta);
+    assert.equal((await t.req(t.A.getLancamentos)).lancamentos.length, apagou ? 0 : 1, resposta);
+    // editar não é sem volta: não pede a biometria
+    const ed = await zo.executar("editar_categoria", args({ id: compras.id, nome: "Lazer" }));
+    await ed.confirmar();
+    assert.equal(pedidos.length, 1);
+  }
 });
 
 test("Zo: perfis só com o recurso; opções viram botões", async () => {
@@ -120,6 +139,7 @@ function telaFalsa() {
     exportar: async () => { chamadas.push(["exportar"]); },
     sair: () => chamadas.push(["sair"]),
     seguranca: async () => ({ doisFatores: true, protecaoAvancada: false }),
+    verificarIdentidade: async () => { chamadas.push(["verificar"]); return "ok"; },
   } };
 }
 async function cenario2() {
@@ -177,7 +197,7 @@ test("Zo: telas abrem na hora; exportar e sair pedem confirmação; sem tela, na
   assert.deepEqual([exp.tipo, sair.tipo], ["escrita", "escrita"]);
   assert.ok(!chamadas.some((c) => c[0] === "exportar" || c[0] === "sair"));                  // nada antes do Confirmar
   await exp.confirmar(); await sair.confirmar();
-  assert.deepEqual(chamadas.slice(-2), [["exportar"], ["sair"]]);
+  assert.deepEqual(chamadas.slice(-3), [["verificar"], ["exportar"], ["sair"]]);              // exportar (relatório) confirma a identidade antes
   const semTela = (await cenario()).zo;                                                     // sem as ações de tela
   assert.deepEqual(JSON.parse((await semTela.executar("abrir_configuracoes", args({ assunto: "senha" }))).resultado), { erro: "tela_indisponivel" });
   assert.equal(JSON.parse((await zo.executar("transferir_entre_moedas", args({ ids: ["x"], destino: "EUR" }))).resultado).erro, "FEATURE_UNAVAILABLE");
@@ -185,7 +205,7 @@ test("Zo: telas abrem na hora; exportar e sair pedem confirmação; sem tela, na
 
 /* ---------------- fase 3: categorizar em lote e importar arquivo ---------------- */
 test("Zo: categorizar em lote propõe pelo histórico e só aplica depois de confirmar", async () => {
-  const { t, zo, cartao, compras, mercado, perfil } = await cenario();
+  const { t, zo, cartao, compras, mercado, perfil } = await cenario({ tela: telaFalsa().tela });
   const lanc = (descricao, categoriaId) => t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao, valor: 10, tipo: "regular", contaId: cartao.id, categoriaId, perfilId: perfil.id } });
   await lanc("Supermercado Dia", mercado.id); await lanc("Loja Renner", compras.id);
   await lanc("SUPERMERCADO DIA", null); await lanc("Supermercado Dia", null); await lanc("Renner", null); await lanc("Algo novo", null);

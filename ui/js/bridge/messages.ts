@@ -51,6 +51,11 @@
     desativar2FA: "desativar2FA",
     statusCodigosBackup: "statusCodigosBackup",
     gerarCodigosBackup: "gerarCodigosBackup",
+    biometriaDisponivel: "biometriaDisponivel",
+    listarBiometrias: "listarBiometrias",
+    registrarBiometria: "registrarBiometria",
+    removerBiometria: "removerBiometria",
+    confirmarBiometria: "confirmarBiometria",
 
     // Documento do usuário (cifrado no navegador e guardado no banco SQL do Cloudflare)
     loadUserData: "loadUserData",
@@ -105,7 +110,7 @@
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.gerarCodigosBackup, ACTIONS.desativar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
+  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.gerarCodigosBackup, ACTIONS.desativar2FA, ACTIONS.registrarBiometria, ACTIONS.removerBiometria, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
     ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao, ACTIONS.zoConversar]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
@@ -132,7 +137,13 @@
     WEAK_PASSWORD: "Use uma senha com pelo menos 8 caracteres.",
     TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
     CAPTCHA_REQUIRED: "Confirme que você não é um robô para continuar.",
-    CODE_INVALID: "Esse código não funcionou. Tente o código mais recente do seu aplicativo 2FA.",
+    CODE_INVALID: "Esse código não funcionou. Tente o código mais recente do seu aplicativo 2FA ou um código de backup.",
+    WEBAUTHN_INVALID: "Não deu para confirmar com a biometria. Tente de novo.",
+    WEBAUTHN_CANCELLED: "A biometria foi cancelada ou demorou demais. Tente de novo.",
+    WEBAUTHN_NONE: "Nenhuma biometria cadastrada. Cadastre em Configurações › Conta.",
+    WEBAUTHN_LIMIT: "Você chegou ao limite de 10 biometrias. Remova uma para cadastrar outra.",
+    WEBAUTHN_EXISTS: "Este aparelho já está cadastrado.",
+    WEBAUTHN_UNSUPPORTED: "Este navegador ou aparelho não oferece biometria nem chave de acesso.",
     CODE_INVALID_AGAIN: "Algo deu errado. Por favor, tente novamente ou entre em contato com o suporte se o problema persistir.",
     "2FA_ALREADY_ON": "A autenticação de dois fatores já está ativada.",
     "2FA_NOT_PENDING": "Gere um novo código QR e tente novamente.",

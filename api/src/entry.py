@@ -94,6 +94,23 @@ class Servicos:
         r = await fetch(url, method=HTTPMethod.POST, body=corpo, headers=dict(cabecalhos))
         return int(r.status), (await r.text())[:limite]        # Resend: só o começo interessa; Zo (Groq): até zo.LIMITE_RESPOSTA
 
+    async def verificar_assinatura(self, alg: int, jwk: Mapping[str, str], dados: bytes, assinatura: bytes) -> bool:
+        """WebAuthn: assinatura conferida pelo WebCrypto do Worker (ES256 = ECDSA P-256 r ‖ s; RS256 = PKCS#1 v1.5)."""
+        from js import Object, crypto
+        if alg == -7:
+            importar, conferir = {"name": "ECDSA", "namedCurve": "P-256"}, {"name": "ECDSA", "hash": "SHA-256"}
+        elif alg == -257:
+            importar, conferir = {"name": "RSASSA-PKCS1-v1_5", "hash": "SHA-256"}, {"name": "RSASSA-PKCS1-v1_5"}
+        else:
+            return False
+        def js(v: Any) -> Any:
+            return to_js(v, dict_converter=Object.fromEntries)
+        try:
+            chave = await crypto.subtle.importKey("jwk", js(dict(jwk)), js(importar), False, js(["verify"]))
+            return bool(await crypto.subtle.verify(js(conferir), chave, js(assinatura), js(dados)))
+        except Exception:  # noqa: BLE001 — chave ou assinatura ruim: recusa, nunca erro 500
+            return False
+
 
 def _cabecalhos(request: Request) -> dict[str, str]:
     h = request.headers

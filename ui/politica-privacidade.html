@@ -51,7 +51,8 @@
     <ul>
       <li><strong>Primeiro nome e e-mail</strong>, para identificar a sua conta, falar com você e entrar no app.</li>
       <li><strong>Uma prova da sua senha</strong>, nunca a senha. O seu navegador transforma a senha (com Argon2id) em duas chaves: uma cifra os seus dados e a outra vira uma prova. O servidor guarda só uma impressão digital (hash) dessa prova, para conferir que é você.</li>
-      <li><strong>Autenticação em duas etapas (2FA)</strong>, se você ativar: o segredo usado para conferir os códigos do seu aplicativo autenticador.</li>
+      <li><strong>Autenticação em duas etapas (2FA)</strong>, se você ativar: o segredo usado para conferir os códigos do seu aplicativo autenticador e uma impressão (HMAC) de cada código de backup, nunca o código em si. Cada código de backup é apagado quando é usado.</li>
+      <li><strong>Biometria e chaves de acesso</strong>, se você cadastrar: a chave pública da credencial, o nome do aparelho e as datas de cadastro e de uso. A sua digital, o seu rosto e o PIN do aparelho nunca saem do aparelho, e o ZoZo não tem acesso a eles.</li>
     </ul>
     <p>O nome e o e-mail não ficam cifrados como os dados financeiros: o servidor precisa deles para você entrar e receber os e-mails do ZoZo.</p>
 
@@ -99,7 +100,7 @@
     <h2 id="finalidades">Para que usamos os dados?</h2>
     <ul>
       <li>Prestar o serviço: guardar e sincronizar os seus dados entre os seus aparelhos.</li>
-      <li>Confirmar a sua identidade: login, confirmação de e-mail, 2FA e recuperação de senha.</li>
+      <li>Confirmar a sua identidade: login, confirmação de e-mail, 2FA, biometria e recuperação de senha.</li>
       <li>Proteger você e o serviço: impedir tentativas de invasão, robôs e abuso.</li>
       <li>Enviar e-mails necessários: confirmação de cadastro, recuperação de senha e avisos de segurança da conta. <strong>Não enviamos e-mails de marketing.</strong></li>
       <li>Cumprir obrigações legais e atender pedidos de autoridades, quando a lei exigir.</li>

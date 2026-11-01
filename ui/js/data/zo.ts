@@ -414,6 +414,23 @@
       },
     };
 
+    /**
+     * Ações sem volta e relatórios: conta sem 2FA confirma com a biometria (o servidor confere a assinatura) antes de
+     * gravar ou gerar o arquivo. Sem tela para pedir a confirmação, nada roda (falha fechada).
+     */
+    const PROTEGIDAS: ReadonlySet<string> = new Set(["excluir_transacao", "remover_pix", "transferir_entre_moedas", "categorizar_em_lote", "exportar_transacoes"]);
+    function protegida(r: ResultadoFerramentaZo): ResultadoFerramentaZo {
+      if (r.tipo !== "escrita") return r;
+      const tela = opcoes.tela, original = r.confirmar;
+      return Object.assign({}, r, { confirmar: async () => {
+        const v = tela ? await tela.verificarIdentidade().catch(() => "negado" as const) : "negado";
+        if (v === "ok") return original();
+        return json(v === "sem_metodo"
+          ? { erro: "VERIFICACAO_NECESSARIA", mensagem: "Sem a verificação em duas etapas, excluir e gerar relatórios pelo Zo pedem a biometria. Cadastre em Configurações › Conta ou ative o 2FA." }
+          : { erro: "VERIFICACAO_NEGADA", mensagem: "A biometria não foi confirmada. Nada foi feito." });
+      } });
+    }
+
     /** Executa uma chamada do Zo. Ferramenta fora da lista ou argumentos ilegíveis viram erro (nada roda). */
     async function executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo> {
       const a = ler(argumentos);
@@ -425,7 +442,7 @@
         }
         if (Object.hasOwn(LEITURA, nome)) return { tipo: "leitura", resultado: json(await LEITURA[nome](a)) };
         if (Object.hasOwn(TELA, nome)) return opcoes.tela ? { tipo: "leitura", resultado: json(await TELA[nome](a)) } : semTela();
-        if (Object.hasOwn(ESCRITA, nome)) return await ESCRITA[nome](a);
+        if (Object.hasOwn(ESCRITA, nome)) return PROTEGIDAS.has(nome) ? protegida(await ESCRITA[nome](a)) : await ESCRITA[nome](a);
         return { tipo: "leitura", resultado: json({ erro: "ferramenta_desconhecida" }) };
       } catch (e) { return { tipo: "leitura", resultado: erroDe(e) }; }
     }
