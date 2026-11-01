@@ -93,6 +93,12 @@ class RemoverChave(Modelo):
     codigo: Codigo | None = None
 
 
+class ApagarDados(Modelo):
+    versaoAnterior: Versao
+    conteudo: Conteudo
+    codigo: Codigo | None = None                  # conta com 2FA: código atual
+
+
 class CodigoAtual(Modelo):
     codigo: Codigo | None = None                  # código atual (aplicativo ou backup)
 
@@ -224,7 +230,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/recuperacao/historico"): EtapaRecuperacao,
     ("PUT", "/api/recuperacao/concluir"): ConcluirRecuperacao,
     ("PUT", "/api/documento"): Documento,
-    ("POST", "/api/documento/apagar"): Documento,
+    ("POST", "/api/documento/apagar"): ApagarDados,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,
     ("POST", "/api/2fa/desativar"): CodigoDoisFatores,
     ("POST", "/api/2fa/codigos"): CodigoAtual,

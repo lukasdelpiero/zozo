@@ -696,7 +696,8 @@
       const doc = await api("GET", "/documento", undefined, k.prova);         // confere a senha e a versão atual
       const va: number = doc ? doc.versao : 0;
       const conteudo = await cifrar(k.chave, s.email, va + 1, null);
-      await api("POST", "/documento/apagar", { versaoAnterior: va, conteudo }, k.prova);
+      // com 2FA, o servidor pede um código atual (a ação apaga também o histórico)
+      await api("POST", "/documento/apagar", d.codigo ? { versaoAnterior: va, conteudo, codigo: String(d.codigo) } : { versaoAnterior: va, conteudo }, k.prova);
       if (sessao === s) s.versao = va + 1;
       await esquecerVersao(s.email);              // recomeço deliberado: vale também depois de "documento sumido"
       await lembrarVersao(s.email, va + 1);

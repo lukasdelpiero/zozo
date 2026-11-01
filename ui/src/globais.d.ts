@@ -831,7 +831,8 @@ declare global {
     perfilShared: ZoZoPerfilShared;
     recorrenciasShared: ZoZoRecorrenciasShared;
     usuario: { Avatar(foto: string | null | undefined, nome: string | undefined, tamanho?: number): HTMLElement };
-    exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): void;
+    /** true = o download foi pedido ao navegador; false = falhou (o aviso de erro já apareceu) */
+    exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): Promise<boolean>;
     configuracoes: { abrir(ctx: ContextoApp, aba?: string): void; desativar2FA(ctx: ContextoApp): void };
     emojiPicker: ZoZoEmojiPicker;
     /** contexto da interface (app.ts), para depuração e para os módulos que não o recebem por parâmetro */

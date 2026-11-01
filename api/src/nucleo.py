@@ -302,11 +302,44 @@ def _email(valor: object) -> str:
     return e
 
 
+PROFUNDIDADE_JSON = 32            # nenhum pedido legítimo passa de 5 níveis; o limite fica com folga
+
+
+def _profundidade_json(texto: str) -> int:
+    """
+    Maior aninhamento de [ e { fora das strings, sem desserializar (laço simples, sem recursão). No Worker (Pyodide)
+    um "[[[[…" gigante estourava a pilha do JavaScript antes de o Python levantar RecursionError.
+    """
+    nivel = maior = 0
+    em_texto = escape = False
+    for c in texto:
+        if em_texto:
+            if escape:
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == '"':
+                em_texto = False
+        elif c == '"':
+            em_texto = True
+        elif c in "[{":
+            nivel += 1
+            if nivel > maior:
+                maior = nivel
+                if maior > PROFUNDIDADE_JSON:
+                    return maior
+        elif c in "]}":
+            nivel -= 1
+    return maior
+
+
 def _json(pedido: Pedido) -> Json:
     if not (pedido.cab("content-type") or "").lower().startswith("application/json"):
         raise Falha(415, "INVALID_REQUEST")
     if len(pedido.corpo.encode("utf-8")) > LIMITE_CORPO:
         raise Falha(413, "DOCUMENT_TOO_LARGE")
+    if _profundidade_json(pedido.corpo or "") > PROFUNDIDADE_JSON:
+        raise Falha(400, "INVALID_REQUEST")
     try:
         dados = json.loads(pedido.corpo or "{}")
     except (ValueError, RecursionError) as ex:            # RecursionError: JSON aninhado demais ("[[[[…")
@@ -1702,6 +1735,10 @@ async def _rota(ctx: Contexto) -> Resposta:
         # "Apagar todos os dados": grava o documento vazio (a versão continua subindo,
         # então nenhum dispositivo confunde isso com um retrocesso) e descarta o histórico
         conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
+        if set(b) - {"conteudo", "versaoAnterior", "codigo"}:
+            raise Falha(400, "INVALID_REQUEST")
+        # sem volta (o histórico também some): com 2FA, um código atual; a sessão e a prova guardadas não bastam
+        await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
         await _lote_atomico(ctx.banco, [
             _gravar_documento(email, va, conteudo), _GUARDA, _LIMPA_GUARDA,
             ("DELETE FROM historico WHERE email = ?", (email,)),
@@ -1773,10 +1810,13 @@ async def _rota(ctx: Contexto) -> Resposta:
         if not await _conferir_fator(ctx, email, conta["totp_segredo"], conta["totp_ultimo_passo"], b.get("codigo")):
             ctx.evento("2fa_desativacao_recusada", email, tentativa=r["falhas"])
             raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
-        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
-        await ctx.banco.lote([
-            ("UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL, totp_ultimo_passo = 0 WHERE email = ?", (email,)),
+        # o código já foi consumido de forma atômica em _conferir_fator; a remoção ainda exige o MESMO segredo
+        # conferido (outra aba trocou o 2FA no meio: nada é desligado) e o lote inteiro falha junto
+        await _lote_atomico(ctx.banco, [
+            ("UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL, totp_ultimo_passo = 0 WHERE email = ? AND totp_segredo = ?",
+             (email, conta["totp_segredo"])), _GUARDA, _LIMPA_GUARDA,
             ("DELETE FROM codigos_backup WHERE email = ?", (email,))])
+        await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
         await _encerrar_outras(ctx, email, s["id"])
         ctx.evento("2fa_desativado", email)
         await _avisar(ctx, email, emails.dois_fatores_desativado(conta["nome"], ctx.agora), "email_aviso_2fa")

@@ -45,6 +45,11 @@
   --color-aviso-erro: #e51300;     --color-aviso-erro-fundo: #ff443314;
   --color-aviso-alerta: #f58000;   --color-aviso-alerta-fundo: #f580001f;
   --color-aviso-sucesso: #008a33;  --color-aviso-sucesso-fundo: #00cc4b14;
+  /* texto dos avisos: o mesmo tom, escurecido só o bastante para ≥ 4,5:1 sobre o fundo translúcido (o ícone fica na cor
+     cheia acima). Antes: alerta 2,35:1, erro 4,29:1, sucesso 4,19:1. Para voltar à cor cheia no texto, troque aqui. */
+  --color-aviso-erro-texto: #da1200;     /* 4,66:1 */
+  --color-aviso-alerta-texto: #a75700;   /* 4,68:1 */
+  --color-aviso-sucesso-texto: #008230;  /* 4,63:1 */
   --color-progress-ok: #19a14a;
   --color-progress-over: #ef3b3b;
   --color-alerta: #e8730c;         /* laranja dos avisos (demonstração, câmbio) */

@@ -71,6 +71,16 @@ jobs:
           shred -u "$plano" "$RUNNER_TEMP/conferencia.db"
           ls -l "$RUNNER_TEMP/saida"
 
+      # a cópia do GitHub sobe logo depois de cifrar: uma falha na nuvem opcional (abaixo) continua visível,
+      # mas não impede esta
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
+        with:
+          name: zozo-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/saida/*.sql.age
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0     # já cifrado: não comprime
+
       - name: Copiar para a nuvem (opcional, rclone)
         if: env.TEM_NUVEM == 'sim'
         env:
@@ -92,11 +102,3 @@ jobs:
           # na nuvem ficam 90 dias de backups (só os arquivos zozo-*.sql.age)
           bin/rclone --config rclone.conf delete "$DESTINO" --min-age 90d --include "zozo-*.sql.age"
           bin/rclone --config rclone.conf lsl "$DESTINO" --include "zozo-*.sql.age" | tail -n 3
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2
-        with:
-          name: zozo-backup-${{ github.run_id }}
-          path: ${{ runner.temp }}/saida/*.sql.age
-          retention-days: 30
-          if-no-files-found: error
-          compression-level: 0     # já cifrado: não comprime

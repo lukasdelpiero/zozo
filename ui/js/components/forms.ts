@@ -40,8 +40,8 @@
     if (t === "cor") {
       let atual = F.cor(valor, ZoZo.regras.paleta[9]);
       const wrap = h("div");
-      const desenhar = (): void => { mount(wrap, UI.ColorPicker(atual, (c: string) => { atual = c; desenhar(); aoMudar(); }, { label: campo.rotulo })); };
-      desenhar();
+      // a paleta marca a cor sozinha (sem redesenhar): o foco do teclado fica na cor escolhida
+      mount(wrap, UI.ColorPicker(atual, (c: string) => { atual = c; aoMudar(); }, { label: campo.rotulo }));
       return { el: wrap, ler: () => atual, foco: null, semLabelFor: true };
     }
     if (t === "emoji") {

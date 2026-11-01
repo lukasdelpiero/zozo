@@ -181,6 +181,9 @@
   }
   function fechar() {
     if (!janela) return;
+    // cartão de confirmação ou opções abertos: fechar CANCELA (nada é gravado); antes a rodada ficava esperando
+    // uma resposta que não tinha mais onde ser dada e a conversa travava
+    if (cancelarPendente) cancelarPendente();
     janela.remove(); janela = null;
     mostrarFab();
     if (fab) fab.focus();
@@ -346,11 +349,19 @@
     } catch (e) {
       if (minha !== geracao) return;
       const x = e as Partial<ErroPonte>;
-      nota((x && x.friendly) || FR.ZO_FAILED);
       if (x && x.code === "CONSENT_REQUIRED") { aceito = false; pedirConsentimento(); }
-      // a ida que falhou não fica na conversa: a próxima recomeça da última fala da pessoa
-      while (historico.length && historico[historico.length - 1].papel !== "usuario") historico.pop();
-      historico.pop();
+      if (gravou) {
+        // o que a pessoa confirmou JÁ foi gravado: a conversa mantém essa parte (repetir o pedido duplicaria) e o Zo
+        // fica sabendo pela nota; só a resposta final faltou
+        const aviso = "O que você confirmou foi feito. Só não consegui terminar a resposta.";
+        nota(aviso + " " + ((x && x.friendly) || FR.ZO_FAILED));
+        historico.push({ papel: "assistente", texto: aviso, chamadas: [] });
+      } else {
+        nota((x && x.friendly) || FR.ZO_FAILED);
+        // a ida que falhou não fica na conversa: a próxima recomeça da última fala da pessoa
+        while (historico.length && historico[historico.length - 1].papel !== "usuario") historico.pop();
+        historico.pop();
+      }
     } finally {
       if (minha === geracao) { ocupado = false; digitando(false); if (janela) atualizarEnvio(); }
       if (gravou) c.recarregarTudo();                 // a tela acompanha o que o Zo gravou
@@ -367,7 +378,10 @@
         c.navigate("lancamentos", { force: true });
       },
       abrirConfiguracoes: (aba) => ZoZo.configuracoes.abrir(c, aba),
-      exportar: () => new Promise<void>((resolver) => { ZoZo.exportarCsv(c, h("button", { type: "button" }) as HTMLButtonElement); setTimeout(resolver, 700); }),
+      // o resultado de verdade (antes: um temporizador de 700 ms dizia "pronto" mesmo se a exportação falhasse)
+      exportar: () => ZoZo.exportarCsv(c, h("button", { type: "button" }) as HTMLButtonElement).then((ok) => {
+        if (!ok) throw new ZoZo.messages.BridgeError("OPERATION_FAILED", FR.OPERATION_FAILED);
+      }),
       sair: () => { fechar(); c.logout(); },
       seguranca: () => c.bridge.request(A.getProtecao).then((p) => ({ doisFatores: !!(ZoZo.store.get().session.user || {}).doisFatores, protecaoAvancada: p.avancada })),
       // conta com 2FA já entrou com o segundo fator; sem 2FA, a biometria confirma (o servidor confere a assinatura)

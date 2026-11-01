@@ -81,8 +81,7 @@
         const linhaOrc = h("div", { class: ZoZo.pecas.campo }, h("span", { class: ZoZo.pecas.campoRotulo }, "Orçamento"), orc.el);
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
-        const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor", cheio: true, altura: 36 }));
-        desenharCores();
+        mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; }, { label: "Cor", cheio: true, altura: 36 }));     // marca sozinha: o foco fica
         linhaOrc.hidden = !orcamentoAtivo;
         let criar: HTMLButtonElement | undefined;
         const enviar = () => {
@@ -120,8 +119,7 @@
         nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
-        const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor do perfil", cheio: true, altura: 36 }));
-        desenharCores();
+        mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; }, { label: "Cor do perfil", cheio: true, altura: 36 }));     // marca sozinha: o foco fica
         const enviar = (btn: HTMLButtonElement | null) => {
           const v = nome.value.trim();
           if (!v) { erro.textContent = "Informe o nome do perfil."; nome.focus(); return; }
@@ -183,8 +181,7 @@
         const saldo = campoDinheiro(0); campos.saldo = saldo;
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
-        const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor", cheio: true, altura: 36 }));
-        desenharCores();
+        mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; }, { label: "Cor", cheio: true, altura: 36 }));     // marca sozinha: o foco fica
 
         let linhas: FilhoDom[];
         let lerEmprestimo: (() => string | { saldo: number; emprestimo: Record<string, unknown> }) | null = null;

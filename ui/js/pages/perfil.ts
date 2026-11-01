@@ -309,8 +309,8 @@
   }
 
   /** Gera o CSV no próprio navegador e baixa (nada passa pelo servidor). Atenção: o arquivo baixado NÃO é cifrado. */
-  function exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement) {
-    if (botao.disabled) return;
+  function exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): Promise<boolean> {
+    if (botao.disabled) return Promise.resolve(false);
     // Carregando: ícone animado no lugar do ícone do botão (pelo menos 600 ms, para dar para ver)
     const iconeOriginal = botao.querySelector("svg");
     const giro = h("span", { class: ZoZo.pecas.girandoBotao, "aria-hidden": "true" });
@@ -318,7 +318,8 @@
     botao.disabled = true;
     botao.setAttribute("aria-busy", "true");
     const minimo = new Promise((r) => setTimeout(r, 600));
-    ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
+    let pedido = false;
+    return ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
       const cfg: Partial<RespostaConfig> = store.get().data.config || {};
       const moeda = cfg.multicambio ? cfg.moeda || "BRL" : null;            // o serviço só devolve moeda válida
       const conteudo = gerarCsv(d.lancamentos || [], moeda);
@@ -330,11 +331,13 @@
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      pedido = true;
       // fora do ZoZo os dados ficam legíveis: avisa toda vez (inclusive pelo botão de Transações)
       ctx.toast("Arquivo baixado. Ele não é cifrado: guarde-o em local seguro.", { tone: "aviso" });
     }).catch((e: Partial<ErroPonte>) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
       .then(() => minimo)
-      .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); });
+      .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); })
+      .then(() => pedido);
   }
 
   /** Ações de conta esperam as gravações em andamento (evita conflito de versão com elas) */
@@ -779,9 +782,12 @@
             .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }))
             .finally(() => { btn.disabled = false; });
         };
-        const apagarDados = () => ZoZo.modais.confirmarComSenha({ titulo: "Apagar todos os dados?", botao: "Apagar dados",
-          mensagem: "Transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
-          .then((senha: string | null) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha })).then(() => {
+        // a senha e, com 2FA, o código atual (o servidor confere: a ação apaga também o histórico)
+        const apagarDados = () => ZoZo.modais.confirmarSeguro({ titulo: "Apagar todos os dados?", botao: "Apagar dados", senha: true, codigo2FA: !!u.doisFatores,
+          mensagem: "Transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita."
+            + (u.doisFatores ? " Digite sua senha e o código do seu aplicativo 2FA para confirmar." : " Digite sua senha para confirmar."),
+          executar: ({ senha, codigo }) => depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha, codigo })).then(() => undefined) })
+          .then((feito) => feito && Promise.resolve().then(() => {
             ZoZo.servico.reset();
             // Filtros, seleção e preferências apontavam para itens que não existem mais
             store.set({ ui: { filtros: null, selecionados: [], busca: "", invExcluidas: [], mostrarOcultas: {}, gruposFechados: {} }, selectedItem: null });

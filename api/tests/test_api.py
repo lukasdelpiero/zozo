@@ -811,6 +811,46 @@ class Teste2FA(Base):
         self.assertEqual(excluir({"confirmacao": "EXCLUIR CONTA", "codigo": self.codigo()})[0], 204)
         self.assertEqual(self.con.execute("SELECT count(*) FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], 0)
 
+    def test_apagar_dados_com_2fa_pede_o_codigo_atual(self):
+        # sem volta (o histórico some junto): a sessão e a prova guardadas não bastam
+        self.ativar()
+        self.gravar(0); self.gravar(1)
+        historico = lambda: self.con.execute("SELECT count(*) FROM historico WHERE email = ?", (EMAIL,)).fetchone()[0]
+        antes = historico()
+        self.assertGreater(antes, 0)
+        self.api.agora += 60
+        apagar = lambda **x: self.api("POST", "/api/documento/apagar", dict({"versaoAnterior": 2, "conteudo": conteudo()}, **x), prova=self.prova)
+        self.assertEqual(apagar()[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(apagar(codigo="000000")[1]["erro"], "CODE_INVALID")
+        self.assertEqual(apagar(codigo=self.codigo(), x=1)[0], 400)
+        self.assertEqual(historico(), antes)                                 # nada apagado
+        self.con.execute("DELETE FROM limites")
+        self.assertEqual(apagar(codigo=self.codigo())[0], 200)
+        self.assertEqual(historico(), 0)
+        # sem 2FA continua pedindo só a sessão e a prova (a tela pede a senha)
+        self.api.agora += 60
+        self.con.execute("UPDATE contas SET totp_segredo = NULL WHERE email = ?", (EMAIL,))
+        self.assertEqual(self.api("POST", "/api/documento/apagar", {"versaoAnterior": 3, "conteudo": conteudo()}, prova=self.prova)[0], 200)
+
+    def test_desligar_2fa_exige_o_mesmo_segredo_conferido(self):
+        # o segredo foi trocado (outra aba refez o 2FA) entre a conferência e a remoção: nada é desligado
+        self.ativar()
+        self.api.agora += 60
+        codigo = self.codigo()
+        original = nucleo._conferir_fator
+        async def trocar_no_meio(ctx, email, cifrado, passo, cod):
+            ok = await original(ctx, email, cifrado, passo, cod)
+            self.con.execute("UPDATE contas SET totp_segredo = ? WHERE email = ?", (totp.cifrar(totp.novo_segredo(), SEGREDO), EMAIL))
+            return ok
+        nucleo._conferir_fator = trocar_no_meio
+        try:
+            st, r = self.api("POST", "/api/2fa/desativar", {"codigo": codigo}, prova=self.prova)
+        finally:
+            nucleo._conferir_fator = original
+        self.assertEqual((st, r["erro"]), (409, "DATA_CHANGED"))
+        self.assertIsNotNone(self.con.execute("SELECT totp_segredo FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0])
+        self.assertEqual(self.con.execute("SELECT count(*) FROM codigos_backup WHERE email = ?", (EMAIL,)).fetchone()[0], 10)
+
     def test_codigo_das_acoes_tem_o_mesmo_bloqueio_do_login(self):
         self.ativar()
         self.api.agora += 60
@@ -2162,6 +2202,29 @@ class TesteAuditoria30(Base):
             st, r = cli(metodo, rota, fundo, prova=pv)
             self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), rota)
             self.assertFalse(any("falha_no_servidor" in x for x in cli.logs), rota)
+
+    def test_profundidade_do_json_e_conferida_antes_de_desserializar(self):
+        # no Worker (Pyodide) a pilha do JavaScript estoura antes do RecursionError: o núcleo mede antes, sem recursão
+        self.assertEqual(nucleo._profundidade_json('{"a": [1, {"b": "[[[[[[" }], "c": "\\"}'), 3)   # colchetes em strings não contam
+        raso = '{"x":' * nucleo.PROFUNDIDADE_JSON + "1" + "}" * nucleo.PROFUNDIDADE_JSON
+        fundo = '{"x":' * (nucleo.PROFUNDIDADE_JSON + 1) + "1" + "}" * (nucleo.PROFUNDIDADE_JSON + 1)
+        self.assertEqual(nucleo._profundidade_json(raso), nucleo.PROFUNDIDADE_JSON)
+        anonimo = Cliente(self.banco, ip="198.51.100.97")
+        self.assertEqual(anonimo("POST", "/api/sessao", fundo), (400, {"erro": "INVALID_REQUEST"}))
+
+    def test_adaptador_repassa_toda_variavel_do_wrangler_que_o_nucleo_le(self):
+        # EMAIL_OBRIGATORIO ficou fora da lista do entry.py: a produção nunca recusava cadastro sem e-mail configurado
+        import ast
+        import tomllib
+        api = AQUI.parent
+        arvore = ast.parse((api / "src" / "entry.py").read_text(encoding="utf-8"))
+        lista = next(n.value for n in arvore.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "_CONFIG")
+        config = {e.value for e in lista.elts}
+        toml = tomllib.loads((api / "wrangler.toml").read_text(encoding="utf-8"))
+        variaveis = set(toml.get("vars", {})) | set(toml["env"]["previa"].get("vars", {}))
+        lidas_fora = {"API_FASTAPI"}                       # lida direto no entry.py (escolhe o caminho do pedido)
+        self.assertEqual(variaveis - config - lidas_fora, set())
+        self.assertIn("EMAIL_OBRIGATORIO", config)
 
 
 class TesteKdf(Base):

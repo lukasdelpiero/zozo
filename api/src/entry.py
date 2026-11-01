@@ -36,7 +36,9 @@ except ImportError:                   # pragma: no cover
     _JSNULL = None
 
 _CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO",
-           "RECURSOS_FATURA_DIA11", "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "GROQ_API_KEY", "ZO_MODELO")
+           "RECURSOS_FATURA_DIA11", "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "EMAIL_OBRIGATORIO", "GROQ_API_KEY", "ZO_MODELO")
+# Toda variável do wrangler.toml que o núcleo lê precisa estar aqui (teste em test_api.py confere): fora da lista,
+# o núcleo recebe vazio e a regra cai no padrão sem avisar (EMAIL_OBRIGATORIO já ficou de fora assim)
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 
