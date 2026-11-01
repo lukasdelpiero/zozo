@@ -66,7 +66,7 @@ test("IDs gerados são imprevisíveis, com o prefixo do tipo e sem repetição",
   assert.match(conta.id, /^c[0-9a-f]{20}$/);
 });
 
-test("fatura: só cartão de crédito do perfil (empréstimo não), no mês pedido, em ordem de data", async () => {
+test("fatura: cartão de crédito e empréstimo do perfil, no mês pedido, em ordem de data", async () => {
   const t = carregar();
   const { perfil: ana } = await t.req(t.A.createPerfil, { perfil: { nome: "Ana" } });
   const { perfil: bia } = await t.req(t.A.createPerfil, { perfil: { nome: "Bia" } });
@@ -78,8 +78,17 @@ test("fatura: só cartão de crédito do perfil (empréstimo não), no mês pedi
   await t.req(t.A.createLancamento, lanc({ data: "2025-03-06", descricao: "De outro perfil", contaId: cartao, perfilId: bia.id }));
   await t.req(t.A.createLancamento, lanc({ data: "2025-04-01", descricao: "Outro mês", contaId: cartao, perfilId: ana.id }));
   await t.req(t.A.createLancamento, lanc({ data: "2025-03-07", descricao: "Sem perfil", contaId: cartao }));
+  await t.req(t.A.createLancamento, lanc({ data: "2025-03-08", descricao: "Parcela paga", contaId: emprestimo, perfilId: ana.id, tipo: "interno", sentido: "entrada" }));
+  await t.req(t.A.createLancamento, lanc({ data: "2025-03-09", descricao: "Receita no empréstimo", contaId: emprestimo, perfilId: ana.id, tipo: "receita" }));
   const f = await t.req(t.A.getBoletoData, { perfilId: ana.id, mes: 3, ano: 2025 });
-  assert.deepEqual(f.lancamentos.map((l) => l.descricao), ["Cartão"]);
+  assert.deepEqual(f.lancamentos.map((l) => l.descricao), ["Empréstimo", "Cartão"]);     // pagar o empréstimo não é gasto
+  assert.deepEqual(f.periodos.map((p) => [p.nome, p.inicio, p.fim, p.semFechamento]),
+    [["Visa", "2025-03-01", "2025-03-31", true], ["Crédito", "2025-03-01", "2025-03-31", false]]);
+  // escolher só o empréstimo
+  const soEmprestimo = await t.req(t.A.getBoletoData, { perfilId: ana.id, cartaoId: emprestimo, mes: 3, ano: 2025 });
+  assert.deepEqual(soEmprestimo.lancamentos.map((l) => l.descricao), ["Empréstimo"]);
+  assert.equal(soEmprestimo.consulta, true);
+  await assert.rejects(t.req(t.A.getBoletoData, { perfilId: ana.id, cartaoId: corrente, mes: 3, ano: 2025 }), codigo("OPERATION_FAILED"));
   assert.equal(f.perfil.nome, "Ana");
   assert.equal(f.consulta, false);
   assert.equal(f.lancamentos[0].ultimos4Digitos, "");
@@ -91,6 +100,23 @@ test("fatura: só cartão de crédito do perfil (empréstimo não), no mês pedi
   const vazia = await t.req(t.A.getBoletoData, { perfilId: "p-inexistente", mes: 3, ano: 2025 });
   assert.equal(vazia.perfil, null);
   assert.deepEqual(vazia.lancamentos, []);
+});
+
+test("fatura: a fatura fechada e a ainda aberta trazem todas as compras do ciclo, inclusive as futuras", async () => {
+  const t = carregar();
+  const { perfil: ana } = await t.req(t.A.createPerfil, { perfil: { nome: "Ana" } });
+  const cartao = (await t.req(t.A.createConta, { conta: { nome: "Visa", tipo: "cartao", saldo: 0, fechamento: 5, vencimento: 12 } })).conta.id;
+  const hoje = new Date(), pad = (n) => String(n).padStart(2, "0");
+  const dia = (a, m, d) => { const x = new Date(a, m, d); return x.getFullYear() + "-" + pad(x.getMonth() + 1) + "-" + pad(x.getDate()); };
+  const A = hoje.getFullYear(), M = hoje.getMonth();
+  // fatura do mês que vem: ciclo de 6 deste mês a 5 do mês que vem (aberta); fatura deste mês: 6 do mês passado a 5 deste (fechada ou quase)
+  const compras = [["Fechada início", dia(A, M - 1, 6)], ["Fechada fim", dia(A, M, 5)], ["Aberta início", dia(A, M, 6)], ["Aberta futura", dia(A, M + 1, 5)], ["Seguinte", dia(A, M + 1, 6)]];
+  for (const [descricao, data] of compras) await t.req(t.A.createLancamento, lanc({ data, descricao, contaId: cartao, perfilId: ana.id }));
+  const fechada = await t.req(t.A.getBoletoData, { perfilId: ana.id, mes: M + 1, ano: A });
+  assert.deepEqual(fechada.lancamentos.map((l) => l.descricao), ["Fechada início", "Fechada fim"]);
+  const prox = new Date(A, M + 1, 1);
+  const aberta = await t.req(t.A.getBoletoData, { perfilId: ana.id, mes: prox.getMonth() + 1, ano: prox.getFullYear() });
+  assert.deepEqual(aberta.lancamentos.map((l) => l.descricao), ["Aberta início", "Aberta futura"]);
 });
 
 test("fatura e Pix só com os recursos liberados", async () => {

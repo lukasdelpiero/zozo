@@ -11,6 +11,13 @@
 
   const NOTAS: readonly NotaVersao[] = [
     {
+      versao: "3.19.1", quando: "outubro de 2026",
+      itens: [
+        { icone: "🧾", tipo: "correcao", titulo: "Fatura completa",
+          texto: "Ao gerar a fatura, entram todas as compras do cartão, da fatura já fechada ou da que ainda está aberta, e também os empréstimos." },
+      ],
+    },
+    {
       versao: "3.19.0", quando: "outubro de 2026",
       itens: [
         { icone: "💬", tipo: "novo", titulo: "Conheça o Zo",

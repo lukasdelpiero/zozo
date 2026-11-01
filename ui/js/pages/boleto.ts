@@ -171,7 +171,7 @@
     if (st.carregando) return UI.Skeleton(4, { short: true });
     if (st.erro) return UI.ErrorState(st.erro, () => { if (atual) atual.carregar(); });
     if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil", class: "tw:min-h-[90px]! tw:p-4!" });
-    if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
+    if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão ou empréstimo no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
     return h("ul", null, st.lancamentos.map((l) => h("li", { class: T.item },
       h("span", { class: T.itemData }, diaMes(l.data)),
       h("span", { class: T.itemDesc },
@@ -436,12 +436,12 @@
     if (!perfisData) ctx.loadData("perfis", A.getPerfis).then((d) => { perfis = d.perfis || []; preencherPerfis(perfis); carregar(); }).catch(() => null);
     perfilSel.addEventListener("change", () => { st.perfilId = perfilSel.value; st.perfil = perfis.find((p) => p.id === st.perfilId) || null; carregar(); });
 
-    // Cartão: os cartões de crédito cadastrados e, no fim, Todos (todos os cartões do perfil escolhido)
+    // Conta: os cartões de crédito e os empréstimos cadastrados e, no fim, Todos (todos os do perfil escolhido)
     const contasData = ZoZo.store.get().data.contas;
     const cartaoSel = UI.Select([], { name: "cartao" });
     let cartoes: ContaTela[] = [];
     const preencherCartoes = (lista: ContaTela[]) => {
-      cartoes = lista.filter((c) => c.tipo === "cartao");
+      cartoes = lista.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo");
       clear(cartaoSel);
       cartoes.forEach((c) => cartaoSel.appendChild(h("option", { value: c.id }, c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""))));
       cartaoSel.appendChild(h("option", { value: TODOS }, "Todos"));
@@ -485,7 +485,7 @@
     }
     const receberBtn = UI.Button("Registrar pagamento recebido", { variant: "secondary", size: "sm", icon: "mais", class: "btn--block", onClick: () => registrarPagamento() });
     const recebidosEl = h("ul", { class: T.recebidos, "aria-label": "Pagamentos recebidos" });
-    const periodosEl = h("ul", { class: T.periodosCartao, "aria-label": "Período de cada cartão" });
+    const periodosEl = h("ul", { class: T.periodosCartao, "aria-label": "Período de cada conta" });
     const seloEl = h("span", { class: T.selo, role: "status" });
 
     // ajustes e pagamentos recebidos são do perfil e do mês: somem na consulta (Todos ou um cartão)
@@ -498,7 +498,7 @@
     const editor = h("div", { class: T.editor },
       h("section", { class: T.secao },
         UI.Field("Perfil", perfilSel),
-        UI.Field("Cartão", cartaoSel),
+        UI.Field("Conta", cartaoSel),
         h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Fatura de"), h("div", { class: T.periodo }, mesSel, anoSel), periodosEl),
         UI.Field("Data da fatura", dataInput)),
       h("section", { class: T.secao },
