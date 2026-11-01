@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.19.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.19.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -12,6 +12,10 @@ Aplicativo web com design baseado no Copilot Money.
 | Acesso | **Login próprio do ZoZo** (e-mail + senha + 2FA opcional), cadastro aberto, conta de demonstração pública |
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
+
+## Novidades da versão 3.19.1
+
+- **Fatura gerada com empréstimos:** além dos cartões de crédito (fatura fechada ou aberta), entram as transações dos empréstimos do perfil (mês do calendário). Pagar o empréstimo (transferência de entrada ou receita) não entra na cobrança. O campo Cartão virou Conta (cartões e empréstimos).
 
 ## Novidades da versão 3.19.0
 

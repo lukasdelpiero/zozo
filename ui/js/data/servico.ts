@@ -1012,8 +1012,8 @@
       };
     },
     /**
-     * Fatura (cobrança): transações de cartão de crédito de um perfil (ou de todos, "todos") num cartão (ou em todos),
-     * o período de cada cartão e, só com UM perfil e todos os cartões, os ajustes guardados, os pagamentos recebidos,
+     * Fatura (cobrança): transações de cartão de crédito (faturas fechadas e a aberta) e de empréstimos de um perfil
+     * (ou de todos, "todos") numa dessas contas (ou em todas), o período de cada conta e, só com UM perfil e todas as contas, os ajustes guardados, os pagamentos recebidos,
      * o saldo anterior e o Pix (guardados por perfil e mês). Com Todos ou um cartão escolhido é só consulta
      * (regras em cobrancaDoMes / saldoAnterior).
      */
@@ -1024,7 +1024,7 @@
       const perfil = todos ? null : doc.perfis.find((p) => p.id === d.perfilId) || null;
       let cartaoId: Id | null = null;
       if (d.cartaoId !== undefined && d.cartaoId !== null && d.cartaoId !== "" && d.cartaoId !== TODOS) {
-        const c = doc.contas.find((x) => x.id === d.cartaoId && x.tipo === "cartao");
+        const c = doc.contas.find((x) => x.id === d.cartaoId && PASSIVOS.includes(x.tipo));
         if (!c) throw erro("OPERATION_FAILED");
         cartaoId = c.id;
       }
@@ -1032,10 +1032,12 @@
       const itens = perfil || todos ? cobrancaDoMes(perfil ? perfil.id : null, mes, cartaoId) : [];
       const guardada = perfil && !consulta ? doc.faturas[perfil.id + "|" + mes] : undefined;
       const ajustes = { contribuicoes: guardada ? guardada.contribuicoes : [], descontos: guardada ? guardada.descontos : [], arredondamentos: guardada ? guardada.arredondamentos : [] };
-      // período de cada cartão que aparece na fatura (do dia seguinte ao fechamento anterior até o dia do fechamento)
-      const periodos = doc.contas.filter((c) => c.tipo === "cartao" && (c.id === cartaoId || itens.some((l) => l.contaId === c.id))).map((c) => {
-        const f = faixaDoCartao(c, mes);
-        return { contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f ? f.inicio : mes + "-01", fim: f ? diaAnterior(f.fim) : dataNoMes(mes, 31), semFechamento: !f };
+      // período de cada conta que aparece na fatura: cartão, do dia seguinte ao fechamento anterior até o dia do
+      // fechamento; empréstimo, o mês do calendário
+      const periodos = doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (c.id === cartaoId || itens.some((l) => l.contaId === c.id))).map((c) => {
+        const f = c.tipo === "cartao" ? faixaDoCartao(c, mes) : null;
+        return { contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f ? f.inicio : mes + "-01", fim: f ? diaAnterior(f.fim) : dataNoMes(mes, 31),
+          semFechamento: !f && c.tipo === "cartao" };
       });
       const cheia = !!perfil && !consulta;
       return {
@@ -1057,9 +1059,9 @@
   const PALAVRAS_COMUNS = new Set(["compra", "pagamento", "parcela", "parcelado", "debito", "credito", "cartao", "pix", "transferencia", "com", "para", "das", "dos", "ltda"]);
 
   /* ---------------- Fatura de perfis (cobrança) ----------------
-     • Entram as transações do perfil (ou de todos) em cartão de crédito (empréstimo não). Cartão com fechamento: as
-       compras do dia seguinte ao fechamento anterior até o dia do fechamento do mês, inclusive; sem fechamento, o mês
-       do calendário.
+     • Entram as transações do perfil (ou de todos) em cartão de crédito e em empréstimo, da fatura já fechada ou da
+       ainda aberta. Cartão com fechamento: as compras do dia seguinte ao fechamento anterior até o dia do fechamento
+       do mês, inclusive; sem fechamento, e no empréstimo, o mês do calendário.
      • Pagar o CARTÃO (o par do tipo Fatura, o formato antigo e a transferência de entrada no cartão) é você pagando o
        banco: não aparece nem abate a cobrança do perfil. O que abate são os pagamentos RECEBIDOS do perfil (receberFatura).
      • Saldo anterior: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais)
@@ -1089,26 +1091,27 @@
   }
   // pagamento do cartão gravado antes da marca pagamentoCartao (3.17 e anteriores): o texto que o "Pagar fatura" gerava
   const PAGAMENTO_ANTIGO = "Pagamento da fatura do cartão de crédito ";
-  /** Pagamento ou crédito no cartão, nunca um gasto: Fatura, transferência de entrada e qualquer Receita (inclusive o
-   *  pagamento lançado à mão como Receita). Estorno não entra aqui: devolução de compra continua abatendo a fatura. */
+  /** Pagamento ou crédito no cartão ou no empréstimo, nunca um gasto: Fatura, transferência de entrada e qualquer
+   *  Receita (inclusive o pagamento lançado à mão como Receita). Estorno não entra aqui: devolução de compra continua
+   *  abatendo a fatura. */
   function pagamentoDoCartao(l: Lancamento, conta: Conta): boolean {
     if (l.tipo === "fatura") return true;
-    if (conta.tipo !== "cartao") return false;
+    if (!PASSIVOS.includes(conta.tipo)) return false;
     if (l.tipo === "interno") return l.sentido === "entrada";
     return l.tipo === "receita";
   }
   /**
-   * Transações cobradas na fatura do mês, em ordem de data: só cartão de crédito. perfilId null = todos os perfis
-   * (inclusive as compras sem perfil, nos cartões da moeda atual); cartaoId null = todos os cartões.
+   * Transações cobradas na fatura do mês, em ordem de data: cartão de crédito e empréstimo. perfilId null = todos os
+   * perfis (inclusive as compras sem perfil, nas contas da moeda atual); cartaoId null = todos os cartões e empréstimos.
    */
   function cobrancaDoMes(perfilId: Id | null, mes: string, cartaoId: Id | null = null): Lancamento[] {
-    const contas = new Map(doc.contas.filter((c) => c.tipo === "cartao" && (!cartaoId || c.id === cartaoId)
+    const contas = new Map(doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (!cartaoId || c.id === cartaoId)
       && (perfilId || moedaDe(c) === moedaAtual())).map((c) => [c.id, c] as const));
     const faixas = new Map<Id, { inicio: string; fim: string } | null>();
     return doc.lancamentos.filter((l) => {
       const c = (perfilId === null || l.perfilId === perfilId) && !l.valorInvalido && l.contaId ? contas.get(l.contaId) : undefined;
       if (!c || pagamentoDoCartao(l, c)) return false;
-      if (!faixas.has(c.id)) faixas.set(c.id, faixaDoCartao(c, mes));
+      if (!faixas.has(c.id)) faixas.set(c.id, c.tipo === "cartao" ? faixaDoCartao(c, mes) : null);
       const f = faixas.get(c.id);
       return f ? l.data >= f.inicio && l.data < f.fim : l.data.startsWith(mes);
     }).sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));

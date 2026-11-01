@@ -138,7 +138,7 @@ FERRAMENTAS: list[dict[str, Any]] = [
     _f("sugerir_categoria", "Sugere categorias pelo histórico da própria pessoa para uma descrição.", {"descricao": _TEXTO}, ["descricao"]),
     _f("sobre_o_zozo", "Informações do app.", {"assunto": {"type": "string",
         "enum": ["versao", "novidades", "termos", "privacidade", "armazenamento", "zo"]}}, ["assunto"]),
-    _f("consultar_fatura", "Fatura de perfil de um mês (só cartão de crédito): transações, ajustes, recebidos e total.", {
+    _f("consultar_fatura", "Fatura de perfil de um mês (cartões de crédito e empréstimos): transações, ajustes, recebidos e total.", {
         "perfil_id": _ID_OU_TODOS, "cartao_id": _ID_OU_TODOS, "mes": _MES}, ["perfil_id"]),
     _f("ler_configuracoes", "Estado das configurações (multicâmbio, moeda, orçamento, Pix cadastrado, 2FA, proteção avançada)."),
     # interface
