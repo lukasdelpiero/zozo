@@ -17,6 +17,8 @@
           texto: "Ao ligar a verificação em duas etapas, você recebe dez códigos de reserva. Se perder o celular, cada um serve uma vez no lugar do código do aplicativo." },
         { icone: "👆", tipo: "novo", titulo: "Confirme com a digital ou o rosto",
           texto: "Cadastre a biometria do seu aparelho em Configurações › Conta e use para confirmar ações importantes, sem digitar nada." },
+        { icone: "✨", tipo: "melhoria", titulo: "Zo de cara nova",
+          texto: "A conversa com o Zo ganhou visual novo. Você pode aumentar a janela, pesquisar palavras na conversa, baixar a conversa e mandar emojis." },
         { icone: "💬", tipo: "melhoria", titulo: "Zo mais cuidadoso",
           texto: "O Zo esconde dados como CPF e cartão antes de pensar na resposta, confirma com você antes de excluir algo e deixa desfazer o que ele fez na conversa." },
         { icone: "🧾", tipo: "novo", titulo: "Fatura do seu jeito",

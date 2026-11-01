@@ -6,6 +6,9 @@
    Cada ida ao Zo leva a conversa recente; as ferramentas rodam aqui (data/zo.ts). Gravação só depois do
    Confirmar no cartão de resumo (montado com os dados reais). Texto sempre como texto (nada de HTML).
    A conversa fica só na memória desta aba: sai ao fechar a aba ou sair da conta.
+   Visual pela "Documentação de chatbot" (seção 1): topo com avatar 32×32, menu ⋯ (Expandir janela, Pesquisar na
+   conversa, Baixar conversa), balões #f5f5f5 / #efebfc com "Nome • tempo" embaixo e a caixa de mensagem com
+   anexo, emojis (o mesmo emoji-mart do ZoZo) e enviar.
    TypeScript: tipos em src/globais.d.ts (ZoZoZo).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
@@ -25,17 +28,45 @@
       + "tw:[transition:transform_160ms_var(--easing),box-shadow_160ms] tw:hover:scale-105 tw:motion-reduce:transition-none tw:celular:right-4 tw:celular:bottom-4",
     fabComTeste: "tw:bottom-16! tw:celular:bottom-14!",                // acima do botão "Modo teste" (local e prévia)
     janela: "tw:fixed tw:right-6 tw:bottom-6 tw:z-50 tw:flex tw:flex-col tw:w-[380px] tw:h-[min(640px,calc(100dvh-48px))] tw:rounded-2xl "
-      + "tw:bg-zz-surface tw:[border:1px_solid_var(--color-border)] tw:[box-shadow:0_16px_48px_rgba(22,33,58,0.22)] tw:overflow-hidden "
+      + "tw:bg-white tw:[border:1px_solid_var(--color-border)] tw:[box-shadow:0_16px_48px_rgba(22,33,58,0.22)] tw:overflow-hidden "
       + "tw:celular:inset-x-2 tw:celular:bottom-2 tw:celular:w-auto tw:celular:h-[min(640px,calc(100dvh-16px))]",
-    topo: "tw:flex tw:items-center tw:gap-3 tw:px-4 tw:h-16 tw:flex-none tw:border-b tw:border-b-zz-border",
-    avatar: "tw:relative tw:grid tw:place-items-center tw:size-10 tw:flex-none tw:rounded-full tw:bg-white tw:[box-shadow:0_1px_4px_rgba(22,33,58,0.16)]",
-    online: "tw:absolute tw:right-0 tw:bottom-0 tw:size-2.5 tw:rounded-full tw:bg-(--color-positive) tw:[border:2px_solid_white]",
-    nome: "tw:m-0 tw:text-[16px] tw:font-[650] tw:text-zz-text tw:leading-tight",
-    status: "tw:m-0 tw:text-[13px] tw:text-zz-secondary",
-    acoesTopo: "tw:ml-auto tw:flex tw:items-center tw:gap-1",
-    log: "tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:flex tw:flex-col tw:gap-3 tw:p-4",
-    bot: "tw:self-start tw:max-w-[88%] tw:px-3.5 tw:py-2.5 tw:rounded-2xl tw:rounded-tl-md tw:bg-(--color-background) tw:text-[15px] tw:leading-normal tw:text-zz-text tw:whitespace-pre-wrap tw:[overflow-wrap:anywhere]",
-    eu: "tw:self-end tw:max-w-[88%] tw:px-3.5 tw:py-2.5 tw:rounded-2xl tw:rounded-tr-md tw:bg-zz-primary-soft tw:text-[15px] tw:leading-normal tw:text-zz-text tw:whitespace-pre-wrap tw:[overflow-wrap:anywhere]",
+    // modo teste (local e prévia): a janela fica acima do botão "Modo teste", que cobria o enviar
+    janelaComTeste: "tw:bottom-16! tw:h-[min(640px,calc(100dvh-88px))]! tw:celular:bottom-14! tw:celular:h-[min(640px,calc(100dvh-64px))]!",
+    // Expandir janela: até 375 px a tela toda; até 800 px, 20 px de folga em volta; acima, 678 px de largura
+    janelaExpandida: "tw:right-5! tw:bottom-5! tw:left-auto! tw:w-[calc(100vw-40px)]! tw:h-[calc(100dvh-40px)]! tw:rounded-3xl! tw:min-[801px]:w-[678px]! "
+      + "tw:max-[375px]:inset-0! tw:max-[375px]:w-full! tw:max-[375px]:h-full! tw:max-[375px]:rounded-none!",
+    topo: "tw:flex tw:items-center tw:gap-2 tw:px-4 tw:h-16 tw:flex-none tw:[border-bottom:1px_solid_rgba(9,14,21,0.06)]",
+    avatar: "tw:grid tw:place-items-center tw:size-8 tw:flex-none tw:rounded-full tw:bg-white tw:[box-shadow:0_1px_4px_rgba(22,33,58,0.16)]",
+    nome: "tw:m-0 tw:text-[15px] tw:font-[650] tw:text-[rgb(20,22,26)] tw:leading-tight",
+    status: "tw:m-0 tw:text-[13px] tw:text-[rgb(108,111,116)] tw:leading-tight",
+    acoesTopo: "tw:ml-auto tw:flex tw:items-center tw:gap-4",
+    botaoTopo: "tw:grid tw:place-items-center tw:p-2.5 tw:rounded-[10px] tw:[border:0] tw:bg-transparent tw:text-[rgb(108,111,116)] tw:cursor-pointer "
+      + "tw:hover:bg-[rgba(9,14,21,0.1)]",
+    // menu ⋯: padding 8 px; itens em pílula, 36 px, 14 px, fundo #ededed ao passar o mouse, 4 px entre eles
+    menu: "tw:p-2!",
+    menuItem: "tw:flex tw:items-center tw:gap-2 tw:w-full tw:min-h-9 tw:px-3 tw:py-2 tw:rounded-full tw:[border:0] tw:bg-transparent tw:text-left "
+      + "tw:text-[14px] tw:font-normal tw:text-[rgb(20,22,26)] tw:cursor-pointer tw:not-first:mt-1 tw:hover:bg-[#ededed] tw:focus-visible:bg-[#ededed]",
+    // Pesquisar na conversa: a barra entre o topo e a conversa
+    busca: "tw:flex tw:items-center tw:flex-none tw:py-[9px] tw:px-3.5 tw:[border-bottom:1px_solid_rgba(9,14,21,0.06)]",
+    buscaCampo: "tw:flex tw:items-center tw:flex-1 tw:min-w-0 tw:max-w-[553px] tw:h-10 tw:ml-2 tw:px-3 tw:rounded-xl tw:bg-[rgba(9,14,21,0.07)] "
+      + "tw:[border:1px_solid_rgba(9,14,21,0.06)] tw:text-[14px] tw:font-normal tw:text-[rgba(9,14,21,0.6)] tw:cursor-text",
+    buscaInput: "tw:flex-1 tw:min-w-0 tw:h-full tw:ml-2 tw:p-0 tw:[border:0] tw:bg-transparent tw:outline-none tw:text-[14px] tw:font-normal "
+      + "tw:text-[rgb(20,22,26)] tw:placeholder:text-[rgb(20,22,26)]",
+    buscaContador: "tw:ml-2 tw:min-w-5 tw:text-[14px] tw:font-normal tw:text-[rgba(9,14,21,0.6)] tw:whitespace-nowrap tw:tabular-nums",
+    buscaBotoes: "tw:flex tw:items-center tw:ml-2",
+    buscaBotao: "tw:grid tw:place-items-center tw:size-8 tw:flex-none tw:rounded-full tw:[border:0] tw:bg-transparent tw:text-[rgba(20,22,26,0.5)] tw:cursor-pointer "
+      + "tw:hover:bg-[rgb(238,238,238)] tw:disabled:text-[rgba(20,22,26,0.25)] tw:disabled:cursor-default tw:disabled:hover:bg-transparent",
+    achado: "tw:bg-[#fde68a] tw:text-inherit tw:rounded-[3px]",
+    achadoAtual: "tw:bg-[#f59e0b] tw:text-inherit tw:rounded-[3px]",
+    // pb-8: a caixa de mensagem sobe 20 px por cima da conversa (margin-top -20 px)
+    log: "tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:flex tw:flex-col tw:gap-5 tw:px-4 tw:pt-4 tw:pb-8",
+    falaBot: "tw:self-start tw:max-w-[88%] tw:flex tw:flex-col tw:items-start tw:gap-1",
+    falaEu: "tw:self-end tw:max-w-[88%] tw:flex tw:flex-col tw:items-end tw:gap-1",
+    bot: "tw:m-0 tw:px-4 tw:py-3 tw:rounded-[20px] tw:bg-[#f5f5f5] tw:text-[14px] tw:font-normal tw:leading-normal tw:text-[rgb(20,22,26)] "
+      + "tw:whitespace-pre-wrap tw:[overflow-wrap:anywhere] tw:[&>p]:mt-0 tw:[&>p]:mx-0 tw:[&>p]:mb-2.5 tw:[&>p:last-child]:mb-0",
+    eu: "tw:m-0 tw:px-4 tw:py-3 tw:rounded-[20px] tw:bg-[#efebfc] tw:text-[14px] tw:font-normal tw:leading-normal tw:text-[rgb(20,22,26)] "
+      + "tw:whitespace-pre-wrap tw:[overflow-wrap:anywhere] tw:[&>p]:mt-0 tw:[&>p]:mx-0 tw:[&>p]:mb-2.5 tw:[&>p:last-child]:mb-0",
+    quem: "tw:m-0 tw:text-[12px] tw:text-[rgb(108,111,116)]",
     cartao: "tw:self-stretch tw:flex tw:flex-col tw:gap-2 tw:p-3.5 tw:rounded-xl tw:[border:1px_solid_var(--color-border)] tw:bg-zz-surface",
     cartaoTitulo: "tw:m-0 tw:text-[14px] tw:font-[650] tw:text-zz-text",
     linhas: "tw:m-0 tw:grid tw:grid-cols-[auto_minmax(0,1fr)] tw:gap-x-3 tw:gap-y-1 tw:text-[14px]",
@@ -45,13 +76,19 @@
     opcao: "tw:inline-flex tw:items-center tw:min-h-8 tw:px-3 tw:rounded-full tw:[border:1px_solid_var(--color-border)] tw:bg-zz-surface "
       + "tw:text-[14px] tw:font-[550] tw:text-zz-primary tw:cursor-pointer tw:hover:bg-zz-primary-softer tw:disabled:opacity-50 tw:disabled:cursor-default",
     nota: "tw:self-center tw:text-[13px] tw:text-zz-secondary",
-    digitando: "tw:self-start tw:flex tw:gap-1 tw:px-3.5 tw:py-3 tw:rounded-2xl tw:bg-(--color-background)",
+    digitando: "tw:self-start tw:flex tw:gap-1 tw:px-4 tw:py-3.5 tw:rounded-[20px] tw:bg-[#f5f5f5]",
     ponto: "tw:size-1.5 tw:rounded-full tw:bg-zz-secondary tw:animate-pulse tw:motion-reduce:animate-none",
-    rodape: "tw:flex-none tw:p-3 tw:border-t tw:border-t-zz-border",
-    caixa: "tw:flex tw:items-end tw:gap-2 tw:rounded-xl tw:[border:1px_solid_var(--color-border)] tw:px-3 tw:py-2 tw:focus-within:border-zz-primary",
-    campo: "tw:flex-1 tw:min-w-0 tw:max-h-28 tw:resize-none tw:[border:0] tw:bg-transparent tw:text-[15px] tw:leading-normal tw:text-zz-text tw:outline-none tw:p-0",
-    enviar: "tw:grid tw:place-items-center tw:size-9 tw:flex-none tw:rounded-full tw:[border:0] tw:bg-(image:--botao-roxo) tw:text-white tw:cursor-pointer "
-      + "tw:disabled:bg-none tw:disabled:bg-zz-border tw:disabled:cursor-default",
+    // parte de baixo: sobe 20 px por cima da conversa, acima dela (z 3)
+    rodape: "tw:relative tw:z-3 tw:flex tw:flex-col tw:gap-2 tw:flex-none tw:-mt-5 tw:px-3 tw:pb-2",
+    caixa: "tw:flex tw:flex-col tw:min-h-20 tw:pb-2 tw:rounded-2xl tw:[border:1px_solid_rgb(237,237,237)] tw:bg-white tw:outline-0 "
+      + "tw:focus-within:[border-color:rgb(105,72,216)]",
+    campo: "tw:block tw:w-full tw:min-h-[21px] tw:max-h-[142px] tw:mt-3 tw:mx-0 tw:mb-0 tw:pt-0 tw:px-4 tw:pb-0.5 tw:resize-none tw:[border:0] tw:bg-transparent "
+      + "tw:text-[14px] tw:font-normal tw:leading-[21px] tw:text-[rgb(20,22,26)] tw:placeholder:text-[rgb(20,22,26)] tw:outline-none tw:box-border",
+    barra: "tw:flex tw:items-center tw:gap-2 tw:min-h-8 tw:pt-1 tw:pr-2 tw:pb-0 tw:pl-3",
+    botaoMini: "tw:grid tw:place-items-center tw:p-1 tw:rounded-md tw:[border:0] tw:bg-transparent tw:text-[rgb(108,111,116)] tw:cursor-pointer "
+      + "tw:hover:text-[rgb(108,111,116)] tw:disabled:opacity-50 tw:disabled:cursor-default",
+    enviar: "tw:ml-auto tw:grid tw:place-items-center tw:size-8 tw:flex-none tw:rounded-full tw:[border:0] tw:bg-(image:--botao-roxo) tw:text-white tw:cursor-pointer "
+      + "tw:disabled:bg-none tw:disabled:bg-[#e6e6e7] tw:disabled:text-[#dadada] tw:disabled:cursor-default",
   };
 
   /** O Z do ZoZo (roxo, traço arredondado), desenhado aqui: nenhum arquivo externo */
@@ -83,6 +120,13 @@
   let geracao = 0;                              // nova conversa / saída: respostas atrasadas são descartadas
   // Lixeira temporal: o que o Zo gravou nesta conversa e ainda pode ser desfeito (as cópias ficam no serviço, nesta aba)
   let lixeira: Array<{ marco: string; titulo: string }> = [];
+  // Falas mostradas (reabrir a janela, pesquisar e baixar a conversa): só na memória desta aba, como o histórico
+  type Fala = { de: "bot" | "eu"; texto: string; quando: number };
+  let falas: Fala[] = [];
+  let conversaId = novoId();
+  let expandida = false;
+  /** 16 algarismos aleatórios: o "id" do arquivo baixado (a conversa não é guardada em lugar nenhum) */
+  function novoId(): string { return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b % 10).join(""); }
   // LGPD: sem uso por 15 minutos, a conversa e a lixeira somem (a memória de curto prazo não fica guardada)
   const INATIVIDADE_MS = 15 * 60 * 1000;
   let inatividade: ReturnType<typeof setTimeout> | null = null;
@@ -116,7 +160,8 @@
     if (cancelarPendente) cancelarPendente();
     if (fab) { fab.remove(); fab = null; }
     if (janela) { janela.remove(); janela = null; }
-    historico = []; aceito = null; ocupado = false;
+    pararRelogio(); buscaEl = null;
+    historico = []; falas = []; conversaId = novoId(); aceito = null; ocupado = false;
     esvaziarLixeira();
     if (inatividade) { clearTimeout(inatividade); inatividade = null; }
   }
@@ -134,7 +179,7 @@
     if (!historico.length && !lixeira.length) return;
     geracao += 1;
     if (cancelarPendente) cancelarPendente();
-    historico = []; ocupado = false;
+    historico = []; falas = []; conversaId = novoId(); ocupado = false;
     esvaziarLixeira();
     if (janela) {
       digitando(false);
@@ -146,38 +191,167 @@
   }
 
   /* ---------------- janela ---------------- */
-  let logEl: HTMLElement, campo: HTMLTextAreaElement, enviarBtn: HTMLButtonElement, anexarBtn: HTMLButtonElement, arquivoEl: HTMLInputElement;
+  let logEl: HTMLElement, campo: HTMLTextAreaElement, enviarBtn: HTMLButtonElement, anexarBtn: HTMLButtonElement, emojiBtn: HTMLButtonElement, arquivoEl: HTMLInputElement;
+  let relogio: ReturnType<typeof setInterval> | null = null;
   function abrir() {
     if (!permitido() || janela) return;
     if (fab) { fab.remove(); fab = null; }
     logEl = h("div", { class: Z.log, role: "log", "aria-live": "polite", "aria-label": "Conversa com o Zo", tabindex: "0" });
-    campo = h("textarea", { class: Z.campo, rows: "1", maxlength: "2000", placeholder: "Mensagem", "aria-label": "Mensagem para o Zo" }) as HTMLTextAreaElement;
-    enviarBtn = h("button", { type: "button", class: Z.enviar, "aria-label": "Enviar", onClick: enviar }, icon("enviar", { size: 18, stroke: 2.25 })) as HTMLButtonElement;
+    campo = h("textarea", { class: Z.campo, rows: "1", maxlength: "2000", placeholder: "Escreva uma mensagem...", "aria-label": "Mensagem para o Zo" }) as HTMLTextAreaElement;
+    enviarBtn = h("button", { type: "button", class: Z.enviar, "aria-label": "Enviar", onClick: enviar }, icon("enviar", { size: 16, stroke: 2.25 })) as HTMLButtonElement;
     // anexar o arquivo do banco (CSV ou OFX): lido aqui, nunca enviado ao Zo
     arquivoEl = h("input", { type: "file", accept: ".csv,.ofx,.txt,text/csv,application/x-ofx", class: "tw:sr-only", tabindex: "-1", "aria-hidden": "true" }) as HTMLInputElement;
     arquivoEl.addEventListener("change", () => { const f = arquivoEl.files && arquivoEl.files[0]; arquivoEl.value = ""; if (f) void importarArquivo(f); });
-    anexarBtn = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Importar arquivo do banco (CSV ou OFX)",
-      title: "Importar arquivo do banco", onClick: () => arquivoEl.click() }, icon("clipe", { size: 18 })) as HTMLButtonElement;
+    anexarBtn = h("button", { type: "button", class: Z.botaoMini, "aria-label": "Anexar arquivo do banco (CSV ou OFX)", title: "Anexar arquivo",
+      onClick: () => arquivoEl.click() }, icon("clipe", { size: 16 })) as HTMLButtonElement;
+    // o mesmo seletor de emojis do ZoZo (emoji-mart, ui/src/emoji-picker.ts)
+    emojiBtn = h("button", { type: "button", class: Z.botaoMini, "aria-label": "Emojis", title: "Emojis", "aria-haspopup": "dialog" }, icon("sorriso", { size: 16 })) as HTMLButtonElement;
+    emojiBtn.addEventListener("click", () => ZoZo.emojiPicker.abrir(emojiBtn, { posicao: "acima", aoEscolher: inserirEmoji }));
     campo.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); } });
-    campo.addEventListener("input", () => { campo.style.height = "auto"; campo.style.height = Math.min(campo.scrollHeight, 112) + "px"; atualizarEnvio(); });
-    const menuBtn = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Opções do Zo", "aria-haspopup": "menu" }, icon("opcoes", { size: 18 })) as HTMLButtonElement;
-    menuBtn.addEventListener("click", () => ZoZo.menu.abrir(menuBtn, [
-      { label: "Nova conversa", onClick: novaConversa },
-      { label: "Lixeira temporal", onClick: mostrarLixeira },
-      { label: "Retirar consentimento", onClick: retirarConsentimento },
-    ], { posicao: "esquerda", label: "Opções do Zo" }));
-    janela = h("section", { class: Z.janela, role: "dialog", "aria-modal": "false", "aria-label": "Zo, assistente do ZoZo" },
+    campo.addEventListener("input", () => { campo.style.height = "auto"; campo.style.height = Math.min(campo.scrollHeight, 142) + "px"; atualizarEnvio(); });
+    const menuBtn = h("button", { type: "button", class: Z.botaoTopo, "aria-label": "Opções do Zo", "aria-haspopup": "menu" }, icon("opcoes", { size: 16 })) as HTMLButtonElement;
+    menuBtn.addEventListener("click", () => ZoZo.menu.abrir(menuBtn, itensMenu, { posicao: "esquerda", label: "Opções do Zo", class: Z.menu }));
+    janela = h("section", { class: [Z.janela, expandida && podeExpandir() ? Z.janelaExpandida : ZoZo.testeHost && Z.janelaComTeste], role: "dialog", "aria-modal": "false", "aria-label": "Zo, assistente do ZoZo" },
       h("header", { class: Z.topo },
-        h("span", { class: Z.avatar }, logoZ(24), h("span", { class: Z.online, "aria-hidden": "true" })),
-        h("div", null, h("p", { class: Z.nome }, "Zo"), h("p", { class: Z.status }, "Assistente do ZoZo")),
+        h("span", { class: Z.avatar }, logoZ(20)),
+        h("div", null, h("p", { class: Z.nome }, "Zo"), h("p", { class: Z.status }, "Assistente virtual")),
         h("div", { class: Z.acoesTopo }, menuBtn,
-          h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Fechar o Zo", onClick: fechar }, icon("fechar", { size: 18 })))),
+          h("button", { type: "button", class: Z.botaoTopo, "aria-label": "Fechar o Zo", onClick: fechar }, icon("fechar", { size: 16 })))),
       logEl,
-      h("footer", { class: Z.rodape }, h("div", { class: Z.caixa }, anexarBtn, campo, enviarBtn), arquivoEl));
-    janela.addEventListener("keydown", (e) => { if (e.key === "Escape" && !document.querySelector(".menu")) { e.preventDefault(); fechar(); } });
+      h("footer", { class: Z.rodape }, h("div", { class: Z.caixa }, campo, h("div", { class: Z.barra }, anexarBtn, emojiBtn, enviarBtn)), arquivoEl));
+    janela.addEventListener("keydown", (e) => { if (e.key === "Escape" && !document.querySelector(".menu, .emoji-pop.is-aberto")) { e.preventDefault(); fechar(); } });
     raiz().appendChild(janela);
+    relogio = setInterval(atualizarTempos, 1000);
     requestAnimationFrame(() => campo.focus());
-    if (historico.length) redesenhar(); else iniciar();
+    if (historico.length) redesenhar(); else { falas = []; iniciar(); }
+  }
+  function pararRelogio() { if (relogio) { clearInterval(relogio); relogio = null; } }
+
+  /* ---------------- menu ⋯ ---------------- */
+  // Expandir não existe no celular pequeno (até 375 px a janela já ocupa a tela)
+  const podeExpandir = () => innerWidth > 375;
+  function itensMenu(): ItemMenu[] {
+    const item = (rotulo: string, nome: string, acao: () => void): ItemMenu => ({
+      render: (api) => h("button", { type: "button", role: "menuitem", class: Z.menuItem, onClick: () => { api.fechar(); acao(); } },
+        icon(nome, { size: 16 }), h("span", null, rotulo)),
+    });
+    const itens: ItemMenu[] = [];
+    if (podeExpandir()) itens.push(expandida ? item("Minimizar janela", "recolher", alternarTamanho) : item("Expandir janela", "expandir", alternarTamanho));
+    itens.push(item("Pesquisar na conversa", "pesquisar", abrirBusca), item("Baixar conversa", "baixar", baixarConversa),
+      item("Nova conversa", "mais", novaConversa), item("Lixeira temporal", "desfazer", mostrarLixeira),
+      item("Retirar consentimento", "sair", retirarConsentimento));
+    return itens;
+  }
+  function alternarTamanho() {
+    if (!janela) return;
+    expandida = !expandida;
+    const el = janela;
+    Z.janelaExpandida.split(" ").forEach((c) => el.classList.toggle(c, expandida));
+    if (ZoZo.testeHost) Z.janelaComTeste.split(" ").forEach((c) => el.classList.toggle(c, !expandida));
+    rolar();
+  }
+
+  /* ---------------- pesquisar na conversa ---------------- */
+  let buscaEl: HTMLElement | null = null, buscaInput: HTMLInputElement, contadorEl: HTMLElement, sobeBtn: HTMLButtonElement, desceBtn: HTMLButtonElement;
+  let achados: HTMLElement[] = [], atual = -1;
+  function abrirBusca() {
+    if (!janela) return;
+    if (buscaEl) { buscaInput.focus(); return; }
+    buscaInput = h("input", { type: "text", class: Z.buscaInput, placeholder: "Pesquisar", "aria-label": "Pesquisar na conversa", enterkeyhint: "search" }) as HTMLInputElement;
+    contadorEl = h("span", { class: Z.buscaContador, "aria-live": "polite" }, "0/0");
+    sobeBtn = h("button", { type: "button", class: Z.buscaBotao, "aria-label": "Resultado anterior", onClick: () => pular(-1) }, icon("chevron-up", { size: 18 })) as HTMLButtonElement;
+    desceBtn = h("button", { type: "button", class: Z.buscaBotao, "aria-label": "Próximo resultado", onClick: () => pular(1) }, icon("chevron-down", { size: 18 })) as HTMLButtonElement;
+    buscaInput.addEventListener("input", buscar);
+    // setas (e Enter / Shift + Enter) pulam entre os resultados, dando a volta; Esc fecha só a pesquisa
+    buscaInput.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); pular(1); }
+      else if (e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey)) { e.preventDefault(); pular(-1); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); fecharBusca(); }
+    });
+    buscaEl = h("div", { class: Z.busca, role: "search" },
+      h("label", { class: Z.buscaCampo }, icon("pesquisar", { size: 16 }), buscaInput, contadorEl),
+      h("div", { class: Z.buscaBotoes }, sobeBtn, desceBtn,
+        h("button", { type: "button", class: Z.buscaBotao, "aria-label": "Fechar a pesquisa", onClick: fecharBusca }, icon("fechar", { size: 18 }))));
+    janela.insertBefore(buscaEl, logEl);
+    buscar();
+    buscaInput.focus();
+  }
+  function fecharBusca() {
+    limparMarcas();
+    if (buscaEl) { buscaEl.remove(); buscaEl = null; }
+    if (janela) campo.focus();
+  }
+  function buscar() {
+    limparMarcas();
+    const termo = buscaInput.value.trim().toLowerCase();
+    if (termo) logEl.querySelectorAll<HTMLElement>("[data-busca]").forEach((el) => marcar(el, termo));
+    atual = achados.length ? 0 : -1;
+    mostrarAtual();
+  }
+  /** Cada ocorrência vira um <mark> (texto continua texto: só nós de texto são divididos) */
+  function marcar(raizEl: HTMLElement, termo: string) {
+    const nos: Text[] = [];
+    const w = document.createTreeWalker(raizEl, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) nos.push(w.currentNode as Text);
+    nos.forEach((no) => {
+      const texto = no.data, baixo = texto.toLowerCase();
+      let i = baixo.indexOf(termo), ini = 0;
+      if (i < 0) return;
+      const pedacos: Node[] = [];
+      while (i >= 0) {
+        if (i > ini) pedacos.push(document.createTextNode(texto.slice(ini, i)));
+        const m = h("mark", { class: Z.achado }, texto.slice(i, i + termo.length));
+        achados.push(m); pedacos.push(m);
+        ini = i + termo.length;
+        i = baixo.indexOf(termo, ini);
+      }
+      if (ini < texto.length) pedacos.push(document.createTextNode(texto.slice(ini)));
+      no.replaceWith(...pedacos);
+    });
+  }
+  function limparMarcas() {
+    if (logEl) logEl.querySelectorAll("mark").forEach((m) => { const pai = m.parentNode; m.replaceWith(document.createTextNode(m.textContent || "")); if (pai) pai.normalize(); });
+    achados = []; atual = -1;
+  }
+  function mostrarAtual() {
+    if (!buscaEl) return;
+    achados.forEach((m, i) => { m.className = i === atual ? Z.achadoAtual : Z.achado; });
+    contadorEl.textContent = (achados.length ? atual + 1 : 0) + "/" + achados.length;
+    sobeBtn.disabled = desceBtn.disabled = achados.length < 2;
+    if (atual >= 0) achados[atual].scrollIntoView({ block: "center" });
+  }
+  /** 1/10 → seta para baixo 2/10, para cima 10/10 (dá a volta) */
+  function pular(passo: number) {
+    if (!achados.length) return;
+    atual = (atual + passo + achados.length) % achados.length;
+    mostrarAtual();
+  }
+
+  /* ---------------- baixar a conversa (.txt) ---------------- */
+  const dois = (n: number) => String(n).padStart(2, "0");
+  function baixarConversa() {
+    if (!falas.length) { nota("A conversa ainda está vazia."); return; }
+    const dia = new Date(falas[0].quando);
+    const linhas = falas.map((f) => {
+      const q = new Date(f.quando);
+      return "[" + dois(q.getDate()) + "/" + dois(q.getMonth() + 1) + "/" + q.getFullYear() + " " + dois(q.getHours()) + ":" + dois(q.getMinutes()) + "] "
+        + quem(f.de) + ": " + f.texto;
+    });
+    const texto = ["Conversa com o Zo, assistente virtual do ZoZo", ""].concat(linhas).join("\r\n") + "\r\n";
+    // zozo-d-m-aaaa-id.txt (ex.: zozo-9-10-2026-2154766083288118.txt): o dia em que a conversa começou
+    const nome = "zozo-" + dia.getDate() + "-" + (dia.getMonth() + 1) + "-" + dia.getFullYear() + "-" + conversaId + ".txt";
+    const url = URL.createObjectURL(new Blob([texto], { type: "text/plain;charset=utf-8" }));
+    const a = h("a", { href: url, download: nome, rel: "noopener" });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function inserirEmoji(emoji: string) {
+    if (!janela || campo.disabled) return;
+    const ini = campo.selectionStart ?? campo.value.length, fim = campo.selectionEnd ?? ini;
+    campo.setRangeText(emoji, ini, fim, "end");
+    campo.dispatchEvent(new Event("input"));
+    campo.focus();
   }
   function fechar() {
     if (!janela) return;
@@ -185,6 +359,7 @@
     // uma resposta que não tinha mais onde ser dada e a conversa travava
     if (cancelarPendente) cancelarPendente();
     janela.remove(); janela = null;
+    pararRelogio(); buscaEl = null; achados = [];
     mostrarFab();
     if (fab) fab.focus();
   }
@@ -192,20 +367,40 @@
     const bloqueado = ocupado || aceito !== true;
     campo.disabled = aceito !== true;
     anexarBtn.disabled = aceito !== true;
+    emojiBtn.disabled = aceito !== true;
     enviarBtn.disabled = bloqueado || !campo.value.trim();
   }
 
   /* ---------------- mensagens na tela ---------------- */
   const rolar = () => requestAnimationFrame(() => { logEl.scrollTop = logEl.scrollHeight; });
-  function bolha(texto: string, de: "bot" | "eu") { logEl.appendChild(h("p", { class: [de === "bot" ? Z.bot : Z.eu, "tw:m-0"] }, texto)); rolar(); }
+  function bolha(texto: string, de: "bot" | "eu") { const f: Fala = { de, texto, quando: Date.now() }; falas.push(f); desenharFala(f); }
+  /** Balão (um <p> por parágrafo) e, embaixo, "Nome • tempo" (o tempo é só visual: não é relido a cada segundo) */
+  function desenharFala(f: Fala) {
+    logEl.appendChild(h("div", { class: f.de === "bot" ? Z.falaBot : Z.falaEu },
+      h("div", { class: f.de === "bot" ? Z.bot : Z.eu, "data-busca": "" }, f.texto.split(/\n{2,}/).map((p) => h("p", null, p))),
+      h("p", { class: Z.quem }, quem(f.de) + " • ", h("span", { "aria-hidden": "true", "data-quando": String(f.quando) }, tempo(f.quando)))));
+    rolar();
+  }
+  function quem(de: "bot" | "eu"): string {
+    if (de === "bot") return "Zo";
+    const nome = ((ZoZo.store.get().session.user || {}).nomeUsuario || "").trim().split(/\s+/)[0];
+    return nome ? nome.charAt(0).toLocaleUpperCase("pt-BR") + nome.slice(1) : "Você";
+  }
+  /** "30s", "1m", "1h": segundos de 1 a 60; minutos e horas sempre inteiros (1h59 = 1h) */
+  function tempo(quando: number): string {
+    const seg = Math.floor((Date.now() - quando) / 1000);
+    if (seg <= 60) return Math.max(1, seg) + "s";
+    const min = Math.floor(seg / 60);
+    return min < 60 ? min + "m" : Math.floor(min / 60) + "h";
+  }
+  function atualizarTempos() {
+    if (logEl) logEl.querySelectorAll<HTMLElement>("[data-quando]").forEach((el) => { el.textContent = tempo(Number(el.dataset.quando)); });
+  }
   function nota(texto: string) { logEl.appendChild(h("p", { class: [Z.nota, "tw:m-0"] }, texto)); rolar(); }
-  /** Só as falas (para reabrir a janela com a conversa); cartões já resolvidos não voltam */
+  /** Só as falas (para reabrir a janela com a conversa); cartões e notas já resolvidos não voltam */
   function redesenhar() {
     mount(logEl);
-    historico.forEach((m) => {
-      if (m.papel === "usuario") bolha(m.texto, "eu");
-      else if (m.papel === "assistente" && m.texto) bolha(m.texto, "bot");
-    });
+    falas.forEach(desenharFala);
     atualizarEnvio();
   }
   let digitandoEl: HTMLElement | null = null;
@@ -267,7 +462,7 @@
     ctx.bridge.request(A.zoConsentimento, { aceito: false }).then(() => {
       geracao += 1;
       if (cancelarPendente) cancelarPendente();
-      historico = []; aceito = false; ocupado = false;
+      historico = []; falas = []; conversaId = novoId(); aceito = false; ocupado = false;
       esvaziarLixeira();
       if (janela) { mount(logEl); bolha("Consentimento retirado. A conversa foi apagada desta tela.", "bot"); pedirConsentimento(); atualizarEnvio(); }
     }).catch((e: ErroPonte) => nota(e.friendly || FR.OPERATION_FAILED));
@@ -275,7 +470,7 @@
   function novaConversa() {
     geracao += 1;
     if (cancelarPendente) cancelarPendente();
-    historico = []; ocupado = false;
+    historico = []; falas = []; conversaId = novoId(); ocupado = false;
     esvaziarLixeira();
     digitando(false);
     mount(logEl);

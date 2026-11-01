@@ -83,6 +83,11 @@
     arquivar: [["rect", { x: 2, y: 3, width: 20, height: 5, rx: 1 }], P("M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"), P("M10 12h4")],
     desarquivar: [["rect", { x: 2, y: 3, width: 20, height: 5, rx: 1 }], P("M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"), P("m9 15 3-3 3 3"), P("M12 12v6")],
     "chevron-left": [P("m15 18-6-6 6-6")],
+    "chevron-up": [P("m18 15-6-6-6 6")],
+    // janela do Zo: expandir (setas para os cantos inferior esquerdo e superior direito) e recolher (setas para o centro)
+    expandir: [P("M15 3h6v6"), P("M9 21H3v-6"), P("M21 3l-7 7"), P("M3 21l7-7")],
+    recolher: [P("M4 10h6V4"), P("M20 14h-6v6"), P("M3 3l7 7"), P("M21 21l-7-7")],
+    sorriso: [["circle", { cx: 12, cy: 12, r: 10 }], P("M8 14s1.5 2 4 2 4-2 4-2"), P("M9 9h.01"), P("M15 9h.01")],
     ordenar: [P("m3 16 4 4 4-4"), P("M7 20V4"), P("m21 8-4-4-4 4"), P("M17 4v16")],
     copiar: [P("M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z"), P("M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2")],
     nota: [P("M12 20h9"), P("M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z")],
