@@ -382,7 +382,7 @@
           check.hidden = false;                                     // ✓ ao lado de "Insira o código de seis dígitos."
           store.set({ session: { user: r.user || null } });
           if (aoAtivar) aoAtivar();
-          setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); }, 700);
+          setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); if (r.codigosBackup && r.codigosBackup.length) mostrarCodigosBackup(ctx, r.codigosBackup); }, 700);
         }).catch((e: ErroPonte) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
@@ -420,12 +420,64 @@
     }).catch((e: ErroPonte) => { mount(qrArea, h("p", { class: P2.erro }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
   }
 
+  /**
+   * Os dez códigos de backup, mostrados UMA vez (o servidor guarda só o HMAC): copiar, baixar em .txt e "Já guardei".
+   * Cada código entra uma vez no lugar do código do aplicativo (login, ações sem volta, recuperação, desligar o 2FA).
+   */
+  function mostrarCodigosBackup(ctx: ContextoApp, codigos: string[]) {
+    const texto = () => "ZoZo · códigos de backup da verificação em duas etapas\n"
+      + "Gerados em " + new Date().toLocaleString("pt-BR") + ". Cada código funciona uma vez só.\n\n" + codigos.join("\n") + "\n";
+    const copiar = UI.Button("Copiar", { size: "sm", icon: "copiar", onClick: (e) => {
+      const b = e.currentTarget as HTMLElement;
+      navigator.clipboard.writeText(codigos.join("\n")).then(() => UI.confirmarNoBotao(b, "Códigos copiados"), () => ctx.toast("Não foi possível copiar.", { tone: "error" }));
+    } });
+    const baixar = UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: () => {
+      const url = URL.createObjectURL(new Blob([texto()], { type: "text/plain;charset=utf-8" }));
+      const a = h("a", { href: url, download: "zozo-codigos-de-backup.txt", rel: "noopener" });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } });
+    const janela = ZoZo.feedback.modal({
+      title: "Guarde seus códigos de backup", class: "modal--confirm",
+      body: h("div", null,
+        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Se você perder o celular, use um destes códigos no lugar do código do aplicativo. Cada um funciona uma vez só. Guarde em um lugar seguro, fora deste aparelho. Eles não aparecem de novo."),
+        h("ol", { class: "tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-1.5 tw:my-4 tw:mx-auto tw:p-3 tw:w-fit tw:list-none tw:rounded-lg tw:bg-(--color-surface-hover,#f4f5f7) "
+          + "tw:font-mono tw:text-[15px] tw:tracking-[0.06em] tw:text-zz-text", "aria-label": "Códigos de backup" },
+          codigos.map((c) => h("li", null, c))),
+        h("div", { class: "tw:flex tw:justify-center tw:gap-2 tw:flex-wrap" }, copiar, baixar,
+          UI.Button("Já guardei", { size: "sm", variant: "primary", onClick: () => janela.fechar(true) }))),
+    });
+  }
+
+  /** Gerar códigos novos: pede o código atual (do aplicativo ou de backup) e troca todos os antigos */
+  function gerarCodigosBackup(ctx: ContextoApp, aoGerar?: () => void) {
+    let codigos: string[] = [];
+    ZoZo.modais.confirmarSeguro({ titulo: "Gerar novos códigos de backup?", botao: "Gerar códigos", codigo2FA: true,
+      mensagem: "Os códigos de backup atuais deixam de valer. Para confirmar, digite o código atual do seu aplicativo 2FA.",
+      executar: ({ codigo }) => ctx.bridge.request(A.gerarCodigosBackup, { codigo }).then((r) => { codigos = r.codigosBackup; }) })
+      .then((feito) => { if (feito && codigos.length) { mostrarCodigosBackup(ctx, codigos); if (aoGerar) aoGerar(); } });
+  }
+
+  /** Linha "Códigos de backup" (só com 2FA): quantos ainda valem e o botão para gerar novos */
+  function linhaCodigosBackup(ctx: ContextoApp) {
+    const descricao = h("span", { class: ZoZo.pecas.cfgSub }, "Use no lugar do código do aplicativo se perder o celular.");
+    const atualizar = () => ctx.bridge.request(A.statusCodigosBackup).then((r) => {
+      descricao.textContent = r.restantes === 0 ? "Nenhum código de backup restante. Gere códigos novos."
+        : (r.restantes === 1 ? "1 código restante" : r.restantes + " códigos restantes") + ". Use no lugar do código do aplicativo se perder o celular.";
+    }).catch(() => null);
+    atualizar();
+    const P = ZoZo.pecas;
+    return h("div", { class: P.cfgLinha },
+      h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Códigos de backup"), descricao),
+      h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, UI.Button("Gerar novos", { size: "sm", onClick: () => gerarCodigosBackup(ctx, atualizar) })));
+  }
+
   /** Desativar o 2FA pede um código ATUAL do aplicativo (o servidor confere): sessão aberta não basta */
   function desativar2FA(ctx: ContextoApp) {
     const erro = h("p", { class: [P2.erro, "tw:text-center"], role: "alert" });
     let erros = 0;
     const campo = ZoZo.verificacao.CampoCodigo({
-      rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-4",
+      rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-4", backup: true,
       onDigitar: () => campo.marcarErro(false),
       onCompleto: (codigo) => {
         campo.desabilitar(true);
@@ -443,7 +495,7 @@
     const janela = ZoZo.feedback.modal({
       title: "Desativar 2FA?", class: "modal--confirm",
       body: h("div", null,
-        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA."),
+        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA ou um código de backup."),
         campo.el, erro),
     });
     requestAnimationFrame(() => campo.foco());
@@ -714,6 +766,7 @@
           demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
             ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
             : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
+          demo || !u.doisFatores ? null : linhaCodigosBackup(ctx),
           demo ? null : linhaProtecao(ctx),
           h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda || "BRL"] || "Real") : "Exportar todas as transações",

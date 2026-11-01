@@ -13,6 +13,10 @@ Aplicativo web com design baseado no Copilot Money.
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
 
+## Em desenvolvimento (próxima versão)
+
+- **Códigos de backup do 2FA:** ao ligar o 2FA, o servidor (Python, `totp.novos_codigos_backup`) gera dez códigos de uso único no formato `XXXXX-XXXXX` (Base32 de Crockford: sem I, L, O e U; ao digitar, O vira 0 e I ou L viram 1). Guardado só o HMAC de cada um (tabela `codigos_backup`, migração 0012, chave derivada do `SEGREDO` + e-mail). Valem uma vez no lugar do código do aplicativo no login, na recuperação de senha, nas ações sem volta e para desligar o 2FA (mesmo bloqueio de 5 erros). Cada uso manda um e-mail de aviso com quantos sobraram. Configurações › Conta mostra quantos restam e gera dez novos (pede o código atual; os antigos deixam de valer). Desligar o 2FA ou excluir a conta apaga todos.
+
 ## Novidades da versão 3.19.1
 
 - **Fatura gerada com empréstimos:** além dos cartões de crédito (fatura fechada ou aberta), entram as transações dos empréstimos do perfil (mês do calendário). Pagar o empréstimo (transferência de entrada ou receita) não entra na cobrança. O campo Cartão virou Conta (cartões e empréstimos).

@@ -574,6 +574,31 @@ test("trocar a senha e desligar a proteção avançada levam o código do 2FA; l
   assert.equal(corpoDe("PUT", "/api/conta/protecao").codigo, "222222");
 });
 
+test("códigos de backup: só o formato certo chega à tela; gerar novos leva o código atual e a prova", async () => {
+  const srv = servidorFalso();
+  const h = await cadastrar(srv, "ana@exemplo.test", novaSenha());
+  const resposta = (corpo) => new Response(JSON.stringify(corpo), { status: 200, headers: { "content-type": "application/json" } });
+  const bons = ["ABCDE-12345", "0Z9Y8-XW7V6"];
+  srv.resposta = (metodo, caminho) => {
+    if (caminho === "/api/2fa/confirmar") return resposta({ doisFatores: true, codigosBackup: [...bons, "<img src=x>", 12345, "abcde-12345", "ILOUU-00000"] });
+    if (metodo === "GET" && caminho === "/api/2fa/codigos") return resposta({ restantes: 7 });
+    if (metodo === "POST" && caminho === "/api/2fa/codigos") return resposta({ codigosBackup: bons });
+    return null;
+  };
+  const ativado = await h.chamar("confirmar2FA", { codigo: "123456" });
+  assert.deepEqual(ativado.codigosBackup, bons);                     // nada fora do formato vira texto na tela
+  assert.equal(ativado.user.doisFatores, true);
+  assert.deepEqual(await h.chamar("statusCodigosBackup"), { restantes: 7 });
+  assert.deepEqual(await h.chamar("gerarCodigosBackup", { codigo: "ABCDE-12345" }), { codigosBackup: bons });
+  const pedido = srv.pedidos.findLast((p) => p.metodo === "POST" && p.caminho === "/api/2fa/codigos");
+  assert.deepEqual(JSON.parse(pedido.corpo), { codigo: "ABCDE-12345" });
+  assert.ok(pedido.prova, "vai com a prova da senha");
+  // resposta sem nenhum código válido: erro, nunca uma lista vazia como se tivesse dado certo
+  srv.resposta = (metodo, caminho) => (caminho === "/api/2fa/codigos" ? resposta({ codigosBackup: ["x"], restantes: 99 }) : null);
+  await assert.rejects(h.chamar("gerarCodigosBackup", { codigo: "123456" }), codigo("OPERATION_FAILED"));
+  assert.deepEqual(await h.chamar("statusCodigosBackup"), { restantes: 0 });
+});
+
 test("ação desconhecida ou herdada de Object: NOT_IMPLEMENTED", async () => {
   const h = carregarHost({ fetch: servidorFalso().fetch });
   for (const action of ["naoExiste", "constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"]) {

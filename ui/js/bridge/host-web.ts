@@ -857,6 +857,7 @@
     },
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */
+    /* códigos de backup: só o formato "XXXXX-XXXXX" (Base32 de Crockford) passa para a tela */
     async iniciar2FA() {
       const s = exigirConta();
       if (simulada(s)) { const c = base32(aleatorio(20)); return { chave: c, uri: "otpauth://totp/ZoZo:" + encodeURIComponent(s.email) + "?secret=" + c + "&issuer=ZoZo%20(teste)" }; }
@@ -866,19 +867,49 @@
     },
     async confirmar2FA(d) {
       const s = exigirConta();
-      if (simulada(s)) { if (!/^\d{6}$/.test(String(d.codigo || ""))) throw erro("CODE_INVALID"); s.doisFatores = true; return sessaoData(); }
-      await comProvaDaSessao(() => api("POST", "/2fa/confirmar", { codigo: String(d.codigo || "") }, s.prova));
+      if (simulada(s)) {
+        if (!/^\d{6}$/.test(String(d.codigo || ""))) throw erro("CODE_INVALID");
+        s.doisFatores = true;
+        return Object.assign(sessaoData(), { codigosBackup: codigosSimulados() });
+      }
+      const r = await comProvaDaSessao(() => api("POST", "/2fa/confirmar", { codigo: String(d.codigo || "") }, s.prova));
       s.doisFatores = true;
-      return sessaoData();
+      return Object.assign(sessaoData(), { codigosBackup: listaDeCodigos(r && r.codigosBackup) });
+    },
+    async statusCodigosBackup() {
+      const s = exigirConta();
+      if (simulada(s)) return { restantes: s.doisFatores ? 10 : 0 };
+      const r = await comProvaDaSessao(() => api("GET", "/2fa/codigos", undefined, s.prova));
+      const n = Number(r && r.restantes);
+      return { restantes: Number.isInteger(n) && n >= 0 && n <= 10 ? n : 0 };
+    },
+    async gerarCodigosBackup(d) {
+      const s = exigirConta();
+      if (simulada(s)) { if (!codigoOuBackup(d && d.codigo)) throw erro("CODE_INVALID"); return { codigosBackup: codigosSimulados() }; }
+      const r = await comProvaDaSessao(() => api("POST", "/2fa/codigos", { codigo: String((d && d.codigo) || "") }, s.prova));
+      const lista = listaDeCodigos(r && r.codigosBackup);
+      if (!lista.length) throw erro("OPERATION_FAILED");
+      return { codigosBackup: lista };
     },
     async desativar2FA(d) {
       const s = exigirConta();
-      if (simulada(s)) { if (!/^\d{6}$/.test(String((d && d.codigo) || ""))) throw erro("CODE_INVALID"); s.doisFatores = false; return sessaoData(); }
+      if (simulada(s)) { if (!codigoOuBackup(d && d.codigo)) throw erro("CODE_INVALID"); s.doisFatores = false; return sessaoData(); }
       await comProvaDaSessao(() => api("POST", "/2fa/desativar", { codigo: String((d && d.codigo) || "") }, s.prova));
       s.doisFatores = false;
       return sessaoData();
     },
   };
+
+  /** Códigos de backup vindos do servidor: só os que têm o formato "XXXXX-XXXXX" (no máximo dez) */
+  function listaDeCodigos(v: unknown): string[] {
+    return Array.isArray(v) ? v.filter((c): c is string => typeof c === "string" && /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/.test(c)).slice(0, 10) : [];
+  }
+  /** Conta simulada: código do aplicativo (6 dígitos) ou de backup (10 caracteres, com ou sem hífen) */
+  const codigoOuBackup = (v: unknown) => /^(\d{6}|[0-9A-Za-z]{5}-?[0-9A-Za-z]{5})$/.test(String(v || ""));
+  function codigosSimulados(): string[] {
+    const alfabeto = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    return Array.from({ length: 10 }, () => { const b = aleatorio(10); const c = Array.from(b, (x) => alfabeto[x % 32]).join(""); return c.slice(0, 5) + "-" + c.slice(5); });
+  }
 
   async function handle(req: PedidoPonte): Promise<RespostaPonte> {
     const base = { type: "response" as const, action: req.action, requestId: req.requestId };

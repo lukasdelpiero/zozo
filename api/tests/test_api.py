@@ -594,9 +594,111 @@ class Teste2FA(Base):
         st, b = self.api("POST", "/api/2fa/iniciar", prova=self.prova)
         self.assertEqual(st, 200)
         self.assertTrue(b["uri"].startswith("otpauth://totp/"))
-        st, _ = self.api("POST", "/api/2fa/confirmar", {"codigo": self.codigo()}, prova=self.prova)
+        st, r = self.api("POST", "/api/2fa/confirmar", {"codigo": self.codigo()}, prova=self.prova)
         self.assertEqual(st, 200)
+        self.codigos_backup = r["codigosBackup"]
         return b["chave"]
+
+    # ---------------- códigos de backup ----------------
+    def restantes(self):
+        return self.con.execute("SELECT count(*) FROM codigos_backup WHERE email = ?", (EMAIL,)).fetchone()[0]
+
+    def test_ativar_gera_dez_codigos_de_backup_guardados_so_como_hmac(self):
+        self.ativar()
+        codigos = self.codigos_backup
+        self.assertEqual(len(codigos), 10)
+        self.assertEqual(len(set(codigos)), 10)
+        for c in codigos:
+            self.assertRegex(c, r"^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$")         # Crockford: sem I, L, O e U
+        guardados = [r[0] for r in self.con.execute("SELECT hash FROM codigos_backup WHERE email = ?", (EMAIL,))]
+        self.assertEqual(len(guardados), 10)
+        bruto = " ".join(guardados)
+        for c in codigos:
+            self.assertNotIn(c.replace("-", ""), bruto)                                    # o banco não revela nenhum código
+        self.assertEqual(self.api("GET", "/api/2fa/codigos", prova=self.prova), (200, {"restantes": 10}))
+        self.assertNotIn(codigos[0], " ".join(self.api.logs))
+
+    def test_codigo_de_backup_entra_uma_vez_so_e_avisa(self):
+        self.ativar()
+        serv = FakeServicos()
+        cel = Cliente(self.banco, serv, CONFIG_EMAIL, ip="198.51.100.47")
+        cel.agora = T0 + 60
+        self.entrar(cel)
+        digitado = " " + self.codigos_backup[3].lower().replace("-", " ") + " "            # minúsculas e espaços valem
+        st, b = cel("POST", "/api/sessao/2fa", {"codigo": digitado})
+        self.assertEqual((st, b["doisFatores"]), (200, True))
+        self.assertEqual(self.restantes(), 9)
+        self.assertIn('"2fa_codigo_backup_usado"', " ".join(cel.logs))
+        self.assertNotIn(self.codigos_backup[3], " ".join(cel.logs))
+        aviso = serv.emails
+        self.assertEqual(len(aviso), 1)
+        self.assertIn("Sobraram 9 códigos de backup", aviso[0]["text"])
+        # o mesmo código não serve de novo (outro dispositivo)
+        tab = Cliente(self.banco, ip="198.51.100.48")
+        tab.agora = cel.agora
+        self.entrar(tab)
+        self.assertEqual(tab("POST", "/api/sessao/2fa", {"codigo": self.codigos_backup[3]}), (401, {"erro": "CODE_INVALID"}))
+        # código de backup inventado, com cara de código: recusado e conta para o bloqueio
+        for _ in range(4):
+            self.assertEqual(tab("POST", "/api/sessao/2fa", {"codigo": "ABCDE-12345"})[0], 401)
+        self.assertEqual(tab("POST", "/api/sessao/2fa", {"codigo": self.codigos_backup[4]})[0], 429)    # 5 erros: bloqueado
+        self.assertEqual(self.restantes(), 9)                                              # o bloqueio não gasta o código
+
+    def test_codigo_de_backup_vale_nas_acoes_e_na_recuperacao_e_e_da_propria_conta(self):
+        self.ativar()
+        self.api.agora += 60
+        # o código de backup de outra conta (mesmo texto) não serve: o HMAC leva o e-mail
+        outro = totp.hash_backup(totp.normalizar_backup(self.codigos_backup[0]), OUTRO, SEGREDO)
+        self.assertNotEqual(outro, totp.hash_backup(totp.normalizar_backup(self.codigos_backup[0]), EMAIL, SEGREDO))
+        st, r = self.api("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova)
+        self.assertEqual(st, 200)
+        st, r = self.api("PUT", "/api/conta/protecao", {"avancada": False, "codigo": self.codigos_backup[0]}, prova=self.prova)
+        self.assertEqual((st, r), (200, {"avancada": False}))
+        self.assertEqual(self.restantes(), 9)
+        # conta sem 2FA: texto com cara de código de backup não vira segundo fator
+        self.assertIsNone(totp.normalizar_backup("123456"))
+        self.assertIsNone(totp.normalizar_backup("ABCDE-1234U"))                            # U não existe no alfabeto
+
+    def test_gerar_codigos_novos_pede_o_codigo_atual_e_invalida_os_antigos(self):
+        self.ativar()
+        antigos = self.codigos_backup
+        self.api.agora += 60
+        self.assertEqual(self.api("POST", "/api/2fa/codigos", {}, prova=self.prova)[1]["erro"], "CODE_REQUIRED")
+        self.assertEqual(self.api("POST", "/api/2fa/codigos", {"codigo": "000000"}, prova=self.prova)[1]["erro"], "CODE_INVALID")
+        self.assertEqual(self.api("POST", "/api/2fa/codigos", {"codigo": self.codigo()}, prova=prova())[0], 403)    # e a senha
+        self.assertEqual(self.api("POST", "/api/2fa/codigos", {"codigo": self.codigo(), "x": 1}, prova=self.prova)[0], 400)
+        self.assertEqual(self.restantes(), 10)
+        self.con.execute("DELETE FROM limites")
+        self.api.agora += 30
+        st, r = self.api("POST", "/api/2fa/codigos", {"codigo": self.codigo()}, prova=self.prova)
+        self.assertEqual(st, 200)
+        novos = r["codigosBackup"]
+        self.assertEqual(len(novos), 10)
+        self.assertFalse(set(novos) & set(antigos))
+        self.assertEqual(self.restantes(), 10)
+        cel = Cliente(self.banco, ip="198.51.100.49")
+        cel.agora = self.api.agora
+        self.entrar(cel)
+        self.assertEqual(cel("POST", "/api/sessao/2fa", {"codigo": antigos[0]})[0], 401)  # os antigos não valem mais
+        self.assertEqual(cel("POST", "/api/sessao/2fa", {"codigo": novos[0]})[0], 200)
+        self.assertIn('"2fa_codigos_backup_gerados"', " ".join(self.api.logs))
+
+    def test_sem_2fa_nao_ha_codigos_e_desligar_ou_excluir_apaga_todos(self):
+        self.assertEqual(self.api("GET", "/api/2fa/codigos", prova=self.prova)[1]["erro"], "2FA_NOT_PENDING")
+        self.assertEqual(self.api("POST", "/api/2fa/codigos", {"codigo": "123456"}, prova=self.prova)[1]["erro"], "2FA_NOT_PENDING")
+        self.ativar()
+        self.api.agora += 60
+        # perdeu o celular: desliga o 2FA com um código de backup
+        st, r = self.api("POST", "/api/2fa/desativar", {"codigo": self.codigos_backup[9]}, prova=self.prova)
+        self.assertEqual((st, r), (200, {"doisFatores": False}))
+        self.assertEqual(self.restantes(), 0)
+        # liga de novo e exclui a conta: nenhum código fica para trás
+        self.api.agora += 60
+        self.ativar()
+        self.assertEqual(self.restantes(), 10)
+        self.api.agora += 60
+        self.assertEqual(self.api("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA", "codigo": self.codigos_backup[0]}, prova=self.prova)[0], 204)
+        self.assertEqual(self.restantes(), 0)
 
     def test_ativacao_e_segredo_cifrado(self):
         self.api("POST", "/api/2fa/iniciar", prova=self.prova)

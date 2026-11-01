@@ -69,6 +69,10 @@ class CodigoDoisFatores(Modelo):
     codigo: Codigo
 
 
+class CodigoAtual(Modelo):
+    codigo: Codigo | None = None                  # código atual (aplicativo ou backup)
+
+
 class NovoNome(Modelo):
     nome: Nome
 
@@ -199,6 +203,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("POST", "/api/documento/apagar"): Documento,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,
     ("POST", "/api/2fa/desativar"): CodigoDoisFatores,
+    ("POST", "/api/2fa/codigos"): CodigoAtual,
     ("POST", "/api/zo"): ZoConversa,
     ("PUT", "/api/zo/consentimento"): ZoConsentimento,
 }

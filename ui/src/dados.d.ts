@@ -158,7 +158,7 @@ declare global {
     | "getSession" | "registerUser" | "reenviarConfirmacao" | "conferirLink" | "pedirRecuperacao" | "abrirRecuperacao" | "concluirRecuperacao"
     | "getProtecao" | "setProtecao" | "repararRecuperacao" | "zoConsentimento" | "zoConversar" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
     | "createLancamento" | "updateLancamento" | "deleteLancamento" | "updateUser" | "changePassword" | "wipeUserData" | "deleteUser"
-    | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "loadUserData" | "saveUserData"
+    | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "statusCodigosBackup" | "gerarCodigosBackup" | "loadUserData" | "saveUserData"
     | "createConta" | "updateConta" | "updateCicloCartao" | "deleteConta"
     | "createCategoria" | "updateCategoria" | "deleteCategoria" | "createCategoriasSugeridas"
     | "createPerfil" | "updatePerfil" | "deletePerfil" | "arquivarPerfil"
@@ -212,8 +212,11 @@ declare global {
     wipeUserData: { apagado: boolean };
     deleteUser: { excluido: boolean };
     iniciar2FA: { chave: string; uri: string };
-    confirmar2FA: RespostaSessao;
+    /** codigosBackup: os dez códigos de uso único, mostrados só nesta resposta */
+    confirmar2FA: RespostaSessao & { codigosBackup?: string[] };
     desativar2FA: RespostaSessao;
+    statusCodigosBackup: { restantes: number };
+    gerarCodigosBackup: { codigosBackup: string[] };
   }
   /** Gravações do serviço → resposta (o serviço é conferido contra esta tabela) */
   interface RespostasEscrita {

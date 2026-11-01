@@ -49,6 +49,8 @@
     iniciar2FA: "iniciar2FA",
     confirmar2FA: "confirmar2FA",
     desativar2FA: "desativar2FA",
+    statusCodigosBackup: "statusCodigosBackup",
+    gerarCodigosBackup: "gerarCodigosBackup",
 
     // Documento do usuário (cifrado no navegador e guardado no banco SQL do Cloudflare)
     loadUserData: "loadUserData",
@@ -103,7 +105,7 @@
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
+  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.gerarCodigosBackup, ACTIONS.desativar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
     ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao, ACTIONS.zoConversar]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */

@@ -151,7 +151,7 @@
     const erro = h("p", { class: C.erro2fa, role: "alert" }, cfg.erro || "");
     const campoCod = V().CampoCodigo({
       rotulo: "Código de 6 dígitos do aplicativo 2FA",
-      classeCaixa: C.caixa2fa,
+      classeCaixa: C.caixa2fa, backup: true,                // perdeu o celular: um dos dez códigos de backup
       onDigitar: () => campoCod.marcarErro(false),
       onCompleto: (codigo) => {
         campoCod.desabilitar(true);

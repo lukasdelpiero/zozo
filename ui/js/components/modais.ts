@@ -638,7 +638,7 @@
           let frase: HTMLInputElement | null = null, senha: HTMLInputElement | null = null, codigo: CampoCodigo6 | null = null;
           let botao: HTMLButtonElement | null = null, ocupado = false;
           const pronto = () => !ocupado && (!frase || normalizar(frase.value) === cfg.frase) && (!senha || !!senha.value)
-            && (!codigo || /^\d{6}$/.test(codigo.valor()));
+            && (!codigo || codigo.completo());
           const atualizar = () => { if (botao) botao.disabled = !pronto(); };
           const confirmar = () => {
             if (!pronto()) return;
@@ -670,7 +670,7 @@
             campos.push(UI.Field("Senha", ZoZo.verificacao.ComRevelar(senha)));       // oculta, com "mostrar" e sem copiar
           }
           if (cfg.codigo2FA) {
-            const c = ZoZo.verificacao.CampoCodigo({ rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-1",
+            const c = ZoZo.verificacao.CampoCodigo({ rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-1", backup: true,
               onDigitar: () => { c.marcarErro(false); atualizar(); }, onCompleto: () => { atualizar(); if (!frase && !senha) confirmar(); } });
             codigo = c;
             campos.push(h("div", null, h("p", { class: E.modalTexto }, "Código atual do seu aplicativo 2FA"), c.el));

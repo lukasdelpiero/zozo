@@ -10,7 +10,7 @@ Camadas de proteção:
      dele. Expira 24 h depois do login, mesmo em uso e com o navegador aberto. O "envelope" que
      protege a chave dos dados guardada no navegador é HMAC(SEGREDO, cookie): não fica
      no banco, então banco + navegador não bastam para abrir os dados;
-  3. 2FA opcional por aplicativo autenticador (TOTP), com proteção contra reuso;
+  3. 2FA opcional por aplicativo autenticador (TOTP), com proteção contra reuso, e dez códigos de backup de uso único;
   4. bloqueio progressivo por e-mail + IP: 3 tentativas livres, CAPTCHA (Turnstile)
      da 4ª em diante, 15 min de bloqueio na 5ª falha e 24 h na 10ª. Muitas falhas
      na mesma conta vindas de IPs diferentes também passam a exigir CAPTCHA;
@@ -540,11 +540,44 @@ async def _conferir_prova(ctx: Contexto, email: str) -> Linha:
     return conta
 
 
+async def _conferir_fator(ctx: Contexto, email: str, totp_cifrado: object, ultimo_passo: int, codigo: object) -> bool:
+    """
+    Segundo fator: o código ATUAL do aplicativo (um passo nunca serve duas vezes, nem em paralelo) ou um dos códigos
+    de backup (uso único: a linha é apagada na mesma operação que confere). Quem chama cuida do bloqueio por erros.
+    """
+    segredo = totp.decifrar(str(totp_cifrado), ctx.segredo) if totp_cifrado else None
+    passo = totp.conferir(segredo, codigo, ctx.agora, ultimo_passo) if segredo else None
+    if passo is not None:
+        n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?", passo, email, passo)
+        return n == 1
+    normalizado = totp.normalizar_backup(codigo) if segredo else None
+    if not normalizado:
+        return False
+    n = await ctx.banco.executar("DELETE FROM codigos_backup WHERE email = ? AND hash = ?",
+                                 email, totp.hash_backup(normalizado, email, ctx.segredo))
+    if n != 1:
+        return False
+    linha = await ctx.banco.primeiro("SELECT count(*) AS n, (SELECT nome FROM contas WHERE email = ?) AS nome FROM codigos_backup WHERE email = ?", email, email)
+    restantes = int(linha["n"]) if linha else 0
+    ctx.evento("2fa_codigo_backup_usado", email, restantes=restantes)
+    await _avisar(ctx, email, emails.codigo_backup_usado(linha["nome"] if linha else None, ctx.agora, restantes), "email_aviso_backup")
+    return True
+
+
+async def _novos_codigos_backup(ctx: Contexto, email: str) -> tuple[list[str], list[Comando]]:
+    """Dez códigos novos (mostrados uma vez) e os comandos que trocam TODOS os antigos por eles."""
+    codigos = totp.novos_codigos_backup()
+    comandos: list[Comando] = [("DELETE FROM codigos_backup WHERE email = ?", (email,))]
+    comandos += [("INSERT INTO codigos_backup (email, hash) VALUES (?, ?)", (email, totp.hash_backup(totp.normalizar_backup(c) or "", email, ctx.segredo)))
+                 for c in codigos]
+    return codigos, comandos
+
+
 async def _exigir_codigo_atual(ctx: Contexto, email: str, conta: Linha, codigo: object) -> None:
     """
     Conta com 2FA: ações que não têm volta (excluir a conta, trocar a senha, desligar a proteção avançada) pedem um
-    código ATUAL do aplicativo — a sessão e a prova guardadas no navegador não bastam. Mesmo bloqueio do código no
-    login (5 erros → 15 min) e o código usado não serve de novo. Conta sem 2FA: nada a conferir.
+    código ATUAL do aplicativo (ou um código de backup) — a sessão e a prova guardadas no navegador não bastam. Mesmo
+    bloqueio do código no login (5 erros → 15 min) e o código usado não serve de novo. Conta sem 2FA: nada a conferir.
     """
     if not conta["totp_segredo"]:
         return
@@ -554,12 +587,7 @@ async def _exigir_codigo_atual(ctx: Contexto, email: str, conta: Linha, codigo: 
     r = await _reservar(ctx, chave)
     if not r:
         raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
-    segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo)
-    passo = totp.conferir(segredo, codigo, ctx.agora, conta["totp_ultimo_passo"]) if segredo else None
-    if passo is not None:
-        n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?", passo, email, passo)
-        passo = passo if n == 1 else None
-    if passo is None:
+    if not await _conferir_fator(ctx, email, conta["totp_segredo"], conta["totp_ultimo_passo"], codigo):
         ctx.evento("2fa_acao_recusada", email, tentativa=r["falhas"])
         raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
     await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
@@ -900,13 +928,7 @@ async def _abrir_recuperacao(ctx: Contexto) -> Resposta:
         r = await _reservar(ctx, chave)
         if not r:
             raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
-        segredo = totp.decifrar(t["totp_segredo"], ctx.segredo)
-        passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, t["totp_ultimo_passo"]) if segredo else None
-        if passo is not None:
-            n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?",
-                                         passo, email, passo)
-            passo = passo if n == 1 else None
-        if passo is None:
+        if not await _conferir_fator(ctx, email, t["totp_segredo"], t["totp_ultimo_passo"], b.get("codigo")):
             ctx.evento("recuperacao_2fa_falhou", email, tentativa=r["falhas"])
             raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
@@ -1085,13 +1107,8 @@ async def _segundo_fator(ctx: Contexto) -> Resposta:
     if not r:
         raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS", {"espera": BLOQUEIO_1_S})
     conta = await ctx.banco.primeiro("SELECT nome, totp_segredo, totp_ultimo_passo, email_verificado FROM contas WHERE email = ?", email)
-    segredo = totp.decifrar(conta["totp_segredo"], ctx.segredo) if conta else None
-    passo = totp.conferir(segredo, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"]) if segredo and conta else None
-    if passo is not None:      # grava o passo usado: o mesmo código não serve de novo (nem em paralelo)
-        n = await ctx.banco.executar("UPDATE contas SET totp_ultimo_passo = ? WHERE email = ? AND totp_ultimo_passo < ?",
-                                     passo, email, passo)
-        passo = passo if n == 1 else None
-    if passo is None or conta is None:
+    # código do aplicativo (o passo usado não serve de novo, nem em paralelo) ou um código de backup (uso único)
+    if conta is None or not await _conferir_fator(ctx, email, conta["totp_segredo"], conta["totp_ultimo_passo"], b.get("codigo")):
         ctx.evento("2fa_falhou", email, tentativa=r["falhas"])
         extra = {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {}
         raise Falha(401, "CODE_INVALID", extra)
@@ -1303,6 +1320,7 @@ _PROTEGIDAS = {
     ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("PUT", "/api/conta/kdf/historico"), ("DELETE", "/api/conta"),
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
+    ("GET", "/api/2fa/codigos"), ("POST", "/api/2fa/codigos"),
     ("GET", "/api/custodia"), ("POST", "/api/custodia/chave"), ("PUT", "/api/custodia"), ("PUT", "/api/conta/protecao"),
     ("POST", "/api/zo"), ("GET", "/api/zo/consentimento"), ("PUT", "/api/zo/consentimento"),
 }
@@ -1466,6 +1484,7 @@ async def _rota(ctx: Contexto) -> Resposta:
             ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
             ("DELETE FROM custodia WHERE email = ?", (email,)),
             ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,)),
+            ("DELETE FROM codigos_backup WHERE email = ?", (email,)),
             ("DELETE FROM documentos WHERE email = ?", (email,)),
             ("DELETE FROM sessoes WHERE email = ?", (email,)),
             ("DELETE FROM contas WHERE email = ?", (email,)),
@@ -1572,15 +1591,33 @@ async def _rota(ctx: Contexto) -> Resposta:
         if passo is None:
             ctx.evento("2fa_ativacao_falhou", email, tentativa=r["falhas"])
             raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
-        n = await ctx.banco.executar(
-            "UPDATE contas SET totp_segredo = totp_pendente, totp_pendente = NULL, totp_ultimo_passo = ? "
-            "WHERE email = ? AND totp_pendente = ?", passo, email, conta["totp_pendente"])
-        if n != 1:
-            raise Falha(409, "DATA_CHANGED")
+        # ativação e os dez códigos de backup na mesma transação (mostrados só nesta resposta)
+        codigos, comandos = await _novos_codigos_backup(ctx, email)
+        await _lote_atomico(ctx.banco, [
+            ("UPDATE contas SET totp_segredo = totp_pendente, totp_pendente = NULL, totp_ultimo_passo = ? "
+             "WHERE email = ? AND totp_pendente = ?", (passo, email, conta["totp_pendente"])),
+            _GUARDA, _LIMPA_GUARDA, *comandos])
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
         await _encerrar_outras(ctx, email, s["id"])
         ctx.evento("2fa_ativado", email)
-        return Resposta(200, {"doisFatores": True})
+        return Resposta(200, {"doisFatores": True, "codigosBackup": codigos})
+
+    if c == "/api/2fa/codigos":
+        # GET: quantos códigos de backup ainda valem. POST: troca todos por dez novos (pede o código atual,
+        # do aplicativo ou de backup: quem só tem a sessão aberta não gera códigos para si)
+        if not conta["totp_segredo"]:
+            raise Falha(409, "2FA_NOT_PENDING")
+        if m == "GET":
+            linha = await ctx.banco.primeiro("SELECT count(*) AS n FROM codigos_backup WHERE email = ?", email)
+            return Resposta(200, {"restantes": int(linha["n"]) if linha else 0})
+        if set(b) - {"codigo"}:
+            raise Falha(400, "INVALID_REQUEST")
+        await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
+        codigos, comandos = await _novos_codigos_backup(ctx, email)
+        await ctx.banco.lote(comandos)
+        ctx.evento("2fa_codigos_backup_gerados", email)
+        await _avisar(ctx, email, emails.codigos_backup_gerados(conta["nome"], ctx.agora), "email_aviso_backup")
+        return Resposta(200, {"codigosBackup": codigos})
 
     if c == "/api/2fa/desativar":
         # Exige um código ATUAL do aplicativo (fator recente): a sessão e a prova guardadas não bastam
@@ -1591,13 +1628,13 @@ async def _rota(ctx: Contexto) -> Resposta:
         r = await _reservar(ctx, chave)
         if not r:
             raise _bloqueado(ctx, await _limite(ctx, chave)) or Falha(429, "TOO_MANY_ATTEMPTS")
-        passo = totp.conferir(segredo_atual, b.get("codigo"), ctx.agora, conta["totp_ultimo_passo"])
-        if passo is None:
+        if not await _conferir_fator(ctx, email, conta["totp_segredo"], conta["totp_ultimo_passo"], b.get("codigo")):
             ctx.evento("2fa_desativacao_recusada", email, tentativa=r["falhas"])
             raise Falha(401, "CODE_INVALID", {"espera": r["bloqueado_ate"] - ctx.agora} if r["bloqueado_ate"] > ctx.agora else {})
         await ctx.banco.executar("DELETE FROM limites WHERE chave = ?", chave)
-        await ctx.banco.executar(
-            "UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL, totp_ultimo_passo = 0 WHERE email = ?", email)
+        await ctx.banco.lote([
+            ("UPDATE contas SET totp_segredo = NULL, totp_pendente = NULL, totp_ultimo_passo = 0 WHERE email = ?", (email,)),
+            ("DELETE FROM codigos_backup WHERE email = ?", (email,))])
         await _encerrar_outras(ctx, email, s["id"])
         ctx.evento("2fa_desativado", email)
         await _avisar(ctx, email, emails.dois_fatores_desativado(conta["nome"], ctx.agora), "email_aviso_2fa")

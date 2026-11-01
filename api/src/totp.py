@@ -97,3 +97,34 @@ def decifrar(texto: str, segredo_servidor: str) -> bytes | None:
     if not hmac.compare_digest(hmac.new(ke, nonce + ct, hashlib.sha256).digest()[:16], tag):
         return None
     return bytes(a ^ b for a, b in zip(ct, _fluxo(kc, nonce, len(ct))))
+
+
+# ---------------- códigos de backup (uso único, no lugar do aplicativo) ----------------
+# 10 códigos de 10 caracteres no alfabeto Base32 de Crockford (sem I, L, O e U: nada de confundir 1 com I ou 0
+# com O), 50 bits cada, mostrados como "ABCDE-12345". Ao conferir: maiúsculas, sem espaço nem hífen, O vira 0 e
+# I ou L viram 1 (erro comum de digitação). Guardado só o HMAC (chave derivada do SEGREDO do servidor + e-mail).
+CODIGOS_BACKUP = 10
+_ALFABETO_BACKUP = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_TAMANHO_BACKUP = 10
+
+
+def novos_codigos_backup() -> list[str]:
+    codigos: set[str] = set()
+    while len(codigos) < CODIGOS_BACKUP:
+        c = "".join(secrets.choice(_ALFABETO_BACKUP) for _ in range(_TAMANHO_BACKUP))
+        codigos.add(c[:5] + "-" + c[5:])
+    return sorted(codigos)
+
+
+def normalizar_backup(texto: object) -> str | None:
+    """Código de backup comparável ("abcde 12345" = "ABCDE-12345"), ou None se não tem o formato."""
+    t = str(texto or "").strip().upper().replace(" ", "").replace("-", "")
+    t = t.translate(str.maketrans("OIL", "011"))
+    if len(t) != _TAMANHO_BACKUP or not t.isascii() or any(ch not in _ALFABETO_BACKUP for ch in t):
+        return None
+    return t
+
+
+def hash_backup(normalizado: str, email: str, segredo_servidor: str) -> str:
+    chave = hashlib.sha256(("zozo/backup/v1|" + segredo_servidor).encode("utf-8")).digest()
+    return hmac.new(chave, (email + "|" + normalizado).encode("utf-8"), hashlib.sha256).hexdigest()

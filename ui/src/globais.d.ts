@@ -428,9 +428,9 @@ declare global {
     reset(id: string): void;
   }
   interface CaptchaWidget { el: HTMLElement; token(): string; reset(): void }
-  interface ConfigCodigo { rotulo?: string; classe?: string; classeCaixa?: string; onCompleto?(codigo: string): void; onDigitar?(): void }
+  interface ConfigCodigo { rotulo?: string; classe?: string; classeCaixa?: string; backup?: boolean; onCompleto?(codigo: string): void; onDigitar?(): void }
   interface CampoCodigo6 {
-    el: HTMLElement; valor(): string; limpar(): void; foco(): void;
+    el: HTMLElement; valor(): string; completo(): boolean; limpar(): void; foco(): void;
     desabilitar(v: boolean): void; marcarErro(v: boolean): void;
   }
   interface ZoZoVerificacao {
