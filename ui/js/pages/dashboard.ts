@@ -55,7 +55,7 @@
     gastoNumeroAcima: "money tw:[font-weight:inherit] tw:text-(--color-negative)",
     gastoPalavra: "tw:font-semibold",
     gastoNota: "tw:text-zz-cinza tw:text-[.9375rem] tw:font-[550]",
-    grafico: "tw:relative tw:mt-4 tw:mb-2",
+    grafico: "tw:relative tw:mb-2",
     // Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado
     tops: "tw:flex tw:flex-col tw:-mx-5 tw:na-tela:min-h-0 tw:na-tela:overflow-hidden",
     top: "tw:grid tw:grid-cols-[16px_26px_minmax(0,1fr)_auto_112px] tw:gap-2.5 tw:items-center tw:min-h-9 tw:px-5 tw:text-[15px] tw:font-[450] "

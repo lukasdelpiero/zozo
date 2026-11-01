@@ -145,7 +145,8 @@
     function draw() {
       const W = Math.max(160, holder.clientWidth);
       const H = o.height;
-      const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 6 };      // modo filtro: espaço para a data em cima do ponto
+      // l: 0 = a linha e a 1ª data começam na borda do conteúdo do card, alinhadas ao título
+      const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 0 };      // modo filtro: espaço para a data em cima do ponto
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
       // o.eixo: as datas do eixo inteiro (ex.: todos os dias do mês). Sem ele, cada série ocupa a largura toda; com
       // ele, a série curta (o gasto até hoje) vai só até o seu último dia em vez de esticar (no dia 1, um ponto só
@@ -199,7 +200,8 @@
 
       // Conteúdo revelado da esquerda para a direita
       const clipId = "zz-clip-" + (++seq);
-      const clipRect = s("rect", { x: 0, y: 0, width: W * progresso, height: H });
+      // x: -8 = a bolinha do 1º ponto, agora na borda (m.l = 0), aparece inteira
+      const clipRect = s("rect", { x: -8, y: 0, width: W * progresso + 8, height: H });
       clipAtual = { rect: clipRect, W };
       tela.appendChild(s("defs", null, s("clipPath", { id: clipId }, clipRect)));
       const g = s("g", { "clip-path": `url(#${clipId})` });
@@ -330,7 +332,7 @@
 
       if (!iniciada && holder.isConnected && holder.clientWidth) {
         iniciada = true;
-        animar(duracao(), (p) => { progresso = p; if (clipAtual) clipAtual.rect.setAttribute("width", String(clipAtual.W * p)); }, inicio);
+        animar(duracao(), (p) => { progresso = p; if (clipAtual) clipAtual.rect.setAttribute("width", String(clipAtual.W * p + 8)); }, inicio);
       }
     }
 

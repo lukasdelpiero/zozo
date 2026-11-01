@@ -22,7 +22,7 @@
     metade: "tw:flex tw:flex-col tw:items-center tw:gap-1 tw:text-center",
     legenda: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-secondary tw:text-[13px] tw:font-medium",
     valor: "money tw:text-[28px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center tw:area460:text-[17px]",
-    grafico: "tw:relative tw:mt-4 tw:mb-2",
+    grafico: "tw:relative tw:mb-2",
     filtros: "tw:flex tw:justify-center",
   };
 
@@ -55,7 +55,7 @@
     const chart = h("div", { class: T.grafico });
     // Uma única linha: verde quando sobe, vermelha quando desce (seção 30)
     ZoZo.charts.renderLineChart(chart, [{ name: "Evolução", colorBySlope: true, points: serie.map((p) => ({ data: p.data, valor: p.valor })) }],
-      { height: 133, ariaLabel: "Evolução dos investimentos" });            // card com 308 px, como o de Contas
+      { height: 149, ariaLabel: "Evolução dos investimentos" });            // card com 308 px, como o de Contas
 
     const engrenagem = UI.IconButton("configuracoes", "Contas incluídas no gráfico", { class: T.engrenagem, expanded: false });
     engrenagem.addEventListener("click", () => abrirContasIncluidas(engrenagem, ctx));
