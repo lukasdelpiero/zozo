@@ -135,6 +135,10 @@ declare global {
 
   /** Leituras do serviço → resposta (o serviço é conferido contra esta tabela) */
   interface RespostasLeitura {
+    /** lixeira temporal do Zo: cópias do documento antes e depois de cada gravação (só na memória da aba) */
+    abrirMarco: { marco: string };
+    fecharMarco: { fechado: boolean };
+    descartarMarcos: { descartados: boolean };
     getLancamentos: RespostaLancamentos;
     getLancamentosOutrasMoedas: { moeda: Moeda; lancamentos: Array<{ id: Id; data: string; descricao: string; valor: number; moeda: Moeda; tipo: string; recorrencia: string | null }> };
     getContas: RespostaContas;
@@ -165,7 +169,7 @@ declare global {
     | "updateLancamentosEmLote" | "deleteLancamentos" | "updateConfig"
     | "pagarRecorrencia" | "encerrarRecorrencia" | "excluirRecorrencia" | "tornarRecorrente" | "vincularRecorrencia" | "desvincularRecorrencia"
     | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura" | "importarLancamentos"
-    | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
+    | "updateGrupo" | "desagruparCategorias" | "transferirMoeda" | "desfazerMarco";
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
   /* ---------------- Zo, o assistente ---------------- */
   /** Chamada de ferramenta escolhida pelo Zo (argumentos em JSON, conferidos no navegador antes de usar) */
@@ -228,6 +232,8 @@ declare global {
   }
   /** Gravações do serviço → resposta (o serviço é conferido contra esta tabela) */
   interface RespostasEscrita {
+    /** desfeitas: o que voltou; conflitos: o que foi mexido depois e ficou como está */
+    desfazerMarco: { desfeitas: number; conflitos: number };
     createLancamento: { lancamento: LancamentoTela };
     updateLancamento: { lancamento: LancamentoTela };
     deleteLancamento: { id: Id };

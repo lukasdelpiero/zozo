@@ -81,6 +81,11 @@
   let aceito: boolean | null = null;            // null = ainda não perguntado ao servidor nesta sessão
   let cancelarPendente: (() => void) | null = null;   // cartão de confirmação ou opções esperando a pessoa
   let geracao = 0;                              // nova conversa / saída: respostas atrasadas são descartadas
+  // Lixeira temporal: o que o Zo gravou nesta conversa e ainda pode ser desfeito (as cópias ficam no serviço, nesta aba)
+  let lixeira: Array<{ marco: string; titulo: string }> = [];
+  // LGPD: sem uso por 15 minutos, a conversa e a lixeira somem (a memória de curto prazo não fica guardada)
+  const INATIVIDADE_MS = 15 * 60 * 1000;
+  let inatividade: ReturnType<typeof setTimeout> | null = null;
 
   function permitido(): boolean {
     const st = ZoZo.store.get();
@@ -112,6 +117,32 @@
     if (fab) { fab.remove(); fab = null; }
     if (janela) { janela.remove(); janela = null; }
     historico = []; aceito = null; ocupado = false;
+    esvaziarLixeira();
+    if (inatividade) { clearTimeout(inatividade); inatividade = null; }
+  }
+  function esvaziarLixeira() {
+    if (lixeira.length && ctx) ctx.bridge.request(A.descartarMarcos).catch(() => null);
+    lixeira = [];
+  }
+  /** Cada uso do Zo reinicia a contagem de inatividade */
+  function tocar() {
+    if (inatividade) clearTimeout(inatividade);
+    inatividade = setTimeout(expirar, INATIVIDADE_MS);
+  }
+  function expirar() {
+    inatividade = null;
+    if (!historico.length && !lixeira.length) return;
+    geracao += 1;
+    if (cancelarPendente) cancelarPendente();
+    historico = []; ocupado = false;
+    esvaziarLixeira();
+    if (janela) {
+      digitando(false);
+      mount(logEl);
+      nota("A conversa foi apagada depois de 15 minutos sem uso, para proteger os seus dados.");
+      if (aceito) bolha(BOAS_VINDAS, "bot");
+      atualizarEnvio();
+    }
   }
 
   /* ---------------- janela ---------------- */
@@ -132,6 +163,7 @@
     const menuBtn = h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone("", true), "aria-label": "Opções do Zo", "aria-haspopup": "menu" }, icon("opcoes", { size: 18 })) as HTMLButtonElement;
     menuBtn.addEventListener("click", () => ZoZo.menu.abrir(menuBtn, [
       { label: "Nova conversa", onClick: novaConversa },
+      { label: "Lixeira temporal", onClick: mostrarLixeira },
       { label: "Retirar consentimento", onClick: retirarConsentimento },
     ], { posicao: "esquerda", label: "Opções do Zo" }));
     janela = h("section", { class: Z.janela, role: "dialog", "aria-modal": "false", "aria-label": "Zo, assistente do ZoZo" },
@@ -233,6 +265,7 @@
       geracao += 1;
       if (cancelarPendente) cancelarPendente();
       historico = []; aceito = false; ocupado = false;
+      esvaziarLixeira();
       if (janela) { mount(logEl); bolha("Consentimento retirado. A conversa foi apagada desta tela.", "bot"); pedirConsentimento(); atualizarEnvio(); }
     }).catch((e: ErroPonte) => nota(e.friendly || FR.OPERATION_FAILED));
   }
@@ -240,6 +273,7 @@
     geracao += 1;
     if (cancelarPendente) cancelarPendente();
     historico = []; ocupado = false;
+    esvaziarLixeira();
     digitando(false);
     mount(logEl);
     if (aceito) bolha(BOAS_VINDAS, "bot"); else iniciar();
@@ -255,6 +289,7 @@
     falar(texto);
   }
   function falar(texto: string) {
+    tocar();
     historico.push({ papel: "usuario", texto: texto.slice(0, 2000) });
     bolha(texto, "eu");
     void turno();
@@ -269,7 +304,8 @@
     if (!ctx) return;
     const c = ctx, minha = geracao;
     const ferramentas = ZoZo.zoFerramentas.criar((acao, dados) => c.bridge.request(acao, dados), {
-      perfis: () => ZoZo.recursos.perfis(), fatura: () => ZoZo.recursos.boleto() && ZoZo.recursos.perfis(), cambio: () => ZoZo.recursos.cambio(), tela: tela(c) });
+      perfis: () => ZoZo.recursos.perfis(), fatura: () => ZoZo.recursos.boleto() && ZoZo.recursos.perfis(), cambio: () => ZoZo.recursos.cambio(), tela: tela(c),
+      aoGravar: (titulo, marco) => { if (minha !== geracao) return; lixeira.push({ marco, titulo }); botaoDesfazer(marco, titulo); } });
     ocupado = true; atualizarEnvio(); digitando(true);
     let gravou = false;
     try {
@@ -345,6 +381,46 @@
         });
       },
     };
+  }
+
+  /* ---------------- lixeira temporal ---------------- */
+  function botaoDesfazer(marco: string, titulo: string) {
+    const b = h("button", { type: "button", class: Z.opcao, "aria-label": "Desfazer " + titulo, onClick: () => desfazer(marco, titulo, b) },
+      icon("desfazer", { size: 15 }), "Desfazer") as HTMLButtonElement;
+    logEl.appendChild(h("div", { class: Z.botoes }, b)); rolar();
+  }
+  /** Desfaz uma gravação do Zo. O Zo fica sabendo (a próxima ida leva a nota) */
+  function desfazer(marco: string, titulo: string, botao: HTMLButtonElement | null) {
+    if (!ctx) return;
+    const c = ctx;
+    if (ocupado) { nota("Espere o Zo terminar para desfazer."); return; }
+    tocar();
+    if (botao) botao.disabled = true;
+    c.bridge.request(A.desfazerMarco, { marco }).then((r) => {
+      lixeira = lixeira.filter((x) => x.marco !== marco);
+      const msg = !r.conflitos ? "\u201C" + titulo + "\u201D foi desfeito."
+        : r.desfeitas ? "Desfiz parte de \u201C" + titulo + "\u201D. " + (r.conflitos === 1 ? "Um item foi alterado" : r.conflitos + " itens foram alterados") + " depois e ficou como está."
+          : "Não desfiz \u201C" + titulo + "\u201D, porque o que ele mudou foi alterado depois e ficou como está.";
+      nota(msg);
+      historico.push({ papel: "assistente", texto: msg, chamadas: [] });
+      if (botao) botao.closest("div")?.remove();
+      c.recarregarTudo();
+    }).catch((e: ErroPonte) => {
+      lixeira = lixeira.filter((x) => x.marco !== marco || e.code !== "UNDO_UNAVAILABLE");
+      nota(e.friendly || FR.OPERATION_FAILED);
+      if (botao) botao.disabled = e.code === "UNDO_UNAVAILABLE";
+    });
+  }
+  function mostrarLixeira() {
+    tocar();
+    if (!lixeira.length) { nota("Nada para desfazer nesta conversa."); return; }
+    nota("Lixeira temporal desta conversa. Desfazer volta só o que o Zo mudou e que ninguém alterou depois.");
+    lixeira.slice().reverse().forEach((x) => {
+      const b = h("button", { type: "button", class: Z.opcao, "aria-label": "Desfazer " + x.titulo, onClick: () => desfazer(x.marco, x.titulo, b) },
+        icon("desfazer", { size: 15 }), x.titulo) as HTMLButtonElement;
+      logEl.appendChild(h("div", { class: Z.botoes }, b));
+    });
+    rolar();
   }
 
   /** Cartão de confirmação: o resumo vem das ferramentas (dados reais), não do texto do modelo */

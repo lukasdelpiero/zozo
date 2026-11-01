@@ -106,6 +106,11 @@
     updateGrupo: "updateGrupo",
     desagruparCategorias: "desagruparCategorias",
     transferirMoeda: "transferirMoeda",
+    // lixeira temporal do Zo (só na memória da aba)
+    abrirMarco: "abrirMarco",
+    fecharMarco: "fecharMarco",
+    descartarMarcos: "descartarMarcos",
+    desfazerMarco: "desfazerMarco",
     getLancamentosOutrasMoedas: "getLancamentosOutrasMoedas",
   });
 
@@ -138,6 +143,7 @@
     TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
     CAPTCHA_REQUIRED: "Confirme que você não é um robô para continuar.",
     CODE_INVALID: "Esse código não funcionou. Tente o código mais recente do seu aplicativo 2FA ou um código de backup.",
+    UNDO_UNAVAILABLE: "Essa alteração não pode mais ser desfeita.",
     WEBAUTHN_INVALID: "Não deu para confirmar com a biometria. Tente de novo.",
     WEBAUTHN_CANCELLED: "A biometria foi cancelada ou demorou demais. Tente de novo.",
     WEBAUTHN_NONE: "Nenhuma biometria cadastrada. Cadastre em Configurações › Conta.",

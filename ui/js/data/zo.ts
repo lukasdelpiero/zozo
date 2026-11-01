@@ -145,8 +145,19 @@
 
     /* ---------------- gravação: resumo com os dados reais + confirmar() ---------------- */
     type Escrita = (a: Args) => Promise<ResultadoFerramentaZo>;
-    const escrita = (titulo: string, linhas: Array<[string, string]>, executar: () => Promise<unknown>): ResultadoFerramentaZo =>
-      ({ tipo: "escrita", titulo, linhas, confirmar: () => executar().then((r) => json(Object.assign({ ok: true }, r && typeof r === "object" ? r : {})), (e) => erroDe(e)) });
+    // Lixeira temporal: cópia antes e depois de cada gravação (no serviço, só nesta aba); a janela recebe o marco para "Desfazer"
+    const escrita = (titulo: string, linhas: Array<[string, string]>, executar: () => Promise<unknown>, desfazivel = true): ResultadoFerramentaZo =>
+      ({ tipo: "escrita", titulo, linhas, confirmar: async () => {
+        const marco = desfazivel ? await req(A.abrirMarco).then((m) => m.marco, () => null) : null;
+        try {
+          const r = await executar();
+          if (marco) await req(A.fecharMarco, { marco }).then(() => { if (opcoes.aoGravar) opcoes.aoGravar(titulo, marco); }, () => null);
+          return json(Object.assign({ ok: true }, r && typeof r === "object" ? r : {}));
+        } catch (e) {
+          if (marco) req(A.descartarMarcos, { marco }).catch(() => null);
+          return erroDe(e);
+        }
+      } });
 
     /** Transação: monta o pedido do serviço e as linhas do resumo (atual: a transação sendo editada) */
     async function transacao(a: Args, atual: LancamentoTela | null) {
@@ -358,12 +369,12 @@
         const tela = opcoes.tela;
         if (!tela) return semTela();
         return escrita("Exportar transações", [["Arquivo", "CSV com todas as transações"], ["Atenção", "O arquivo não é cifrado. Guarde em local seguro."]],
-          () => tela.exportar().then(() => ({})));
+          () => tela.exportar().then(() => ({})), false);
       },
       sair: async () => {
         const tela = opcoes.tela;
         if (!tela) return semTela();
-        return escrita("Sair da conta", [["Neste aparelho", "A sessão termina e a senha será pedida de novo"]], () => { tela.sair(); return Promise.resolve({}); });
+        return escrita("Sair da conta", [["Neste aparelho", "A sessão termina e a senha será pedida de novo"]], () => { tela.sair(); return Promise.resolve({}); }, false);
       },
       criar_perfil: async (a) => {
         if (!opcoes.perfis()) return { tipo: "leitura", resultado: json({ erro: "FEATURE_UNAVAILABLE", mensagem: ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE }) };

@@ -226,3 +226,22 @@ test("Zo: importar arquivo só mostra o botão (o arquivo é lido no aparelho, n
   const { zo } = await cenario();
   assert.deepEqual(JSON.parse(JSON.stringify(await zo.executar("importar_arquivo", args({ caminho: "C:/segredo.csv" })))), { tipo: "arquivo" });
 });
+
+test("Zo: lixeira temporal recebe cada gravação confirmada e desfaz só ela; exportar e sair não entram", async () => {
+  const gravadas = [];
+  const f = telaFalsa();
+  const c = await cenario();
+  const zo = c.t.Z.zoFerramentas.criar((acao, dados) => c.t.req(acao, dados), { perfis: () => true, tela: f.tela, aoGravar: (titulo, marco) => gravadas.push({ titulo, marco }) });
+  const cat = await zo.executar("criar_categoria", args({ nome: "Pets", icone: "🐶" }));
+  assert.equal(gravadas.length, 0);                                                         // nada antes do Confirmar
+  assert.ok(JSON.parse(await cat.confirmar()).ok);
+  assert.equal(gravadas.length, 1);
+  assert.equal(gravadas[0].titulo, cat.titulo);
+  await (await zo.executar("exportar_transacoes", "{}")).confirmar();
+  assert.equal(gravadas.length, 1);
+  assert.deepEqual(await c.t.req(c.t.A.desfazerMarco, { marco: gravadas[0].marco }), { desfeitas: 1, conflitos: 0 });
+  assert.ok(!(await c.t.req(c.t.A.getCategorias)).categorias.some((x) => x.nome === "Pets"));
+  // gravação que falha não entra na lixeira
+  const ruim = await zo.executar("editar_categoria", args({ id: "k-inexistente", nome: "X" }));
+  if (ruim.tipo === "escrita") { await ruim.confirmar(); assert.equal(gravadas.length, 1); }
+});

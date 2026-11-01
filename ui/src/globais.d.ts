@@ -742,7 +742,8 @@ declare global {
     /** Antes do que não tem volta: "ok" (2FA ligado ou biometria confirmada), "negado" ou "sem_metodo" (nem 2FA nem biometria) */
     verificarIdentidade(): Promise<"ok" | "negado" | "sem_metodo">;
   }
-  interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo }
+  /** aoGravar: gravação confirmada que pode ser desfeita (lixeira temporal; o marco vale só nesta aba) */
+  interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo; aoGravar?(titulo: string, marco: string): void }
   interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }
   interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
 

@@ -72,6 +72,7 @@
     receita: [P("M12 19V5"), P("m5 12 7-7 7 7")],     // entra dinheiro: seta para cima
     regular: [P("M12 5v14"), P("m19 12-7 7-7-7")],     // sai dinheiro: seta para baixo
     "seta-voltar": [P("m12 19-7-7 7-7"), P("M19 12H5")],
+    desfazer: [P("M9 14 4 9l5-5"), P("M4 9h10.5a5.5 5.5 0 0 1 0 11H11")],
     "baixar-circulo": [["circle", { cx: 12, cy: 12, r: 9.5 }], P("M12 7.5v8.5"), P("m8.5 12.5 3.5 3.5 3.5-3.5")],
     dividir: [P("M16 3h5v5"), P("M8 3H3v5"), P("M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3"), P("m15 9 6-6")],   // seta de divisão
     info: [["circle", { cx: 12, cy: 12, r: 9.5 }], P("M12 11v5.5"), P("M12 7.6v.2")],

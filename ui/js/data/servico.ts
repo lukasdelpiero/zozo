@@ -292,7 +292,89 @@
     return exec;
   }
 
-  function reset() { esquecer(); carregando = null; fila = Promise.resolve(); aplicadas = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; }
+  function reset() { esquecer(); carregando = null; fila = Promise.resolve(); aplicadas = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; marcos.clear(); }
+
+  /* ---------------- Lixeira temporal (Zo) ----------------
+     Antes e depois de cada gravação confirmada no Zo, uma cópia do documento fica SÓ na memória desta aba (some ao sair,
+     ao trocar de conta, na nova conversa e por inatividade: LGPD). Desfazer aplica o inverso só do que aquela gravação
+     mudou, e só onde o dado continua como ela deixou: o que foi mexido depois fica como está e conta como conflito.
+     Saldo: segue pelas anotações de efeito (reverter o atual; sincronizarSaldos aplica o antigo), nunca copiando o saldo. */
+  type Marco = { antes: Documento; depois: Documento | null };
+  const marcos = new Map<string, Marco>();
+  const MAX_MARCOS = 30;
+  const igual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const semEfeito = (l: Lancamento): Lancamento => { const x = clone(l); delete x.efeito; return x; };
+  const semHistorico = (c: Conta) => { const x: Partial<Conta> = Object.assign({}, c); delete x.historico; return x; };
+
+  /** Inverso de uma lista com id: tira o que a gravação criou, devolve o que ela tirou, volta o que ela mudou */
+  function inverterLista<T extends { id: Id }>(atuais: T[], antes: T[], depois: T[], o: {
+    mesmo(a: T, b: T): boolean; podeTirar?(x: T): boolean; aoTirar?(x: T): void; devolver(x: T): T; voltar(atual: T, velho: T): T;
+  }): { lista: T[]; feitas: number; conflitos: number } {
+    const A = new Map(antes.map((x) => [x.id, x] as const)), B = new Map(depois.map((x) => [x.id, x] as const));
+    let lista = atuais.slice(), feitas = 0, conflitos = 0;
+    B.forEach((b, id) => {
+      const a = A.get(id), i = lista.findIndex((x) => x.id === id);
+      if (a && o.mesmo(a, b)) return;                                     // a gravação não mexeu
+      if (!a) {                                                           // criado pela gravação
+        if (i < 0) return;                                                // já não existe: nada a desfazer
+        if (!o.mesmo(lista[i], b) || (o.podeTirar && !o.podeTirar(lista[i]))) { conflitos += 1; return; }
+        if (o.aoTirar) o.aoTirar(lista[i]);
+        lista.splice(i, 1); feitas += 1; return;
+      }
+      if (i < 0 || !o.mesmo(lista[i], b)) { conflitos += 1; return; }    // mudado depois (ou apagado): fica como está
+      lista[i] = o.voltar(lista[i], a); feitas += 1;
+    });
+    A.forEach((a, id) => {
+      if (B.has(id)) return;                                              // apagado pela gravação
+      if (lista.some((x) => x.id === id)) { conflitos += 1; return; }
+      const pos = Math.min(antes.findIndex((x) => x.id === id), lista.length);
+      lista = lista.slice(0, pos).concat([o.devolver(a)], lista.slice(pos)); feitas += 1;
+    });
+    return { lista, feitas, conflitos };
+  }
+  /** Inverso de um registro por chave (grupos, faturas) e da configuração */
+  function inverterRegistro<T>(atual: Record<string, T>, antes: Record<string, T>, depois: Record<string, T>) {
+    const r = Object.assign({}, atual);
+    let feitas = 0, conflitos = 0;
+    new Set(Object.keys(antes).concat(Object.keys(depois))).forEach((k) => {
+      const a = antes[k], b = depois[k];
+      if (igual(a, b)) return;
+      if (!igual(r[k], b)) { conflitos += 1; return; }
+      if (a === undefined) delete r[k]; else r[k] = clone(a);
+      feitas += 1;
+    });
+    return { registro: r, feitas, conflitos };
+  }
+  function desfazerMarco(m: Marco & { depois: Documento }): { desfeitas: number; conflitos: number } {
+    let feitas = 0, conflitos = 0;
+    const somar = (r: { feitas: number; conflitos: number }) => { feitas += r.feitas; conflitos += r.conflitos; };
+    // 1) transações primeiro (assim as contas, categorias e perfis criados ficam livres para sair)
+    const l = inverterLista(doc.lancamentos, m.antes.lancamentos, m.depois.lancamentos, {
+      mesmo: (a, b) => igual(semEfeito(a), semEfeito(b)),
+      aoTirar: (x) => { reverterEfeito(x); },
+      devolver: (x) => semEfeito(x),
+      voltar: (atual, velho) => { reverterEfeito(atual); return semEfeito(velho); },
+    });
+    doc.lancamentos = l.lista; somar(l);
+    const usado = (campo: "contaId" | "categoriaId" | "perfilId") => (x: { id: Id }) => !doc.lancamentos.some((y) => y[campo] === x.id);
+    const c = inverterLista<Conta>(doc.contas, m.antes.contas, m.depois.contas, {
+      mesmo: (a, b) => igual(semHistorico(a), semHistorico(b)), podeTirar: usado("contaId"),
+      devolver: (x) => clone(x), voltar: (atual, velho) => Object.assign(clone(velho), { historico: atual.historico }),
+    });
+    doc.contas = c.lista; somar(c);
+    const k = inverterLista<Categoria>(doc.categorias, m.antes.categorias, m.depois.categorias, { mesmo: igual, podeTirar: usado("categoriaId"), devolver: (x) => clone(x), voltar: (_a, v) => clone(v) });
+    doc.categorias = k.lista; somar(k);
+    const p = inverterLista<Perfil>(doc.perfis, m.antes.perfis, m.depois.perfis, { mesmo: igual, podeTirar: usado("perfilId"), devolver: (x) => clone(x), voltar: (_a, v) => clone(v) });
+    doc.perfis = p.lista; somar(p);
+    const g = inverterRegistro(doc.grupos, m.antes.grupos, m.depois.grupos);
+    doc.grupos = g.registro; somar(g);
+    const f = inverterRegistro(doc.faturas, m.antes.faturas, m.depois.faturas);
+    doc.faturas = f.registro; somar(f);
+    if (!igual(m.antes.config, m.depois.config)) {
+      if (igual(doc.config, m.depois.config)) { doc.config = clone(m.antes.config); feitas += 1; } else conflitos += 1;
+    }
+    return { desfeitas: feitas, conflitos };
+  }
   const gravando = () => pendentes > 0;
   /** Outro dispositivo gravou: esquece o documento (a próxima leitura baixa a versão nova). Nunca com gravação pendente. */
   function recarregarDoServidor() {
@@ -875,6 +957,25 @@
   const A = M.ACTIONS;
   // cada leitura devolve exatamente o tipo de ui/src/dados.d.ts (RespostasLeitura): o compilador confere
   const LEITURAS: { readonly [K in NomeLeitura]: (d: Dados) => RespostasLeitura[K] } = {
+    /** Lixeira temporal: guarda o documento antes de uma gravação do Zo (o id é só desta aba) */
+    [A.abrirMarco]: () => {
+      const id = novoId("m");
+      marcos.set(id, { antes: clone(doc), depois: null });
+      while (marcos.size > MAX_MARCOS) marcos.delete(marcos.keys().next().value as string);
+      return { marco: id };
+    },
+    /** ...e depois dela (sem o "depois", não há o que desfazer) */
+    [A.fecharMarco]: (d) => {
+      const m = marcos.get(String(d.marco || ""));
+      if (!m || m.depois) throw erro("OPERATION_FAILED");
+      m.depois = clone(doc);
+      return { fechado: true };
+    },
+    /** Um marco (gravação que falhou) ou todos (fim da conversa, inatividade) */
+    [A.descartarMarcos]: (d) => {
+      if (d.marco) marcos.delete(String(d.marco)); else marcos.clear();
+      return { descartados: true };
+    },
     [A.getLancamentos]: getLancamentos,
     /** Multicâmbio: transações das OUTRAS moedas, para trazer para a moeda escolhida (lê o documento inteiro) */
     [A.getLancamentosOutrasMoedas]: () => {
@@ -1197,6 +1298,14 @@
 
   // cada gravação devolve exatamente RespostasEscrita[ação] (ui/src/dados.d.ts): o compilador confere
   const ESCRITAS: { readonly [K in NomeEscrita]: (d: Dados) => RespostasEscrita[K] } = {
+    /** Desfazer uma gravação do Zo (lixeira temporal). Só uma vez: o marco sai da lixeira. */
+    [A.desfazerMarco]: (d) => {
+      const id = String(d.marco || ""), m = marcos.get(id);
+      if (!m || !m.depois) throw erro("UNDO_UNAVAILABLE");
+      const r = desfazerMarco(m as Marco & { depois: Documento });
+      marcos.delete(id);
+      return r;
+    },
     /* Lançamentos */
     [A.createLancamento]: (d) => {
       const tipo = d.lancamento && d.lancamento.tipo === "recorrente" ? "recorrencia" : "lancamento";
@@ -1848,7 +1957,8 @@
     const d = (data && typeof data === "object" ? data : {}) as Dados;
     if (ehLeitura(action)) {
       // getConfig e a lista para transferir entre moedas enxergam o documento inteiro; o resto, só a moeda escolhida
-      const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas;
+      const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas
+        || action === A.abrirMarco || action === A.fecharMarco || action === A.descartarMarcos;     // a lixeira copia o documento inteiro
       return aplicadas.then(() => garantirCarregado()).then(() => (inteiro ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
     }
     if (ehEscrita(action)) {
