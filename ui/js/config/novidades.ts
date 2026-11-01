@@ -11,10 +11,18 @@
 
   const NOTAS: readonly NotaVersao[] = [
     {
-      versao: "3.19.1", quando: "outubro de 2026",
+      versao: "3.20.0", quando: "novembro de 2026",
       itens: [
-        { icone: "🧾", tipo: "correcao", titulo: "Fatura completa",
-          texto: "Ao gerar a fatura, entram todas as compras do cartão, da fatura já fechada ou da que ainda está aberta, e também os empréstimos." },
+        { icone: "🔑", tipo: "novo", titulo: "Códigos para entrar sem o celular",
+          texto: "Ao ligar a verificação em duas etapas, você recebe dez códigos de reserva. Se perder o celular, cada um serve uma vez no lugar do código do aplicativo." },
+        { icone: "👆", tipo: "novo", titulo: "Confirme com a digital ou o rosto",
+          texto: "Cadastre a biometria do seu aparelho em Configurações › Conta e use para confirmar ações importantes, sem digitar nada." },
+        { icone: "💬", tipo: "melhoria", titulo: "Zo mais cuidadoso",
+          texto: "O Zo esconde dados como CPF e cartão antes de pensar na resposta, confirma com você antes de excluir algo e deixa desfazer o que ele fez na conversa." },
+        { icone: "🧾", tipo: "novo", titulo: "Fatura do seu jeito",
+          texto: "Escolha se a fatura mostra também o que ainda está em aberto, baixe a fatura como imagem e encontre os arquivos com nomes mais claros." },
+        { icone: "🛠️", tipo: "correcao", titulo: "Empréstimos na fatura",
+          texto: "As parcelas dos empréstimos agora entram na fatura gerada, junto com as compras do cartão." },
       ],
     },
     {

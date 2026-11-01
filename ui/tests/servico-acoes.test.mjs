@@ -163,6 +163,24 @@ test("fatura com a regra do dia 11: fechamentos e vencimentos de 12/M a 11/M+1 s
   assert.deepEqual(outubro, ["Nubank 05/10", "Parcela 11/10", "Parcela 12/10", "Parcela 31/10", "Visa 20/10", "Visa 21/09"]);
 });
 
+test("regra do dia 11 vale para todos os meses, inclusive na virada do ano e em fevereiro", async () => {
+  const t = carregar({ recursos: { perfis: true, boleto: true, pix: true, cambio: false, faturaDia11: true } });
+  const { perfil: eu } = await t.req(t.A.createPerfil, { perfil: { nome: "Lukas" } });
+  const nubank = (await t.req(t.A.createConta, { conta: { nome: "Nubank", tipo: "cartao", saldo: 0, fechamento: 5, vencimento: 12 } })).conta.id;
+  const emp = (await t.req(t.A.createConta, { conta: { nome: "Empréstimo", tipo: "emprestimo", saldo: 0 } })).conta.id;
+  const em = (contaId, descricao, data, extra) => t.req(t.A.createLancamento, lanc(Object.assign({ data, descricao, contaId, perfilId: eu.id }, extra)));
+  await em(nubank, "Nubank 06/12", "2025-12-06"); await em(nubank, "Nubank 05/01", "2026-01-05"); await em(nubank, "Nubank 06/01", "2026-01-06");
+  for (const d of ["2025-12-11", "2025-12-12", "2026-01-11", "2026-01-12", "2026-02-11", "2026-02-28", "2026-03-11", "2026-03-12"]) {
+    await em(emp, "Parcela " + d, d, { tipo: "interno", sentido: "saida" });
+  }
+  const doMes = async (mes, ano) => (await t.req(t.A.getBoletoData, { perfilId: eu.id, mes, ano })).lancamentos.map((l) => l.descricao).sort();
+  assert.deepEqual(await doMes(11, 2025), ["Parcela 2025-12-11"]);                                     // novembro: até 11/12
+  assert.deepEqual(await doMes(12, 2025), ["Nubank 05/01", "Nubank 06/12", "Parcela 2025-12-12", "Parcela 2026-01-11"]);   // dezembro: 12/12 a 11/01
+  assert.deepEqual(await doMes(1, 2026), ["Nubank 06/01", "Parcela 2026-01-12", "Parcela 2026-02-11"]);  // janeiro: 12/01 a 11/02
+  assert.deepEqual(await doMes(2, 2026), ["Parcela 2026-02-28", "Parcela 2026-03-11"]);                 // fevereiro de 28 dias: 12/02 a 11/03
+  assert.deepEqual(await doMes(3, 2026), ["Parcela 2026-03-12"]);
+});
+
 test("fatura e Pix só com os recursos liberados", async () => {
   const sem = carregar({ recursos: { perfis: true, boleto: false, pix: false, cambio: false } });
   await assert.rejects(sem.req(sem.A.getBoletoData, { perfilId: "p", mes: 3, ano: 2025 }), codigo("FEATURE_UNAVAILABLE"));

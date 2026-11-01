@@ -230,6 +230,29 @@
         return escrita("Excluir transação", [["Nome", atual.descricao], ["Valor", F.moeda(atual.valor)], ["Data", dataBr(atual.data)], ["Conta", atual.nomeConta || "Sem conta"]],
           () => req(A.deleteLancamento, { id: atual.id }));
       },
+      excluir_conta: async (a) => {
+        const c = (await contas()).find((x) => x.id === a.id);
+        if (!c) return { tipo: "leitura", resultado: json({ erro: "conta_nao_encontrada" }) };
+        const n = (await lancamentos()).filter((l) => l.contaId === c.id).length;
+        return escrita("Excluir conta", [["Nome", c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : "")], ["Tipo", TIPOS_CONTA[c.tipo] || c.tipo],
+          ["Transações", n ? n + " continuam, sem conta" : "nenhuma"]], () => req(A.deleteConta, { id: c.id }));
+      },
+      excluir_categoria: async (a) => {
+        const k = (await categorias()).find((x) => x.id === a.id);
+        if (!k) return { tipo: "leitura", resultado: json({ erro: "categoria_nao_encontrada" }) };
+        const n = (await lancamentos()).filter((l) => l.categoriaId === k.id).length;
+        return escrita("Excluir categoria", [["Nome", (k.icone ? k.icone + " " : "") + k.nome],
+          ["Transações", n ? n + " vão para a categoria Outros" : "nenhuma"], ["Orçamentos", "O histórico de orçamentos dela é apagado"]],
+          () => req(A.deleteCategoria, { id: k.id }));
+      },
+      excluir_perfil: async (a) => {
+        if (!opcoes.perfis()) return { tipo: "leitura", resultado: json({ erro: "FEATURE_UNAVAILABLE", mensagem: ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE }) };
+        const p = (await req(A.getPerfis)).perfis.find((x) => x.id === a.id);
+        if (!p) return { tipo: "leitura", resultado: json({ erro: "perfil_nao_encontrado" }) };
+        const n = (await lancamentos()).filter((l) => l.perfilId === p.id).length;
+        return escrita("Excluir perfil", [["Nome", p.nome], ["Transações", n ? n + " ficam sem perfil" : "nenhuma"], ["Faturas", "As faturas deste perfil são apagadas"]],
+          () => req(A.deletePerfil, { id: p.id }));
+      },
       criar_conta: async (a) => {
         const nome = txt(a.nome), tipo = typeof a.tipo === "string" && Object.hasOwn(TIPOS_CONTA, a.tipo) ? a.tipo : undefined;
         if (!nome || !tipo) return faltam([!nome ? "nome" : "", !tipo ? "tipo" : ""].filter(Boolean));
@@ -400,6 +423,10 @@
       },
     };
 
+    const SEM_VERIFICACAO = { erro: "VERIFICACAO_NECESSARIA", mensagem: "Sem a verificação em duas etapas, excluir, exportar, mudar de moeda e as ações de conta pelo Zo pedem a biometria. Cadastre em Configurações › Conta ou ative o 2FA." };
+    const VERIFICACAO_NEGADA = { erro: "VERIFICACAO_NEGADA", mensagem: "A biometria não foi confirmada. Nada foi feito." };
+    /** Telas das Configurações que o Zo só abre depois de confirmar a identidade (conta sem 2FA) */
+    const TELAS_PROTEGIDAS: ReadonlySet<string> = new Set(["senha", "apagar_dados", "excluir_conta", "pix"]);
     const ASSUNTOS: Record<string, { aba: "geral" | "conta"; onde: string }> = {
       senha: { aba: "conta", onde: "Alterar senha" }, dois_fatores: { aba: "conta", onde: "Autenticação de Dois Fatores" },
       protecao_avancada: { aba: "conta", onde: "Proteção avançada" }, apagar_dados: { aba: "conta", onde: "Apagar todos os dados" },
@@ -421,6 +448,12 @@
       },
       abrir_configuracoes: async (a) => {
         const assunto = typeof a.assunto === "string" && Object.hasOwn(ASSUNTOS, a.assunto) ? ASSUNTOS[a.assunto] : ASSUNTOS.geral;
+        // trocar a senha, apagar os dados, excluir a conta e mexer no Pix: sem 2FA, a biometria antes de abrir a tela
+        // (lá dentro continuam a senha, a frase e o código de sempre)
+        if (typeof a.assunto === "string" && TELAS_PROTEGIDAS.has(a.assunto)) {
+          const v = await (opcoes.tela as TelaZo).verificarIdentidade().catch(() => "negado" as const);
+          if (v !== "ok") return v === "sem_metodo" ? SEM_VERIFICACAO : VERIFICACAO_NEGADA;
+        }
         (opcoes.tela as TelaZo).abrirConfiguracoes(assunto.aba);
         return { aberta: true, aba: assunto.aba === "conta" ? "Conta" : "Geral", item: assunto.onde };
       },
@@ -430,16 +463,15 @@
      * Ações sem volta e relatórios: conta sem 2FA confirma com a biometria (o servidor confere a assinatura) antes de
      * gravar ou gerar o arquivo. Sem tela para pedir a confirmação, nada roda (falha fechada).
      */
-    const PROTEGIDAS: ReadonlySet<string> = new Set(["excluir_transacao", "remover_pix", "transferir_entre_moedas", "categorizar_em_lote", "exportar_transacoes"]);
+    const PROTEGIDAS: ReadonlySet<string> = new Set(["excluir_transacao", "excluir_conta", "excluir_categoria", "excluir_perfil", "remover_pix",
+      "transferir_entre_moedas", "exportar_transacoes"]);
     function protegida(r: ResultadoFerramentaZo): ResultadoFerramentaZo {
       if (r.tipo !== "escrita") return r;
       const tela = opcoes.tela, original = r.confirmar;
       return Object.assign({}, r, { confirmar: async () => {
         const v = tela ? await tela.verificarIdentidade().catch(() => "negado" as const) : "negado";
         if (v === "ok") return original();
-        return json(v === "sem_metodo"
-          ? { erro: "VERIFICACAO_NECESSARIA", mensagem: "Sem a verificação em duas etapas, excluir e gerar relatórios pelo Zo pedem a biometria. Cadastre em Configurações › Conta ou ative o 2FA." }
-          : { erro: "VERIFICACAO_NEGADA", mensagem: "A biometria não foi confirmada. Nada foi feito." });
+        return json(v === "sem_metodo" ? SEM_VERIFICACAO : VERIFICACAO_NEGADA);
       } });
     }
 

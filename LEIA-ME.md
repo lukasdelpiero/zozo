@@ -1,6 +1,6 @@
 # ZoZo
 
-**Versão 3.19.1** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
+**Versão 3.20.0** · Autor: **Lukas Del Piero Barros** — Controle financeiro pessoal
 
 Aplicativo web com design baseado no Copilot Money.
 
@@ -13,19 +13,17 @@ Aplicativo web com design baseado no Copilot Money.
 
 Padrão de segurança obrigatório para qualquer mudança: [docs/SEGURANCA.md](docs/SEGURANCA.md) (o Claude Code lê automaticamente via [CLAUDE.md](CLAUDE.md)).
 
-## Em desenvolvimento (próxima versão)
+## Novidades da versão 3.20.0
+
+- **Fatura gerada com empréstimos:** além dos cartões de crédito, entram as transações dos empréstimos do perfil (mês do calendário). Pagar o empréstimo (transferência de entrada ou receita) não entra na cobrança. O campo Cartão virou Conta (cartões e empréstimos).
 
 - **Fatura: valores em aberto, PNG e nomes de arquivo:** a opção "Incluir valores em aberto" (desmarcada por padrão) põe na fatura as compras das faturas de cartão ainda abertas, só até hoje; sem ela, entram só as faturas fechadas e os empréstimos (estes sempre, inclusive vencimentos futuros). A tela diz, conta por conta, o que entrou e o que ficou de fora. Novo botão "Baixar imagem PNG" (gerado no aparelho, sem biblioteca: estilos calculados + logo e fontes embutidos num SVG, desenhado em dobro num canvas). Arquivos: `fatura-perfil-mês-aaaa.pdf/.png` (ex.: `fatura-lukas-outubro-2026`) e `zozo-transacoes-brl|eur|dol-dd-mm-aaaa.csv`. **Regra do dia 11** (contas do segredo `RECURSOS_FATURA_DIA11`): a fatura do mês M leva os fechamentos de cartão e vencimentos de empréstimo de 12/M a 11/(M+1).
 
 - **Lixeira temporal do Zo:** cada gravação confirmada no Zo ganha um botão Desfazer na conversa e entra na Lixeira temporal (menu do Zo). O serviço guarda uma cópia do documento antes e depois (`abrirMarco`/`fecharMarco`, só na memória da aba, até 30) e `desfazerMarco` aplica o inverso só do que aquela gravação mudou e só onde o dado continua como ela deixou (o resto conta como conflito e fica como está; contas, categorias e perfis em uso não saem). Saldo pelas anotações de efeito, sem contar duas vezes. Exportar e sair não entram. **LGPD:** a conversa e a lixeira somem na nova conversa, ao retirar o consentimento, ao sair e depois de 15 minutos sem uso.
 
-- **Biometria e chaves de acesso (WebAuthn):** Configurações › Conta › "Biometria e chaves de acesso" cadastra a digital, o rosto ou o PIN do aparelho (até 10; com 2FA, cadastrar e remover pedem o código atual). O servidor (`api/src/webauthn.py` + rotas `/api/webauthn/*`, migração 0013) confere desafio de uso único (5 min), origem, domínio (rpId), presença e verificação da pessoa (UP + UV), contador de assinaturas (credencial clonada é recusada) e a assinatura (ES256 ou RS256; WebCrypto no Worker, Python puro em `api/dev/assinatura_local.py` nos testes e no servidor local). Guarda só a chave pública (JWK). E-mail de aviso ao cadastrar e remover. **Zo:** em conta sem 2FA, excluir transação, remover a chave Pix, levar transações para outra moeda, categorizar em lote e exportar pedem a biometria no Confirmar; sem biometria cadastrada, nada acontece e o Zo explica como cadastrar ou ativar o 2FA. A extensão PRF já é pedida no cadastro, para no futuro entrar sem senha abrindo os dados cifrados.
+- **Biometria e chaves de acesso (WebAuthn):** Configurações › Conta › "Biometria e chaves de acesso" cadastra a digital, o rosto ou o PIN do aparelho (até 10; com 2FA, cadastrar e remover pedem o código atual). O servidor (`api/src/webauthn.py` + rotas `/api/webauthn/*`, migração 0013) confere desafio de uso único (5 min), origem, domínio (rpId), presença e verificação da pessoa (UP + UV), contador de assinaturas (credencial clonada é recusada) e a assinatura (ES256 ou RS256; WebCrypto no Worker, Python puro em `api/dev/assinatura_local.py` nos testes e no servidor local). Guarda só a chave pública (JWK). E-mail de aviso ao cadastrar e remover. **Zo:** em conta sem 2FA, excluir transação, conta, categoria ou perfil, remover a chave Pix, levar transações para outra moeda e exportar pedem a biometria no Confirmar, e as telas de trocar a senha, apagar os dados, excluir a conta e Pix só abrem depois dela (lá dentro valem a senha, a frase e o código de sempre). O Zo também exclui uma conta, categoria ou perfil por vez (nada em massa); sem biometria cadastrada, nada acontece e o Zo explica como cadastrar ou ativar o 2FA. A extensão PRF já é pedida no cadastro, para no futuro entrar sem senha abrindo os dados cifrados.
 
 - **Códigos de backup do 2FA:** ao ligar o 2FA, o servidor (Python, `totp.novos_codigos_backup`) gera dez códigos de uso único no formato `XXXXX-XXXXX` (Base32 de Crockford: sem I, L, O e U; ao digitar, O vira 0 e I ou L viram 1). Guardado só o HMAC de cada um (tabela `codigos_backup`, migração 0012, chave derivada do `SEGREDO` + e-mail). Valem uma vez no lugar do código do aplicativo no login, na recuperação de senha, nas ações sem volta e para desligar o 2FA (mesmo bloqueio de 5 erros). Cada uso manda um e-mail de aviso com quantos sobraram. Configurações › Conta mostra quantos restam e gera dez novos (pede o código atual; os antigos deixam de valer). Desligar o 2FA ou excluir a conta apaga todos.
-
-## Novidades da versão 3.19.1
-
-- **Fatura gerada com empréstimos:** além dos cartões de crédito (fatura fechada ou aberta), entram as transações dos empréstimos do perfil (mês do calendário). Pagar o empréstimo (transferência de entrada ou receita) não entra na cobrança. O campo Cartão virou Conta (cartões e empréstimos).
 
 ## Novidades da versão 3.19.0
 

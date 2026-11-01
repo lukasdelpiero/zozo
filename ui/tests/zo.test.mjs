@@ -247,3 +247,53 @@ test("Zo: lixeira temporal recebe cada gravação confirmada e desfaz só ela; e
   const ruim = await zo.executar("editar_categoria", args({ id: "k-inexistente", nome: "X" }));
   if (ruim.tipo === "escrita") { await ruim.confirmar(); assert.equal(gravadas.length, 1); }
 });
+
+test("Zo: excluir conta, categoria e perfil mostram o impacto, pedem a biometria (sem 2FA) e voltam pela lixeira", async () => {
+  const pedidos = [], gravadas = [];
+  let resposta = "negado";
+  const tela = Object.assign(telaFalsa().tela, { verificarIdentidade: async () => { pedidos.push(1); return resposta; } });
+  const c = await cenario({ tela });
+  const zo = c.t.Z.zoFerramentas.criar((acao, dados) => c.t.req(acao, dados), { perfis: () => true, tela, aoGravar: (titulo, marco) => gravadas.push(marco) });
+  await c.t.req(c.t.A.createLancamento, { lancamento: { data: hoje(), descricao: "Cinema", valor: 40, tipo: "regular", contaId: c.cartao.id, categoriaId: c.compras.id, perfilId: c.perfil.id } });
+  const ec = await zo.executar("excluir_conta", args({ id: c.cartao.id }));
+  assert.equal(Object.fromEntries(JSON.parse(JSON.stringify(ec.linhas))).Transações, "1 continuam, sem conta");
+  assert.equal(JSON.parse(await ec.confirmar()).erro, "VERIFICACAO_NEGADA");                     // biometria negada: nada sai
+  assert.ok((await c.t.req(c.t.A.getContas)).contas.some((x) => x.id === c.cartao.id));
+  resposta = "ok";
+  assert.ok(JSON.parse(await (await zo.executar("excluir_conta", args({ id: c.cartao.id }))).confirmar()).ok);
+  assert.ok(!(await c.t.req(c.t.A.getContas)).contas.some((x) => x.id === c.cartao.id));
+  assert.deepEqual(await c.t.req(c.t.A.desfazerMarco, { marco: gravadas.at(-1) }), { desfeitas: 2, conflitos: 0 });   // a conta e o vínculo da transação
+  assert.equal((await c.t.req(c.t.A.getLancamentos)).lancamentos[0].contaId, c.cartao.id);
+  const ek = await zo.executar("excluir_categoria", args({ id: c.compras.id }));
+  assert.equal(Object.fromEntries(JSON.parse(JSON.stringify(ek.linhas))).Transações, "1 vão para a categoria Outros");
+  assert.ok(JSON.parse(await ek.confirmar()).ok);
+  const ep = await zo.executar("excluir_perfil", args({ id: c.perfil.id }));
+  assert.equal(Object.fromEntries(JSON.parse(JSON.stringify(ep.linhas))).Transações, "1 ficam sem perfil");
+  assert.ok(JSON.parse(await ep.confirmar()).ok);
+  assert.equal(pedidos.length, 4);                                                                // uma biometria por exclusão
+  for (const [nome, erro] of [["excluir_conta", "conta_nao_encontrada"], ["excluir_categoria", "categoria_nao_encontrada"], ["excluir_perfil", "perfil_nao_encontrado"]]) {
+    assert.equal(JSON.parse((await zo.executar(nome, args({ id: "x-inexistente" }))).resultado).erro, erro);
+  }
+  // sem tela para confirmar a identidade, nada é excluído
+  const semTela = (await cenario()).zo;
+  const r = await semTela.executar("excluir_categoria", args({ id: (await c.t.req(c.t.A.getCategorias)).categorias[0].id }));
+  if (r.tipo === "escrita") assert.equal(JSON.parse(await r.confirmar()).erro, "VERIFICACAO_NEGADA");
+});
+
+test("Zo: senha, apagar dados, excluir a conta e Pix só abrem a tela depois da biometria (sem 2FA)", async () => {
+  for (const [resposta, abre] of [["ok", true], ["negado", false], ["sem_metodo", false]]) {
+    const f = telaFalsa();
+    const tela = Object.assign(f.tela, { verificarIdentidade: async () => { f.chamadas.push(["verificar"]); return resposta; } });
+    const { zo } = await cenario({ tela });
+    for (const assunto of ["senha", "apagar_dados", "excluir_conta", "pix"]) {
+      const r = JSON.parse((await zo.executar("abrir_configuracoes", args({ assunto }))).resultado);
+      assert.equal(r.aberta === true, abre, resposta + " " + assunto);
+      if (!abre) assert.ok(/^VERIFICACAO_/.test(r.erro));
+    }
+    assert.equal(f.chamadas.filter((x) => x[0] === "configuracoes").length, abre ? 4 : 0);
+    // o resto das Configurações abre direto, sem biometria
+    const antes = f.chamadas.filter((x) => x[0] === "verificar").length;
+    await zo.executar("abrir_configuracoes", args({ assunto: "dois_fatores" }));
+    assert.equal(f.chamadas.filter((x) => x[0] === "verificar").length, antes);
+  }
+});
