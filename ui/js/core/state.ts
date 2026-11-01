@@ -90,6 +90,7 @@
     boleto: () => recurso("boleto"),
     pix: () => recurso("pix"),
     cambio: () => recurso("cambio"),          // levar transações de uma moeda para outra (multicâmbio)
+    faturaDia11: () => recurso("faturaDia11"), // fatura com o que fecha ou vence até o dia 11 do mês seguinte
     demo: () => usuario().demo === true,
   };
   ZoZo.recursos = recursos;

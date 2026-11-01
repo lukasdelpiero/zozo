@@ -515,8 +515,10 @@ def _sessao_publica(ctx: Contexto, email: str, nome: str, envelope: str, dois_fa
     av = _avancado(ctx, email, verificado)
     # Levar transações de uma moeda para outra (multicâmbio): contas avançadas + segredo RECURSOS_CAMBIO
     cambio = av or _na_lista(ctx, "RECURSOS_CAMBIO", email, verificado)
+    # Fatura "até o dia 11 do mês seguinte": regra de contas específicas (segredo RECURSOS_FATURA_DIA11; nunca a demo)
+    dia11 = av and email != DEMO_EMAIL and _na_lista(ctx, "RECURSOS_FATURA_DIA11", email, verificado)
     return {"email": email, "nome": nome, "envelope": envelope, "doisFatores": bool(dois_fatores),
-            "demo": email == DEMO_EMAIL, "recursos": {"perfis": av, "boleto": av, "pix": av, "cambio": cambio}}
+            "demo": email == DEMO_EMAIL, "recursos": {"perfis": av, "boleto": av, "pix": av, "cambio": cambio, "faturaDia11": dia11}}
 
 
 # ---------------- prova da senha (rotas com sessão) ----------------

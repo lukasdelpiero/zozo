@@ -522,10 +522,10 @@ test("recursos da conta: só o valor booleano true libera", async () => {
   const srv = servidorFalso();
   const senha = novaSenha();
   await cadastrar(srv, "ana@exemplo.test", senha);
-  srv.contas.get("ana@exemplo.test").recursos = { perfis: "true", boleto: 1, pix: true, cambio: { sim: true } };
+  srv.contas.get("ana@exemplo.test").recursos = { perfis: "true", boleto: 1, pix: true, cambio: { sim: true }, faturaDia11: "true" };
   const h = carregarHost({ fetch: srv.fetch });
   const r = await h.chamar("login", { email: "ana@exemplo.test", senha });
-  assert.deepEqual(r.user.recursos, { perfis: false, boleto: false, pix: true, cambio: false });
+  assert.deepEqual(r.user.recursos, { perfis: false, boleto: false, pix: true, cambio: false, faturaDia11: false });
 });
 
 test("conta de demonstração: nada é gravado no servidor e ações de conta são recusadas", async () => {
@@ -930,7 +930,7 @@ test("prévia/local: conta simulada sem servidor — cadastro, dados e ações d
     T.simular(true);
     const r = await h.chamar("registerUser", { email: "Sim@Exemplo.test", senha: novaSenha(), nomeUsuario: "Simulada" });
     assert.equal(r.authenticated, true);
-    assert.deepEqual(r.user.recursos, { perfis: true, boleto: true, pix: true, cambio: true });
+    assert.deepEqual(r.user.recursos, { perfis: true, boleto: true, pix: true, cambio: true, faturaDia11: false });
     assert.equal(r.user.simulada, true);
     assert.equal((await h.chamar("loadUserData")).documento, null);
     await h.chamar("saveUserData", { documento: { texto: "simulado" } });

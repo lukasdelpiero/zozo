@@ -124,12 +124,17 @@ declare global {
     gastoMensal: { mes: string; dias: Array<{ data: string; valor: number }>; total: number; orcamento: number; ultimoDia: number };
     contas: RespostaContas; categorias: RespostaCategorias; recorrencias: RespostaRecorrencias; ultimosLancamentos: LancamentoTela[];
   }
-  /** todos: perfil "Todos"; cartaoId: o cartão escolhido (null = todos); consulta: sem ajustes, recebidos, saldo anterior e Pix */
+  /**
+   * todos: perfil "Todos"; cartaoId: a conta escolhida (null = todas); consulta: sem ajustes, recebidos, saldo anterior e Pix;
+   * incluirAberto: faturas de cartão em aberto entraram (até hoje); dia11: a conta usa a regra "até o dia 11 do mês seguinte".
+   * periodos: uma linha por faixa de cada conta (aberta: o fechamento ainda não passou).
+   */
   interface RespostaFatura {
     perfil: Perfil | null; todos: boolean; cartaoId: Id | null; consulta: boolean; mes: string; moeda: Moeda;
+    incluirAberto: boolean; hoje: string; dia11: boolean;
     lancamentos: LancamentoTela[];
     ajustes: FaturaGuardada;
-    periodos: Array<{ contaId: Id; nome: string; ultimos4Digitos: string; inicio: string; fim: string; semFechamento: boolean }>;
+    periodos: Array<{ contaId: Id; nome: string; ultimos4Digitos: string; inicio: string; fim: string; semFechamento: boolean; aberta: boolean; emprestimo: boolean }>;
     recebimentos: LancamentoTela[]; saldoAnterior: number; pix: ChavePix | null;
   }
 

@@ -285,7 +285,7 @@ class TesteContaESessao(Base):
         self.assertNotIn("Max-Age", sc)          # cookie de sessão: some ao fechar o navegador
         self.assertNotIn("Expires", sc)
         self.assertEqual(set(self.sessao), {"email", "nome", "envelope", "doisFatores", "demo", "recursos"})
-        self.assertEqual((self.sessao["demo"], self.sessao["recursos"]), (False, {"perfis": False, "boleto": False, "pix": False, "cambio": False}))
+        self.assertEqual((self.sessao["demo"], self.sessao["recursos"]), (False, {"perfis": False, "boleto": False, "pix": False, "cambio": False, "faturaDia11": False}))
         token = self.api.cookies["__Host-zozo"]
         guardado = self.con.execute("SELECT id FROM sessoes").fetchone()[0]
         self.assertEqual(guardado, hashlib.sha256(token.encode()).hexdigest())   # banco não guarda o token
@@ -1007,7 +1007,7 @@ class TesteDemo(Base):
 
     def test_senha_publica_entra_com_recursos(self):
         st, s = self.entrar(self.demo, email=DEMO, pv=self.PROVA)
-        self.assertEqual((st, s["demo"], s["recursos"]), (200, True, {"perfis": True, "boleto": True, "pix": True, "cambio": True}))
+        self.assertEqual((st, s["demo"], s["recursos"]), (200, True, {"perfis": True, "boleto": True, "pix": True, "cambio": True, "faturaDia11": False}))
         self.assertTrue(self.demo("GET", "/api/sessao")[1]["demo"])
         self.assertEqual(self.entrar(Cliente(self.banco, ip="198.51.100.61"), email=DEMO, pv=prova())[0], 401)   # senha errada
 
@@ -1086,7 +1086,7 @@ class TesteDemo(Base):
         cfg = dict(CONFIG, RECURSOS_AVANCADOS=f" outro@exemplo.com , {EMAIL.upper()} ")
         cli = Cliente(self.banco, config=cfg, ip="198.51.100.63")
         st, s = self.entrar(cli)
-        self.assertEqual((st, s["recursos"], s["demo"]), (200, {"perfis": True, "boleto": True, "pix": True, "cambio": True}, False))
+        self.assertEqual((st, s["recursos"], s["demo"]), (200, {"perfis": True, "boleto": True, "pix": True, "cambio": True, "faturaDia11": False}, False))
         self.assertTrue(cli("GET", "/api/sessao")[1]["recursos"]["pix"])
         # a lista não dá privilégio nenhum além disso: o documento continua exigindo a prova da própria conta
         self.assertEqual(cli("GET", "/api/documento", prova=prova())[0], 403)
@@ -1097,9 +1097,23 @@ class TesteDemo(Base):
         self.assertFalse(self.entrar(cli)[1]["recursos"]["cambio"])          # e-mail não confirmado: nada
         self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))
         st, s = self.entrar(cli)
-        self.assertEqual((st, s["recursos"]), (200, {"perfis": False, "boleto": False, "pix": False, "cambio": True}))  # só o câmbio
+        self.assertEqual((st, s["recursos"]), (200, {"perfis": False, "boleto": False, "pix": False, "cambio": True, "faturaDia11": False}))  # só o câmbio
         cli2 = Cliente(self.banco, config=dict(CONFIG, RECURSOS_CAMBIO="outro@exemplo.com"), ip="198.51.100.68")
         self.assertFalse(self.entrar(cli2)[1]["recursos"]["cambio"])         # fora da lista
+
+    def test_fatura_dia_11_so_para_a_lista_com_recursos_e_nunca_na_demo(self):
+        cfg = dict(CONFIG, RECURSOS_FATURA_DIA11=EMAIL)
+        cli = Cliente(self.banco, config=cfg, ip="198.51.100.69")
+        self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))
+        self.assertFalse(self.entrar(cli)[1]["recursos"]["faturaDia11"])     # sem os recursos avançados (fatura): nada
+        com = Cliente(self.banco, config=dict(cfg, RECURSOS_AVANCADOS=EMAIL), ip="198.51.100.70")
+        self.assertTrue(self.entrar(com)[1]["recursos"]["faturaDia11"])
+        outra = Cliente(self.banco, config=dict(CONFIG, RECURSOS_AVANCADOS=EMAIL, RECURSOS_FATURA_DIA11="outro@exemplo.com"), ip="198.51.100.71")
+        self.assertFalse(self.entrar(outra)[1]["recursos"]["faturaDia11"])  # fora da lista
+        self.con.execute("UPDATE contas SET email_verificado = 0 WHERE email = ?", (EMAIL,))
+        self.assertFalse(self.entrar(com)[1]["recursos"]["faturaDia11"])     # e-mail não confirmado
+        demo = Cliente(self.banco, config=dict(CONFIG, RECURSOS_FATURA_DIA11=DEMO), ip="198.51.100.72")
+        self.assertFalse(self.entrar(demo, email=DEMO, pv=self.PROVA)[1]["recursos"]["faturaDia11"])   # a demo nunca
 
     def test_segredo_dos_recursos_digitado_de_varios_jeitos(self):
         self.con.execute("UPDATE contas SET email_verificado = 1 WHERE email = ?", (EMAIL,))

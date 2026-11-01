@@ -70,6 +70,8 @@
   const boletoLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.boleto());
   const ehDemo = () => !!(ZoZo.recursos && ZoZo.recursos.demo());
   const cambioLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.cambio && ZoZo.recursos.cambio());
+  /** Fatura "até o dia 11 do mês seguinte" (contas liberadas no servidor: RECURSOS_FATURA_DIA11) */
+  const faturaDia11 = () => !!(ZoZo.recursos && ZoZo.recursos.faturaDia11 && ZoZo.recursos.faturaDia11());
   function exigir(liberado: boolean) { if (!liberado) throw erro("FEATURE_UNAVAILABLE"); }
   /** Demonstração: além do que foi gerado, só 1 perfil, conta, cartão, categoria, lançamento e recorrência */
   const LIMITE_DEMO = 1;
@@ -1113,10 +1115,10 @@
       };
     },
     /**
-     * Fatura (cobrança): transações de cartão de crédito (faturas fechadas e a aberta) e de empréstimos de um perfil
-     * (ou de todos, "todos") numa dessas contas (ou em todas), o período de cada conta e, só com UM perfil e todas as contas, os ajustes guardados, os pagamentos recebidos,
-     * o saldo anterior e o Pix (guardados por perfil e mês). Com Todos ou um cartão escolhido é só consulta
-     * (regras em cobrancaDoMes / saldoAnterior).
+     * Fatura (cobrança): transações de cartão de crédito (faturas fechadas; as em aberto só com incluirAberto, até hoje)
+     * e de empréstimos de um perfil (ou de todos, "todos") numa dessas contas (ou em todas), o período de cada conta e,
+     * só com UM perfil e todas as contas, os ajustes guardados, os pagamentos recebidos, o saldo anterior e o Pix
+     * (guardados por perfil e mês). Com Todos ou um cartão escolhido é só consulta (regras em faixasDaConta / cobrancaDoMes).
      */
     [A.getBoletoData]: (d) => {
       exigir(boletoLiberado() && avancado());
@@ -1130,23 +1132,29 @@
         cartaoId = c.id;
       }
       const consulta = todos || !!cartaoId;
-      const itens = perfil || todos ? cobrancaDoMes(perfil ? perfil.id : null, mes, cartaoId) : [];
+      if (d.incluirAberto !== undefined && typeof d.incluirAberto !== "boolean") throw erro("OPERATION_FAILED");
+      const incluirAberto = d.incluirAberto === true, hoje = hojeIso();
+      const itens = perfil || todos ? cobrancaDoMes(perfil ? perfil.id : null, mes, cartaoId, incluirAberto) : [];
       const guardada = perfil && !consulta ? doc.faturas[perfil.id + "|" + mes] : undefined;
       const ajustes = { contribuicoes: guardada ? guardada.contribuicoes : [], descontos: guardada ? guardada.descontos : [], arredondamentos: guardada ? guardada.arredondamentos : [] };
-      // período de cada conta que aparece na fatura: cartão, do dia seguinte ao fechamento anterior até o dia do
-      // fechamento; empréstimo, o mês do calendário
-      const periodos = doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (c.id === cartaoId || itens.some((l) => l.contaId === c.id))).map((c) => {
-        const f = c.tipo === "cartao" ? faixaDoCartao(c, mes) : null;
-        return { contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f ? f.inicio : mes + "-01", fim: f ? diaAnterior(f.fim) : dataNoMes(mes, 31),
-          semFechamento: !f && c.tipo === "cartao" };
-      });
+      // período de cada conta da fatura (faixasDaConta): a escolhida, as que entraram e as que têm algo numa fatura em
+      // aberto deixada de fora (para a pessoa saber que existe). aberta: o fechamento ainda não passou.
+      const doPerfil = (l: Lancamento) => (perfil ? l.perfilId === perfil.id : todos) && !l.valorInvalido;
+      const periodos = doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (!cartaoId || c.id === cartaoId) && (perfil || moedaDe(c) === moedaAtual()))
+        .flatMap((c) => {
+          const faixas = faixasDaConta(c, mes, hoje);
+          const tem = c.id === cartaoId || doc.lancamentos.some((l) => l.contaId === c.id && doPerfil(l) && !pagamentoDoCartao(l, c)
+            && faixas.some((f) => l.data >= f.inicio && l.data < f.fim));
+          return tem ? faixas.map((f) => ({ contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f.inicio, fim: diaAnterior(f.fim),
+            semFechamento: f.semFechamento, aberta: f.aberta, emprestimo: c.tipo === "emprestimo" })) : [];
+        });
       const cheia = !!perfil && !consulta;
       return {
-        perfil, todos, cartaoId, consulta, mes, moeda: moedaAtual(),
+        perfil, todos, cartaoId, consulta, mes, moeda: moedaAtual(), incluirAberto, hoje, dia11: faturaDia11(),
         lancamentos: itens.map(enriquecer),
         ajustes, periodos,
         recebimentos: cheia && perfil ? recebimentosDoMes(perfil.id, mes).map(enriquecer) : [],
-        saldoAnterior: cheia && perfil ? saldoAnterior(perfil.id, mes) : 0,
+        saldoAnterior: cheia && perfil ? saldoAnterior(perfil.id, mes, incluirAberto) : 0,
         // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
         pix: cheia && pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null,
       };
@@ -1160,9 +1168,9 @@
   const PALAVRAS_COMUNS = new Set(["compra", "pagamento", "parcela", "parcelado", "debito", "credito", "cartao", "pix", "transferencia", "com", "para", "das", "dos", "ltda"]);
 
   /* ---------------- Fatura de perfis (cobrança) ----------------
-     • Entram as transações do perfil (ou de todos) em cartão de crédito e em empréstimo, da fatura já fechada ou da
-       ainda aberta. Cartão com fechamento: as compras do dia seguinte ao fechamento anterior até o dia do fechamento
-       do mês, inclusive; sem fechamento, e no empréstimo, o mês do calendário.
+     • Entram as transações do perfil (ou de todos) em cartão de crédito e em empréstimo (faixas em faixasDaConta).
+       Cartão: fatura FECHADA (o dia do fechamento já passou) entra inteira; fatura EM ABERTO só com "Incluir valores
+       em aberto", e então só o que tem data até hoje. Empréstimo: sempre, inclusive vencimentos futuros da faixa.
      • Pagar o CARTÃO (o par do tipo Fatura, o formato antigo e a transferência de entrada no cartão) é você pagando o
        banco: não aparece nem abate a cobrança do perfil. O que abate são os pagamentos RECEBIDOS do perfil (receberFatura).
      • Saldo anterior: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais)
@@ -1202,19 +1210,41 @@
     return l.tipo === "receita";
   }
   /**
+   * Faixas [inicio, fim) de uma conta na fatura do mês:
+   *  • cartão: o ciclo do mês (do dia seguinte ao fechamento anterior até o fechamento); sem fechamento, o mês do
+   *    calendário. aberta = o dia do fechamento ainda não passou (no próprio dia, a fatura ainda recebe compras);
+   *  • empréstimo: o mês do calendário, inclusive vencimentos futuros (nunca "em aberto");
+   *  • regra do dia 11 (faturaDia11): a fatura do mês M leva o que fecha ou vence de 12/M a 11/(M+1). No cartão, cada
+   *    ciclo cujo fechamento cai nessa janela (dois, se o fechamento mudar de um mês para o outro; nenhum, se não cair).
+   *    Cada fechamento e cada vencimento pertence a uma fatura só: nada é cobrado duas vezes.
+   */
+  type FaixaFatura = { inicio: string; fim: string; aberta: boolean; semFechamento: boolean };
+  function faixasDaConta(c: Conta, mes: string, hoje: string): FaixaFatura[] {
+    const dia11 = faturaDia11();
+    const calendario = dia11 ? { inicio: mes + "-12", fim: somarMes(mes, 1) + "-12" } : { inicio: mes + "-01", fim: somarMes(mes, 1) + "-01" };
+    if (c.tipo === "emprestimo") return [Object.assign({ aberta: false, semFechamento: false }, calendario)];
+    const ciclos = (dia11 ? [mes, somarMes(mes, 1)] : [mes]).map((m) => faixaDoCartao(c, m));
+    if (ciclos.every((f) => !f)) return [Object.assign({ aberta: hoje < calendario.fim, semFechamento: true }, calendario)];
+    return ciclos.filter((f): f is { inicio: string; fim: string } => !!f)
+      .filter((f) => !dia11 || (f.fim > calendario.inicio && f.fim <= calendario.fim))      // fechamento (fim − 1 dia) na janela
+      .map((f) => ({ inicio: f.inicio, fim: f.fim, aberta: hoje < f.fim, semFechamento: false }));
+  }
+  /**
    * Transações cobradas na fatura do mês, em ordem de data: cartão de crédito e empréstimo. perfilId null = todos os
    * perfis (inclusive as compras sem perfil, nas contas da moeda atual); cartaoId null = todos os cartões e empréstimos.
+   * Fatura de cartão em aberto: só com incluirAberto, e só até hoje.
    */
-  function cobrancaDoMes(perfilId: Id | null, mes: string, cartaoId: Id | null = null): Lancamento[] {
+  function cobrancaDoMes(perfilId: Id | null, mes: string, cartaoId: Id | null = null, incluirAberto = false): Lancamento[] {
     const contas = new Map(doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (!cartaoId || c.id === cartaoId)
       && (perfilId || moedaDe(c) === moedaAtual())).map((c) => [c.id, c] as const));
-    const faixas = new Map<Id, { inicio: string; fim: string } | null>();
+    const hoje = hojeIso();
+    const faixas = new Map<Id, FaixaFatura[]>();
     return doc.lancamentos.filter((l) => {
       const c = (perfilId === null || l.perfilId === perfilId) && !l.valorInvalido && l.contaId ? contas.get(l.contaId) : undefined;
       if (!c || pagamentoDoCartao(l, c)) return false;
-      if (!faixas.has(c.id)) faixas.set(c.id, c.tipo === "cartao" ? faixaDoCartao(c, mes) : null);
-      const f = faixas.get(c.id);
-      return f ? l.data >= f.inicio && l.data < f.fim : l.data.startsWith(mes);
+      if (!faixas.has(c.id)) faixas.set(c.id, faixasDaConta(c, mes, hoje));
+      const f = (faixas.get(c.id) as FaixaFatura[]).find((x) => l.data >= x.inicio && l.data < x.fim);
+      return !!f && (!f.aberta || (incluirAberto && l.data <= hoje));
     }).sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
   }
   /** Pagamentos recebidos do perfil para a fatura do mês */
@@ -1240,13 +1270,13 @@
   }
   const somaRecebida = (lista: Lancamento[]) => lista.reduce((s, l) => s + centavos(l.valor), 0) / 100;
   /** O que ficou em aberto (positivo) ou pago a mais (negativo) nas faturas anteriores, desde a 1ª com pagamento registrado */
-  function saldoAnterior(perfilId: Id, mes: string): number {
+  function saldoAnterior(perfilId: Id, mes: string, incluirAberto = false): number {
     const meses = doc.lancamentos.filter((l) => l.tipo === "receita" && l.perfilId === perfilId && mesFaturaValido(l.faturaPerfil)).map((l) => l.faturaPerfil as string).sort();
     if (!meses.length || meses[0] >= mes) return 0;
     let saldo = 0;
     for (let k = meses[0], n = 0; k < mes && n < 1200; k = somarMes(k, 1), n++) {
       const g = doc.faturas[perfilId + "|" + k];
-      const t = calcularFatura(Object.assign({ lancamentos: cobrancaDoMes(perfilId, k) }, g || {}));
+      const t = calcularFatura(Object.assign({ lancamentos: cobrancaDoMes(perfilId, k, null, incluirAberto) }, g || {}));
       saldo += centavos(t.total) - centavos(somaRecebida(recebimentosDoMes(perfilId, k)));
     }
     return saldo / 100;

@@ -10,7 +10,8 @@ este código só recebe os caminhos /api/*.
 Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
   API_FASTAPI = "1"  → os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py) antes do
                        núcleo. Ligado na prévia; produção só depois de aprovado lá.
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO, RESEND_API_KEY,
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO,
+  RECURSOS_FATURA_DIA11 (fatura "até o dia 11 do mês seguinte"), RESEND_API_KEY,
   GROQ_API_KEY (Zo, o assistente; sem ela o Zo fica desligado). Variável ZO_MODELO (wrangler.toml): o modelo no Groq.
 Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 """
@@ -35,7 +36,7 @@ except ImportError:                   # pragma: no cover
     _JSNULL = None
 
 _CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO",
-           "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "GROQ_API_KEY", "ZO_MODELO")
+           "RECURSOS_FATURA_DIA11", "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "GROQ_API_KEY", "ZO_MODELO")
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 

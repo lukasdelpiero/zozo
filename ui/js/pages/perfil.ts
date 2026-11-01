@@ -322,7 +322,10 @@
       const cfg: Partial<RespostaConfig> = store.get().data.config || {};
       const moeda = cfg.multicambio ? cfg.moeda || "BRL" : null;            // o serviço só devolve moeda válida
       const conteudo = gerarCsv(d.lancamentos || [], moeda);
-      const nome = "ZoZo-transacoes-" + (moeda ? moeda + "-" : "") + F.iso(new Date()) + ".csv";
+      // zozo-transacoes-câmbio-dd-mm-aaaa.csv (brl, eur ou dol; sem multicâmbio, o Real)
+      const cambio = ({ BRL: "brl", EUR: "eur", USD: "dol" } as Record<string, string>)[moeda || cfg.moeda || "BRL"] || "brl";
+      const agora = new Date(), dois = (n: number) => String(n).padStart(2, "0");
+      const nome = "zozo-transacoes-" + cambio + "-" + dois(agora.getDate()) + "-" + dois(agora.getMonth() + 1) + "-" + agora.getFullYear() + ".csv";
       const url = URL.createObjectURL(new Blob([conteudo], { type: "text/csv;charset=utf-8" }));
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();

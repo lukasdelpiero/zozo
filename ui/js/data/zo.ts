@@ -114,14 +114,15 @@
         if (!fatura()) return { erro: "FEATURE_UNAVAILABLE" };
         const m = doMes(a.mes);
         const perfilId = txt(a.perfil_id, 64) || "todos", cartaoId = txt(a.cartao_id, 64) || "todos";
-        const d = await req(A.getBoletoData, { perfilId, cartaoId, mes: m.mes, ano: m.ano });
+        const d = await req(A.getBoletoData, { perfilId, cartaoId, mes: m.mes, ano: m.ano, incluirAberto: a.incluir_aberto === true });
         const recebido = d.recebimentos.reduce((s, l) => s + l.valor, 0);
         const t = ZoZo.servico.calcularFatura(Object.assign({}, d.ajustes, { lancamentos: d.lancamentos, saldoAnterior: d.saldoAnterior, recebido }));
         return { mes: m.texto, perfil: d.todos ? "todos" : d.perfil ? d.perfil.nome : null, so_consulta: d.consulta,
           transacoes: d.lancamentos.slice(0, 50).map((l) => ({ data: l.data, descricao: l.descricao, valor: l.valor, tipo: l.tipo, cartao: l.nomeConta || undefined })),
           quantidade: d.lancamentos.length, total_transacoes: t.lancamentos, contribuicoes: t.contribuicoes, descontos: t.descontos,
           arredondamentos: t.arredondamentos, saldo_anterior: t.saldoAnterior, recebido: t.recebido, a_pagar: t.aPagar,
-          ajustes: d.consulta ? undefined : d.ajustes, periodos: d.periodos.map((p) => ({ cartao: p.nome, de: p.inicio, ate: p.fim })) };
+          ajustes: d.consulta ? undefined : d.ajustes, incluiu_aberto: d.incluirAberto,
+          periodos: d.periodos.map((p) => ({ cartao: p.nome, de: p.inicio, ate: p.fim, em_aberto: p.aberta || undefined })) };
       },
       ler_configuracoes: async () => {
         const c = await req(A.getConfig);

@@ -102,21 +102,65 @@ test("fatura: cartão de crédito e empréstimo do perfil, no mês pedido, em or
   assert.deepEqual(vazia.lancamentos, []);
 });
 
-test("fatura: a fatura fechada e a ainda aberta trazem todas as compras do ciclo, inclusive as futuras", async () => {
+test("fatura: fechada entra inteira; em aberto só com a opção e só até hoje; empréstimo sempre, inclusive vencimento futuro", async () => {
   const t = carregar();
   const { perfil: ana } = await t.req(t.A.createPerfil, { perfil: { nome: "Ana" } });
   const cartao = (await t.req(t.A.createConta, { conta: { nome: "Visa", tipo: "cartao", saldo: 0, fechamento: 5, vencimento: 12 } })).conta.id;
-  const hoje = new Date(), pad = (n) => String(n).padStart(2, "0");
-  const dia = (a, m, d) => { const x = new Date(a, m, d); return x.getFullYear() + "-" + pad(x.getMonth() + 1) + "-" + pad(x.getDate()); };
-  const A = hoje.getFullYear(), M = hoje.getMonth();
-  // fatura do mês que vem: ciclo de 6 deste mês a 5 do mês que vem (aberta); fatura deste mês: 6 do mês passado a 5 deste (fechada ou quase)
-  const compras = [["Fechada início", dia(A, M - 1, 6)], ["Fechada fim", dia(A, M, 5)], ["Aberta início", dia(A, M, 6)], ["Aberta futura", dia(A, M + 1, 5)], ["Seguinte", dia(A, M + 1, 6)]];
-  for (const [descricao, data] of compras) await t.req(t.A.createLancamento, lanc({ data, descricao, contaId: cartao, perfilId: ana.id }));
-  const fechada = await t.req(t.A.getBoletoData, { perfilId: ana.id, mes: M + 1, ano: A });
-  assert.deepEqual(fechada.lancamentos.map((l) => l.descricao), ["Fechada início", "Fechada fim"]);
-  const prox = new Date(A, M + 1, 1);
-  const aberta = await t.req(t.A.getBoletoData, { perfilId: ana.id, mes: prox.getMonth() + 1, ano: prox.getFullYear() });
-  assert.deepEqual(aberta.lancamentos.map((l) => l.descricao), ["Aberta início", "Aberta futura"]);
+  const emprestimo = (await t.req(t.A.createConta, { conta: { nome: "Crédito", tipo: "emprestimo", saldo: 0 } })).conta.id;
+  const agora = new Date(), A = agora.getFullYear(), M = agora.getMonth(), D = agora.getDate();
+  const dia = (a, m, d) => isoDe(new Date(a, m, d));
+  // fatura em aberto = a que tem o dia de hoje (fecha dia 5); a anterior já fechou
+  const ab = D <= 5 ? new Date(A, M, 1) : new Date(A, M + 1, 1);
+  const fe = new Date(ab.getFullYear(), ab.getMonth() - 1, 1);
+  const pedir = (d, extra) => t.req(t.A.getBoletoData, Object.assign({ perfilId: ana.id, mes: d.getMonth() + 1, ano: d.getFullYear() }, extra));
+  const compra = (descricao, data) => t.req(t.A.createLancamento, lanc({ data, descricao, contaId: cartao, perfilId: ana.id }));
+  await compra("Fechada", dia(fe.getFullYear(), fe.getMonth(), 5));                        // dia do fechamento: entra na fechada
+  await compra("Aberta até hoje", hoje());
+  const fimAberta = dia(ab.getFullYear(), ab.getMonth(), 5);
+  if (fimAberta > hoje()) await compra("Aberta futura", fimAberta);                         // parcela que ainda não chegou
+  await t.req(t.A.createLancamento, lanc({ data: dia(ab.getFullYear(), ab.getMonth() + 1, 0), descricao: "Parcela do empréstimo", contaId: emprestimo, perfilId: ana.id, tipo: "interno", sentido: "saida" }));
+  const nomes = (f) => f.lancamentos.map((l) => l.descricao);
+  assert.deepEqual(nomes(await pedir(fe)), ["Fechada"]);
+  const semOpcao = await pedir(ab);
+  assert.deepEqual(nomes(semOpcao), ["Parcela do empréstimo"]);                             // em aberto fica de fora; empréstimo futuro entra
+  assert.equal(semOpcao.incluirAberto, false);
+  assert.deepEqual(semOpcao.periodos.map((p) => [p.nome, p.aberta]), [["Visa", true], ["Crédito", false]]);   // a pessoa vê o que ficou de fora
+  const comOpcao = await pedir(ab, { incluirAberto: true });
+  assert.deepEqual(nomes(comOpcao).sort(), ["Aberta até hoje", "Parcela do empréstimo"]);  // só até hoje: a futura não entra
+  await assert.rejects(pedir(ab, { incluirAberto: "sim" }), codigo("OPERATION_FAILED"));
+});
+
+test("fatura com a regra do dia 11: fechamentos e vencimentos de 12/M a 11/M+1 são da fatura de M, sem cobrar nada duas vezes", async () => {
+  const t = carregar({ recursos: { perfis: true, boleto: true, pix: true, cambio: false, faturaDia11: true } });
+  const { perfil: eu } = await t.req(t.A.createPerfil, { perfil: { nome: "Lukas" } });
+  const conta = async (nome, tipo, extra) => (await t.req(t.A.createConta, { conta: Object.assign({ nome, tipo, saldo: 0 }, extra) })).conta.id;
+  const nubank = await conta("Nubank", "cartao", { fechamento: 5, vencimento: 12 });       // fecha dia 5 do mês seguinte
+  const visa = await conta("Visa", "cartao", { fechamento: 20, vencimento: 27 });           // fecha no próprio mês
+  const emp = await conta("Empréstimo", "emprestimo");
+  const em = (contaId, descricao, data, extra) => t.req(t.A.createLancamento, lanc(Object.assign({ data, descricao, contaId, perfilId: eu.id }, extra)));
+  const parcela = (descricao, data) => em(emp, descricao, data, { tipo: "interno", sentido: "saida" });
+  await em(nubank, "Nubank 06/10", "2025-10-06"); await em(nubank, "Nubank 05/11", "2025-11-05"); await em(nubank, "Nubank 06/11", "2025-11-06");
+  await em(nubank, "Nubank 05/10", "2025-10-05");
+  await em(visa, "Visa 21/09", "2025-09-21"); await em(visa, "Visa 20/10", "2025-10-20"); await em(visa, "Visa 21/10", "2025-10-21");
+  await parcela("Parcela 11/10", "2025-10-11"); await parcela("Parcela 12/10", "2025-10-12"); await parcela("Parcela 31/10", "2025-10-31");
+  await parcela("Parcela 05/11", "2025-11-05"); await parcela("Parcela 11/11", "2025-11-11"); await parcela("Parcela 12/11", "2025-11-12");
+  const doMes = async (mes) => (await t.req(t.A.getBoletoData, { perfilId: eu.id, mes, ano: 2025 })).lancamentos.map((l) => l.descricao).sort();
+  // outubro: Nubank que fecha 05/11 (06/10 a 05/11), Visa que fecha 20/10 (21/09 a 20/10), vencimentos de 12/10 a 11/11
+  assert.deepEqual(await doMes(10), ["Nubank 05/11", "Nubank 06/10", "Parcela 05/11", "Parcela 11/11", "Parcela 12/10", "Parcela 31/10", "Visa 20/10", "Visa 21/09"]);
+  assert.deepEqual(await doMes(9), ["Nubank 05/10", "Parcela 11/10"]);                      // fechou ou venceu até 11/10
+  assert.deepEqual(await doMes(11), ["Nubank 06/11", "Parcela 12/11", "Visa 21/10"]);       // 12/11 já é de novembro
+  // cada transação em uma fatura só
+  const todas = (await doMes(9)).concat(await doMes(10), await doMes(11));
+  assert.equal(new Set(todas).size, todas.length);
+  assert.equal(todas.length, 13);
+  const f = await t.req(t.A.getBoletoData, { perfilId: eu.id, mes: 10, ano: 2025 });
+  assert.equal(f.dia11, true);
+  assert.deepEqual(f.periodos.map((p) => [p.nome, p.inicio, p.fim]),
+    [["Nubank", "2025-10-06", "2025-11-05"], ["Visa", "2025-09-21", "2025-10-20"], ["Empréstimo", "2025-10-12", "2025-11-11"]]);
+  // sem o recurso, a mesma conta segue a regra comum (mês do fechamento; empréstimo no mês do calendário)
+  const comum = carregar({ documento: t.documento() });
+  const outubro = (await comum.req(comum.A.getBoletoData, { perfilId: eu.id, mes: 10, ano: 2025 })).lancamentos.map((l) => l.descricao).sort();
+  assert.deepEqual(outubro, ["Nubank 05/10", "Parcela 11/10", "Parcela 12/10", "Parcela 31/10", "Visa 20/10", "Visa 21/09"]);
 });
 
 test("fatura e Pix só com os recursos liberados", async () => {

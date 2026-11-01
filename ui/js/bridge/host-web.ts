@@ -56,7 +56,7 @@
   type Kdf = typeof KDF_PBKDF2 | typeof KDF_ARGON2;
   /** Chaves de uma senha: a dos dados (e os bytes dela, para guardar cifrada) e a prova */
   type Chaves = { chave: CryptoKey; bits: Bytes; prova: string };
-  type RecursosConta = { perfis: boolean; boleto: boolean; pix: boolean; cambio: boolean };
+  type RecursosConta = { perfis: boolean; boleto: boolean; pix: boolean; cambio: boolean; faturaDia11: boolean };
   type Sessao = {
     email: string; nome: string; chave: CryptoKey; prova: string; envelope: string; versao: number;
     doisFatores: boolean; demo: boolean; recursos: RecursosConta;
@@ -80,7 +80,7 @@
   const HOSTS_PREVIA = ["zozo-previa.zozo-finance-app.workers.dev"];
   const hostAtual = typeof location !== "undefined" ? location.hostname : "";
   const TESTE = hostAtual === "127.0.0.1" || hostAtual === "localhost" || hostAtual === "[::1]" || hostAtual.endsWith(".localhost") || HOSTS_PREVIA.includes(hostAtual);
-  const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true };
+  const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true, faturaDia11: false };     // a regra do dia 11 é de contas específicas
   const CHAVE_SIMULAR = "zozo.teste.simular";
   const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown, zoAceito: false };
   try { teste.simular = TESTE && sessionStorage.getItem(CHAVE_SIMULAR) === "1"; } catch (e) { /* sem sessionStorage */ }
@@ -256,7 +256,7 @@
   /** Recursos que o servidor liberou para a conta (só valores booleanos conhecidos) */
   const lerRecursos = (r: unknown): RecursosConta => {
     const x = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
-    return { perfis: x.perfis === true, boleto: x.boleto === true, pix: x.pix === true, cambio: x.cambio === true };
+    return { perfis: x.perfis === true, boleto: x.boleto === true, pix: x.pix === true, cambio: x.cambio === true, faturaDia11: x.faturaDia11 === true };
   };
   const novaSessao = (r: RespostaApi, k: { chave: CryptoKey; prova: string }): Sessao => ({
     email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0,

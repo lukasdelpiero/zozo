@@ -31,7 +31,7 @@ declare global {
   }
 
   /** js/core/state.ts — estado central (os dados de cada tela ainda são `any`: vêm de módulos em JS) */
-  type RecursoConta = "perfis" | "boleto" | "pix" | "cambio";
+  type RecursoConta = "perfis" | "boleto" | "pix" | "cambio" | "faturaDia11";
   interface UsuarioSessao {
     nomeUsuario?: string;
     email?: string;
@@ -101,6 +101,8 @@ declare global {
     boleto(): boolean;
     pix(): boolean;
     cambio(): boolean;
+    /** fatura do mês com o que fecha ou vence até o dia 11 do mês seguinte (regra de contas específicas) */
+    faturaDia11(): boolean;
     demo(): boolean;
   }
   interface ZoZoLog {

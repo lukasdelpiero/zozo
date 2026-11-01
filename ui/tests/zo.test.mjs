@@ -156,15 +156,17 @@ test("Zo: ajustes e pagamento recebido da fatura só depois de confirmar; a cons
   const aj = await zo.executar("salvar_ajustes_fatura", args({ perfil_id: perfil.id, mes, descontos: [{ descricao: "Amizade", valor: 50 }] }));
   assert.equal(aj.tipo, "escrita");
   assert.equal(Object.fromEntries(aj.linhas).Descontos, "Amizade R$ 50,00");
-  let f = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes }))).resultado);
+  // mês atual (cartão sem fechamento) = fatura em aberto: sem incluir_aberto, nada entra
+  assert.equal(JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes }))).resultado).quantidade, 0);
+  let f = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes, incluir_aberto: true }))).resultado);
   assert.equal(f.a_pagar, 300);                                                              // ainda não confirmou
   await aj.confirmar();
   const pg = await zo.executar("registrar_pagamento_recebido", args({ perfil_id: perfil.id, mes, conta_id: banco.id, valor: 100 }));
   assert.equal(Object.fromEntries(pg.linhas)["Entrou em"], "Itaú");
   await pg.confirmar();
-  f = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes }))).resultado);
+  f = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: perfil.id, mes, incluir_aberto: true }))).resultado);
   assert.deepEqual([f.total_transacoes, f.descontos, f.recebido, f.a_pagar, f.so_consulta], [300, -50, 100, 150, false]);
-  const todos = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: "todos", mes }))).resultado);
+  const todos = JSON.parse((await zo.executar("consultar_fatura", args({ perfil_id: "todos", mes, incluir_aberto: true }))).resultado);
   assert.deepEqual([todos.perfil, todos.so_consulta, todos.a_pagar], ["todos", true, 300]);
 });
 

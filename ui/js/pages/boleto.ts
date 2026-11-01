@@ -25,6 +25,8 @@
   /** Estado do editor: perfil e mês escolhidos, o que veio do serviço e os ajustes como estão na tela */
   interface EstadoFatura {
     perfilId: string; perfil: Perfil | null; cartaoId: string; consulta: boolean; mes: number; ano: number; dataFatura: string;
+    /** "Incluir valores em aberto": faturas de cartão ainda abertas entram, só até hoje (hoje: a data do serviço) */
+    incluirAberto: boolean; hoje: string;
     lancamentos: LancamentoTela[] | null; carregadoPara: string | null; carregando: boolean; erro: string | null;
     contribuicoes: AjusteTela[]; descontos: AjusteTela[]; arredondamentos: AjusteTela[];
     pix: ChavePix | null; pixCodigo: string | null;
@@ -158,7 +160,7 @@
   /** Os dados na tela correspondem exatamente ao perfil e ao período escolhidos? (pode imprimir/copiar Pix) */
   const invalido = (st: EstadoFatura) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x) => x.invalido));
   const pronto = (st: EstadoFatura) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
-  const chaveFiltro = (st: EstadoFatura) => st.perfilId + "|" + st.cartaoId + "|" + st.ano + "-" + st.mes;
+  const chaveFiltro = (st: EstadoFatura) => st.perfilId + "|" + st.cartaoId + "|" + st.ano + "-" + st.mes + "|" + (st.incluirAberto ? "aberto" : "fechado");
   /** Nome no topo do documento e no arquivo: o perfil (ou "Todos os perfis") e o cartão escolhido */
   function nomeDaFatura(st: EstadoFatura, cartoes: ContaTela[]): string {
     const quem = st.perfilId === TODOS ? "Todos os perfis" : st.perfil ? st.perfil.nome : "";
@@ -302,9 +304,14 @@
      não correspondem ao perfil/período escolhidos, o documento não é impresso
      (nem pelo Ctrl+P: veja print.css, .doc[aria-busy="true"]).
      O título da página vira o nome sugerido do arquivo (sem caracteres inválidos). */
-  function imprimirDocumento(st: EstadoFatura, nome: string) {
-    const titulo = ("Fatura " + nome + " " + F.mesNome(st.mes - 1) + " " + st.ano)
-      .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
+  /** Nome dos arquivos da fatura: fatura-perfil-mês-aaaa (ex.: fatura-lukas-outubro-2026), sem acento, minúsculas e hífens */
+  function nomeDoArquivo(st: EstadoFatura): string {
+    const slug = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+    const quem = st.perfilId === TODOS ? "todos" : st.perfil ? st.perfil.nome : "";
+    return ["fatura", slug(quem) || "perfil", slug(F.mesNome(st.mes - 1)), String(st.ano)].join("-");
+  }
+  function imprimirDocumento(st: EstadoFatura) {
+    const titulo = nomeDoArquivo(st);                // "Salvar como PDF" sugere fatura-perfil-mês-aaaa.pdf
     const tituloAnterior = document.title;
     const fim = () => {
       document.body.classList.remove("is-printing-boleto");
@@ -317,6 +324,87 @@
     window.print();
   }
 
+  /* ---------------- PNG ----------------
+     Sem biblioteca e dentro da CSP (img-src 'self' data:): a folha é montada fora da tela, na largura A4 e sem a escala
+     da prévia; a marcação é gerada à parte (nunca vai para a página), cada elemento com os seus estilos calculados; o
+     logo e as fontes vão embutidos (data:) e o SVG com foreignObject vira PNG num canvas, em dobro para ficar nítido.
+     Nada sai do aparelho. */
+  const XHTML = "http://www.w3.org/1999/xhtml", SVG_NS = "http://www.w3.org/2000/svg";
+  const escapar = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  function emDataUrl(url: string): Promise<string> {
+    return fetch(url).then((r) => r.blob()).then((b) => new Promise<string>((ok, falha) => {
+      const fr = new FileReader(); fr.onload = () => ok(String(fr.result)); fr.onerror = () => falha(fr.error); fr.readAsDataURL(b);
+    }));
+  }
+  /** As @font-face da página (Matter), com o arquivo embutido: dentro da imagem não se baixa nada */
+  async function fontesEmbutidas(): Promise<string> {
+    const saida: string[] = [];
+    const visitar = async (regras: CSSRuleList, base: string) => {
+      for (const r of Array.from(regras)) {
+        if (r instanceof CSSFontFaceRule) {
+          const m = /url\(["']?([^"')]+)["']?\)/.exec(r.style.getPropertyValue("src"));
+          if (m) { try { saida.push(r.cssText.replace(m[0], 'url("' + await emDataUrl(new URL(m[1], base).href) + '")')); } catch { /* sem a fonte: a do sistema */ } }
+        } else if ("cssRules" in r) await visitar((r as CSSGroupingRule).cssRules, base);
+      }
+    };
+    for (const folha of Array.from(document.styleSheets)) {
+      let regras: CSSRuleList | null = null;
+      try { regras = folha.cssRules; } catch { regras = null; }       // folha de outro site: não dá para ler
+      if (regras) await visitar(regras, folha.href || location.href);
+    }
+    return saida.join("\n");
+  }
+  /** Marcação XHTML/SVG do nó com os estilos calculados (texto sempre escapado; nada de HTML vindo dos dados) */
+  async function marcacao(no: Node, raiz = false): Promise<string> {
+    if (no.nodeType === Node.TEXT_NODE) return escapar(no.textContent || "");
+    if (!(no instanceof Element)) return "";
+    const svg = no.namespaceURI === SVG_NS, tag = no.localName;
+    let attrs = "";
+    if (svg) Array.from(no.attributes).forEach((a) => { if (!/^on/i.test(a.name)) attrs += " " + a.name + '="' + escapar(a.value) + '"'; });
+    else {
+      const cs = getComputedStyle(no);
+      let css = "";
+      for (let i = 0; i < cs.length; i++) css += cs[i] + ":" + cs.getPropertyValue(cs[i]) + ";";
+      if (raiz) css += "position:static;left:auto;top:auto;margin:0;box-shadow:none;";   // a caixa fica fora da tela; na imagem, no canto
+      attrs += ' style="' + escapar(css) + '"';
+      if (no instanceof HTMLImageElement && no.src) attrs += ' src="' + escapar(await emDataUrl(no.src).catch(() => "")) + '"';
+      ["width", "height", "colspan", "alt"].forEach((n) => { const v = no.getAttribute(n); if (v !== null) attrs += " " + n + '="' + escapar(v) + '"'; });
+    }
+    if (tag === "svg") attrs += ' xmlns="' + SVG_NS + '"';
+    let filhos = "";
+    for (const f of Array.from(no.childNodes)) filhos += await marcacao(f);
+    return !svg && /^(img|br|hr|input)$/.test(tag) ? "<" + tag + attrs + "/>" : "<" + tag + attrs + ">" + filhos + "</" + tag + ">";
+  }
+  async function fotografar(folha: HTMLElement, nomeArquivo: string) {
+    // fora da tela, na largura A4 (sem o zoom da prévia, que mudaria as medidas calculadas)
+    const caixa = h("div", { class: T.papel + " tw:fixed tw:left-[-12000px] tw:top-0", "aria-hidden": "true" }, folha);
+    document.body.appendChild(caixa);
+    try {
+      const imgs = Array.from(caixa.querySelectorAll("img"));
+      await Promise.all(imgs.map((i) => i.decode().catch(() => null)));
+      const larg = Math.ceil(caixa.getBoundingClientRect().width), alt = Math.ceil(caixa.getBoundingClientRect().height);
+      const corpo = await marcacao(caixa, true);
+      const fontes = await fontesEmbutidas();
+      const svg = '<svg xmlns="' + SVG_NS + '" width="' + larg + '" height="' + alt + '"><defs><style>' + escapar(fontes).replace(/&quot;/g, '"') + "</style></defs>"
+        + '<foreignObject x="0" y="0" width="' + larg + '" height="' + alt + '"><div xmlns="' + XHTML + '">' + corpo + "</div></foreignObject></svg>";
+      const imagem = new Image();
+      imagem.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+      await imagem.decode();
+      const escala = 2, canvas = document.createElement("canvas");
+      canvas.width = larg * escala; canvas.height = alt * escala;
+      const c2d = canvas.getContext("2d");
+      if (!c2d) throw new Error("canvas");
+      c2d.fillStyle = "#ffffff"; c2d.fillRect(0, 0, canvas.width, canvas.height);
+      c2d.scale(escala, escala);
+      c2d.drawImage(imagem, 0, 0);
+      const png = await new Promise<Blob>((ok, falha) => canvas.toBlob((b) => (b ? ok(b) : falha(new Error("png"))), "image/png"));
+      const url = URL.createObjectURL(png);
+      const a = h("a", { href: url, download: nomeArquivo, rel: "noopener" });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } finally { caixa.remove(); }
+  }
+
   /* ---------------- Editor (janela em tela cheia) ---------------- */
   function open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean; cartaoId?: string; mes?: number; ano?: number }) {
     if (atual) return;
@@ -327,6 +415,7 @@
     const st: EstadoFatura = {
       perfilId: o.perfilId || "", perfil: null, cartaoId: o.cartaoId || TODOS, consulta: false,
       mes: o.mes && o.mes >= 1 && o.mes <= 12 ? o.mes : hoje.getMonth() + 1, ano: o.ano || hoje.getFullYear(), dataFatura: F.iso(hoje),
+      incluirAberto: false, hoje: F.iso(hoje),
       lancamentos: null, carregadoPara: null, carregando: false, erro: null,
       contribuicoes: [], descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
       recebimentos: [], saldoAnterior: 0, periodos: [],
@@ -344,7 +433,8 @@
     const avisoPix = h("p", { class: T.avisoPix });
     const copiarPix = UI.Button("Copiar Pix copia e cola", { size: "sm", variant: "secondary", icon: "copiar", class: "btn--block",
       onClick: (e) => { const b = e.currentTarget as HTMLElement; if (pronto(st) && st.pixCodigo) navigator.clipboard.writeText(st.pixCodigo).then(() => UI.confirmarNoBotao(b, "Código Pix copiado"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } });
-    const imprimirBtn = UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
+    const imprimirBtn = UI.Button("Imprimir ou salvar PDF", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
+    const pngBtn: HTMLButtonElement = UI.Button("Baixar imagem PNG", { variant: "secondary", icon: "baixar", class: "btn--block", onClick: () => baixarPng(pngBtn) });
 
     function atualizarResumo() {
       const sit = pronto(st) ? situacao(calcular(st)) : null;
@@ -354,6 +444,7 @@
       mount(docEl, Documento(st, nomeDaFatura(st, cartoes)));
       copiarPix.hidden = !st.pixCodigo;
       imprimirBtn.disabled = !pronto(st);
+      pngBtn.disabled = !pronto(st);
       avisoPix.textContent = invalido(st) ? "Corrija o valor marcado em vermelho para imprimir a fatura."
         : pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › Pix." : "";
     }
@@ -361,9 +452,7 @@
       contadorEl.textContent = st.lancamentos && !st.carregando ? String(st.lancamentos.length) : "";
       mount(listaEl, ListaTransacoes(st));
       const ok = pronto(st);
-      mount(periodosEl, ok ? st.periodos.map((p) => h("li", null,
-        p.nome + (p.ultimos4Digitos ? " " + p.ultimos4Digitos : "") + (p.semFechamento ? ": mês inteiro (cadastre o fechamento no cartão para usar o ciclo)"
-        : ": compras de " + F.dataCurta(p.inicio) + " a " + F.dataCurta(p.fim)))) : null);
+      mount(periodosEl, ok ? st.periodos.map((p) => h("li", null, p.nome + (p.ultimos4Digitos ? " " + p.ultimos4Digitos : "") + textoPeriodo(p))) : null);
       mount(recebidosEl, ok ? st.recebimentos.map((l) => h("li", { class: T.recebido },
         h("span", { class: T.itemData }, diaMes(l.data)),
         h("span", { class: T.itemNome }, l.nomeConta || "Conta"),
@@ -373,6 +462,15 @@
       secoesDoPerfil.forEach((s) => s.classList.toggle("tw:hidden", st.consulta));   // as seções são flex: o atributo hidden não basta
       avisoPix.hidden = st.consulta;
       atualizarResumo();
+    }
+    /** Como cada conta entra: fechada (o ciclo), em aberto (só até hoje, com a opção) ou fora; empréstimo pelos vencimentos */
+    function textoPeriodo(p: RespostaFatura["periodos"][number]): string {
+      const de = F.dataCurta(p.inicio), ate = F.dataCurta(p.fim);
+      if (p.emprestimo) return ": vencimentos de " + de + " a " + ate;
+      const ciclo = p.semFechamento ? "mês inteiro (cadastre o fechamento no cartão para usar o ciclo)" : "compras de " + de + " a " + ate;
+      if (!p.aberta) return ": " + ciclo;
+      return st.incluirAberto ? ": fatura em aberto, " + (p.semFechamento ? "mês" : "compras de " + de) + " até hoje (" + F.dataCurta(st.hoje) + ")"
+        : ": fatura em aberto (fecha " + ate + "), fora desta fatura";
     }
     /* Ajustes ficam guardados para o perfil e o mês: grava um pouco depois da última digitação (e ao fechar) */
     let espera: ReturnType<typeof setTimeout> | null = null;
@@ -402,11 +500,11 @@
       if (!st.perfilId) { st.perfil = null; st.erro = null; st.carregando = false; atualizarLista(); return; }
       const chave = chaveFiltro(st);
       st.carregando = true; st.erro = null; atualizarLista();
-      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, cartaoId: st.cartaoId, mes: st.mes, ano: st.ano }).then((d) => {
+      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, cartaoId: st.cartaoId, mes: st.mes, ano: st.ano, incluirAberto: st.incluirAberto }).then((d) => {
         if (meu !== token || chave !== chaveFiltro(st)) return;
         st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || (d.todos ? null : st.perfil); st.pix = d.pix || null;
         st.consulta = !!d.consulta;
-        st.recebimentos = d.recebimentos || []; st.saldoAnterior = F.numero(d.saldoAnterior) || 0; st.periodos = d.periodos || [];
+        st.recebimentos = d.recebimentos || []; st.saldoAnterior = F.numero(d.saldoAnterior) || 0; st.periodos = d.periodos || []; st.hoje = d.hoje || st.hoje;
         const aj = d.ajustes || {};
         repor(st.contribuicoes, aj.contribuicoes); repor(st.descontos, aj.descontos); repor(st.arredondamentos, aj.arredondamentos);
         editoresAjuste.forEach((e) => e.desenhar());
@@ -467,7 +565,16 @@
       if (!st.perfilId) { ctx.toast("Selecione um perfil para imprimir.", { tone: "error" }); perfilSel.focus(); return; }
       if (invalido(st)) { ctx.toast("Há um valor inválido nos ajustes da fatura.", { tone: "error" }); return; }
       if (!pronto(st)) { ctx.toast("Espere as transações carregarem para imprimir.", { tone: "error" }); return; }
-      imprimirDocumento(st, nomeDaFatura(st, cartoes));
+      imprimirDocumento(st);
+    }
+    function baixarPng(botao: HTMLButtonElement) {
+      if (!st.perfilId) { ctx.toast("Selecione um perfil.", { tone: "error" }); perfilSel.focus(); return; }
+      if (invalido(st)) { ctx.toast("Há um valor inválido nos ajustes da fatura.", { tone: "error" }); return; }
+      if (!pronto(st)) { ctx.toast("Espere as transações carregarem.", { tone: "error" }); return; }
+      botao.disabled = true;
+      fotografar(Documento(st, nomeDaFatura(st, cartoes)), nomeDoArquivo(st) + ".png")
+        .catch(() => ctx.toast("Não foi possível gerar a imagem. Use Imprimir e salve como PDF.", { tone: "error" }))
+        .finally(() => { botao.disabled = !pronto(st); });
     }
 
     const editoresAjuste: Array<{ desenhar(): void }> = [];
@@ -500,12 +607,14 @@
         UI.Field("Perfil", perfilSel),
         UI.Field("Conta", cartaoSel),
         h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Fatura de"), h("div", { class: T.periodo }, mesSel, anoSel), periodosEl),
+        // desmarcada: só faturas de cartão já fechadas e empréstimos; marcada: também as abertas, até hoje
+        UI.Checkbox(false, (v) => { st.incluirAberto = v; carregar(); }, { texto: "Incluir valores em aberto", class: "tw:mt-1" }),
         UI.Field("Data da fatura", dataInput)),
       h("section", { class: T.secao },
         h("h2", { class: T.secaoTitulo }, "Transações", contadorEl),
         listaEl),
       ...secoesDoPerfil,
-      h("section", { class: T.secaoResumo }, seloEl, resumoEl, avisoPix, copiarPix, imprimirBtn));
+      h("section", { class: T.secaoResumo }, seloEl, resumoEl, avisoPix, copiarPix, imprimirBtn, pngBtn));
 
     // área com rolagem própria: focável (Tab) e com nome, para rolar pelo teclado (WCAG 2.1.1)
     const preview = h("div", { class: T.previa, tabindex: "0", role: "region", "aria-label": "Prévia da fatura" }, h("div", { class: T.escala }, docEl));
