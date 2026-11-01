@@ -82,7 +82,8 @@
       // degradê: o de Ativos desce até a linha de Passivos; o de Passivos, até o fim do gráfico
       { name: "Ativos", color: css.getPropertyValue("--color-assets").trim(), points: serie.map((p) => ({ data: p.data, valor: p.ativos })) },
       { name: "Passivos", color: css.getPropertyValue("--color-liabilities").trim(), points: serie.map((p) => ({ data: p.data, valor: p.passivos })) },
-    ], { height: o.alturaGrafico || (o.compact ? 150 : 190), independentScale: true, ariaLabel: "Evolução de ativos e passivos",
+    // 133: o card inteiro da tela Contas fica com 308 px de altura, como o de Investimentos
+    ], { height: o.alturaGrafico || (o.compact ? 150 : 133), independentScale: true, ariaLabel: "Evolução de ativos e passivos",
       aoPassar: (pts) => {
         if (!pts || !serie.length) {
           ativos.mostrar(resumo.ativos.valor, resumo.ativos.variacaoPercentual);

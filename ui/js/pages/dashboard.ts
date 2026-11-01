@@ -164,9 +164,11 @@
     const chart = h("div", { class: T.grafico });
     const cs = getComputedStyle(document.documentElement);
     const series: SerieGrafico[] = [{ name: "Gasto", color: cs.getPropertyValue(acima ? "--color-progress-over" : "--color-primary").trim(), points: g.dias, area: true }];
+    // o eixo é o mês inteiro: o gasto vai até hoje e o ritmo do orçamento (tracejado) atravessa o mês todo
+    const eixo = Array.from({ length: g.ultimoDia }, (_, i) => g.mes + "-" + String(i + 1).padStart(2, "0"));
     if (g.orcamento > 0 && g.dias.length) {
       series.push({ name: "Orçamento", color: cs.getPropertyValue("--color-text-muted").trim(), tracejado: true,
-        points: g.dias.map((d) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
+        points: eixo.map((data, i) => ({ data, valor: Math.round((g.orcamento * (i + 1) / g.ultimoDia) * 100) / 100 })) });
     }
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
@@ -179,7 +181,7 @@
     };
     resumo();
     // passar o mouse "filtra": o topo mostra o gasto acumulado até o dia do ponto
-    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês",
+    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês", eixo,
       aoPassar: (pts) => {
         const p = pts && pts[0];
         if (!p) { resumo(); return; }

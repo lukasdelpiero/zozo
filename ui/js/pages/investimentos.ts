@@ -55,7 +55,7 @@
     const chart = h("div", { class: T.grafico });
     // Uma única linha: verde quando sobe, vermelha quando desce (seção 30)
     ZoZo.charts.renderLineChart(chart, [{ name: "Evolução", colorBySlope: true, points: serie.map((p) => ({ data: p.data, valor: p.valor })) }],
-      { height: 190, ariaLabel: "Evolução dos investimentos" });
+      { height: 133, ariaLabel: "Evolução dos investimentos" });            // card com 308 px, como o de Contas
 
     const engrenagem = UI.IconButton("configuracoes", "Contas incluídas no gráfico", { class: T.engrenagem, expanded: false });
     engrenagem.addEventListener("click", () => abrirContasIncluidas(engrenagem, ctx));

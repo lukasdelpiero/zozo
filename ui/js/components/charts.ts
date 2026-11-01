@@ -147,6 +147,10 @@
       const H = o.height;
       const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 6 };      // modo filtro: espaço para a data em cima do ponto
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
+      // o.eixo: as datas do eixo inteiro (ex.: todos os dias do mês). Sem ele, cada série ocupa a largura toda; com
+      // ele, a série curta (o gasto até hoje) vai só até o seu último dia em vez de esticar (no dia 1, um ponto só
+      // ficava solto na beira direita)
+      const N = o.eixo && o.eixo.length ? Math.max(o.eixo.length, ...validas.map((sr) => sr.points.length)) : 0;
       const n = Math.max(...validas.map((sr) => sr.points.length));
 
       const escala = (pts: PontoGrafico[]) => {
@@ -171,7 +175,7 @@
           sr._base = m.t + ih;
         }
       });
-      const x = (i: number, len: number) => m.l + (len <= 1 ? iw : (i / (len - 1)) * iw);
+      const x = (i: number, len: number) => { const total = N || len; return m.l + (total <= 1 ? iw : (i / (total - 1)) * iw); };
 
       if (svg) svg.remove();
       const tela = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: P.graficoSvg });
@@ -179,7 +183,8 @@
 
 
       if (!o.semEixo) {
-        const ref = validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
+        const ref = o.eixo && o.eixo.length ? o.eixo.map((data) => ({ data, valor: 0 }))
+          : validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
         // Início, meio e fim — sem repetir (séries curtas) e sem o do meio quando não cabe entre os outros dois
         const ultimo = ref.length - 1, meio = Math.floor(ultimo / 2);
         const indices = ultimo <= 0 ? [0] : (meio > 0 && meio < ultimo && iw >= 240) ? [0, meio, ultimo] : [0, ultimo];
@@ -272,7 +277,8 @@
       const mostrar = (clientX: number) => {
         const r = tela.getBoundingClientRect();
         const rel = Math.max(0, Math.min(iw, clientX - r.left - m.l));
-        mostrarPonto(Math.round((rel / iw) * (n - 1)));
+        // com eixo: a posição no eixo inteiro, presa ao último dia que tem valor
+        mostrarPonto(Math.min(n - 1, Math.round((rel / iw) * ((N || n) - 1))));
       };
       /** mostra o ponto i (mouse ou teclado) e devolve o texto que o leitor de tela anuncia */
       const mostrarPonto = (i: number): string => {

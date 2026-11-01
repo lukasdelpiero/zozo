@@ -521,6 +521,8 @@ declare global {
   interface SerieGrafico { name?: string; color?: string; colorBySlope?: boolean; points: PontoGrafico[]; area?: boolean; tracejado?: boolean; pontos?: boolean }
   interface OpcoesGraficoLinha {
     height?: number; ariaLabel?: string; animar?: boolean; semEixo?: boolean; independentScale?: boolean;
+    /** datas do eixo inteiro (ex.: todos os dias do mês): séries mais curtas vão só até o seu último ponto */
+    eixo?: string[];
     formatValue?: (v: number) => string; rotuloX?: (p: PontoGrafico) => string; rotuloTooltip?: (p: PontoGrafico) => string;
     /** passar o mouse "filtra": data em cima do ponto, o resto esmaecido e quem chama atualiza o topo
         (pontos = o ponto de cada série no lugar do mouse; null = saiu do gráfico) */

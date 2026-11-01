@@ -23,6 +23,8 @@
           texto: "Escolha se a fatura mostra também o que ainda está em aberto, baixe a fatura como imagem e encontre os arquivos com nomes mais claros." },
         { icone: "🛠️", tipo: "correcao", titulo: "Empréstimos na fatura",
           texto: "As parcelas dos empréstimos agora entram na fatura gerada, junto com as compras do cartão." },
+        { icone: "📈", tipo: "correcao", titulo: "Gráfico do gasto mensal",
+          texto: "O gráfico do gasto no mês mostra o mês inteiro, do dia 1 ao último, e a linha do orçamento atravessa o mês todo. No começo do mês ele não fica mais espremido no canto." },
       ],
     },
     {
