@@ -95,6 +95,10 @@ if ($nomes -notcontains "GROQ_API_KEY") {
 if ($nomes -notcontains "RECURSOS_CAMBIO") {
   Write-Host "   Aviso: RECURSOS_CAMBIO não configurado — levar transações entre moedas fica só para a demonstração e as contas de RECURSOS_AVANCADOS." -ForegroundColor Yellow
 }
+if ($nomes -notcontains "RECURSOS_FATURA_DIA11") {
+  Write-Host "   Aviso: RECURSOS_FATURA_DIA11 não configurado — a fatura 'até o dia 11 do mês seguinte' não vale para nenhuma conta (as demais seguem a regra comum)." -ForegroundColor Yellow
+  Write-Host "   Para ligar na sua conta: npx wrangler secret put RECURSOS_FATURA_DIA11 $($extra -join ' ')  (e-mails separados por vírgula; a conta precisa estar também em RECURSOS_AVANCADOS)" -ForegroundColor Yellow
+}
 if ($nomes -notcontains "RECURSOS_AVANCADOS") {
   Write-Host "   Aviso: RECURSOS_AVANCADOS não configurado — Perfis, boletos e Pix ficam só na conta de demonstração." -ForegroundColor Yellow
   Write-Host "   Para liberar a sua conta: npx wrangler secret put RECURSOS_AVANCADOS $($extra -join ' ')  (e-mails separados por vírgula)" -ForegroundColor Yellow
