@@ -1,17 +1,19 @@
 """
-ZoZo — Zo, o assistente (fases 1, 2 e 3), com um modelo aberto no Groq (API no formato da OpenAI)
+ZoZo — Zo, o assistente (fases 1, 2 e 3), com um modelo aberto no Cloudflare Workers AI (formato da OpenAI)
 
 O navegador conversa com o Zo por POST /api/zo. Este módulo:
   • guarda as INSTRUÇÕES do Zo e a lista FECHADA de ferramentas (o navegador nunca as envia nem altera);
   • confere cada mensagem da conversa (papéis, tamanhos, ferramentas conhecidas, ids que batem);
-  • mascara dados pessoais (CPF, CNPJ, cartão, telefone, e-mail) ANTES de qualquer texto sair para o Groq;
+  • mascara dados pessoais (CPF, CNPJ, cartão, telefone, e-mail) ANTES de qualquer texto ir para o modelo;
   • monta o pedido (chat completions) e devolve só o texto e as chamadas de ferramenta;
   • bloqueio por categoria: o modelo chama a ferramenta interna BARRAR (ódio, palavrões, assédio, conteúdo sexual,
     política, fora do tema). Ofensa recebe resposta fixa e, repetida, pausa o Zo no dia; o resto, recusa neutra.
 
-Groq: não usa o que é enviado para treinar modelos e, com a Retenção Zero de Dados (ZDR) ligada no console
-(Data Controls), não guarda os pedidos. O aviso de consentimento diz isso (versão CONSENTIMENTO_VERSAO); mudou o
-aviso, suba a versão e todos aceitam de novo.
+Workers AI (binding AI do Worker, a mesma conta Cloudflare do ZoZo): não usa o que é enviado para treinar modelos
+e não guarda os pedidos depois de responder (retenção zero, developers.cloudflare.com/workers-ai/platform/data-usage).
+O aviso de consentimento diz isso (versão CONSENTIMENTO_VERSAO); mudou o aviso, suba a versão e todos aceitam de novo.
+Antes (até a 3.20) era o Groq: o plano gratuito (8 mil tokens por minuto) não aguentava duas idas seguidas ao modelo,
+e quase todo pedido com ferramenta precisa de duas.
 
 Os dados financeiros ficam cifrados no servidor: quem lê e grava é o NAVEGADOR, que executa as ferramentas pelo
 serviço de dados (as mesmas regras da tela) e pede a confirmação da pessoa antes de qualquer gravação.
@@ -23,8 +25,7 @@ import re
 import secrets
 from typing import Any
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-CONSENTIMENTO_VERSAO = "groq-zdr-1"          # o aviso aceito; outra versão = pedir o consentimento de novo
+CONSENTIMENTO_VERSAO = "workers-ai-1"        # o aviso aceito; outra versão = pedir o consentimento de novo
 LIMITE_MENSAGENS = 40            # mensagens por pedido (o navegador manda só as mais recentes)
 LIMITE_TEXTO_USUARIO = 2000
 LIMITE_TEXTO_ASSISTENTE = 8000
@@ -32,9 +33,9 @@ LIMITE_ARGUMENTOS = 4000
 LIMITE_RESULTADO = 20000
 LIMITE_CHAMADAS = 8
 LIMITE_TOTAL = 120_000           # caracteres somados da conversa
-LIMITE_RESPOSTA = 200_000        # bytes lidos da resposta do Groq
+LIMITE_RESPOSTA = 200_000        # caracteres lidos da resposta do modelo
 MAX_TOKENS = 4096                # inclui o "raciocínio" dos modelos que pensam antes de responder
-TEMPO_LIMITE_S = 20              # espera máxima pelo Groq; o navegador espera um pouco mais (components/zo.ts)
+TEMPO_LIMITE_S = 20              # espera máxima pelo modelo; o navegador espera um pouco mais (components/zo.ts)
 
 # Categorias de BARRAR: as de ofensa contam para a pausa do dia; as outras recebem só a recusa neutra
 OFENSA = frozenset({"odio", "palavrao", "sexual"})
@@ -207,7 +208,7 @@ def _texto(v: object, limite: int, vazio: bool = False) -> str:
     return v
 
 
-# ---------------- máscara de dados pessoais (antes de sair para o Groq) ----------------
+# ---------------- máscara de dados pessoais (antes de ir para o modelo) ----------------
 # Telefone antes do cartão ("+55 27 99999 8888" tem 13 dígitos); grudado em letra (ids) não é dado pessoal. Valores em reais
 # (1.234,56) e os 4 últimos dígitos ficam como estão.
 _MASCARAS = [
@@ -228,7 +229,7 @@ def mascarar(texto: str) -> str:
 
 def ler_mensagens(bruto: object) -> list[dict[str, Any]]:
     """
-    Conversa vinda do navegador → mensagens no formato da OpenAI (o Groq usa o mesmo), já mascaradas.
+    Conversa vinda do navegador → mensagens no formato da OpenAI (o Workers AI usa o mesmo), já mascaradas.
     Sem papel "system" (as instruções são do servidor). Cada chamada de ferramenta precisa do resultado, na ordem.
     """
     if not isinstance(bruto, list) or not 1 <= len(bruto) <= LIMITE_MENSAGENS:
@@ -255,7 +256,8 @@ def ler_mensagens(bruto: object) -> list[dict[str, Any]]:
             chamadas = m.get("chamadas", [])
             if not isinstance(chamadas, list) or len(chamadas) > LIMITE_CHAMADAS or (not chamadas and not (fala and fala.strip())):
                 raise Invalido()
-            msg: dict[str, Any] = {"role": "assistant", "content": mascarar(fala) if fala and fala.strip() else None}
+            # sem fala: texto vazio (o Workers AI recusa "content": null com "Bad input")
+            msg: dict[str, Any] = {"role": "assistant", "content": mascarar(fala) if fala and fala.strip() else ""}
             if chamadas:
                 lista = []
                 for c in chamadas:
@@ -288,20 +290,20 @@ def ler_mensagens(bruto: object) -> list[dict[str, Any]]:
 
 def modelos(texto: str) -> list[str]:
     """
-    ZO_MODELO = "principal" ou "principal,reserva" (até 3). Nome conferido (ex.: openai/gpt-oss-20b): só letras
-    minúsculas, números, ponto, hífen e sublinhado, com no máximo um "dono/" na frente.
+    ZO_MODELO = "principal" ou "principal,reserva" (até 3). Nome de modelo do Workers AI conferido
+    (ex.: @cf/openai/gpt-oss-120b): "@cf/dono/nome", só letras minúsculas, números, ponto, hífen e sublinhado.
     """
     nomes = [n.strip() for n in texto.split(",") if n.strip()]
     if not nomes or len(nomes) > 3:
         raise Invalido()
     for n in nomes:
-        if not re.fullmatch(r"(?:[a-z0-9][a-z0-9._\-]{0,40}/)?[a-z0-9][a-z0-9._\-]{1,60}", n):
+        if not re.fullmatch(r"@cf/[a-z0-9][a-z0-9._\-]{0,40}/[a-z0-9][a-z0-9._\-]{1,60}", n):
             raise Invalido()
     return nomes
 
 
 def motivo_erro(texto: str) -> str:
-    """Só o código do erro do Groq (ex.: rate_limit_exceeded) para os logs; nada da conversa nem da mensagem."""
+    """Só o código do erro (o adaptador resume o do Workers AI, ex.: cota_diaria) para os logs; nada da conversa."""
     try:
         erro = json.loads(texto).get("error") or {}
         codigo = str(erro.get("code") or erro.get("type") or "") if isinstance(erro, dict) else ""
@@ -313,17 +315,19 @@ def motivo_erro(texto: str) -> str:
 def raciocinio(modelo: str) -> dict[str, Any]:
     """
     Raciocínio mínimo: os pedidos do Zo são curtos (criar, buscar, resumir) e pensar demais só atrasa a resposta.
-    gpt-oss: esforço "low" e o raciocínio fora da resposta. Llama e outros: não pensam (nada a ajustar).
+    gpt-oss: esforço "low" (o raciocínio vem num campo à parte, que ler_resposta ignora). Os outros: o padrão deles.
     """
-    if modelo.startswith("openai/gpt-oss"):
-        return {"reasoning_effort": "low", "include_reasoning": False}
+    if modelo.startswith("@cf/openai/gpt-oss"):
+        return {"reasoning_effort": "low"}
     return {}
 
 
 def montar_pedido(mensagens: list[dict[str, Any]], contexto: str, modelo: str) -> str:
-    """Corpo do pedido ao Groq: instruções do servidor + contexto do dia + a conversa conferida e mascarada."""
+    """
+    Corpo do pedido ao modelo (o nome vai à parte, no Servicos.ia): instruções do servidor + contexto do dia + a
+    conversa conferida e mascarada.
+    """
     return json.dumps({
-        "model": modelo,
         "messages": [{"role": "system", "content": INSTRUCOES + "\n\nContexto\n" + contexto}, *mensagens],
         "tools": [*FERRAMENTAS, BARRAR], "tool_choice": "auto",
         "temperature": 0.3,
@@ -334,7 +338,7 @@ def montar_pedido(mensagens: list[dict[str, Any]], contexto: str, modelo: str) -
 
 def ler_resposta(texto: str) -> dict[str, Any]:
     """
-    Resposta do Groq → {texto, chamadas, bloqueio}. bloqueio: None; "ofensa" (BARRAR por ódio, palavrão ou conteúdo
+    Resposta do modelo → {texto, chamadas, bloqueio}. bloqueio: None; "ofensa" (BARRAR por ódio, palavrão ou conteúdo
     sexual); "fora" (BARRAR por política ou fora do tema); "refeito" (resposta barrada pelo filtro do provedor).
     Só ferramentas conhecidas; o raciocínio do modelo nunca vai para a pessoa.
     """

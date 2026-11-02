@@ -31,7 +31,7 @@
     tw:[&_strong]:font-[550] tw:[&_a]:text-zz-primary tw:[&_a]:font-[550] tw:[&_a]:underline-offset-2 tw:[&_a:hover]:underline">
 
     <h1 class="tw:m-0 tw:text-[32px] tw:leading-[1.2] tw:font-[550] tw:tracking-[-0.015em] tw:text-[#1b2a4a] tw:celular:text-[26px]">Política de privacidade</h1>
-    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 31 de outubro de 2026</p>
+    <p class="tw:mt-2! tw:text-[14px]! tw:text-zz-secondary">Atualizada em 2 de novembro de 2026</p>
 
     <p>O ZoZo existe para você ter o controle das suas finanças, e isso inclui estar no controle dos seus dados. Esta página explica, sem rodeios, o que guardamos, por quê, com quem falamos e como você decide sobre tudo isso.</p>
 
@@ -84,18 +84,18 @@
     <p>As cópias de segurança do banco feitas antes de você ligar a Proteção avançada ainda contêm a cópia antiga da chave, pelo prazo explicado em <a href="#retencao">Por quanto tempo os dados ficam guardados</a>. Elas são cifradas e guardadas com acesso restrito.</p>
 
     <h2 id="zo">E o Zo, o assistente?</h2>
-    <p>O Zo é opcional. Na primeira conversa ele pede o seu consentimento, e sem ele nada é enviado. Com o consentimento, o seu navegador abre os dados (como sempre) e, a cada pergunta, envia ao <strong>Groq</strong>, o serviço que roda a inteligência artificial do Zo, pelo servidor do ZoZo, só o necessário para responder: a sua mensagem, a conversa recente e os trechos dos dados que o Zo consultou (por exemplo, as contas ou as transações de um mês). O seu e-mail de login, a sua senha e as chaves dos dados não são enviados.</p>
+    <p>O Zo é opcional. Na primeira conversa ele pede o seu consentimento, e sem ele nada é enviado. Com o consentimento, o seu navegador abre os dados (como sempre) e, a cada pergunta, envia ao <strong>Workers AI</strong>, o serviço da Cloudflare que roda a inteligência artificial do Zo, pelo servidor do ZoZo, só o necessário para responder: a sua mensagem, a conversa recente e os trechos dos dados que o Zo consultou (por exemplo, as contas ou as transações de um mês). O seu e-mail de login, a sua senha e as chaves dos dados não são enviados.</p>
     <ul>
       <li><strong>Dados pessoais escondidos:</strong> antes de qualquer texto sair do servidor do ZoZo, CPF, CNPJ, números de cartão, telefones e e-mails são trocados por marcas como [CPF oculto].</li>
-      <li><strong>Sem treinamento e sem retenção:</strong> pelo contrato do Groq, o que é enviado não é usado para treinar inteligência artificial. O ZoZo usa a Retenção Zero de Dados do Groq, que não guarda os pedidos depois de responder.</li>
+      <li><strong>Sem treinamento e sem retenção:</strong> pelos termos do Workers AI, a Cloudflare não usa o que é enviado para treinar inteligência artificial e não guarda os pedidos nem as respostas depois de responder (retenção zero).</li>
       <li>O Zo só grava (cria, edita ou exclui) depois de você tocar em Confirmar no resumo que aparece na conversa.</li>
       <li>Senha, código da verificação em duas etapas, CPF e chave Pix nunca passam pelo chat: para isso o Zo abre a tela segura das Configurações.</li>
-      <li>Arquivos do banco (CSV ou OFX) que você importa pelo Zo são lidos no seu aparelho e nunca são enviados ao Groq nem ao servidor do ZoZo. Só as transações que você confirmar entram nos seus dados, cifradas como sempre.</li>
+      <li>Arquivos do banco (CSV ou OFX) que você importa pelo Zo são lidos no seu aparelho e nunca são enviados ao Workers AI nem ao servidor do ZoZo. Só as transações que você confirmar entram nos seus dados, cifradas como sempre.</li>
       <li>O Zo não responde a ódio, preconceito, palavrões, conteúdo sexual, discurso político nem a assuntos fora do ZoZo. Mensagens ofensivas recebem uma resposta padrão e, se repetidas, o Zo pausa até o dia seguinte. Guardamos só a contagem, nunca o texto.</li>
       <li>O ZoZo não guarda a conversa: ela fica só na tela e some ao fechar a aba ou sair. No servidor guardamos só qual aviso você aceitou, a data, e a contagem de mensagens do dia, para o limite diário.</li>
       <li>Você retira o consentimento quando quiser no menu do Zo. Se o aviso mudar, o Zo pede o seu consentimento de novo.</li>
     </ul>
-    <p>O Groq processa esses dados fora do Brasil, com as garantias contratuais previstas na LGPD (art. 33).</p>
+    <p>A Cloudflare pode processar esses dados fora do Brasil, com as garantias contratuais previstas na LGPD (art. 33).</p>
 
     <h2 id="finalidades">Para que usamos os dados?</h2>
     <ul>
@@ -110,10 +110,9 @@
     <h2 id="compartilhamento">Vocês enviam minhas informações para mais alguém?</h2>
     <p>Não vendemos nem compartilhamos os seus dados para fins comerciais. Para o ZoZo funcionar, contamos com alguns fornecedores, que tratam os dados só para nos prestar o serviço:</p>
     <ul>
-      <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques e o CAPTCHA (Turnstile) do cadastro e do login.</li>
+      <li><strong>Cloudflare:</strong> hospedagem do site e do banco de dados, proteção contra ataques, o CAPTCHA (Turnstile) do cadastro e do login e, só se você usar o Zo e der o seu consentimento, o Workers AI, que roda a inteligência artificial do Zo. O Workers AI recebe as suas mensagens e os trechos dos seus dados necessários para responder, com dados pessoais escondidos, sem usá-los para treinar inteligência artificial e sem guardá-los (veja acima).</li>
       <li><strong>Resend:</strong> envio dos e-mails do ZoZo (recebe o seu endereço e o conteúdo do e-mail).</li>
       <li><strong>Google:</strong> só se você escolher "Continuar com Google". Recebemos o seu e-mail confirmado e o seu primeiro nome. A senha do ZoZo continua sendo necessária.</li>
-      <li><strong>Groq:</strong> só se você usar o Zo, o assistente, e der o seu consentimento. Recebe as suas mensagens e os trechos dos seus dados necessários para responder, com dados pessoais escondidos, sem usá-los para treinar inteligência artificial e sem guardá-los (veja abaixo).</li>
       <li><strong>GitHub e Google Drive:</strong> guardam as cópias de segurança do banco de dados, cifradas antes de saírem do nosso ambiente. Sem a chave, que fica só com o responsável pelo ZoZo, elas não podem ser abertas.</li>
     </ul>
     <p>Esses serviços podem processar dados fora do Brasil, com garantias contratuais de proteção previstas na LGPD (art. 33). Também podemos ter de entregar informações a autoridades, quando a lei ou uma ordem judicial exigir. Mesmo assim, os dados financeiros continuam cifrados.</p>

@@ -2,7 +2,7 @@
    ZoZo — Zo, o assistente (botão flutuante + janela de conversa)
    ------------------------------------------------------------
    Botão no canto inferior direito (vidro, com o Z). Ao tocar, abre a janela no mesmo canto e o botão some.
-   Na primeira conversa vem o aviso de consentimento: sem ele nada vai para o Groq (o servidor também recusa).
+   Na primeira conversa vem o aviso de consentimento: sem ele nada vai para o modelo (o servidor também recusa).
    Cada ida ao Zo leva a conversa recente; as ferramentas rodam aqui (data/zo.ts). Gravação só depois do
    Confirmar no cartão de resumo (montado com os dados reais). Texto sempre como texto (nada de HTML).
    A conversa fica só na memória desta aba: sai ao fechar a aba ou sair da conta.
@@ -99,11 +99,11 @@
       s("path", { d: "M 320 320 H 704 L 320 704 H 704", fill: "none", stroke: "url(#" + id + ")", "stroke-width": 160, "stroke-linecap": "round", "stroke-linejoin": "round" }));
   }
 
-  // Aviso do Zo com o Groq (retenção zero). Mudou o texto? Suba zo.CONSENTIMENTO_VERSAO no servidor.
+  // Aviso do Zo com o Cloudflare Workers AI (retenção zero). Mudou o texto? Suba zo.CONSENTIMENTO_VERSAO no servidor.
   const CONSENTIMENTO = "Antes de começar, preciso do seu consentimento. Para ajudar você, o Zo lê e, quando você confirma, altera os seus dados no ZoZo. "
-    + "A cada pergunta, a sua mensagem e só os trechos dos dados necessários são enviados ao Groq, o serviço que roda a inteligência artificial do Zo, para gerar a resposta. "
+    + "A cada pergunta, a sua mensagem e só os trechos dos dados necessários são enviados ao Workers AI, da Cloudflare, o serviço que roda a inteligência artificial do Zo, para gerar a resposta. "
     + "Antes do envio, o ZoZo esconde CPF, CNPJ, número de cartão, telefone e e-mail. "
-    + "O Groq não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos depois de responder. "
+    + "A Cloudflare não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos depois de responder. "
     + "O ZoZo não vende nem usa os seus dados fora desta finalidade, e você pode retirar o consentimento quando quiser no menu do Zo.";
   const SEM_CONSENTIMENTO = "Tudo bem. Sem o seu consentimento eu não consigo continuar. Se mudar de ideia, é só tocar em Rever o aviso.";
   const BOAS_VINDAS = "Oi, eu sou o Zo. Posso criar, consultar e editar transações, contas, categorias, recorrências e perfis, importar o arquivo do seu banco, fazer resumos e tirar dúvidas sobre o ZoZo. Como posso ajudar?";
@@ -508,7 +508,7 @@
     let gravou = false;
     try {
       for (let rodada = 0; rodada < MAX_RODADAS; rodada += 1) {
-        // o servidor desiste do Groq em 20 s (zo.TEMPO_LIMITE_S) e avisa; aqui a espera é um pouco maior, para o aviso chegar
+        // o servidor desiste do modelo em 20 s (zo.TEMPO_LIMITE_S) e avisa; aqui a espera é um pouco maior, para o aviso chegar
         const r = await c.bridge.request(A.zoConversar, { mensagens: recentes() }, { timeout: 30000 });
         if (minha !== geracao) return;
         historico.push({ papel: "assistente", texto: r.texto, chamadas: r.chamadas });

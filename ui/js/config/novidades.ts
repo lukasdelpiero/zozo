@@ -19,6 +19,8 @@
           texto: "Cadastre a biometria do seu aparelho em Configurações › Conta e use para confirmar ações importantes, sem digitar nada." },
         { icone: "✨", tipo: "melhoria", titulo: "Zo de cara nova",
           texto: "A conversa com o Zo ganhou visual novo. Você pode aumentar a janela, pesquisar palavras na conversa, baixar a conversa e mandar emojis." },
+        { icone: "🤖", tipo: "correcao", titulo: "Zo respondendo de verdade",
+          texto: "O Zo mudou de serviço de inteligência artificial e agora consegue consultar, lançar e resumir sem parar no meio com o aviso de muitos pedidos." },
         { icone: "💬", tipo: "melhoria", titulo: "Zo mais cuidadoso",
           texto: "O Zo esconde dados como CPF e cartão antes de pensar na resposta, confirma com você antes de excluir algo e deixa desfazer o que ele fez na conversa." },
         { icone: "🧾", tipo: "novo", titulo: "Fatura do seu jeito",

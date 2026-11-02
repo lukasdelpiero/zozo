@@ -1,7 +1,7 @@
 /* =============================================================
    ZoZo — Zo, o assistente: as ferramentas (rodam AQUI, no navegador)
    ------------------------------------------------------------
-   O modelo (no Groq, pela API do ZoZo) só ESCOLHE uma ferramenta e preenche os argumentos. Quem lê e grava é o
+   O modelo (no Cloudflare Workers AI, pela API do ZoZo) só ESCOLHE uma ferramenta e preenche os argumentos. Quem lê e grava é o
    serviço de dados, com as mesmas regras da tela. Cada argumento é conferido aqui; nada que vem do modelo é
    executado sem passar por esta lista fechada.
      • leitura: devolve só o necessário (JSON curto) para o Zo responder;
@@ -138,7 +138,7 @@
           return n ? { versao: n.versao, quando: n.quando, itens: n.itens.map((i) => i.titulo + ". " + i.texto) } : { itens: [] };
         }
         if (assunto === "termos") return { endereco: "/termos-uso", resumo: "Uso pessoal e gratuito. A senha é a chave dos dados. Você pode exportar, apagar os dados ou excluir a conta quando quiser." };
-        if (assunto === "privacidade") return { endereco: "/politica-privacidade", resumo: "Os dados financeiros são cifrados no seu navegador. O ZoZo não vende dados nem usa publicidade. Com o Zo e o seu consentimento, as mensagens e trechos dos dados vão ao Groq, com CPF, cartão, telefone e e-mail escondidos. O Groq não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos." };
+        if (assunto === "privacidade") return { endereco: "/politica-privacidade", resumo: "Os dados financeiros são cifrados no seu navegador. O ZoZo não vende dados nem usa publicidade. Com o Zo e o seu consentimento, as mensagens e trechos dos dados vão ao Workers AI, da Cloudflare, com CPF, cartão, telefone e e-mail escondidos. A Cloudflare não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos." };
         if (assunto === "armazenamento") return { resumo: "Os dados financeiros ficam num documento cifrado com AES-256-GCM no seu navegador, com uma chave que nasce da sua senha. O servidor guarda só a versão cifrada e as 10 versões anteriores. Por padrão há uma cópia da chave para recuperar a senha pelo e-mail; com a Proteção avançada essa cópia não existe." };
         return { resumo: "O Zo cria, consulta, edita e exclui transações, contas, categorias, recorrências e perfis, cuida das faturas de perfis, importa arquivos CSV e OFX do banco, categoriza em lote, faz resumos e tira dúvidas sobre o ZoZo. Antes de gravar, ele sempre pede a sua confirmação." };
       },

@@ -176,6 +176,7 @@
     IMPORT_ACCOUNT: "Escolha uma conta da moeda atual para importar.",
     IMPORT_INVALID: "O arquivo tem uma linha que não deu para importar. Nada foi importado: confira o arquivo e tente de novo.",
     ZO_BUSY: "O Zo está com muitos pedidos agora. Tente de novo em alguns minutos.",
+    ZO_DAILY: "O Zo chegou ao limite de uso de hoje. Ele volta a responder à noite, depois das 21h.",
     PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",

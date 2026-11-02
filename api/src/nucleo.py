@@ -33,6 +33,7 @@ O núcleo recebe:
   banco    — primeiro(sql, *p) -> dict|None · todos -> list · executar -> int · lote([(sql, p)]) -> list
   servicos — http_get(url, cab) -> (status, texto) · http_post(url, campos) -> (status, texto)
              · http_post_json(url, cab, corpo_json) -> (status, texto)   (e-mails pelo Resend)
+             · ia(modelo, corpo_json, limite) -> (status, texto)          (Zo, pelo Workers AI)
   config   — SEGREDO, TURNSTILE_SITE_KEY, TURNSTILE_SECRET, COOKIE_SEGURO,
              GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO,
              RESEND_API_KEY, EMAIL_REMETENTE, URL_PUBLICA (e-mail: ver emails.py)
@@ -138,6 +139,13 @@ class Servicos(Protocol):
     async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]: ...
     async def http_post(self, url: str, campos: Mapping[str, str]) -> tuple[int, str]: ...
     async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str, limite: int = 2000) -> tuple[int, str]: ...
+    async def ia(self, modelo: str, corpo: str, limite: int) -> tuple[int, str]:
+        """
+        Zo: roda o modelo do Workers AI (binding AI) com o corpo JSON (mensagens e ferramentas no formato da OpenAI).
+        200 + a resposta (chat completion) em JSON; erro = status + {"error": {"code": ...}} (só o código, sem conteúdo).
+        Sem o binding: status 0.
+        """
+        ...
     async def verificar_assinatura(self, alg: int, jwk: Mapping[str, str], dados: bytes, assinatura: bytes) -> bool:
         """ES256 (assinatura r ‖ s) ou RS256 (PKCS#1 v1.5) com SHA-256. Nunca lança: chave ou assinatura ruim = False."""
         ...
@@ -1387,7 +1395,7 @@ async def _webauthn(ctx: Contexto, email: str, conta: Linha, b: Json) -> Respost
 async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     """
     Consentimento (GET/PUT /api/zo/consentimento) e conversa (POST /api/zo). Sessão e prova já conferidas.
-    Sem o consentimento do aviso ATUAL (zo.CONSENTIMENTO_VERSAO), nada vai para o Groq. Limite diário por conta.
+    Sem o consentimento do aviso ATUAL (zo.CONSENTIMENTO_VERSAO), nada vai para o modelo. Limite diário por conta.
     Nenhum conteúdo nos logs.
     """
     p = ctx.pedido
@@ -1407,8 +1415,8 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     linha = await ctx.banco.primeiro("SELECT zo_consentimento, email_verificado FROM contas WHERE email = ?", email)
     if not linha or not str(linha["zo_consentimento"] or "").startswith(atual):
         raise Falha(403, "CONSENT_REQUIRED")
-    chave, modelo = str(ctx.config.get("GROQ_API_KEY") or "").strip(), str(ctx.config.get("ZO_MODELO") or "").strip()
-    if not chave or not modelo:
+    modelo = str(ctx.config.get("ZO_MODELO") or "").strip()
+    if not modelo:
         raise Falha(503, "ZO_UNAVAILABLE")
     try:
         modelos = zo.modelos(modelo)
@@ -1433,14 +1441,13 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     av = _avancado(ctx, email, linha["email_verificado"])
     contexto = (f"Hoje é {dia.tm_mday:02d}/{dia.tm_mon:02d}/{dia.tm_year} ({time.strftime('%Y-%m-%d', dia)}). "
                 f"Perfis {'disponíveis' if av else 'indisponíveis'} nesta conta. Fatura de perfis {'disponível' if av else 'indisponível'}.")
-    cab = {"Authorization": "Bearer " + chave, "Content-Type": "application/json"}
     # Tempo limite TOTAL: o modelo já levou 126 s e o navegador desistiu antes, com o erro genérico. Passou do
     # limite, a pessoa recebe na hora o aviso do Zo (a chamada que ficou para trás é descartada).
     # Falhou (sobrecarga, chamada de ferramenta malformada, modelo fora do ar): tenta o próximo da lista
     # (ZO_MODELO = "principal,reserva"); com um só modelo, tenta ele de novo uma vez. Tudo no mesmo tempo limite.
     inicio = time.monotonic()
     tentativas = modelos if len(modelos) > 1 else modelos * 2
-    status, texto = 0, ""
+    status, texto, motivo = 0, "", ""
     for i, nome in enumerate(tentativas):
         resta = zo.TEMPO_LIMITE_S - (time.monotonic() - inicio)
         if i and resta < 1:                               # sem tempo para outra tentativa
@@ -1450,17 +1457,24 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
         comeco = time.monotonic()
         try:
             status, texto = await asyncio.wait_for(
-                ctx.servicos.http_post_json(zo.GROQ_URL, cab, zo.montar_pedido(mensagens, contexto, nome), zo.LIMITE_RESPOSTA), resta)
+                ctx.servicos.ia(nome, zo.montar_pedido(mensagens, contexto, nome), zo.LIMITE_RESPOSTA), resta)
         except TimeoutError as ex:
             ctx.evento("zo_demorou", email, ms=int((time.monotonic() - inicio) * 1000), modelo=nome)
             raise Falha(504, "ZO_TIMEOUT") from ex
         ctx.evento("zo_tempo", email, ms=int((time.monotonic() - comeco) * 1000), status=status, modelo=nome)
         if status == 200:
             break
-        ctx.evento("zo_falhou", email, status=status, modelo=nome, motivo=zo.motivo_erro(texto))
+        motivo = zo.motivo_erro(texto)
+        ctx.evento("zo_falhou", email, status=status, modelo=nome, motivo=motivo)
+        if status == 0 or motivo == "cota_diaria":           # sem o binding ou cota do dia no fim: a reserva também falharia
+            break
     if status != 200:
-        # 429: limite do plano; 498 e 503: Groq sem capacidade no momento (passam: tentar de novo em instantes)
-        raise Falha(429, "ZO_BUSY") if status in (429, 498, 503) else Falha(502, "ZO_FAILED")
+        if status == 0:
+            raise Falha(503, "ZO_UNAVAILABLE")
+        if motivo == "cota_diaria":                         # a cota do Workers AI volta à meia-noite UTC (21h de Brasília)
+            raise Falha(429, "ZO_DAILY")
+        # 429 e 503: modelo sem capacidade no momento (passa: tentar de novo em instantes)
+        raise Falha(429, "ZO_BUSY") if status in (429, 503) else Falha(502, "ZO_FAILED")
     try:
         resposta = zo.ler_resposta(texto)
     except zo.Invalido as ex:

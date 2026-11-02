@@ -18,10 +18,11 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
   ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
-  ZOZO_DEV_ZO=simulado     Zo sem o Groq: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
+  ZOZO_DEV_ZO=simulado     Zo sem o Workers AI: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
                            "senha" e "orçamento" usam as ferramentas da fase 2, "importar", "categorizar"; "OFENSA-TESTE"
                            e "POLITICA-TESTE" caem no bloqueio; o resto ecoa a mensagem JÁ MASCARADA)
-  ZOZO_DEV_GROQ_KEY / ZOZO_DEV_ZO_MODELO   Zo com o Groq de verdade (use só dados de teste)
+  ZOZO_DEV_CF_CONTA / ZOZO_DEV_CF_TOKEN / ZOZO_DEV_ZO_MODELO   Zo com o Workers AI de verdade, pela API REST
+                           (token com permissão Workers AI; use só dados de teste)
 """
 import asyncio
 import http.server
@@ -78,13 +79,13 @@ CONFIG.update({
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 })
 if os.environ.get("ZOZO_DEV_ZO") == "simulado":
-    CONFIG.update({"GROQ_API_KEY": "simulado", "ZO_MODELO": "simulado"})
-elif os.environ.get("ZOZO_DEV_GROQ_KEY"):
-    CONFIG.update({"GROQ_API_KEY": os.environ["ZOZO_DEV_GROQ_KEY"], "ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "openai/gpt-oss-20b")})
+    CONFIG.update({"ZO_MODELO": "@cf/zozo/simulado"})
+elif os.environ.get("ZOZO_DEV_CF_CONTA") and os.environ.get("ZOZO_DEV_CF_TOKEN"):
+    CONFIG.update({"ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "@cf/openai/gpt-oss-120b,@cf/qwen/qwen3.8-27b")})
 
 
 def _zo_simulado(corpo):
-    """Resposta fixa no formato do Groq (OpenAI): o bastante para testar a janela, a leitura, a confirmação e as telas."""
+    """Resposta fixa no formato do Workers AI (o da OpenAI): o bastante para testar a janela, a leitura, a confirmação e as telas."""
     ultima = json.loads(corpo)["messages"][-1]
     texto = str(ultima.get("content") or "").lower()
     chamadas = []
@@ -164,12 +165,21 @@ class Servicos:
         dados = urllib.parse.urlencode(campos).encode("utf-8")
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
 
+    async def ia(self, modelo, corpo, limite):
+        if modelo == "@cf/zozo/simulado":
+            return _zo_simulado(corpo)
+        conta, token = os.environ.get("ZOZO_DEV_CF_CONTA", ""), os.environ.get("ZOZO_DEV_CF_TOKEN", "")
+        if not conta or not token:
+            return 0, ""
+        # o mesmo modelo pela API REST (no Worker é o binding AI); a resposta vem dentro de "result"
+        url = f"https://api.cloudflare.com/client/v4/accounts/{conta}/ai/run/{modelo}"
+        status, texto = await asyncio.to_thread(self._baixar, urllib.request.Request(
+            url, data=corpo.encode("utf-8"), headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}, method="POST"))
+        if status != 200:
+            return status, json.dumps({"error": {"code": "cota_diaria" if status == 429 else "erro_do_modelo"}})
+        return 200, json.dumps(json.loads(texto).get("result") or {})[:limite]
+
     async def http_post_json(self, url, cabecalhos, corpo, limite=2000):
-        if url.startswith("https://api.groq.com/"):
-            if CONFIG.get("GROQ_API_KEY") == "simulado":
-                return _zo_simulado(corpo)
-            status, texto = await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=corpo.encode("utf-8"), headers=cabecalhos, method="POST"))
-            return status, texto[:limite]
         if CONFIG.get("RESEND_API_KEY") == "console":
             # modo console: mostra o e-mail aqui (assunto e texto, com o link) e não envia nada
             m = json.loads(corpo)
