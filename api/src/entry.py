@@ -25,6 +25,7 @@ from pyodide.ffi import to_js
 from workers import Request, Response, WorkerEntrypoint, fetch
 
 import nucleo
+import zo
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -102,15 +103,15 @@ class Servicos:
 
     async def ia(self, modelo: str, corpo: str, limite: int) -> tuple[int, str]:
         """Zo: o modelo do Workers AI pelo binding AI (sem chave: é a própria conta do Worker)."""
-        from js import JSON, Object
         ai = getattr(self.env, "AI", None)
         if ai is None:
             return 0, ""
         try:
-            r = await ai.run(modelo, to_js(json.loads(corpo), dict_converter=Object.fromEntries))
+            # o SDK converte o dict para JS na ida e a resposta para Python (dict) na volta
+            r = await ai.run(modelo, json.loads(corpo))
         except Exception as ex:  # noqa: BLE001 — o erro do Workers AI vira um código curto (nada do conteúdo)
             return _erro_ia(str(ex))
-        return 200, str(JSON.stringify(r))[:limite]
+        return 200, zo.resposta_em_json(r)[:limite]
 
     async def verificar_assinatura(self, alg: int, jwk: Mapping[str, str], dados: bytes, assinatura: bytes) -> bool:
         """WebAuthn: assinatura conferida pelo WebCrypto do Worker (ES256 = ECDSA P-256 r ‖ s; RS256 = PKCS#1 v1.5)."""

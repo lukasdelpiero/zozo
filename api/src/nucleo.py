@@ -1448,6 +1448,7 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
     inicio = time.monotonic()
     tentativas = modelos if len(modelos) > 1 else modelos * 2
     status, texto, motivo = 0, "", ""
+    resposta: dict[str, Any] | None = None
     for i, nome in enumerate(tentativas):
         resta = zo.TEMPO_LIMITE_S - (time.monotonic() - inicio)
         if i and resta < 1:                               # sem tempo para outra tentativa
@@ -1463,23 +1464,28 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
             raise Falha(504, "ZO_TIMEOUT") from ex
         ctx.evento("zo_tempo", email, ms=int((time.monotonic() - comeco) * 1000), status=status, modelo=nome)
         if status == 200:
-            break
+            try:
+                resposta = zo.ler_resposta(texto)
+                break
+            except zo.Invalido:
+                # ilegível (formato inesperado, ferramenta com nome torto, sem texto nem chamada): tenta a reserva.
+                # Nos logs, só os nomes dos campos que vieram (zo.formato), para achar a causa sem ver a conversa.
+                ctx.evento("zo_resposta_invalida", email, modelo=nome, formato=zo.formato(texto))
+                motivo = "resposta_invalida"
+                continue
         motivo = zo.motivo_erro(texto)
         ctx.evento("zo_falhou", email, status=status, modelo=nome, motivo=motivo)
         if status == 0 or motivo == "cota_diaria":           # sem o binding ou cota do dia no fim: a reserva também falharia
             break
-    if status != 200:
+    if resposta is None:
+        if motivo == "resposta_invalida":
+            raise Falha(502, "ZO_FAILED")
         if status == 0:
             raise Falha(503, "ZO_UNAVAILABLE")
         if motivo == "cota_diaria":                         # a cota do Workers AI volta à meia-noite UTC (21h de Brasília)
             raise Falha(429, "ZO_DAILY")
         # 429 e 503: modelo sem capacidade no momento (passa: tentar de novo em instantes)
         raise Falha(429, "ZO_BUSY") if status in (429, 503) else Falha(502, "ZO_FAILED")
-    try:
-        resposta = zo.ler_resposta(texto)
-    except zo.Invalido as ex:
-        ctx.evento("zo_resposta_invalida", email)
-        raise Falha(502, "ZO_FAILED") from ex
     # Bloqueio por categoria (zo.BARRAR): ódio, palavrão e conteúdo sexual não são tolerados (resposta fixa e,
     # repetidos, pausa no dia); política e fora do tema recebem uma recusa neutra; resposta barrada nunca chega à pessoa.
     bloqueio = resposta.pop("bloqueio")

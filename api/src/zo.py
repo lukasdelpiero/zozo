@@ -336,6 +336,41 @@ def montar_pedido(mensagens: list[dict[str, Any]], contexto: str, modelo: str) -
     }, ensure_ascii=False)
 
 
+def resposta_em_json(valor: Any) -> str:
+    """
+    Resposta do binding AI → texto JSON. O SDK do Python Workers já converte o resultado para Python (dict; o
+    JSON.stringify do JS nesse dict gerava um objeto sem os campos e o Zo dava "resposta inválida" em toda conversa).
+    Valor ainda em JS (SDK antigo) ou proxies aninhados: convertidos com to_py.
+    """
+    def converter(v: Any) -> Any:
+        if hasattr(v, "to_py"):
+            return v.to_py()
+        raise TypeError(type(v).__name__)
+    if hasattr(valor, "to_py"):
+        valor = valor.to_py()
+    return json.dumps(valor, ensure_ascii=False, default=converter)
+
+
+def formato(texto: str) -> str:
+    """
+    Para os logs de uma resposta ilegível: só os NOMES dos campos (da resposta e da mensagem), nunca os valores.
+    Ex.: "choices,id,model,usage|content,role,tool_calls".
+    """
+    try:
+        r = json.loads(texto)
+    except ValueError:
+        return "nao_json"
+    if not isinstance(r, dict):
+        return type(r).__name__
+    nomes = ",".join(sorted(k for k in r if re.fullmatch(r"[a-z_]{1,30}", str(k))))[:200]
+    try:
+        msg = r["choices"][0]["message"]
+        nomes += "|" + ",".join(sorted(k for k in msg if re.fullmatch(r"[a-z_]{1,30}", str(k))))[:200]
+    except (KeyError, IndexError, TypeError):
+        pass
+    return nomes or "vazio"
+
+
 def ler_resposta(texto: str) -> dict[str, Any]:
     """
     Resposta do modelo → {texto, chamadas, bloqueio}. bloqueio: None; "ofensa" (BARRAR por ódio, palavrão ou conteúdo

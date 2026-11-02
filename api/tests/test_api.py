@@ -1823,6 +1823,43 @@ class TesteZo(Base):
         self.assertEqual(self.serv.pedidos_ia, [])
         self.assertEqual(self.falar([u, chamada, resultado])[0], 200)                           # a conversa certa passa
 
+    def test_resposta_do_binding_vira_json_com_os_campos(self):
+        # o SDK do Python Workers devolve o resultado do env.AI.run já em Python (dict); antes ia pelo
+        # JSON.stringify do JS, que gerava um objeto sem os campos, e toda conversa dava "resposta inválida"
+        resposta = {"choices": [{"index": 0, "message": {"role": "assistant", "content": "Oi.", "tool_calls": None}, "finish_reason": "stop"}]}
+
+        class JsDict(dict):                                   # o que o SDK devolve (dict com acesso por atributo)
+            pass
+
+        class Proxy:                                          # valor ainda em JS (SDK antigo ou proxy aninhado)
+            def __init__(self, valor):
+                self.valor = valor
+
+            def to_py(self):
+                return self.valor
+
+        for valor in (resposta, JsDict(resposta), Proxy(resposta), {"choices": [Proxy(resposta["choices"][0])]}):
+            texto = zo.resposta_em_json(valor)
+            self.assertEqual(zo.ler_resposta(texto), {"texto": "Oi.", "chamadas": [], "bloqueio": None})
+
+    def test_resposta_ilegivel_tenta_a_reserva_e_loga_so_o_formato(self):
+        self.consentir()
+        u = [{"papel": "usuario", "texto": "oi"}]
+        reserva = Cliente(self.banco, self.serv, dict(CONFIG_ZO, ZO_MODELO="@cf/openai/gpt-oss-120b,@cf/qwen/qwen3.8-27b"))
+        reserva.cookies = dict(self.api.cookies)
+        respostas = [json.dumps({"segredo_do_modelo": "texto da pessoa"}), ia_texto("Oi, eu sou o Zo.")]
+        original = self.serv.ia
+
+        async def em_sequencia(modelo, corpo, limite):
+            await original(modelo, corpo, limite)
+            return 200, respostas.pop(0)
+        self.serv.ia = em_sequencia
+        self.assertEqual(self.falar(u, cli=reserva), (200, {"texto": "Oi, eu sou o Zo.", "chamadas": []}))
+        self.assertEqual([p["modelo"] for p in self.serv.pedidos_ia[-2:]], ["@cf/openai/gpt-oss-120b", "@cf/qwen/qwen3.8-27b"])
+        logs = " ".join(reserva.logs)
+        self.assertIn('"formato": "segredo_do_modelo"', logs)                                   # só o nome do campo
+        self.assertNotIn("texto da pessoa", logs)                                               # nunca o valor
+
     def test_resposta_do_modelo_ilegivel_ou_barrada(self):
         self.consentir()
         u = [{"papel": "usuario", "texto": "oi"}]
