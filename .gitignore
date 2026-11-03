@@ -1,5 +1,6 @@
 # gerados
 api/public/
+api/portfolio/public/
 api/dev/*.db
 api/dev/*.db-*
 __pycache__/

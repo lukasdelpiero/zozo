@@ -95,7 +95,7 @@
     <section aria-labelledby="prompts" class="tw:flex tw:flex-col tw:gap-4">
       <div>
         <h2 id="prompts" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Prompts em destaque</h2>
-        <p class="tw:m-0 tw:max-w-[680px] tw:text-[15px] tw:leading-[1.6] tw:text-zz-secondary">Trechos reais, como foram enviados. Cada um mostra uma forma de trabalhar com agentes que eu repetiria em qualquer projeto.</p>
+        <p class="tw:m-0 tw:max-w-[680px] tw:text-[15px] tw:leading-[1.6] tw:text-zz-secondary">Trechos reais, só encurtados e com a formatação ajustada para caber na página. Cada um mostra uma forma de trabalhar com agentes que eu repetiria em qualquer projeto.</p>
       </div>
 
       <!-- 1. Especificação do Zo -->
@@ -129,6 +129,53 @@
                2. É formatado automaticamente em ponto separando milhar e
                   vírgula separando os centavos. Ex.: 1000,00 = 1.000,00</pre>
         <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> 36 ferramentas numa lista fechada, o cartão de confirmação antes de qualquer gravação e a janela do Zo nas medidas do documento, com pesquisa, download da conversa e emojis.</p>
+      </article>
+
+      <!-- 2. Especificação do ZoZo -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Especificação · Claude Code · 122 linhas</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">O 2FA do ZoZo descrito estado por estado, com a defesa contra força bruta anexada</h3>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">A mesma disciplina do Zo aplicada a um fluxo de segurança: onde fica cada elemento, a animação do painel, cada etapa, a mensagem do primeiro erro e a do segundo, com tamanho e peso de fonte, o que muda depois do acerto e o novo passo do login. Junto foi uma estratégia de bloqueio progressivo para o login.</p>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Adicionar opção de método 2FA:
+1. Abaixo de alterar senha
+   1. Esquerda: Autenticação de Dois Fatores
+   2. Direita: Botão Ativar 2FA
+      1. Clicou
+         1. Abre uma sidebar do lado direito da janela modal de configurações
+            1. Animação da direita para esquerda
+               1. Etapas
+                  1. Abra seu aplicativo 2FA
+                  2. Clique em + ou Adicionar
+                  3. Escaneie o QR code ou insira a chave de configuração
+                     1. Gera um QR Code dinâmico e uma chave de configuração
+                  4. Insira o código de seis dígitos.
+                     1. Se errado:
+                        1. Esse código não funcionou. Tente o código mais recente
+                           do seu aplicativo 2FA.
+                           1. font size 0.8125rem
+                           2. font weight 450
+                           3. Se errar de novo
+                              1. Algo deu errado. Por favor, tente novamente ou entre em
+                                 contato com o suporte se o problema persistir.
+                     2. Se certo:
+                        1. Check cor branca com fundo circular verde
+                        2. Painel lateral que havia sido aberto fecha, esquerda pra direita
+                        3. Texto do botão Ativar 2FA muda para Desativar 2FA
+                           1. Se clicar: janela modal "Desativar 2FA?"
+                     3. Quando o usuário logar novamente e estiver com 2FA ativado
+                        1. Logo após a tela de inserir senha irá para uma outra
+                           1. Mesmo conceito, mesmas posições: "Autentique sua conta"
+                              1. font size 1.5rem
+                              2. font weight 550
+
+Lógica para erro de login · Bloqueio progressivo
+Até 3 tentativas       Permitir login normal
+4ª e 5ª tentativa      Exigir CAPTCHA (v3 ou Turnstile)
+5ª tentativa errada    Bloqueio temporário por 15 minutos
+10ª tentativa errada   Bloqueio preventivo total + disparo de e-mail
+• Vincule o bloqueio ao IP + usuário
+• Mensagens de erro genéricas: "Usuário ou senha incorretos"</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Autenticação em duas etapas com código de aplicativo que nunca vale duas vezes, dez códigos de backup de uso único, bloqueio por tentativas erradas, CAPTCHA no login e respostas que não revelam se uma conta existe. Cada controle tem um teste negativo na API.</p>
       </article>
 
       <!-- 2. Auditoria: antes e depois -->
@@ -174,18 +221,59 @@ requisitos pertinentes.
         <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Achados rastreáveis e uma regra que ficou no projeto. Todo controle de segurança novo ganha um teste negativo, e cada relatório do Codex passa por uma triagem antes de virar código.</p>
       </article>
 
-      <!-- 3. Diagnóstico por evidência -->
+      <!-- Passagem de tarefa entre agentes -->
       <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Diagnóstico · os dois agentes no mesmo problema</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Pedir a causa exata, com o laudo do outro agente anexado</h3>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Agora, ainda temos problema com o Zo. Ele simplesmente não funciona.
-Nunca funcionou. Preciso que verifique a exata causa, até mesmo se ele
-de fato está configurado.
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Passagem de tarefa · do Claude Code para outra sessão e para o Codex</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Um agente escreve o brief que outro agente executa</h3>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">Num teste no navegador, o Claude Code achou um bug fora do escopo do que estava fazendo. Em vez de desviar, escreveu uma tarefa completa para outra sessão, com contexto, reprodução, risco, onde procurar, como provar e o que não fazer. Eu abri a tarefa numa sessão nova e, no dia seguinte, levei o mesmo brief ao Codex.</p>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">ZoZo project (…). Read CLAUDE.md and docs/SEGURANCA.md first.
 
-Vou deixar o que o Codex me disse a respeito
-[diagnóstico do Codex, com hipóteses e o que ele não conseguiu provar]</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O Codex chegou a uma hipótese e disse com clareza o que não conseguia provar sem os registros. O Claude Code foi aos logs da Cloudflare e fechou a questão. A primeira chamada ao modelo respondia em 0,7 s. A segunda, um segundo depois, voltava <code class="tw:text-[13px] tw:px-1.5 tw:py-px tw:rounded tw:bg-zz-primary-softer">429 rate_limit_exceeded</code>. Cada chamada leva uns 6,6 mil tokens (as 36 ferramentas pesam 5 mil), e o plano gratuito do provedor aceitava 8 mil por minuto. Todo pedido com ferramenta precisa de duas chamadas.</p>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Causa medida em tokens e confirmada nos registros de produção e da prévia, em vez de uma troca de provedor no escuro.</p>
+Bug seen in a browser test: in Configurações › Conta (pages/perfil.ts), changing
+the user name opens the "Confirmar alteração" dialog, which asks for the password.
+If the session ends while that dialog is open (sign-out triggered elsewhere, e.g.
+another tab or an expired session, or "Sair" triggered programmatically), the app
+goes back to the login screen, but the dialog stays in the DOM, visible on top. It
+is still there after a NEW account signs in. Clicking "Salvar" would then send the
+rename for the NEW session.
+
+Task: when the session ends (logout, 401 / expired session, account switch), close
+every open modal, dialog and side panel, and drop their pending callbacks. Find
+where the app returns to the login screen (ui/js/app.ts, components/auth.ts, the
+modal helpers in components/estrutura.ts or similar) and add a single place that
+clears the modals. Add a test in ui/tests if a suitable harness exists; otherwise
+verify in the browser. Run npm run typecheck and npm test. Do not deploy.
+Report in Portuguese.</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Por que funciona.</strong> O brief se sustenta sozinho. Diz o que ler antes, descreve o defeito com o impacto real (uma ação de uma conta indo para outra), aponta onde procurar sem impor a solução, define como provar que terminou e o que não fazer. Qualquer agente, de qualquer fornecedor, consegue executar.</p>
+      </article>
+
+      <!-- Diagnóstico entre agentes -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Diagnóstico · o laudo do Codex vira o ponto de partida do Claude Code</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Investigar sem tocar no código, entregar um laudo e confirmar no ambiente real</h3>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O Zo não conversava. Pedi ao Codex uma investigação só de leitura, com um laudo escrito para o Claude Code. O laudo veio com o commit examinado, o escopo, a evidência com arquivo e linha e, principalmente, o que ele não tinha como provar.</p>
+        <figure class="tw:m-0 tw:flex tw:flex-col tw:gap-2">
+          <figcaption class="tw:text-[13px] tw:font-[620] tw:text-zz-secondary">Laudo do Codex · 1º de novembro</figcaption>
+          <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words"># Diagnóstico do assistente Zo — entrega para Claude Code
+
+Referência examinada: main, commit c7519d9 (29/10/2026).
+Escopo: investigar por que o Zo não conversa adequadamente, não responde consultas
+ou não conclui funções. Auditoria somente de leitura; nenhuma correção ou publicação
+realizada.
+
+Esses defeitos estão identificados no código examinado. Não foi comprovado que esse
+commit está publicado no ambiente usado pelo usuário. Não foram acessados logs do
+Worker, valores de segredos, cota do projeto Google ou banco em produção.
+
+Uma consulta aos dados depende de pelo menos duas chamadas ao modelo. A primeira
+funcionar não comprova que a integração inteira funciona.
+
+### ZO-01 — P1: assinatura obrigatória do Gemini perdida no ciclo de ferramentas
+Evidência
+- api/src/zo.py:345–356: a resposta é reduzida a texto e chamadas com id, nome e
+  argumentos. O campo thoughtSignature da parte original é descartado.</pre>
+        </figure>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O Claude Code fez a triagem do laudo, corrigiu os defeitos confirmados (o travamento ao fechar com uma confirmação aberta e a perda do que já tinha sido gravado) e foi atrás do que o Codex declarou não ter visto. Nos logs da Cloudflare, a primeira chamada ao modelo respondia em 0,7 s e a segunda, um segundo depois, voltava <code class="tw:text-[13px] tw:px-1.5 tw:py-px tw:rounded tw:bg-zz-primary-softer">429 rate_limit_exceeded</code>. Cada chamada leva uns 6,6 mil tokens, e o plano gratuito do provedor aceitava 8 mil por minuto. Exatamente a segunda chamada que o laudo apontava como ponto cego.</p>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Dois agentes, duas camadas de evidência. O código explicou parte do problema, os registros do ambiente explicaram o resto, e a causa foi medida em tokens antes de qualquer troca de provedor.</p>
       </article>
 
       <!-- 4. Avaliação de modelos -->
