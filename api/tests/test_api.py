@@ -1842,6 +1842,28 @@ class TesteZo(Base):
             texto = zo.resposta_em_json(valor)
             self.assertEqual(zo.ler_resposta(texto), {"texto": "Oi.", "chamadas": [], "bloqueio": None})
 
+    def test_raciocinio_vazado_no_texto_nunca_chega_a_tela(self):
+        # o gpt-oss escreveu o raciocínio e a chamada como texto ("<|channel|>…<|call|>"): na tela apareciam os ids
+        # e o "pensamento" do modelo. Agora a resposta é descartada e a reserva responde
+        vazado = ia_texto("<|channel|>buscar: We need to edit transaction id l28e11c<|end|><|start|>assistant to=functions "
+                          "editar transacao<|call|>")
+        self.assertRaises(zo.Invalido, zo.ler_resposta, vazado)
+        self.assertEqual(zo.formato(vazado), "texto_em_formato_interno")
+        self.consentir()
+        reserva = Cliente(self.banco, self.serv, dict(CONFIG_ZO, ZO_MODELO="@cf/openai/gpt-oss-120b,@cf/qwen/qwen3.8-27b"))
+        reserva.cookies = dict(self.api.cookies)
+        respostas = [vazado, ia_texto("Pronto.")]
+        original = self.serv.ia
+
+        async def em_sequencia(modelo, corpo, limite):
+            await original(modelo, corpo, limite)
+            return 200, respostas.pop(0)
+        self.serv.ia = em_sequencia
+        self.assertEqual(self.falar([{"papel": "usuario", "texto": "muda o valor"}], cli=reserva), (200, {"texto": "Pronto.", "chamadas": []}))
+        logs = " ".join(reserva.logs)
+        self.assertIn('"formato": "texto_em_formato_interno"', logs)
+        self.assertNotIn("l28e11c", logs)
+
     def test_resposta_ilegivel_tenta_a_reserva_e_loga_so_o_formato(self):
         self.consentir()
         u = [{"papel": "usuario", "texto": "oi"}]

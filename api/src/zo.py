@@ -360,6 +360,11 @@ def formato(texto: str) -> str:
         r = json.loads(texto)
     except ValueError:
         return "nao_json"
+    try:
+        if _FORMATO_INTERNO.search(str(r["choices"][0]["message"].get("content") or "")):
+            return "texto_em_formato_interno"
+    except (KeyError, IndexError, TypeError, AttributeError):
+        pass
     if not isinstance(r, dict):
         return type(r).__name__
     nomes = ",".join(sorted(k for k in r if re.fullmatch(r"[a-z_]{1,30}", str(k))))[:200]
@@ -369,6 +374,9 @@ def formato(texto: str) -> str:
     except (KeyError, IndexError, TypeError):
         pass
     return nomes or "vazio"
+
+
+_FORMATO_INTERNO = re.compile(r"<\|(?:channel|start|end|message|call|constrain|return)\|>")
 
 
 def ler_resposta(texto: str) -> dict[str, Any]:
@@ -411,6 +419,10 @@ def ler_resposta(texto: str) -> dict[str, Any]:
                          "nome": f["name"], "argumentos": argumentos if len(argumentos) <= LIMITE_ARGUMENTOS else "{}"})
     conteudo = msg.get("content")
     fala = conteudo.strip()[:LIMITE_TEXTO_ASSISTENTE] if isinstance(conteudo, str) else ""
+    # gpt-oss às vezes escreve o raciocínio e a chamada de ferramenta como TEXTO, no formato interno dele
+    # ("<|channel|>analysis…<|call|>"): isso nunca vai para a tela; a resposta conta como ilegível (tenta a reserva)
+    if _FORMATO_INTERNO.search(fala):
+        raise Invalido()
     if not chamadas and not fala:
         raise Invalido()
     return {"texto": fala or None, "chamadas": chamadas, "bloqueio": None}
