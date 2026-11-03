@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Portfólio · Lukas Del Piero Barros · ZoZo</title>
+  <meta name="description" content="Como o ZoZo e o Zo foram construídos orientando o Claude Code e o Codex: números, processo com vários agentes e os prompts que fizeram a diferença.">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/assets/img/favicon.png">
+  <link rel="stylesheet" href="/src/estilos.css">
+</head>
+<!-- Página pública e estática (sem JavaScript), no visual da apresentação (/sobre): fundo #f8f9fb, cartões brancos,
+     logo e fonte Matter. Portfólio do autor: como o ZoZo e o Zo foram feitos com agentes de IA. Números levantados
+     dos registros das sessões (Claude Code e Codex) e do repositório em 03/11/2026; ao atualizar, mude a data. -->
+<body class="tw:overflow-y-auto tw:bg-[#f8f9fb] tw:text-zz-text">
+  <a href="#conteudo" class="tw:sr-only tw:focus:not-sr-only tw:focus:fixed tw:focus:top-3 tw:focus:left-3 tw:focus:z-10 tw:focus:px-3 tw:focus:py-2 tw:focus:rounded-lg tw:focus:bg-zz-surface tw:focus:text-zz-text">Pular para o conteúdo</a>
+
+  <header class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:pt-7 tw:pb-5">
+    <a href="/sobre" class="tw:inline-flex tw:items-center tw:gap-2.5 tw:rounded-[10px] tw:text-zz-text tw:no-underline tw:text-[17px] tw:font-[620] tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-4">
+      <img src="/assets/img/zozo-logo.svg" alt="" width="32" height="32" class="tw:size-8 tw:rounded-lg tw:shadow-[0_4px_10px_rgba(15,39,66,0.12),0_1px_2px_rgba(15,39,66,0.10)]">
+      ZoZo
+    </a>
+    <a href="/" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Entrar no ZoZo</a>
+  </header>
+
+  <main id="conteudo" class="tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:mb-10 tw:flex tw:flex-col tw:gap-10">
+
+    <!-- Abertura -->
+    <section aria-labelledby="titulo" class="tw:flex tw:flex-col tw:items-start tw:pt-10 tw:pb-2 tw:celular:pt-4">
+      <p class="tw:m-0 tw:mb-4 tw:text-[13px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Portfólio · AI Builder</p>
+      <h1 id="titulo" class="tw:m-0 tw:max-w-[760px] tw:text-[44px] tw:leading-[1.12] tw:font-[550] tw:tracking-[-0.02em] tw:text-[#1b2a4a] tw:text-balance tw:celular:text-[31px]">Como construí o ZoZo e o Zo orientando agentes de IA</h1>
+      <p class="tw:mt-5 tw:mb-0 tw:max-w-[680px] tw:text-[18px] tw:leading-[1.6] tw:text-zz-secondary tw:celular:text-[16px]">Sou Lukas Del Piero Barros. Em quatro semanas, conduzi o Claude Code e o Codex na construção de um app de finanças pessoais com criptografia de ponta a ponta e de um assistente de IA com 36 ferramentas. Aqui estão os números, o processo com vários agentes e os prompts que fizeram a diferença.</p>
+      <div class="tw:flex tw:flex-wrap tw:gap-3 tw:mt-8">
+        <a href="/sobre" class="tw:inline-flex tw:items-center tw:justify-center tw:h-[46px] tw:px-6 tw:rounded-xl tw:text-[15px] tw:font-[650] tw:text-white tw:no-underline tw:bg-[#6948D8] tw:bg-(image:--botao-roxo) tw:shadow-[0_1px_2px_rgba(15,39,66,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] tw:hover:bg-(image:--botao-roxo-hover) tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2">Conhecer o ZoZo</a>
+        <a href="https://github.com/lukasdelpiero/zozo" rel="noopener" class="tw:inline-flex tw:items-center tw:justify-center tw:h-[46px] tw:px-6 tw:rounded-xl tw:text-[15px] tw:font-[620] tw:text-zz-text tw:no-underline tw:bg-zz-surface tw:border tw:border-[#e3e6eb] tw:shadow-[0_1px_2px_rgba(15,39,66,0.08)] tw:hover:shadow-[0_2px_6px_rgba(15,39,66,0.12)] tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2">Ver o código no GitHub</a>
+      </div>
+    </section>
+
+    <!-- Números -->
+    <section aria-labelledby="numeros">
+      <h2 id="numeros" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">O projeto em números</h2>
+      <p class="tw:m-0 tw:mb-5 tw:text-[15px] tw:text-zz-secondary">De 6 de outubro a 3 de novembro de 2026, contados nos registros das sessões e no repositório.</p>
+      <ul class="tw:grid tw:grid-cols-2 tw:computador:grid-cols-3 tw:largo:grid-cols-4 tw:gap-3 tw:m-0 tw:p-0 tw:list-none
+        tw:[&>li]:flex tw:[&>li]:flex-col tw:[&>li]:gap-1 tw:[&>li]:p-5 tw:[&>li]:bg-zz-surface tw:[&>li]:border tw:[&>li]:border-[#e6e8ec] tw:[&>li]:rounded-2xl
+        tw:[&_strong]:text-[30px] tw:[&_strong]:leading-[1.1] tw:[&_strong]:font-[620] tw:[&_strong]:tracking-[-0.02em] tw:[&_strong]:text-[#1b2a4a] tw:[&_strong]:[font-variant-numeric:proportional-nums]
+        tw:[&_span]:text-[14px] tw:[&_span]:leading-[1.45] tw:[&_span]:text-zz-secondary">
+        <li><strong>213</strong><span>prompts enviados (176 ao Claude Code e 37 ao Codex)</span></li>
+        <li><strong>10,5 mil</strong><span>linhas de prompts, entre pedidos, especificações e auditorias</span></li>
+        <li><strong>3,6 mil</strong><span>comandos executados pelos agentes no terminal</span></li>
+        <li><strong>30 mil</strong><span>linhas de código em TypeScript, Python, SQL, CSS e HTML</span></li>
+        <li><strong>325</strong><span>testes automatizados (161 da interface e 164 da API)</span></li>
+        <li><strong>123</strong><span>commits em 35 versões publicadas</span></li>
+        <li><strong>12</strong><span>relatórios de auditoria escritos pelo Codex para o Claude Code</span></li>
+        <li><strong>36</strong><span>ferramentas do Zo, numa lista fechada no servidor</span></li>
+      </ul>
+    </section>
+
+    <!-- Processo -->
+    <section aria-labelledby="processo" class="tw:px-14 tw:py-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-8">
+      <h2 id="processo" class="tw:m-0 tw:mb-3 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Um processo com vários agentes</h2>
+      <p class="tw:m-0 tw:max-w-[680px] tw:text-[15px] tw:leading-[1.65]">Cada agente tem um papel e nenhum revisa o próprio trabalho. Eu decido o produto e as regras, o Claude Code constrói e o Codex audita de fora, em sessões separadas, sem ver o raciocínio de quem construiu.</p>
+
+      <ul class="tw:grid tw:grid-cols-1 tw:computador:grid-cols-3 tw:gap-3 tw:mt-7 tw:mb-0 tw:p-0 tw:list-none
+        tw:[&>li]:flex tw:[&>li]:flex-col tw:[&>li]:gap-2 tw:[&>li]:p-5 tw:[&>li]:rounded-xl tw:[&>li]:bg-[#f8f9fb] tw:[&>li]:border tw:[&>li]:border-[#e6e8ec]
+        tw:[&_h3]:m-0 tw:[&_h3]:text-[16px] tw:[&_h3]:font-[550] tw:[&_small]:text-[12px] tw:[&_small]:font-[620] tw:[&_small]:tracking-[0.08em] tw:[&_small]:uppercase tw:[&_small]:text-zz-primary
+        tw:[&_p]:m-0 tw:[&_p]:text-[14px] tw:[&_p]:leading-[1.6] tw:[&_p]:text-zz-secondary">
+        <li><small>Produto e orquestração</small><h3>Eu</h3><p>Escrevo as especificações (telas medidas em pixels, regras de negócio, LGPD), escolho entre as alternativas que os agentes trazem, testo na prévia e decido o que vai para produção.</p></li>
+        <li><small>Construção</small><h3>Claude Code</h3><p>Lê o contexto do projeto, implementa, roda testes e tipos, confere o app no navegador, lê os logs da Cloudflare e publica na prévia. Foram cerca de 6,5 mil ações em 5 sessões longas.</p></li>
+        <li><small>Auditoria independente</small><h3>Codex</h3><p>Revisa o código como engenheiro sênior de segurança ou de interface e escreve relatórios e pacotes de correção endereçados ao Claude Code. Foram 37 prompts e 12 relatórios.</p></li>
+      </ul>
+
+      <h3 class="tw:mt-9 tw:mb-3 tw:text-[18px] tw:font-[550] tw:text-[#1b2a4a]">O ciclo de cada entrega</h3>
+      <ol class="tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-3 tw:[counter-reset:passo]
+        tw:[&>li]:relative tw:[&>li]:pl-11 tw:[&>li]:text-[15px] tw:[&>li]:leading-[1.6] tw:[&>li]:[counter-increment:passo]
+        tw:[&>li]:before:absolute tw:[&>li]:before:left-0 tw:[&>li]:before:top-0 tw:[&>li]:before:grid tw:[&>li]:before:place-items-center tw:[&>li]:before:size-7 tw:[&>li]:before:rounded-full tw:[&>li]:before:bg-zz-primary-softer tw:[&>li]:before:text-zz-primary tw:[&>li]:before:text-[13px] tw:[&>li]:before:font-[650] tw:[&>li]:before:[content:counter(passo)]
+        tw:[&_strong]:font-[550]">
+        <li><strong>Especificar.</strong> Um pedido ou documento com critérios que dá para conferir, como medidas, estados, exemplos e o que nunca pode acontecer.</li>
+        <li><strong>Construir.</strong> O Claude Code implementa com um teste negativo para cada controle de segurança novo e cada regra de dinheiro.</li>
+        <li><strong>Auditar.</strong> O Codex revisa o mesmo código em outra sessão e escreve um relatório para o Claude Code.</li>
+        <li><strong>Triar.</strong> O Claude Code confere cada achado no código e separa o que é pertinente, o que já estava corrigido e o que é decisão de produto.</li>
+        <li><strong>Validar.</strong> Testes, verificação de tipos, build e o app real no navegador, no computador e no celular. Depois, publicação na prévia.</li>
+        <li><strong>Decidir.</strong> Eu testo na prévia e publico em produção. Segredos, cobranças e o que é público ficam comigo.</li>
+      </ol>
+
+      <h3 class="tw:mt-9 tw:mb-2 tw:text-[18px] tw:font-[550] tw:text-[#1b2a4a]">Contexto que não se perde entre sessões</h3>
+      <ul class="tw:m-0 tw:pl-5 tw:list-disc tw:flex tw:flex-col tw:gap-1.5 tw:[&>li]:text-[15px] tw:[&>li]:leading-[1.6] tw:[&>li]:pl-1 tw:[&_li::marker]:text-zz-primary tw:[&_code]:text-[13px] tw:[&_code]:px-1.5 tw:[&_code]:py-px tw:[&_code]:rounded tw:[&_code]:bg-zz-primary-softer">
+        <li>Um <code>CLAUDE.md</code> com as regras que valem sempre: dados cifrados no navegador, SQL só parametrizado, nada de <code>innerHTML</code>, logs sem dados pessoais.</li>
+        <li>Um padrão de segurança próprio (OWASP, ASVS e LGPD) que o agente lê antes de mexer em login, API, banco ou criptografia.</li>
+        <li>Um script de publicação que roda testes, tipos e migrações e não publica nada se algo falhar.</li>
+      </ul>
+    </section>
+
+    <!-- Prompts -->
+    <section aria-labelledby="prompts" class="tw:flex tw:flex-col tw:gap-4">
+      <div>
+        <h2 id="prompts" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Prompts em destaque</h2>
+        <p class="tw:m-0 tw:max-w-[680px] tw:text-[15px] tw:leading-[1.6] tw:text-zz-secondary">Trechos reais, como foram enviados. Cada um mostra uma forma de trabalhar com agentes que eu repetiria em qualquer projeto.</p>
+      </div>
+
+      <!-- 1. Especificação do Zo -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Especificação · Claude Code · 1.268 linhas</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">O Zo inteiro escrito como documento de produto antes de qualquer código</h3>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">Cada botão com medida, cor e estado, cada função com campos, formatos e exemplos. Quando o agente recebe um alvo verificável, o resultado deixa de ser uma interpretação.</p>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">1. Como acessar?
+   1. O Zo ficará disponível como um Botão de Ação Flutuante no canto inferior
+      direito da tela, com border-radius de 50%, fundo branco semi-transparente
+      e com efeito glass, e a logo do Zo centralizada.
+   2. Uma vez que o usuário clicar no Botão de Ação Flutuante, ele dará lugar
+      a uma janela modal com fundo branco com aparência de um chat.
+      1. A parte superior do chat
+         1. Border bottom 1px solid rgba(9, 14, 21, 0.06)
+         …
+            1. Botão 1
+               1. Alinhado ao canto direito
+               2. Ícone de X (16x16)
+               3. Cor rgb(108, 111, 116)
+               4. Padding 10px
+               6. Hover
+                  1. Cor de fundo rgba(9, 14, 21, 0.1)
+                  2. Border radius 10px
+               7. Função de fechar o chat
+2. Funções?
+   1. Criar
+      1. Transações
+         …
+            5. Valor
+               2. É formatado automaticamente em ponto separando milhar e
+                  vírgula separando os centavos. Ex.: 1000,00 = 1.000,00</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> 36 ferramentas numa lista fechada, o cartão de confirmação antes de qualquer gravação e a janela do Zo nas medidas do documento, com pesquisa, download da conversa e emojis.</p>
+      </article>
+
+      <!-- 2. Auditoria: antes e depois -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Auditoria · Codex e Claude Code · 4 semanas de diferença</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Da lista de verificações à auditoria com método</h3>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O primeiro pedido de auditoria era uma lista de temas. O de quatro semanas depois define a referência, o método, os limites e o formato da evidência, e proíbe o agente de declarar algo seguro sem verificar.</p>
+        <div class="tw:grid tw:grid-cols-1 tw:largo:grid-cols-2 tw:gap-3">
+          <figure class="tw:m-0 tw:flex tw:flex-col tw:gap-2 tw:min-w-0">
+            <figcaption class="tw:text-[13px] tw:font-[620] tw:text-zz-secondary">Antes · 8 de outubro, ao Codex</figcaption>
+            <pre class="tw:m-0 tw:p-5 tw:h-full tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Você é um programador sênior com 20 anos de
+experiência em backend e segurança de dados,
+banco de dados, e bugs.
+Faça uma verificação completa do código,
+sem pular etapas.
+Verifique o funcionamento do Vite
+Verifique a integração do Python com o Cloudflare
+Verifique se o funcionamento da criptografia funciona
+Verifique por bugs
+Verifique por falhas de segurança
+Verifique a segurança contra XSS
+…</pre>
+          </figure>
+          <figure class="tw:m-0 tw:flex tw:flex-col tw:gap-2 tw:min-w-0">
+            <figcaption class="tw:text-[13px] tw:font-[620] tw:text-zz-secondary">Depois · 1º de novembro, ao Claude Code</figcaption>
+            <pre class="tw:m-0 tw:p-5 tw:h-full tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Atue como engenheiro sênior de backend e segurança
+de aplicações. Audite o ZoZo, corrija problemas
+confirmados e valide as correções com evidências.
+Use o OWASP ASVS 5.0 como referência, priorizando
+os requisitos aplicáveis do nível 2. Não declare
+conformidade completa sem verificar todos os
+requisitos pertinentes.
+
+* Identifique as fronteiras de confiança:
+  navegador, API, Cloudflare, banco de dados
+  e terceiros.
+* Diferencie problema confirmado, suspeita que
+  precisa de validação e melhoria opcional.
+* Se faltar acesso, configuração ou ambiente,
+  registre a limitação; não invente resultados.</pre>
+          </figure>
+        </div>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Achados rastreáveis e uma regra que ficou no projeto. Todo controle de segurança novo ganha um teste negativo, e cada relatório do Codex passa por uma triagem antes de virar código.</p>
+      </article>
+
+      <!-- 3. Diagnóstico por evidência -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Diagnóstico · os dois agentes no mesmo problema</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Pedir a causa exata, com o laudo do outro agente anexado</h3>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Agora, ainda temos problema com o Zo. Ele simplesmente não funciona.
+Nunca funcionou. Preciso que verifique a exata causa, até mesmo se ele
+de fato está configurado.
+
+Vou deixar o que o Codex me disse a respeito
+[diagnóstico do Codex, com hipóteses e o que ele não conseguiu provar]</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O Codex chegou a uma hipótese e disse com clareza o que não conseguia provar sem os registros. O Claude Code foi aos logs da Cloudflare e fechou a questão. A primeira chamada ao modelo respondia em 0,7 s. A segunda, um segundo depois, voltava <code class="tw:text-[13px] tw:px-1.5 tw:py-px tw:rounded tw:bg-zz-primary-softer">429 rate_limit_exceeded</code>. Cada chamada leva uns 6,6 mil tokens (as 36 ferramentas pesam 5 mil), e o plano gratuito do provedor aceitava 8 mil por minuto. Todo pedido com ferramenta precisa de duas chamadas.</p>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Causa medida em tokens e confirmada nos registros de produção e da prévia, em vez de uma troca de provedor no escuro.</p>
+      </article>
+
+      <!-- 4. Avaliação de modelos -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Avaliação de modelos · Claude Code</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Escolher o modelo pelo comportamento com as ferramentas reais</h3>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Teste se as ferramentas do Zo funcionam no Cloudflare Workers AI,
+pois eles têm vários agentes</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O agente rodou as mesmas instruções e as 36 ferramentas do Zo em 10 modelos, com dados de exemplo, em quatro cenários: um cumprimento, o resumo do mês, um lançamento que exige quatro ferramentas seguidas e uma pergunta que deve ser bloqueada.</p>
+        <div class="tw:overflow-x-auto tw:rounded-xl tw:border tw:border-[#e6e8ec]">
+          <table class="tw:w-full tw:min-w-[560px] tw:border-collapse tw:text-[14px] tw:[&_th]:text-left tw:[&_th]:px-4 tw:[&_th]:py-2.5 tw:[&_th]:bg-[#f8f9fb] tw:[&_th]:text-[12px] tw:[&_th]:font-[620] tw:[&_th]:tracking-[0.05em] tw:[&_th]:uppercase tw:[&_th]:text-zz-secondary tw:[&_td]:px-4 tw:[&_td]:py-2.5 tw:[&_td]:border-t tw:[&_td]:border-[#e6e8ec] tw:[&_td]:align-top">
+            <thead><tr><th scope="col">Modelo</th><th scope="col">Acertos</th><th scope="col">O que falhou</th></tr></thead>
+            <tbody>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">gpt-oss-120b</td><td class="tw:tabular-nums">4 de 4</td><td>Nada. Virou o modelo principal.</td></tr>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">qwen3.8-27b</td><td class="tw:tabular-nums">4 de 4</td><td>Nada, com mais custo por chamada. Virou a reserva.</td></tr>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">gemma-4-26b</td><td class="tw:tabular-nums">3 de 4</td><td>Errou um centavo no resumo.</td></tr>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">qwen3-30b</td><td class="tw:tabular-nums">3 de 4</td><td>Criou a transação sem categoria.</td></tr>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">glm-4.7-flash</td><td class="tw:tabular-nums">2 de 4</td><td>Respondeu em texto em vez de bloquear e fugiu do formato de moeda.</td></tr>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">gpt-oss-20b</td><td class="tw:tabular-nums">1 de 4</td><td>Nome de ferramenta quebrado, mês errado e resposta vazia.</td></tr>
+              <tr><td class="tw:font-[550] tw:whitespace-nowrap">llama-4-scout e mistral-small</td><td>0 a 1</td><td>Escreveram as chamadas como texto.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tw:m-0 tw:text-[14px] tw:leading-[1.6] tw:text-zz-secondary">Dois modelos não rodaram no plano gratuito. No caminho, o teste também achou uma diferença de formato que travava a segunda chamada.</p>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> O Zo passou a rodar no Workers AI, na mesma conta do app, com modelo reserva automático. O aviso de consentimento, a política de privacidade e os termos foram atualizados no mesmo dia.</p>
+      </article>
+
+      <!-- 5. Red teaming -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Red teaming · Claude Code</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Pedir ao agente que ataque o próprio assistente</h3>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Gere 10 exemplos de prompts que permitam explorar o Zo e buscar falhas nele.</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">Vieram dez testes com o resultado esperado de cada um: instrução escondida na descrição de uma transação, CPF e cartão no chat, exclusão em massa, troca de senha pelo chat, pergunta política e um pedido incompleto. Num deles, o modelo escreveu na tela o próprio raciocínio, com ids de transações, no formato interno dele.</p>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Correção no mesmo dia. Uma resposta assim é descartada antes de chegar à tela, o modelo reserva responde e o log guarda só o tipo da falha, nunca o conteúdo. Um teste de regressão impede que volte.</p>
+      </article>
+
+      <!-- 6. Humano no circuito -->
+      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
+        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Humano no circuito · Claude Code</p>
+        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Separar o que o agente faz do que é decisão minha</h3>
+        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Me informe o que necessita de minha decisão, revisão ou ação. O que
+preciso configurar, se há algo a ser migrado e testado. Me dê passo a
+passo detalhados. Verifique 2x se os passos fornecidos estão
+atualizados e então me retorne.</pre>
+        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Uma lista curta do que só eu posso fazer: cadastrar segredos, aceitar custos, fechar pull requests e publicar em produção. O agente faz o resto e para nos pontos sem volta.</p>
+      </article>
+    </section>
+
+    <!-- Aprendizados -->
+    <section aria-labelledby="aprendi" class="tw:px-14 tw:py-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-8">
+      <h2 id="aprendi" class="tw:m-0 tw:mb-4 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">O que aprendi construindo com agentes</h2>
+      <ul class="tw:m-0 tw:pl-5 tw:list-disc tw:flex tw:flex-col tw:gap-2.5 tw:[&>li]:text-[15px] tw:[&>li]:leading-[1.65] tw:[&>li]:pl-1 tw:[&_li::marker]:text-zz-primary tw:[&_strong]:font-[550]">
+        <li><strong>Um teste pelo caminho errado não prova nada.</strong> O modelo funcionou pela API REST e falhou dentro do Worker, onde a resposta chegava em outro formato. Só os logs do ambiente real mostraram isso.</li>
+        <li><strong>Limite do provedor é requisito de arquitetura.</strong> 36 ferramentas custam uns 6,6 mil tokens por chamada, e isso decide qual plano e qual modelo cabem no produto.</li>
+        <li><strong>Dois agentes com papéis diferentes acham mais problemas.</strong> O auditor não tem o viés de quem construiu, e o construtor confere cada achado antes de mexer no código.</li>
+        <li><strong>Regras escritas valem mais que lembranças.</strong> O que fica no arquivo de contexto do projeto continua valendo na sessão seguinte. O que fica só na conversa se perde.</li>
+        <li><strong>Especificação boa é a que dá para conferir.</strong> Medidas, estados, exemplos e proibições explícitas reduzem as idas e vindas.</li>
+      </ul>
+    </section>
+
+    <!-- Tecnologias -->
+    <section aria-labelledby="stack">
+      <h2 id="stack" class="tw:m-0 tw:mb-4 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Tecnologias</h2>
+      <ul class="tw:flex tw:flex-wrap tw:gap-2 tw:m-0 tw:p-0 tw:list-none tw:[&>li]:px-3 tw:[&>li]:py-1.5 tw:[&>li]:rounded-full tw:[&>li]:bg-zz-surface tw:[&>li]:border tw:[&>li]:border-[#e6e8ec] tw:[&>li]:text-[14px] tw:[&>li]:font-[550]">
+        <li>Claude Code</li><li>Codex</li><li>Cloudflare Workers AI</li><li>Function calling</li>
+        <li>TypeScript</li><li>Python</li><li>Vite</li><li>Tailwind CSS</li>
+        <li>Cloudflare Workers</li><li>Cloudflare D1</li><li>FastAPI e Pydantic</li>
+        <li>Web Crypto (AES-256-GCM)</li><li>Argon2id</li><li>WebAuthn</li><li>TOTP</li>
+        <li>OWASP ASVS</li><li>WCAG 2.2 AA</li><li>LGPD</li><li>GitHub Actions</li>
+      </ul>
+      <p class="tw:mt-6 tw:mb-0 tw:text-[15px] tw:leading-[1.65] tw:text-zz-secondary">Quer ver como os dados ficam protegidos? A <a href="/sobre" class="tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline">apresentação do ZoZo</a> e a <a href="/politica-privacidade" class="tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline">política de privacidade</a> explicam em linguagem simples.</p>
+    </section>
+  </main>
+
+  <footer class="tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:pb-8 tw:text-center tw:text-[13px] tw:text-zz-secondary">
+    © 2026 ZoZo · Lukas Del Piero Barros · <a href="https://github.com/lukasdelpiero/zozo" rel="noopener" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">GitHub</a> · <a href="/sobre" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Sobre o ZoZo</a> · <a href="/termos-uso" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Termos de uso</a> · <a href="/politica-privacidade" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Política de privacidade</a>
+  </footer>
+</body>
+</html>

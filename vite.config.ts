@@ -54,8 +54,11 @@ function zozo(): Plugin {
         "/index.html", "  Cache-Control: no-cache",
         "/politica-privacidade", "  Cache-Control: no-cache",
         "/termos-uso", "  Cache-Control: no-cache",
-        "/sobre", "  Cache-Control: no-cache"];
+        "/sobre", "  Cache-Control: no-cache",
+        "/portfolio", "  Cache-Control: no-cache"];
       this.emitFile({ type: "asset", fileName: "_headers", source: linhas.join("\n") + "\n" });
+      // /portifolio (como foi divulgado) leva ao endereço certo
+      this.emitFile({ type: "asset", fileName: "_redirects", source: "/portifolio /portfolio 301\n/portifolio/ /portfolio 301\n" });
     },
   };
 }
@@ -79,8 +82,8 @@ export default defineConfig({
     sourcemap: false,                       // sem mapas do código-fonte no site publicado
     modulePreload: { polyfill: false },     // navegadores atuais; evita código extra
     cssCodeSplit: false,
-    // app + páginas públicas sem JavaScript (usezozo.com.br/sobre, /politica-privacidade e /termos-uso)
+    // app + páginas públicas sem JavaScript (usezozo.com.br/sobre, /politica-privacidade, /termos-uso e /portfolio)
     rolldownOptions: { input: { app: raiz("./ui/index.html"), sobre: raiz("./ui/sobre.html"),
-      politica: raiz("./ui/politica-privacidade.html"), termos: raiz("./ui/termos-uso.html") } },
+      politica: raiz("./ui/politica-privacidade.html"), termos: raiz("./ui/termos-uso.html"), portfolio: raiz("./ui/portfolio.html") } },
   },
 });
