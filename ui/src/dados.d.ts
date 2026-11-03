@@ -44,6 +44,8 @@ declare global {
     debitado?: { contaId: Id; valor: number };          // formato anterior (2.8–3.1)
     /** Formato anterior do "Pagar fatura" (débito na conta + receita no cartão): convertido para o tipo "fatura" ao abrir */
     pagamentoCartao?: boolean;
+    /** Identificador da transação no extrato do banco (FITID do OFX): reimportar o mesmo extrato não duplica */
+    origemId?: string;
     /** Pagamento de fatura (tipo "fatura"): as duas transações têm o mesmo grupo; "pagante" aparece em Transações, "cartao" não */
     pagamento?: { grupo: Id; lado: "pagante" | "cartao" };
     /** Receita que quita a fatura de um perfil: o mês ("AAAA-MM") da fatura paga (o perfil é o do lançamento) */
@@ -178,7 +180,8 @@ declare global {
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
   /* ---------------- Zo, o assistente ---------------- */
   /** Chamada de ferramenta escolhida pelo Zo (argumentos em JSON, conferidos no navegador antes de usar) */
-  interface ChamadaZo { id: string; nome: string; argumentos: string }
+  /** problemas: argumentos fora do esquema (o servidor marca; o navegador não executa e devolve ao modelo) */
+  interface ChamadaZo { id: string; nome: string; argumentos: string; problemas?: string[] }
   interface RespostaZo { texto: string | null; chamadas: ChamadaZo[] }
   /** Uma mensagem da conversa como a API recebe (sem papel de sistema: as instruções ficam no servidor) */
   type MensagemZo = { papel: "usuario"; texto: string } | { papel: "assistente"; texto: string | null; chamadas: ChamadaZo[] }

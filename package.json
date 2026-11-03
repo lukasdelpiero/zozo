@@ -9,7 +9,7 @@
     "build": "vite build",
     "build:portfolio": "vite build --mode portfolio",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test ui/tests"
+    "test": "node --test ui/tests api/portfolio/tests"
   },
   "dependencies": {
     "@emoji-mart/data": "1.2.1",

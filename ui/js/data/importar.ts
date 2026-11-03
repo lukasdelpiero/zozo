@@ -28,20 +28,23 @@
     if (dt.getFullYear() !== a || dt.getMonth() !== m - 1 || dt.getDate() !== d || a < 2000 || a > 2100) return null;
     return a + "-" + pad(m) + "-" + pad(d);
   }
-  /** Valor do banco → número com sinal (null se não for um valor) */
+  /**
+   * Valor do banco → número com sinal (null se não for um valor). Gramática estrita: o separador de milhar só vale
+   * em grupos de 3 ("1.234.567,89", "1,234,567.89"); o decimal tem 1 ou 2 casas. Ambíguo ou malformado ("12.34.56",
+   * "1,2,3", "1,234") é recusado: a linha fica de fora e aparece como ignorada, em vez de virar outro número.
+   */
   function valor(bruto: string): number | null {
     let t = bruto.trim().replace(/\s/g, "").replace(/^R\$|^\$|R\$$/i, "").replace(/R\$/i, "");
     let neg = false;
     if (/^\(.*\)$/.test(t)) { neg = true; t = t.slice(1, -1); }
     if (t.endsWith("-")) { neg = !neg; t = t.slice(0, -1); }
     if (t.startsWith("-")) { neg = !neg; t = t.slice(1); } else if (t.startsWith("+")) t = t.slice(1);
-    if (!/^[\d.,]+$/.test(t) || !/\d/.test(t)) return null;
-    const ponto = t.lastIndexOf("."), virgula = t.lastIndexOf(",");
-    if (ponto >= 0 && virgula >= 0) t = ponto > virgula ? t.replace(/,/g, "") : t.replace(/\./g, "").replace(",", ".");
-    else if (virgula >= 0) t = (t.match(/,/g) || []).length > 1 ? t.replace(/,/g, "") : t.replace(",", ".");
-    else if (ponto >= 0 && (t.match(/\./g) || []).length === 1 && t.length - ponto - 1 === 3 && t.length > 4) t = t.replace(".", "");  // 1.234 = mil
-    else if ((t.match(/\./g) || []).length > 1) t = t.replace(/\./g, "");
-    const n = Number(t);
+    let n: number;
+    if (/^\d+$/.test(t)) n = Number(t);                                                   // 1234
+    else if (/^\d+[.,]\d{1,2}$/.test(t)) n = Number(t.replace(",", "."));                 // 1234,56 · 1234.5
+    else if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(t)) n = Number(t.replace(/\./g, "").replace(",", "."));   // 1.234.567,89 · 1.234
+    else if (/^\d{1,3}(,\d{3})+\.\d{1,2}$/.test(t)) n = Number(t.replace(/,/g, ""));     // 1,234,567.89 (só com decimal: "1,234" é ambíguo)
+    else return null;
     if (!Number.isFinite(n) || Math.abs(n) > 1e12) return null;
     return Math.round((neg ? -n : n) * 100) / 100;
   }
@@ -57,7 +60,9 @@
       const d = data(campo(bloco, "DTPOSTED")), v = valor(campo(bloco, "TRNAMT"));
       const descricao = limpar(campo(bloco, "MEMO") || campo(bloco, "NAME"));
       if (!d || v === null || !v || !descricao) { avisos.push("linha"); return; }
-      itens.push({ data: d, descricao, valor: v });
+      // FITID: o identificador do banco para esta transação (reimportar o mesmo extrato não duplica)
+      const fitid = campo(bloco, "FITID");
+      itens.push(Object.assign({ data: d, descricao, valor: v }, /^[!-~]{1,80}$/.test(fitid) ? { origemId: fitid } : {}));
     });
     if (blocos.length > MAX_LINHAS) avisos.push("limite");
     return { formato: "ofx", cartao: /<CCSTMTRS>|CREDITCARDMSGSRS/i.test(texto), itens, ignoradas: avisos.filter((a) => a === "linha").length };

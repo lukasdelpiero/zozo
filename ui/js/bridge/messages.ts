@@ -177,6 +177,8 @@
     IMPORT_INVALID: "O arquivo tem uma linha que não deu para importar. Nada foi importado: confira o arquivo e tente de novo.",
     ZO_BUSY: "O Zo está com muitos pedidos agora. Tente de novo em alguns minutos.",
     ZO_DAILY: "O Zo chegou ao limite de uso de hoje. Ele volta a responder à noite, depois das 21h.",
+    RECURRENCE_TYPE: "Só despesas e débitos podem repetir ou ser parcelados. Receitas, estornos e transferências ainda não viram recorrência.",
+    STALE_PROPOSAL: "Isso mudou depois que o Zo preparou a confirmação. Nada foi gravado: peça de novo para ver os dados atuais.",
     PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",

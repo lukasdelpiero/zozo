@@ -107,7 +107,9 @@
         atualizar = () => itens.forEach(({ campo, wrap }) => { wrap.hidden = campo.mostrarSe ? !campo.mostrarSe(valores) : false; });
         atualizar();
 
-        const erroEl = h("div", { class: ZoZo.pecas.erroForm, role: "alert" });
+        // o campo com erro aponta para a mensagem (aria-describedby): o leitor de tela lê o motivo ao focar o campo
+        const erroId = "erro-form-" + Math.random().toString(36).slice(2, 10);
+        const erroEl = h("div", { class: ZoZo.pecas.erroForm, role: "alert", id: erroId });
         const salvar = h("button", { type: "submit", class: ZoZo.pecas.botaoPrimario }, icon("check", { size: 16 }), h("span", { class: ZoZo.pecas.rotuloBotao }, cfg.textoSalvar || "Salvar"));
 
         const form = h("form", { class: T.form, novalidate: true },
@@ -129,14 +131,14 @@
 
         form.addEventListener("submit", (e) => {
           e.preventDefault();
-          itens.forEach(({ c }) => c.input && c.input.removeAttribute("aria-invalid"));
+          itens.forEach(({ c }) => { if (c.input) { c.input.removeAttribute("aria-invalid"); c.input.removeAttribute("aria-describedby"); } });
           const faltando = itens.filter(({ campo, c, wrap }) => {
             if (wrap.hidden || !campo.obrigatorio) return false;
             const v = c.ler();
             return v === "" || v === null || (typeof v === "number" && !Number.isFinite(v));
           });
           if (faltando.length) {
-            faltando.forEach(({ c }) => c.input && c.input.setAttribute("aria-invalid", "true"));
+            faltando.forEach(({ c }) => { if (c.input) { c.input.setAttribute("aria-invalid", "true"); c.input.setAttribute("aria-describedby", erroId); } });
             erroEl.textContent = "Preencha os campos obrigatórios: " + faltando.map((x) => x.campo.rotulo).join(", ") + ".";
             if (faltando[0].c.foco) faltando[0].c.foco.focus();
             return;

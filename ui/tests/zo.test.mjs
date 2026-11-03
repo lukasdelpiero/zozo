@@ -70,7 +70,9 @@ test("Zo: leitura devolve só o necessário; sugestão de categoria pelo histór
   for (const [d, cat] of [["Supermercado Dia", mercado], ["Supermercado Dia", mercado], ["Supermercado Extra", mercado], ["Loja X", compras]]) {
     await t.req(t.A.createLancamento, { lancamento: { data: hoje(), descricao: d, valor: 20, tipo: "regular", contaId: cartao.id, categoriaId: cat.id, perfilId: perfil.id, notas: "segredo de teste" } });
   }
-  const contas = JSON.parse((await zo.executar("listar_contas", "{}")).resultado);
+  const lidas = JSON.parse((await zo.executar("listar_contas", "{}")).resultado);
+  assert.equal(lidas.moeda, "BRL");                                   // a unidade dos valores vai junto (ZO-12)
+  const contas = lidas.contas;
   assert.deepEqual(contas.map((c) => Object.keys(c).sort()), [["id", "nome", "saldo", "tipo"], ["id", "nome", "saldo", "tipo"]]);
   assert.equal(contas.find((c) => c.id === banco.id).saldo, 1000);
   const sug = JSON.parse((await zo.executar("sugerir_categoria", args({ descricao: "supermercado dia" }))).resultado);

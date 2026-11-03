@@ -1462,7 +1462,9 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
         except TimeoutError as ex:
             ctx.evento("zo_demorou", email, ms=int((time.monotonic() - inicio) * 1000), modelo=nome)
             raise Falha(504, "ZO_TIMEOUT") from ex
-        ctx.evento("zo_tempo", email, ms=int((time.monotonic() - comeco) * 1000), status=status, modelo=nome)
+        # consumo por modelo (tokens de entrada e saída) para acompanhar custo e cota, sem nada do conteúdo
+        ctx.evento("zo_tempo", email, ms=int((time.monotonic() - comeco) * 1000), status=status, modelo=nome,
+                   **(zo.uso(texto) if status == 200 else {}))
         if status == 200:
             try:
                 resposta = zo.ler_resposta(texto)

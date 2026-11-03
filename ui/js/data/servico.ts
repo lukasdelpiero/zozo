@@ -47,6 +47,10 @@
   const PASSIVOS: readonly string[] = ["cartao", "emprestimo"];
   /** Contas de onde sai o pagamento da fatura (investimento, empréstimo e cartão não) */
   const CONTAS_PAGAMENTO: readonly string[] = ["corrente", "poupanca", "outros"];
+  // Recorrência: só despesa e débito (e o que já foi recorrente, de série desfeita). As ocorrências contam como gasto.
+  const TIPOS_RECORRIVEIS: readonly string[] = ["regular", "debito", "recorrente"];
+  // Tipos que ENTRAM na conta (o resto sai; transferência pelo sentido)
+  const ENTRADAS: readonly string[] = ["receita", "estorno"];
 
   // Documento do usuário em memória. Antes de carregar (ou depois de descartado) fica vazio e temDoc = false:
   // toda ação passa por garantirCarregado antes de ler ou mudar o documento.
@@ -304,6 +308,7 @@
   type Marco = { antes: Documento; depois: Documento | null };
   const marcos = new Map<string, Marco>();
   const MAX_MARCOS = 30;
+  const MAX_MARCOS_GRANDE = 10;
   const igual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
   const semEfeito = (l: Lancamento): Lancamento => { const x = clone(l); delete x.efeito; return x; };
   const semHistorico = (c: Conta) => { const x: Partial<Conta> = Object.assign({}, c); delete x.historico; return x; };
@@ -962,8 +967,12 @@
     /** Lixeira temporal: guarda o documento antes de uma gravação do Zo (o id é só desta aba) */
     [A.abrirMarco]: () => {
       const id = novoId("m");
-      marcos.set(id, { antes: clone(doc), depois: null });
-      while (marcos.size > MAX_MARCOS) marcos.delete(marcos.keys().next().value as string);
+      const antes = clone(doc);
+      marcos.set(id, { antes, depois: null });
+      // memória: cada marco guarda duas cópias do documento inteiro; documento grande (mais de 1 milhão de caracteres,
+      // milhares de transações) guarda só os 10 últimos marcos
+      const limite = JSON.stringify(antes).length > 1_000_000 ? MAX_MARCOS_GRANDE : MAX_MARCOS;
+      while (marcos.size > limite) marcos.delete(marcos.keys().next().value as string);
       return { marco: id };
     },
     /** ...e depois dela (sem o "depois", não há o que desfazer) */
@@ -1351,7 +1360,8 @@
       if (i < 0) throw erro("OPERATION_FAILED");
       const antigo = doc.lancamentos[i];
       if (antigo.tipo === "fatura") return { lancamento: enriquecer(editarPagamentoFatura(antigo, objeto(d.lancamento) ? d.lancamento : {})) };
-      const novo = Object.assign({ id: d.id }, lerLancamento(d.lancamento, antigo));
+      const novo: Lancamento = Object.assign({ id: d.id }, lerLancamento(d.lancamento, antigo));
+      if (antigo.origemId) novo.origemId = antigo.origemId;               // editar não faz a reimportação duplicar
       const divisaoAntiga = antigo.divisao;
       if (divisaoAntiga) {
         novo.divisao = divisaoAntiga;
@@ -1414,6 +1424,9 @@
       conferirLimiteDemo("recorrencia");
       const l = doc.lancamentos.find((x) => x.id === d.id);
       if (!l || l.tipo === "fatura" || (l.serieId && l.serieId !== l.id && !String(l.serieId).startsWith("removida:"))) throw erro("OPERATION_FAILED");
+      // a série gera ocorrências do tipo "recorrente", que contam como gasto: receita, estorno e transferência
+      // perderiam a natureza (uma receita mensal viraria despesa). Só despesa e débito repetem.
+      if (!TIPOS_RECORRIVEIS.includes(l.tipo)) throw erro("RECURRENCE_TYPE");
       const rec = recorrenciaValida(d.recorrencia);
       let pa = null, pt = null;
       if (rec === "parcelada") {
@@ -1588,18 +1601,32 @@
       const itens: Dados[] = Array.isArray(d.itens) ? d.itens : [];
       if (!itens.length || itens.length > 500) throw erro("IMPORT_INVALID");
       const permitidos = conta.tipo === "cartao" ? ["regular", "estorno"] : ["debito", "receita"];
-      const chave = (data: string, valor: number, descricao: string) => data + "|" + Math.round(valor * 100) + "|" + chaveDescricao(descricao);
-      const existentes = new Map<string, number>();
-      doc.lancamentos.forEach((l) => { if (l.contaId === conta.id) { const k = chave(l.data, l.valor, l.descricao); existentes.set(k, (existentes.get(k) || 0) + 1); } });
+      // repetido = mesmo sentido (entrada ou saída), data, valor e descrição: uma receita não some por ter o mesmo
+      // nome e valor de um débito. Com o identificador do banco (FITID do OFX), vale ele.
+      const chave = (l: { data: string; valor: number; descricao: string; tipo: string; sentido?: Sentido | null }) =>
+        (ENTRADAS.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada") ? "e" : "s") + "|" + l.data + "|" + Math.round(l.valor * 100) + "|" + chaveDescricao(l.descricao);
+      const existentes = new Map<string, number>(), origens = new Set<string>();
+      doc.lancamentos.forEach((l) => {
+        if (l.contaId !== conta.id) return;
+        const k = chave(l); existentes.set(k, (existentes.get(k) || 0) + 1);
+        if (l.origemId) origens.add(l.origemId);
+      });
       // tudo é conferido ANTES de gravar qualquer coisa: um item ruim recusa o arquivo inteiro
       const novos: Lancamento[] = [];
       let repetidos = 0;
       itens.forEach((it) => {
         if (!objeto(it) || !permitidos.includes(it.tipo)) throw erro("IMPORT_INVALID");
-        const l = Object.assign({ id: novoId("l") }, lerLancamento({ data: it.data, descricao: it.descricao, valor: it.valor, tipo: it.tipo, contaId: conta.id,
+        const l: Lancamento = Object.assign({ id: novoId("l") }, lerLancamento({ data: it.data, descricao: it.descricao, valor: it.valor, tipo: it.tipo, contaId: conta.id,
           categoriaId: it.categoriaId || null, perfilId: d.perfilId || null, notas: "Importada de arquivo do banco." }, null));
-        const k = chave(l.data, l.valor, l.descricao), ja = existentes.get(k) || 0;
-        if (ja > 0) { existentes.set(k, ja - 1); repetidos += 1; return; }
+        const origemId = typeof it.origemId === "string" && /^[!-~]{1,80}$/.test(it.origemId) ? it.origemId : "";
+        if (origemId) {
+          if (origens.has(origemId)) { repetidos += 1; return; }
+          origens.add(origemId);
+          l.origemId = origemId;
+        } else {
+          const k = chave(l), ja = existentes.get(k) || 0;
+          if (ja > 0) { existentes.set(k, ja - 1); repetidos += 1; return; }
+        }
         novos.push(l);
       });
       novos.forEach((l) => doc.lancamentos.push(l));
@@ -1983,6 +2010,21 @@
     try { return clone(LEITURAS[action](d)); } finally { doc = real; }
   }
 
+  /** Várias ações numa gravação só (tipo em globais.d.ts: ZoZoServico.lote). Usado pelo Zo: criar + repetir, editar
+      vários campos, categorizar vários grupos e conferir que nada mudou desde a confirmação, tudo ou nada. */
+  function lote<T>(passo: (exec: <K extends NomeAcao>(acao: K, dados?: unknown) => RespostaDe<K>) => T): Promise<T> {
+    const exec = (action: string, data?: unknown): unknown => {
+      const d = (data && typeof data === "object" ? data : {}) as Dados;
+      if (ehEscrita(action)) return clone(ESCRITAS[action](d));
+      if (ehLeitura(action) && action !== A.abrirMarco && action !== A.fecharMarco && action !== A.descartarMarcos) {
+        sincronizarSaldos();                                      // a leitura no meio do lote vê o efeito das etapas anteriores
+        return action === A.getConfig || action === A.getLancamentosOutrasMoedas ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d);
+      }
+      throw erro("OPERATION_FAILED");
+    };
+    return alterar(() => passo(exec as <K extends NomeAcao>(acao: K, dados?: unknown) => RespostaDe<K>)).catch((e) => { throw amigavel(e); });
+  }
+
   function handle(action: string, data?: unknown): Promise<unknown> {
     const d = (data && typeof data === "object" ? data : {}) as Dados;
     if (ehLeitura(action)) {
@@ -2000,5 +2042,5 @@
   /** Promessa que resolve quando todas as gravações pendentes terminarem (antes de sair, trocar senha ou apagar dados) */
   const aguardarGravacoes = () => fila.catch(() => null);
 
-  ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor, calcularFatura };
+  ZoZo.servico = { handle, lote, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor, calcularFatura };
 })(window.ZoZo);

@@ -44,12 +44,47 @@
   const hoje = () => F.iso(new Date());
   const mesAtual = () => hoje().slice(0, 7);
   const r2 = (n: number) => Math.round(n * 100) / 100;
-  const json = (v: unknown) => { const s = JSON.stringify(v); return s.length > LIMITE_RESULTADO ? s.slice(0, LIMITE_RESULTADO) + "…(cortado)" : s; };
+  /** Resultado grande demais: as listas encolhem pela metade até caber, sempre em JSON válido e com o aviso (antes o
+      texto era cortado no meio, e o modelo recebia um JSON quebrado) */
+  const encolher = (v: unknown): unknown => (Array.isArray(v) ? v.slice(0, Math.max(1, Math.floor(v.length / 2))).map(encolher)
+    : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, encolher(x)]))
+      : typeof v === "string" && v.length > 300 ? v.slice(0, 300) + "…" : v);
+  const json = (v: unknown): string => {
+    const s = JSON.stringify(v);
+    if (s.length <= LIMITE_RESULTADO) return s;
+    let x = v;
+    for (let i = 0; i < 12; i += 1) {
+      x = encolher(x);
+      const t = JSON.stringify({ cortado: true, dica: "Resultado grande demais, mostrei só uma parte. Peça um período ou um filtro menor.", dados: x });
+      if (t.length <= LIMITE_RESULTADO) return t;
+    }
+    return JSON.stringify({ erro: "resultado_grande_demais", dica: "Peça um período ou um filtro menor." });
+  };
   const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   const dataBr = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4);
 
   /** Faltou algo obrigatório: o Zo recebe a lista e pergunta à pessoa (nada é gravado) */
   const faltam = (campos: string[]): ResultadoFerramentaZo => ({ tipo: "leitura", resultado: json({ erro: "faltam_dados", campos }) });
+  /** Veio, mas não vale (data impossível, mês torto, parcelas fora da faixa, combinação que o ZoZo não faz): nada é
+      gravado e nada é trocado por um padrão às escondidas. O Zo confere com a pessoa e chama de novo. */
+  const invalidos = (campos: string[], dica = "Nada foi gravado. Confira com a pessoa e chame de novo."): ResultadoFerramentaZo =>
+    ({ tipo: "leitura", resultado: json({ erro: "dados_invalidos", campos, dica }) });
+  const veio = (v: unknown) => v !== undefined && v !== null;
+  /** Campos de data e mês que vieram e não valem (os mesmos nomes em todas as ferramentas) */
+  const datasRuins = (a: Args): string[] => [
+    ...["data", "de", "ate"].filter((k) => veio(a[k]) && !data(a[k])),
+    ...(veio(a.mes) && !mesVal(a.mes) ? ["mes"] : []),
+  ];
+  // só despesa e débito repetem ou parcelam (no serviço: TIPOS_RECORRIVEIS); recorrente = a origem de uma série
+  const RECORRIVEIS = ["regular", "debito", "recorrente"];
+  const SO_DESPESA = "Só despesas e débitos podem repetir ou ser parcelados. Receitas, estornos e transferências ainda não viram recorrência.";
+  /** Marca do que a pessoa viu no cartão: mudou até a confirmação, nada é gravado (STALE_PROPOSAL) */
+  const marca = (v: unknown) => JSON.stringify(v);
+  const vencida = () => new ZoZo.messages.BridgeError("STALE_PROPOSAL", ZoZo.messages.FRIENDLY.STALE_PROPOSAL);
+  const marcaLanc = (l: LancamentoTela) => marca([l.data, l.descricao, l.valor, l.tipo, l.contaId || null, l.categoriaId || null, l.perfilId || null,
+    l.notas || "", l.recorrencia || null, l.parcelaAtual || null, l.parcelaTotal || null, l.sentido || null]);
+  const marcaConta = (c: ContaTela) => marca([c.nome, c.ultimos4Digitos || "", c.fechamento || null, c.vencimento || null]);
+  const marcaCat = (c: CategoriaTela) => marca([c.nome, c.icone, c.cor, c.grupo || null, c.reservadoFixo, c.status]);
   const erroDe = (e: unknown) => {
     const x = e as Partial<ErroPonte> | null;
     return json({ erro: (x && x.code) || "OPERATION_FAILED", mensagem: (x && x.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED });
@@ -57,6 +92,9 @@
 
   function criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia {
     const fatura = () => (opcoes.fatura ? opcoes.fatura() : false), cambio = () => (opcoes.cambio ? opcoes.cambio() : false);
+    const lote: ZoZoServico["lote"] = opcoes.lote || ((passo) => ZoZo.servico.lote(passo));
+    const vigente = () => (opcoes.vigente ? opcoes.vigente() : true);
+    const moeda = () => req(A.getConfig).then((c) => c.moeda || "BRL");
     const indisponivel = () => ({ tipo: "leitura" as const, resultado: json({ erro: "FEATURE_UNAVAILABLE", mensagem: ZoZo.messages.FRIENDLY.FEATURE_UNAVAILABLE }) });
     const semTela = () => ({ tipo: "leitura" as const, resultado: json({ erro: "tela_indisponivel" }) });
     /** "AAAA-MM" → { mes, ano } do pedido da fatura (mês atual se vier vazio) */
@@ -73,22 +111,23 @@
 
     /* ---------------- leitura ---------------- */
     const LEITURA: Record<string, (a: Args) => Promise<unknown>> = {
-      listar_contas: async () => (await contas()).map((c) => ({ id: c.id, nome: c.nome, tipo: c.tipo, saldo: c.valor, ultimos4: c.ultimos4Digitos || undefined,
-        fechamento: c.fechamento || undefined, vencimento: c.vencimento || undefined, oculta: c.oculta || undefined })),
-      listar_categorias: async () => (await categorias()).filter((c) => c.status === "regular")
-        .map((c) => ({ id: c.id, nome: c.nome, icone: c.icone, orcamento_mes: c.reservado, gasto_mes: c.gasto, grupo: c.grupo || undefined })),
+      // moeda: o código ISO dos valores (BRL, USD ou EUR); com o multicâmbio, as leituras mostram só a moeda escolhida
+      listar_contas: async () => ({ moeda: await moeda(), contas: (await contas()).map((c) => ({ id: c.id, nome: c.nome, tipo: c.tipo, saldo: c.valor,
+        ultimos4: c.ultimos4Digitos || undefined, fechamento: c.fechamento || undefined, vencimento: c.vencimento || undefined, oculta: c.oculta || undefined })) }),
+      listar_categorias: async () => ({ moeda: await moeda(), categorias: (await categorias()).filter((c) => c.status === "regular")
+        .map((c) => ({ id: c.id, nome: c.nome, icone: c.icone, orcamento_mes: c.reservado, gasto_mes: c.gasto, grupo: c.grupo || undefined })) }),
       listar_perfis: async () => (await perfis()).map((p) => ({ id: p.id, nome: p.nome })),
       listar_recorrencias: async () => {
         const r = await req(A.getRecorrencias);
-        return r.recorrencias.concat(r.proximas || []).map((o) => ({ serie_id: o.serieId, descricao: o.descricao, valor: o.valor, data: o.data,
-          frequencia: o.tipoRecorrencia, parcela: o.parcela ? o.parcela + "/" + o.parcelaTotal : undefined, pago: o.pago, categoria: o.categoria ? o.categoria.nome : undefined }));
+        return { moeda: await moeda(), recorrencias: r.recorrencias.concat(r.proximas || []).map((o) => ({ serie_id: o.serieId, descricao: o.descricao, valor: o.valor, data: o.data,
+          frequencia: o.tipoRecorrencia, parcela: o.parcela ? o.parcela + "/" + o.parcelaTotal : undefined, pago: o.pago, categoria: o.categoria ? o.categoria.nome : undefined })) };
       },
       buscar_transacoes: async (a) => {
         const texto = norm(txt(a.texto)), de = data(a.de), ate = data(a.ate), limite = int(a.limite, 1, 50) || 20;
         const lista = (await lancamentos()).filter((l) => (!texto || norm(l.descricao).includes(texto) || norm(l.notas).includes(texto))
           && (!de || l.data >= de) && (!ate || l.data <= ate) && (!a.conta_id || l.contaId === a.conta_id) && (!a.categoria_id || l.categoriaId === a.categoria_id)
           && (!a.perfil_id || l.perfilId === a.perfil_id) && (!a.tipo || l.tipo === a.tipo));
-        return { total_encontrado: lista.length, transacoes: lista.slice(0, limite).map((l) => ({ id: l.id, data: l.data, descricao: l.descricao, valor: l.valor,
+        return { moeda: await moeda(), total_encontrado: lista.length, transacoes: lista.slice(0, limite).map((l) => ({ id: l.id, data: l.data, descricao: l.descricao, valor: l.valor,
           tipo: l.tipo, sentido: l.sentido || undefined, conta: l.nomeConta || undefined, categoria: l.categoria ? l.categoria.nome : undefined,
           perfil: l.perfil ? l.perfil.nome : undefined, parcela: l.parcelaTotal ? l.parcelaAtual + "/" + l.parcelaTotal : undefined,
           serie_id: l.serieId || undefined, notas: l.notas ? l.notas.slice(0, 120) : undefined })) };
@@ -100,7 +139,7 @@
         const porCat = new Map<string, number>();
         doMes.forEach((l) => { if (l.categoria) porCat.set(l.categoria.nome, (porCat.get(l.categoria.nome) || 0) + (S[l.tipo] || 0) * l.valor); });
         const cats = await req(A.getCategorias, { mes });
-        return { mes, gasto: r2(doMes.reduce((s, l) => s + (T.gasto[l.tipo] || 0) * l.valor, 0)),
+        return { mes, moeda: await moeda(), gasto: r2(doMes.reduce((s, l) => s + (T.gasto[l.tipo] || 0) * l.valor, 0)),
           recebido: r2(doMes.reduce((s, l) => s + (T.recebido[l.tipo] || 0) * l.valor, 0)),
           orcamento_total: cats.resumo.reservado, transacoes: doMes.length,
           por_categoria: [...porCat].filter(([, v]) => r2(v) > 0).sort((x, y) => y[1] - x[1]).slice(0, 12).map(([categoria, v]) => ({ categoria, gasto: r2(v) })) };
@@ -117,7 +156,7 @@
         const d = await req(A.getBoletoData, { perfilId, cartaoId, mes: m.mes, ano: m.ano, incluirAberto: a.incluir_aberto === true });
         const recebido = d.recebimentos.reduce((s, l) => s + l.valor, 0);
         const t = ZoZo.servico.calcularFatura(Object.assign({}, d.ajustes, { lancamentos: d.lancamentos, saldoAnterior: d.saldoAnterior, recebido }));
-        return { mes: m.texto, perfil: d.todos ? "todos" : d.perfil ? d.perfil.nome : null, so_consulta: d.consulta,
+        return { mes: m.texto, moeda: await moeda(), perfil: d.todos ? "todos" : d.perfil ? d.perfil.nome : null, so_consulta: d.consulta,
           transacoes: d.lancamentos.slice(0, 50).map((l) => ({ data: l.data, descricao: l.descricao, valor: l.valor, tipo: l.tipo, cartao: l.nomeConta || undefined })),
           quantidade: d.lancamentos.length, total_transacoes: t.lancamentos, contribuicoes: t.contribuicoes, descontos: t.descontos,
           arredondamentos: t.arredondamentos, saldo_anterior: t.saldoAnterior, recebido: t.recebido, a_pagar: t.aPagar,
@@ -138,7 +177,7 @@
           return n ? { versao: n.versao, quando: n.quando, itens: n.itens.map((i) => i.titulo + ". " + i.texto) } : { itens: [] };
         }
         if (assunto === "termos") return { endereco: "/termos-uso", resumo: "Uso pessoal e gratuito. A senha é a chave dos dados. Você pode exportar, apagar os dados ou excluir a conta quando quiser." };
-        if (assunto === "privacidade") return { endereco: "/politica-privacidade", resumo: "Os dados financeiros são cifrados no seu navegador. O ZoZo não vende dados nem usa publicidade. Com o Zo e o seu consentimento, as mensagens e trechos dos dados vão ao Workers AI, da Cloudflare, com CPF, cartão, telefone e e-mail escondidos. A Cloudflare não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos." };
+        if (assunto === "privacidade") return { endereco: "/politica-privacidade", resumo: "Os dados financeiros são cifrados no seu navegador. O ZoZo não vende dados nem usa publicidade. Com o Zo e o seu consentimento, as mensagens e trechos dos dados vão ao Workers AI, da Cloudflare, com os formatos comuns de CPF, CNPJ, cartão, telefone, e-mail, senha e código escondidos (não é uma detecção perfeita: não cole senhas nem documentos no chat). A Cloudflare informa que não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos depois de responder, salvo quando a lei ou a segurança exigirem." };
         if (assunto === "armazenamento") return { resumo: "Os dados financeiros ficam num documento cifrado com AES-256-GCM no seu navegador, com uma chave que nasce da sua senha. O servidor guarda só a versão cifrada e as 10 versões anteriores. Por padrão há uma cópia da chave para recuperar a senha pelo e-mail; com a Proteção avançada essa cópia não existe." };
         return { resumo: "O Zo cria, consulta, edita e exclui transações, contas, categorias, recorrências e perfis, cuida das faturas de perfis, importa arquivos CSV e OFX do banco, categoriza em lote, faz resumos e tira dúvidas sobre o ZoZo. Antes de gravar, ele sempre pede a sua confirmação." };
       },
@@ -147,8 +186,12 @@
     /* ---------------- gravação: resumo com os dados reais + confirmar() ---------------- */
     type Escrita = (a: Args) => Promise<ResultadoFerramentaZo>;
     // Lixeira temporal: cópia antes e depois de cada gravação (no serviço, só nesta aba); a janela recebe o marco para "Desfazer"
-    const escrita = (titulo: string, linhas: Array<[string, string]>, executar: () => Promise<unknown>, desfazivel = true): ResultadoFerramentaZo =>
-      ({ tipo: "escrita", titulo, linhas, confirmar: async () => {
+    // A confirmação vale UMA vez: chamar de novo devolve o mesmo resultado, sem gravar outra vez (nada de lançamento em dobro).
+    // Conversa que já não vale (nova conversa, sair, consentimento retirado) não grava.
+    const escrita = (titulo: string, linhas: Array<[string, string]>, executar: () => Promise<unknown>, desfazivel = true): ResultadoFerramentaZo => {
+      let feito: Promise<string> | null = null;
+      const uma = async (): Promise<string> => {
+        if (!vigente()) return json({ cancelado: true, motivo: "a conversa mudou antes da confirmação" });
         const marco = desfazivel ? await req(A.abrirMarco).then((m) => m.marco, () => null) : null;
         try {
           const r = await executar();
@@ -158,12 +201,15 @@
           if (marco) req(A.descartarMarcos, { marco }).catch(() => null);
           return erroDe(e);
         }
-      } });
+      };
+      return { tipo: "escrita", titulo, linhas, confirmar: () => (feito = feito || uma()) };
+    };
 
     /** Transação: monta o pedido do serviço e as linhas do resumo (atual: a transação sendo editada) */
     async function transacao(a: Args, atual: LancamentoTela | null) {
       const [cs, ks, ps] = await Promise.all([contas(), categorias(), perfis()]);
       const t = typeof a.tipo === "string" && Object.hasOwn(TIPOS, a.tipo) ? TIPOS[a.tipo] : null;
+      const ruins = [...datasRuins(a), ...(veio(a.tipo) && !t ? ["tipo"] : []), ...(veio(a.valor) && num(a.valor) === undefined ? ["valor"] : [])];
       const tipo = t ? t.tipo : atual ? atual.tipo : "regular";
       const l = {
         data: data(a.data) || (atual ? atual.data : hoje()), descricao: txt(a.descricao) || (atual ? atual.descricao : ""),
@@ -189,46 +235,61 @@
       if (cat) linhas.push(["Categoria", cat.nome]);
       if (perfil) linhas.push(["Perfil", perfil.nome]);
       if (l.notas) linhas.push(["Observação", l.notas]);
-      return { l, precisa, linhas };
+      return { l, precisa, linhas, ruins };
     }
 
     const ESCRITA: Record<string, Escrita> = {
       criar_transacao: async (a) => {
-        const { l, precisa, linhas } = await transacao(a, null);
+        const { l, precisa, linhas, ruins } = await transacao(a, null);
+        const parcelas = int(a.parcelas, 2, 999), freq = typeof a.recorrencia === "string" && FREQ.includes(a.recorrencia) ? a.recorrencia : undefined;
+        if (veio(a.parcelas) && !parcelas) ruins.push("parcelas");
+        if (veio(a.recorrencia) && !freq) ruins.push("recorrencia");
+        if (ruins.length) return invalidos(ruins);
+        if (parcelas && freq) return invalidos(["parcelas", "recorrencia"], "Ou parcelado ou recorrente, não os dois. Pergunte à pessoa qual dos dois.");
         if (!(typeof a.tipo === "string" && Object.hasOwn(TIPOS, a.tipo))) precisa.push("tipo");
         if (precisa.length) return faltam(precisa);
-        const parcelas = int(a.parcelas, 2, 999), freq = typeof a.recorrencia === "string" && FREQ.includes(a.recorrencia) ? a.recorrencia : undefined;
+        if ((parcelas || freq) && !RECORRIVEIS.includes(l.tipo)) return invalidos(["tipo", parcelas ? "parcelas" : "recorrencia"], SO_DESPESA);
         if (parcelas) linhas.splice(2, 1, ["Valor", F.moeda(l.valor) + " em " + parcelas + "x"]);
         if (freq) linhas.push(["Repete", (ZoZo.servico.FREQUENCIAS[freq] || { rotulo: freq }).rotulo]);
-        return escrita("Criar transação", linhas, async () => {
-          const { lancamento } = await req(A.createLancamento, { lancamento: l });
-          if (parcelas || freq) {
-            // parcelado pelo valor TOTAL (o ZoZo divide) ou recorrente; se falhar, a transação criada sai (nada pela metade)
-            try { await req(A.tornarRecorrente, parcelas ? { id: lancamento.id, recorrencia: "parcelada", parcelaAtual: 1, parcelaTotal: parcelas, valorTotal: l.valor } : { id: lancamento.id, recorrencia: freq }); }
-            catch (e) { await req(A.deleteLancamento, { id: lancamento.id }).catch(() => null); throw e; }
-          }
+        // criar e repetir (ou parcelar) numa gravação só: se uma parte falha, nada fica gravado
+        return escrita("Criar transação", linhas, () => lote((x) => {
+          const { lancamento } = x(A.createLancamento, { lancamento: l });
+          if (parcelas) x(A.tornarRecorrente, { id: lancamento.id, recorrencia: "parcelada", parcelaAtual: 1, parcelaTotal: parcelas, valorTotal: l.valor });
+          else if (freq) x(A.tornarRecorrente, { id: lancamento.id, recorrencia: freq });
           return { id: lancamento.id };
-        });
+        }));
       },
       editar_transacao: async (a) => {
         const atual = (await lancamentos()).find((x) => x.id === a.id);
         if (!atual) return { tipo: "leitura", resultado: json({ erro: "transacao_nao_encontrada" }) };
         if (atual.tipo === "fatura" && a.tipo !== undefined) return { tipo: "leitura", resultado: json({ erro: "PAYMENT_TYPE_LOCKED", mensagem: ZoZo.messages.FRIENDLY.PAYMENT_TYPE_LOCKED }) };
-        const { l, precisa, linhas } = await transacao(a, atual);
-        if (precisa.length) return faltam(precisa);
+        const { l, precisa, linhas, ruins } = await transacao(a, atual);
         const freq = typeof a.recorrencia === "string" && FREQ.includes(a.recorrencia) ? a.recorrencia : undefined;
+        if (veio(a.recorrencia) && !freq) ruins.push("recorrencia");
+        if (ruins.length) return invalidos(ruins);
+        if (precisa.length) return faltam(precisa);
+        if (freq && !RECORRIVEIS.includes(l.tipo)) return invalidos(["tipo", "recorrencia"], SO_DESPESA);
         if (freq) linhas.push(["Repete", (ZoZo.servico.FREQUENCIAS[freq] || { rotulo: freq }).rotulo]);
-        return escrita("Editar transação", linhas, async () => {
-          await req(A.updateLancamento, { id: atual.id, lancamento: l });
-          if (freq) await req(A.tornarRecorrente, { id: atual.id, recorrencia: freq });
+        // o cartão mostra a transação como estava: se ela mudou até a confirmação (outra tela, outra aba), nada é gravado
+        const base = marcaLanc(atual);
+        return escrita("Editar transação", linhas, () => lote((x) => {
+          const agora = x(A.getLancamentos).lancamentos.find((y) => y.id === atual.id);
+          if (!agora || marcaLanc(agora) !== base) throw vencida();
+          x(A.updateLancamento, { id: atual.id, lancamento: l });
+          if (freq) x(A.tornarRecorrente, { id: atual.id, recorrencia: freq });
           return { id: atual.id };
-        });
+        }));
       },
       excluir_transacao: async (a) => {
         const atual = (await lancamentos()).find((x) => x.id === a.id);
         if (!atual) return { tipo: "leitura", resultado: json({ erro: "transacao_nao_encontrada" }) };
+        const base = marcaLanc(atual);
         return escrita("Excluir transação", [["Nome", atual.descricao], ["Valor", F.moeda(atual.valor)], ["Data", dataBr(atual.data)], ["Conta", atual.nomeConta || "Sem conta"]],
-          () => req(A.deleteLancamento, { id: atual.id }));
+          () => lote((x) => {
+            const agora = x(A.getLancamentos).lancamentos.find((y) => y.id === atual.id);
+            if (!agora || marcaLanc(agora) !== base) throw vencida();
+            return x(A.deleteLancamento, { id: atual.id });
+          }));
       },
       excluir_conta: async (a) => {
         const c = (await contas()).find((x) => x.id === a.id);
@@ -258,7 +319,9 @@
         if (!nome || !tipo) return faltam([!nome ? "nome" : "", !tipo ? "tipo" : ""].filter(Boolean));
         const fech = int(a.fechamento, 1, 31), venc = int(a.vencimento, 1, 31), dig = txt(a.ultimos4, 4);
         if (tipo === "cartao" && !!fech !== !!venc) return faltam([fech ? "vencimento" : "fechamento"]);
-        const linhas: Array<[string, string]> = [["Nome", nome], ["Tipo", TIPOS_CONTA[tipo]], ["Saldo", F.moeda(num(a.saldo) || 0)]];
+        if (veio(a.saldo) && num(a.saldo) === undefined) return invalidos(["saldo"]);
+        // saldo com sinal: -500 aparece como -R$ 500,00 (antes o cartão mostrava R$ 500,00 e gravava -500)
+        const linhas: Array<[string, string]> = [["Nome", nome], ["Tipo", TIPOS_CONTA[tipo]], ["Saldo", F.moeda(num(a.saldo) || 0, { comSinal: true })]];
         if (dig) linhas.push(["4 últimos dígitos", dig]);
         if (fech && venc) linhas.push(["Fechamento e vencimento", "dia " + fech + " e dia " + venc]);
         return escrita("Criar conta", linhas, () => req(A.createConta, { conta: { nome, tipo, saldo: r2(num(a.saldo) || 0), ultimos4Digitos: dig || "",
@@ -275,12 +338,15 @@
         if (dig !== undefined) linhas.push(["4 últimos dígitos", dig || "sem dígitos"]);
         if (fech && venc) linhas.push(["Fechamento e vencimento", "dia " + fech + " e dia " + venc + ", todos os meses"]);
         if (linhas.length === 1) return faltam(["nome", "ultimos4", "fechamento"]);
-        return escrita("Editar conta", linhas, async () => {
-          if (nome) await req(A.updateConta, { id: c.id, nome });
-          if (dig !== undefined) await req(A.updateConta, { id: c.id, ultimos4Digitos: dig });
-          if (fech && venc) await req(A.updateCicloCartao, { id: c.id, fechamento: String(fech), vencimento: String(venc), modo: "fixo" });
+        const base = marcaConta(c);
+        return escrita("Editar conta", linhas, () => lote((x) => {
+          const agora = x(A.getContas).contas.find((y) => y.id === c.id);
+          if (!agora || marcaConta(agora) !== base) throw vencida();
+          if (nome) x(A.updateConta, { id: c.id, nome });
+          if (dig !== undefined) x(A.updateConta, { id: c.id, ultimos4Digitos: dig });
+          if (fech && venc) x(A.updateCicloCartao, { id: c.id, fechamento: String(fech), vencimento: String(venc), modo: "fixo" });
           return { id: c.id };
-        });
+        }));
       },
       criar_categoria: async (a) => {
         const nome = txt(a.nome, 50);
@@ -302,12 +368,15 @@
         if (nova) linhas.push(["Cor", nova]);
         if (orc !== undefined && orc >= 0) linhas.push(["Orçamento", F.moeda(orc) + (mensal ? " só em " + mes.slice(5, 7) + "/" + mes.slice(0, 4) : " todos os meses")]);
         if (linhas.length === 1) return faltam(["nome", "icone", "cor", "orcamento"]);
-        return escrita("Editar categoria", linhas, async () => {
-          if (nome || icone || nova) await req(A.updateCategoria, { id: c.id, categoria: { nome: nome || c.nome, icone: icone || c.icone, cor: nova || c.cor,
+        const base = marcaCat(c);
+        return escrita("Editar categoria", linhas, () => lote((x) => {
+          const agora = x(A.getCategorias).categorias.find((y) => y.id === c.id);
+          if (!agora || marcaCat(agora) !== base) throw vencida();
+          if (nome || icone || nova) x(A.updateCategoria, { id: c.id, categoria: { nome: nome || c.nome, icone: icone || c.icone, cor: nova || c.cor,
             grupo: c.grupo, reservado: c.reservadoFixo, status: c.status } });
-          if (orc !== undefined && orc >= 0) await req(A.updateCategoria, mensal ? { id: c.id, orcamentoMes: { mes, valor: r2(orc) } } : { id: c.id, reservado: r2(orc), modoOrcamento: "fixo" });
+          if (orc !== undefined && orc >= 0) x(A.updateCategoria, mensal ? { id: c.id, orcamentoMes: { mes, valor: r2(orc) } } : { id: c.id, reservado: r2(orc), modoOrcamento: "fixo" });
           return { id: c.id };
-        });
+        }));
       },
       salvar_ajustes_fatura: async (a) => {
         if (!fatura()) return indisponivel();
@@ -319,10 +388,14 @@
         if (!novos.contribuicoes && !novos.descontos && !novos.arredondamentos) return faltam(["contribuicoes", "descontos", "arredondamentos"]);
         const final = { contribuicoes: novos.contribuicoes || atual.ajustes.contribuicoes, descontos: novos.descontos || atual.ajustes.descontos,
           arredondamentos: novos.arredondamentos || atual.ajustes.arredondamentos };
-        const lista = (l: Array<{ descricao: string; valor: number }>) => (l.length ? l.map((x) => (x.descricao || "Sem nome") + " " + F.moeda(x.valor)).join(", ") : "nenhum");
+        const lista = (l: Array<{ descricao: string; valor: number }>) => (l.length ? l.map((x) => (x.descricao || "Sem nome") + " " + F.moeda(x.valor, { comSinal: true })).join(", ") : "nenhum");
+        const base = marca(atual.ajustes);
         return escrita("Ajustes da fatura", [["Perfil", p.nome], ["Fatura de", m.texto.slice(5, 7) + "/" + m.texto.slice(0, 4)],
           ["Contribuições", lista(final.contribuicoes)], ["Descontos", lista(final.descontos)], ["Arredondamentos", lista(final.arredondamentos)]],
-        () => req(A.salvarFatura, Object.assign({ perfilId: p.id, mes: m.mes, ano: m.ano }, final)));
+        () => lote((x) => {
+          if (marca(x(A.getBoletoData, { perfilId: p.id, mes: m.mes, ano: m.ano }).ajustes) !== base) throw vencida();
+          return x(A.salvarFatura, Object.assign({ perfilId: p.id, mes: m.mes, ano: m.ano }, final));
+        }));
       },
       registrar_pagamento_recebido: async (a) => {
         if (!fatura()) return indisponivel();
@@ -384,10 +457,16 @@
         if (grupos.size > 12) linhas.push(["E mais", (grupos.size - 12) + " categorias"]);
         if (semSugestao) linhas.push(["Sem sugestão", semSugestao + " ficam como estão"]);
         const n = sem.length - semSugestao;
-        return escrita("Categorizar " + n + (n === 1 ? " transação" : " transações"), linhas, async () => {
-          for (const [categoriaId, g] of grupos) await req(A.updateLancamentosEmLote, { ids: g.ids, categoriaId });
-          return { categorizadas: sem.length - semSugestao, sem_sugestao: semSugestao };
-        });
+        // todos os grupos numa gravação só; o que ganhou categoria depois do cartão não é trocado (fica de fora)
+        return escrita("Categorizar " + n + (n === 1 ? " transação" : " transações"), linhas, () => lote((x) => {
+          const aindaSem = new Set(x(A.getLancamentos).lancamentos.filter((l) => !l.categoriaId).map((l) => l.id));
+          let feitas = 0;
+          for (const [categoriaId, g] of grupos) {
+            const ids = g.ids.filter((id) => aindaSem.has(id));
+            if (ids.length) { x(A.updateLancamentosEmLote, { ids, categoriaId }); feitas += ids.length; }
+          }
+          return { categorizadas: feitas, sem_sugestao: semSugestao, ja_tinham_categoria: n - feitas };
+        }));
       },
       exportar_transacoes: async () => {
         const tela = opcoes.tela;
@@ -415,11 +494,14 @@
         const linhas: Array<[string, string]> = [["Perfil", p.nome]];
         if (nome) linhas.push(["Novo nome", nome]);
         if (nova) linhas.push(["Cor", nova]);
-        return escrita("Editar perfil", linhas, async () => {
-          if (nome) await req(A.updatePerfil, { id: p.id, nome });
-          if (nova) await req(A.updatePerfil, { id: p.id, cor: nova });
+        const base = marca([p.nome, p.cor || null]);
+        return escrita("Editar perfil", linhas, () => lote((x) => {
+          const agora = x(A.getPerfis).perfis.find((y) => y.id === p.id);
+          if (!agora || marca([agora.nome, agora.cor || null]) !== base) throw vencida();
+          if (nome) x(A.updatePerfil, { id: p.id, nome });
+          if (nova) x(A.updatePerfil, { id: p.id, cor: nova });
           return { id: p.id };
-        });
+        }));
       },
     };
 
@@ -470,14 +552,20 @@
       const tela = opcoes.tela, original = r.confirmar;
       return Object.assign({}, r, { confirmar: async () => {
         const v = tela ? await tela.verificarIdentidade().catch(() => "negado" as const) : "negado";
+        // a biometria pode levar minutos: se a conversa acabou nesse meio tempo, nada é gravado
+        if (v === "ok" && !vigente()) return json({ cancelado: true, motivo: "a conversa mudou antes da confirmação" });
         if (v === "ok") return original();
         return json(v === "sem_metodo" ? SEM_VERIFICACAO : VERIFICACAO_NEGADA);
       } });
     }
 
     /** Executa uma chamada do Zo. Ferramenta fora da lista ou argumentos ilegíveis viram erro (nada roda). */
-    async function executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo> {
+    async function executar(nome: string, argumentos: string, problemas?: string[]): Promise<ResultadoFerramentaZo> {
+      // fora do esquema (o servidor conferiu): não executa; o Zo corrige ou pergunta à pessoa
+      if (problemas && problemas.length) return invalidos(problemas.slice(0, 10).map((p) => String(p).slice(0, 80)));
       const a = ler(argumentos);
+      const datas = datasRuins(a);
+      if (datas.length && nome !== "oferecer_opcoes") return invalidos(datas, "Data ou mês que não existe. Nada foi feito. Confira com a pessoa.");
       try {
         if (nome === "importar_arquivo") return { tipo: "arquivo" };
         if (nome === "oferecer_opcoes") {

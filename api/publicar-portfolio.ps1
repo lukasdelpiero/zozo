@@ -3,7 +3,8 @@
 #   .\api\publicar-portfolio.ps1 previa     → https://zozo-portfolio-previa.zozo-finance-app.workers.dev/portfolio
 #   .\api\publicar-portfolio.ps1 producao   → https://usezozo.com.br/portfolio
 #
-# É outro Worker (api/portfolio/wrangler.toml), só com arquivos estáticos. Passos: monta a página
+# É outro Worker (api/portfolio/wrangler.toml): arquivos estáticos + o formulário de contato (POST /portfolio/contato,
+# segredos TURNSTILE_SECRET e RESEND_API_KEY; ver o wrangler.toml). Passos: monta a página
 # (npm run build:portfolio → api/portfolio/public) → publica. Produção pede confirmação.
 param(
   [Parameter(Mandatory = $true)][ValidateSet("previa", "producao")][string]$Ambiente

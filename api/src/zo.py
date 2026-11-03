@@ -25,7 +25,7 @@ import re
 import secrets
 from typing import Any
 
-CONSENTIMENTO_VERSAO = "workers-ai-1"        # o aviso aceito; outra versão = pedir o consentimento de novo
+CONSENTIMENTO_VERSAO = "workers-ai-2"        # o aviso aceito; outra versão = pedir o consentimento de novo
 LIMITE_MENSAGENS = 40            # mensagens por pedido (o navegador manda só as mais recentes)
 LIMITE_TEXTO_USUARIO = 2000
 LIMITE_TEXTO_ASSISTENTE = 8000
@@ -53,7 +53,7 @@ TEXTO_REFEITO = "Desculpe, não consegui responder do jeito certo. Pode repetir 
 INSTRUCOES = """Você é o Zo, o assistente do ZoZo, um app de finanças pessoais. Responda sempre em português do Brasil.
 
 Jeito de falar
-Linguagem simples, amigável, neutra e direta. Frases curtas. Nunca use dois pontos nem travessão nas respostas. Trate a pessoa por você. Valores em reais no formato R$ 1.234,56. Datas no formato 29/10/2026.
+Linguagem simples, amigável, neutra e direta. Frases curtas. Nunca use dois pontos nem travessão nas respostas. Trate a pessoa por você. Valores na moeda que as ferramentas informam no campo moeda, no formato brasileiro (BRL R$ 1.234,56, USD US$ 1.234,56, EUR € 1.234,56). Nunca troque a moeda de um valor. Datas no formato 29/10/2026.
 
 Respeito
 1. Nunca use palavrões, xingamentos, ironia, deboche nem expressões racistas, misóginas, homofóbicas, transfóbicas, capacitistas, xenofóbicas, religiosamente ofensivas ou preconceituosas de qualquer tipo. Nada que insulte a pessoa ou ofenda religião, crença, orientação sexual, gênero, identidade, raça, cor, etnia, origem, nacionalidade, idade, deficiência, aparência ou condição social.
@@ -111,7 +111,7 @@ _IDS = {"type": "array", "maxItems": 50, "items": _ID}
 _DATA = {"type": "string", "description": "Data AAAA-MM-DD", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
 _MES = {"type": "string", "description": "AAAA-MM", "pattern": "^\\d{4}-\\d{2}$"}
 _TEXTO = {"type": "string", "maxLength": 200}
-_VALOR = {"type": "number", "description": "Valor em reais, positivo"}
+_VALOR = {"type": "number", "description": "Valor positivo, na moeda atual (a das leituras, campo moeda)"}
 _TIPO = {"type": "string", "enum": ["despesa", "estorno", "receita", "debito", "transferencia_entrada", "transferencia_saida"],
          "description": "despesa = Regular › Despesa; estorno = Regular › Estorno; transferencia_* = Transferência › Entrada/Saída"}
 _FREQUENCIAS = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "quadrimestral", "semestral", "anual"]
@@ -156,7 +156,8 @@ FERRAMENTAS: list[dict[str, Any]] = [
         "enum": ["senha", "dois_fatores", "protecao_avancada", "apagar_dados", "excluir_conta", "pix", "geral"]}}, ["assunto"]),
     _f("importar_arquivo", "Mostra o botão para a pessoa escolher um arquivo CSV ou OFX do banco (fatura ou extrato). O arquivo é lido no aparelho e a pessoa confere a lista antes de importar."),
     # gravação (o app pede confirmação antes)
-    _f("criar_transacao", "Cria uma transação. parcelas = compra parcelada pelo valor TOTAL; recorrencia = repetir.", {
+    _f("criar_transacao", "Cria uma transação. parcelas = compra parcelada pelo valor TOTAL; recorrencia = repetir. Nunca os dois juntos. "
+         "Só despesa e débito podem ser parcelados ou repetir.", {
         "descricao": _TEXTO, "valor": _VALOR, "data": _DATA, "tipo": _TIPO, "conta_id": _ID, "categoria_id": _ID, "perfil_id": _ID,
         "parcelas": {"type": "integer", "minimum": 2, "maximum": 999}, "recorrencia": {"type": "string", "enum": _FREQUENCIAS},
         "notas": {"type": "string", "maxLength": 500}}, ["descricao", "valor", "tipo", "conta_id"]),
@@ -193,10 +194,59 @@ FERRAMENTAS: list[dict[str, Any]] = [
     _f("sair", "Sai da conta neste aparelho."),
 ]
 NOMES = frozenset(f["function"]["name"] for f in FERRAMENTAS)
+_ESQUEMAS: dict[str, dict[str, Any]] = {f["function"]["name"]: f["function"]["parameters"] for f in FERRAMENTAS}
 
 # Só do servidor (o navegador nunca a vê nem a executa): o modelo marca a mensagem que não pode seguir
 BARRAR = _f("barrar_mensagem", "Marca a última mensagem da pessoa como conteúdo bloqueado. Use sozinha, sem texto.",
             {"motivo": {"type": "string", "enum": MOTIVOS}}, ["motivo"])
+
+def _conferir(esquema: dict[str, Any], v: Any, onde: str, saida: list[str]) -> None:
+    """
+    Confere um valor contra o esquema (tipo, enum, padrão, tamanho, faixa e campo desconhecido). Campo AUSENTE não
+    é problema aqui: o navegador pergunta à pessoa o que falta (faltam_dados).
+    """
+    tipo = esquema.get("type")
+    ok = {"string": isinstance(v, str), "boolean": isinstance(v, bool), "array": isinstance(v, list), "object": isinstance(v, dict),
+          "integer": isinstance(v, int) and not isinstance(v, bool),
+          "number": isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf")}.get(str(tipo), True)
+    if not ok:
+        saida.append((onde or "argumentos") + ": tipo")
+        return
+    if "enum" in esquema and v not in esquema["enum"]:
+        saida.append(onde + ": valor fora da lista")
+    if isinstance(v, str):
+        if len(v) > esquema.get("maxLength", 10**9):
+            saida.append(onde + ": longo demais")
+        if "pattern" in esquema and not re.search(esquema["pattern"], v):
+            saida.append(onde + ": formato")
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        if v < esquema.get("minimum", -float("inf")) or v > esquema.get("maximum", float("inf")):
+            saida.append(onde + ": fora da faixa")
+    if isinstance(v, list):
+        if len(v) > esquema.get("maxItems", 10**9):
+            saida.append(onde + ": itens demais")
+        for i, x in enumerate(v[:200]):
+            _conferir(esquema.get("items", {}), x, f"{onde}[{i}]", saida)
+    if isinstance(v, dict):
+        props = esquema.get("properties", {})
+        for k, x in v.items():
+            caminho = f"{onde}.{k}" if onde else str(k)
+            if k not in props:
+                if esquema.get("additionalProperties") is False:
+                    saida.append(caminho[:80] + ": campo desconhecido")
+                continue
+            _conferir(props[k], x, caminho, saida)
+
+
+def problemas_argumentos(nome: str, argumentos: dict[str, Any]) -> list[str]:
+    """Argumentos presentes que fogem do esquema da ferramenta (no máximo 10; só nomes de campos, nunca valores)."""
+    esquema = _ESQUEMAS.get(nome)
+    if esquema is None:
+        return ["ferramenta desconhecida"]
+    saida: list[str] = []
+    _conferir(esquema, argumentos, "", saida)
+    return saida[:10]
+
 
 class Invalido(ValueError):
     """Conversa fora das regras (vira 400 no núcleo)."""
@@ -211,10 +261,17 @@ def _texto(v: object, limite: int, vazio: bool = False) -> str:
 # ---------------- máscara de dados pessoais (antes de ir para o modelo) ----------------
 # Telefone antes do cartão ("+55 27 99999 8888" tem 13 dígitos); grudado em letra (ids) não é dado pessoal. Valores em reais
 # (1.234,56) e os 4 últimos dígitos ficam como estão.
+# Sinais invisíveis (espaço de largura zero, hífen suave…) saem antes: um CPF com um deles no meio passava.
+_INVISIVEIS = re.compile("[\u00ad\u180e\u200b-\u200f\u2060-\u2064\ufeff]")
 _MASCARAS = [
+    # senha e código colados no chat (o Zo nunca deveria recebê-los): some o valor, fica a palavra
+    (re.compile(r"(?i)\b(senha|password|passwd|pin)(\s*(?:é|e|:|=|-)?\s*)\S+"), r"\1\2[oculto]"),
+    (re.compile(r"(?i)\b(c[oó]digo|code|2fa|otp|token)(\D{0,24}?)(?<!\d)\d{6,8}(?!\d)"), r"\1\2[código oculto]"),
     (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), "[e-mail oculto]"),
     (re.compile(r"(?<![\w.,/-])\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}(?![\w/]|,\d)"), "[CNPJ oculto]"),
     (re.compile(r"(?<![\w.,/-])(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9\d{4}[\s-]?\d{4}(?![\w/]|,\d)"), "[telefone oculto]"),
+    # telefone fixo: (11) 3456-7890, 11 3456 7890; sem DDD, só com hífen (3456-7890), para "2026 3456" não virar telefone
+    (re.compile(r"(?<![\w.,/-])(?:(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?[2-5]\d{3}[\s-]\d{4}|[2-5]\d{3}-\d{4})(?![\w/]|,\d)"), "[telefone oculto]"),
     (re.compile(r"(?<![\w.,/-])(?:\d[ .-]?){12,18}\d(?![\w/]|,\d)"), "[cartão oculto]"),
     (re.compile(r"(?<![\w.,/-])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\w/]|,\d)"), "[CPF oculto]"),
     (re.compile(r"(?<![\w.,/-])\d{11}(?![\w/]|,\d)"), "[número oculto]"),
@@ -222,6 +279,11 @@ _MASCARAS = [
 
 
 def mascarar(texto: str) -> str:
+    """
+    Esconde os formatos COMUNS de dados pessoais e de acesso antes de ir para o modelo. Não é detecção perfeita
+    (o aviso do Zo diz isso): um número escrito de um jeito incomum pode passar.
+    """
+    texto = _INVISIVEIS.sub("", texto)
     for padrao, troca in _MASCARAS:
         texto = padrao.sub(troca, texto)
     return texto
@@ -376,6 +438,16 @@ def formato(texto: str) -> str:
     return nomes or "vazio"
 
 
+def uso(texto: str) -> dict[str, int]:
+    """Tokens da resposta, para os logs (consumo e custo por modelo, sem conteúdo)."""
+    try:
+        u = json.loads(texto).get("usage") or {}
+        return {k: int(u[c]) for k, c in (("tokens_entrada", "prompt_tokens"), ("tokens_saida", "completion_tokens"))
+                if isinstance(u.get(c), int) and not isinstance(u.get(c), bool)}
+    except (ValueError, AttributeError, TypeError):
+        return {}
+
+
 _FORMATO_INTERNO = re.compile(r"<\|(?:channel|start|end|message|call|constrain|return)\|>")
 
 
@@ -395,28 +467,43 @@ def ler_resposta(texto: str) -> dict[str, Any]:
         raise Invalido()
     if escolha.get("finish_reason") == "content_filter":
         return {"texto": None, "chamadas": [], "bloqueio": "refeito"}
+    # resposta cortada pelo limite de tokens: o texto pode dizer "feito" sem ter terminado (tenta a reserva)
+    if escolha.get("finish_reason") == "length":
+        raise Invalido()
     brutas = msg.get("tool_calls") or []
     if not isinstance(brutas, list):
         raise Invalido()
-    chamadas: list[dict[str, str]] = []
+    chamadas: list[dict[str, Any]] = []
+    ids: set[str] = set()
     for c in brutas:
         f = c.get("function") if isinstance(c, dict) else None
         if not isinstance(f, dict):
-            continue
+            raise Invalido()
         args = f.get("arguments")
         try:
-            objeto = json.loads(args) if isinstance(args, str) and args.strip() else {}
+            objeto = json.loads(args) if isinstance(args, str) and args.strip() else ({} if args in (None, "") else args)
         except ValueError:
             objeto = None
         if f.get("name") == BARRAR["function"]["name"]:  # bloqueio vence tudo o que veio junto
             motivo = objeto.get("motivo") if isinstance(objeto, dict) else None
             return {"texto": None, "chamadas": [], "bloqueio": "ofensa" if motivo in OFENSA else "fora"}
-        if f.get("name") not in NOMES or len(chamadas) >= LIMITE_CHAMADAS or not isinstance(objeto, dict):
-            continue
+        # chamada que não dá para executar como veio (nome desconhecido, argumentos ilegíveis ou grandes demais, chamadas
+        # demais): a resposta inteira é recusada, em vez de executar só uma parte dela (tenta a reserva)
+        argumentos = json.dumps(objeto, ensure_ascii=False) if isinstance(objeto, dict) else ""
+        if f.get("name") not in NOMES or len(chamadas) >= LIMITE_CHAMADAS or not isinstance(objeto, dict) or len(argumentos) > LIMITE_ARGUMENTOS:
+            raise Invalido()
         cid = c.get("id")
-        argumentos = json.dumps(objeto, ensure_ascii=False)
-        chamadas.append({"id": cid if isinstance(cid, str) and re.fullmatch(r"[\w-]{1,64}", cid) else "c" + secrets.token_hex(6),
-                         "nome": f["name"], "argumentos": argumentos if len(argumentos) <= LIMITE_ARGUMENTOS else "{}"})
+        # id repetido ou torto ganha um id novo (dois resultados com o mesmo id quebrariam a conversa na ida seguinte)
+        if not (isinstance(cid, str) and re.fullmatch(r"[\w-]{1,64}", cid)) or cid in ids:
+            cid = "c" + secrets.token_hex(6)
+        ids.add(cid)
+        chamada: dict[str, Any] = {"id": cid, "nome": f["name"], "argumentos": argumentos}
+        # argumento fora do esquema (tipo, lista, formato, faixa, campo desconhecido): o navegador não executa e devolve
+        # os problemas ao modelo, que corrige ou pergunta à pessoa
+        problemas = problemas_argumentos(f["name"], objeto)
+        if problemas:
+            chamada["problemas"] = problemas
+        chamadas.append(chamada)
     conteudo = msg.get("content")
     fala = conteudo.strip()[:LIMITE_TEXTO_ASSISTENTE] if isinstance(conteudo, str) else ""
     # gpt-oss às vezes escreve o raciocínio e a chamada de ferramenta como TEXTO, no formato interno dele

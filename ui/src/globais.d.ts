@@ -617,6 +617,11 @@ declare global {
   interface ZoZoServico {
     /** a resposta é RespostaDe<ação> (quem chama pela ponte recebe o tipo certo: transporte.ts) */
     handle(action: string, data?: unknown): Promise<unknown>;
+    /**
+     * Várias gravações como UMA: o passo recebe exec(ação, dados), que roda leituras e gravações do serviço no mesmo
+     * documento, em sequência. Um erro em qualquer etapa desfaz todas e nada é gravado; no fim, uma gravação só.
+     */
+    lote<T>(passo: (exec: <K extends NomeAcao>(acao: K, dados?: unknown) => RespostaDe<K>) => T): Promise<T>;
     atende(action: string): boolean;
     reset(): void;
     FREQUENCIAS: Readonly<Record<string, { dias?: number; meses?: number; rotulo: string; texto: string }>>;
@@ -732,7 +737,7 @@ declare global {
     | { tipo: "opcoes"; pergunta: string; opcoes: string[] }
     | { tipo: "arquivo" };
   /** Importar do banco (data/importar.ts): linhas com o valor COM SINAL, como vieram no arquivo */
-  interface LinhaImportada { data: string; descricao: string; valor: number }
+  interface LinhaImportada { data: string; descricao: string; valor: number; origemId?: string }
   interface ResultadoImportacao { formato: "csv" | "ofx"; cartao: boolean; itens: LinhaImportada[]; ignoradas: number }
   interface ZoZoImportar {
     ler(texto: string): ResultadoImportacao;
@@ -740,7 +745,7 @@ declare global {
     data(bruto: string): string | null;
     valor(bruto: string): number | null;
   }
-  interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo>; nomes: string[] }
+  interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string, problemas?: string[]): Promise<ResultadoFerramentaZo>; nomes: string[] }
   /** Ações de tela que a janela do Zo entrega às ferramentas (nada aqui grava dados sem o serviço) */
   interface TelaZo {
     abrirFatura(o: { perfilId: string | null; cartaoId: string; mes: number; ano: number }): void;
@@ -753,7 +758,13 @@ declare global {
     verificarIdentidade(): Promise<"ok" | "negado" | "sem_metodo">;
   }
   /** aoGravar: gravação confirmada que pode ser desfeita (lixeira temporal; o marco vale só nesta aba) */
-  interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo; aoGravar?(titulo: string, marco: string): void }
+  interface OpcoesFerramentasZo {
+    perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo; aoGravar?(titulo: string, marco: string): void;
+    /** a conversa que preparou a confirmação ainda vale (nova conversa, sair ou retirar o consentimento: não grava) */
+    vigente?(): boolean;
+    /** gravações compostas numa só (padrão: ZoZo.servico.lote); os testes trocam para simular falhas */
+    lote?: ZoZoServico["lote"];
+  }
   interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }
   interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
 

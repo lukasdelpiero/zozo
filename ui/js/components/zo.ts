@@ -19,6 +19,9 @@
   const FR = ZoZo.messages.FRIENDLY;
   const MAX_RODADAS = 6;                          // idas seguidas ao Zo num mesmo pedido (ferramentas encadeadas)
   const MAX_ENVIADAS = 30;                         // mensagens recentes enviadas a cada ida
+  // limites do servidor (api/src/zo.py: LIMITE_MENSAGENS e LIMITE_TOTAL), com folga para a resposta da ida
+  const LIMITE_MENSAGENS = 40;
+  const LIMITE_CARACTERES = 110000;
 
   const Z = {
     // botão: vidro (translúcido com desfoque), redondo, acima do conteúdo e abaixo das janelas
@@ -100,10 +103,11 @@
   }
 
   // Aviso do Zo com o Cloudflare Workers AI (retenção zero). Mudou o texto? Suba zo.CONSENTIMENTO_VERSAO no servidor.
+  // workers-ai-2: a máscara pega os formatos comuns (não é detecção perfeita) e a ressalva legal da Cloudflare.
   const CONSENTIMENTO = "Antes de começar, preciso do seu consentimento. Para ajudar você, o Zo lê e, quando você confirma, altera os seus dados no ZoZo. "
     + "A cada pergunta, a sua mensagem e só os trechos dos dados necessários são enviados ao Workers AI, da Cloudflare, o serviço que roda a inteligência artificial do Zo, para gerar a resposta. "
-    + "Antes do envio, o ZoZo esconde CPF, CNPJ, número de cartão, telefone e e-mail. "
-    + "A Cloudflare não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos depois de responder. "
+    + "Antes do envio, o ZoZo esconde os formatos comuns de CPF, CNPJ, número de cartão, telefone, e-mail, senha e código de verificação. Essa detecção não é perfeita: não cole senhas nem documentos no chat. "
+    + "A Cloudflare informa que não usa esse conteúdo para treinar inteligência artificial e não guarda os pedidos depois de responder, salvo quando a lei ou a segurança exigirem. "
     + "O ZoZo não vende nem usa os seus dados fora desta finalidade, e você pode retirar o consentimento quando quiser no menu do Zo.";
   const SEM_CONSENTIMENTO = "Tudo bem. Sem o seu consentimento eu não consigo continuar. Se mudar de ideia, é só tocar em Rever o aviso.";
   const BOAS_VINDAS = "Oi, eu sou o Zo. Posso criar, consultar e editar transações, contas, categorias, recorrências e perfis, importar o arquivo do seu banco, fazer resumos e tirar dúvidas sobre o ZoZo. Como posso ajudar?";
@@ -438,6 +442,7 @@
       h("div", { class: Z.botoes }, sim, nao));
     logEl.appendChild(cartao); rolar();
     requestAnimationFrame(() => sim.focus());
+    const minha = geracao;
     const decidir = (ok: boolean) => {
       sim.disabled = true; nao.disabled = true;
       if (!ok) {
@@ -449,6 +454,7 @@
         return;
       }
       c.bridge.request(A.zoConsentimento, { aceito: true }).then((r) => {
+        if (minha !== geracao) return;                     // a conversa recomeçou enquanto gravava: o fluxo novo decide
         aceito = r.aceito;
         bolha(BOAS_VINDAS, "bot");
         atualizarEnvio(); campo.focus();
@@ -492,31 +498,70 @@
     bolha(texto, "eu");
     void turno();
   }
-  /** As mensagens recentes, começando numa fala da pessoa (nunca um resultado sem a chamada) */
+  const tamanho = (m: MensagemZo) => (m.papel === "ferramenta" ? m.resultado.length : (m.texto || "").length
+    + (m.papel === "assistente" ? m.chamadas.reduce((s, c) => s + c.argumentos.length, 0) : 0));
+  const excede = (l: MensagemZo[]) => l.length > LIMITE_MENSAGENS || l.reduce((s, m) => s + tamanho(m), 0) > LIMITE_CARACTERES;
+  /**
+   * As mensagens recentes, começando numa fala da pessoa (nunca um resultado sem a chamada), dentro dos limites do
+   * servidor: um pedido longo com muitas ferramentas passava de 40 mensagens e a conversa travava. Passou: começa numa
+   * fala mais recente; ainda grande, os resultados mais antigos viram um resumo curto (a chamada continua com par).
+   */
   function recentes(): MensagemZo[] {
     let i = Math.max(0, historico.length - MAX_ENVIADAS);
     while (i > 0 && historico[i].papel !== "usuario") i -= 1;
-    return historico.slice(i);
+    while (excede(historico.slice(i))) {
+      const j = historico.findIndex((m, k) => k > i && m.papel === "usuario");
+      if (j < 0) break;
+      i = j;
+    }
+    const lista = historico.slice(i);
+    for (let k = 0; k < lista.length && lista.reduce((s, m) => s + tamanho(m), 0) > LIMITE_CARACTERES; k += 1) {
+      const m = lista[k];
+      if (m.papel === "ferramenta" && m.resultado.length > 200) lista[k] = { papel: "ferramenta", id: m.id, resultado: '{"omitido":"resultado antigo, longo demais para reenviar; consulte de novo se precisar"}' };
+    }
+    return lista;
+  }
+  /** O que a pessoa vê depois de Confirmar: o resultado de verdade da gravação, não o texto do modelo */
+  function recibo(resultado: string): string {
+    try {
+      const r = JSON.parse(resultado) as { ok?: boolean; cancelado?: boolean; mensagem?: string };
+      if (r.ok) return "Gravado";
+      if (r.cancelado) return "Não gravado. A conversa mudou antes da confirmação.";
+      return "Não gravado. " + (r.mensagem || FR.OPERATION_FAILED);
+    } catch (e) { return "Não gravado. " + FR.OPERATION_FAILED; }
   }
   async function turno() {
     if (!ctx) return;
     const c = ctx, minha = geracao;
+    // a gravação avisa (aoGravar) durante o confirmar(); o botão só entra depois do recibo
+    const pendente: { desfazer: { marco: string; titulo: string } | null } = { desfazer: null };
     const ferramentas = ZoZo.zoFerramentas.criar((acao, dados) => c.bridge.request(acao, dados), {
       perfis: () => ZoZo.recursos.perfis(), fatura: () => ZoZo.recursos.boleto() && ZoZo.recursos.perfis(), cambio: () => ZoZo.recursos.cambio(), tela: tela(c),
-      aoGravar: (titulo, marco) => { if (minha !== geracao) return; lixeira.push({ marco, titulo }); botaoDesfazer(marco, titulo); } });
+      vigente: () => minha === geracao && aceito === true && !!ctx,
+      // o Desfazer aparece depois do recibo ("Gravado"), não antes
+      aoGravar: (titulo, marco) => { if (minha !== geracao) return; lixeira.push({ marco, titulo }); pendente.desfazer = { marco, titulo }; } });
     ocupado = true; atualizarEnvio(); digitando(true);
     let gravou = false;
     try {
       for (let rodada = 0; rodada < MAX_RODADAS; rodada += 1) {
+        const envio = recentes();
+        if (excede(envio)) {
+          // o próprio pedido já passou do limite (muitas ferramentas seguidas): o que foi confirmado está gravado
+          const aviso = "O pedido ficou longo demais para eu continuar. O que você confirmou foi feito. Pode me dizer o resto de outro jeito?";
+          nota(aviso);
+          historico.push({ papel: "assistente", texto: aviso, chamadas: [] });
+          break;
+        }
         // o servidor desiste do modelo em 20 s (zo.TEMPO_LIMITE_S) e avisa; aqui a espera é um pouco maior, para o aviso chegar
-        const r = await c.bridge.request(A.zoConversar, { mensagens: recentes() }, { timeout: 30000 });
+        const r = await c.bridge.request(A.zoConversar, { mensagens: envio }, { timeout: 30000 });
         if (minha !== geracao) return;
-        historico.push({ papel: "assistente", texto: r.texto, chamadas: r.chamadas });
+        // a conversa guarda só id, nome e argumentos (o servidor recusa campos a mais na ida seguinte)
+        historico.push({ papel: "assistente", texto: r.texto, chamadas: r.chamadas.map((ch) => ({ id: ch.id, nome: ch.nome, argumentos: ch.argumentos })) });
         if (r.texto && r.texto.trim()) { digitando(false); bolha(r.texto.trim(), "bot"); }
         if (!r.chamadas.length) break;
         let esperarPessoa = false;
         for (const ch of r.chamadas) {
-          const res = await ferramentas.executar(ch.nome, ch.argumentos);
+          const res = await ferramentas.executar(ch.nome, ch.argumentos, ch.problemas);
           if (minha !== geracao) return;
           let resultado: string;
           if (res.tipo === "leitura") resultado = res.resultado;
@@ -532,8 +577,13 @@
             digitando(false);
             const decisao = await confirmar(res.titulo, res.linhas);
             if (minha !== geracao) return;
-            if (decisao) { resultado = await res.confirmar(); gravou = gravou || resultado.startsWith('{"ok":true'); }
-            else resultado = '{"cancelado":true,"motivo":"a pessoa não confirmou"}';
+            if (decisao) {
+              resultado = await res.confirmar();
+              gravou = gravou || resultado.startsWith('{"ok":true');
+              nota(recibo(resultado));                    // recibo: gravou ou não, pelo resultado da gravação
+              if (minha !== geracao) return;
+              if (pendente.desfazer) { botaoDesfazer(pendente.desfazer.marco, pendente.desfazer.titulo); pendente.desfazer = null; }
+            } else resultado = '{"cancelado":true,"motivo":"a pessoa não confirmou"}';
             digitando(true);
           }
           historico.push({ papel: "ferramenta", id: ch.id, resultado });
@@ -644,7 +694,8 @@
         h("div", { class: Z.botoes }, ok, nao));
       logEl.appendChild(cartao); rolar();
       requestAnimationFrame(() => ok.focus());
-      const fim = (sim: boolean) => { ok.disabled = true; nao.disabled = true; cancelarPendente = null; nota(sim ? "Confirmado" : "Cancelado"); resolver(sim); };
+      // Confirmar só registra o toque; "Gravado" ou "Não gravado" aparece depois, com o resultado da gravação
+      const fim = (sim: boolean) => { ok.disabled = true; nao.disabled = true; cancelarPendente = null; nota(sim ? "Gravando…" : "Cancelado"); resolver(sim); };
       cancelarPendente = () => fim(false);
       ok.addEventListener("click", () => fim(true));
       nao.addEventListener("click", () => fim(false));
@@ -667,11 +718,12 @@
      pelo histórico, o que entra) e o serviço grava tudo de uma vez (importarLancamentos), sem repetir o que já existe. */
   async function importarArquivo(arquivo: File) {
     if (!ctx || !janela) return;
-    const c = ctx;
+    const c = ctx, minha = geracao;
     if (arquivo.size > MAX_ARQUIVO) { nota("Esse arquivo é grande demais. Use o CSV ou o OFX de um mês."); return; }
     let lido: ResultadoImportacao;
     try { lido = ZoZo.importar.ler(ZoZo.importar.decodificar(await arquivo.arrayBuffer())); }
-    catch (e) { nota("Não consegui ler esse arquivo. Use o CSV ou o OFX que o banco exporta."); return; }
+    catch (e) { if (minha === geracao) nota("Não consegui ler esse arquivo. Use o CSV ou o OFX que o banco exporta."); return; }
+    if (minha !== geracao || !janela) return;              // nova conversa, sair ou fechar enquanto lia: para aqui
     if (!lido.itens.length) { nota("Não encontrei transações nesse arquivo. Use o CSV ou o OFX que o banco exporta."); return; }
     const itens = lido.itens.slice(0, MAX_IMPORTAR);
     if (lido.itens.length > MAX_IMPORTAR) nota("O arquivo tem " + lido.itens.length + " linhas. Vou mostrar as " + MAX_IMPORTAR + " primeiras.");
@@ -679,18 +731,23 @@
       c.bridge.request(A.getContas), c.bridge.request(A.getCategorias),
       ZoZo.recursos.perfis() ? c.bridge.request(A.getPerfis) : Promise.resolve(null),
       c.bridge.request(A.sugerirCategorias, { descricoes: itens.map((x) => x.descricao) }),
-    ]).catch((e: ErroPonte) => { nota(e.friendly || FR.OPERATION_FAILED); return [null, null, null, null] as const; });
-    if (!contasR || !catsR || !sug) return;
+    ]).catch((e: ErroPonte) => { if (minha === geracao) nota(e.friendly || FR.OPERATION_FAILED); return [null, null, null, null] as const; });
+    if (!contasR || !catsR || !sug || minha !== geracao || !janela) return;
     const contas = contasR.contas.filter((x) => !x.oculta && ["cartao", "corrente", "poupanca", "outros"].includes(x.tipo));
     if (!contas.length) { nota("Cadastre antes a conta ou o cartão do arquivo."); return; }
     const cats = catsR.categorias.filter((x) => x.status === "regular");
     const perfis = perfisR ? perfisR.perfis.filter((p) => !p.arquivado) : [];
-    // cartão: o sinal das compras varia por banco; vale o que mais aparece (a maioria das linhas são compras)
+    // Cartão: o sinal das compras varia por banco. A sugestão é o sinal que mais aparece, mas fica à vista e a pessoa
+    // troca (um extrato com mais estornos que compras inverteria tudo em silêncio).
     const positivos = itens.filter((x) => x.valor > 0).length;
-    const compraPositiva = positivos >= itens.length - positivos;
-    const padrao = contas.find((x) => x.tipo === "cartao" && lido.cartao) || contas.find((x) => (positivos > 0 && x.tipo === "cartao")) || contas[0];
+    // Conta: só vem escolhida quando há uma só possível; senão a pessoa escolhe (antes: o primeiro cartão, por palpite)
+    const possiveis = lido.cartao ? contas.filter((x) => x.tipo === "cartao") : contas;
+    const unica = possiveis.length === 1 ? possiveis[0] : contas.length === 1 ? contas[0] : null;
 
-    const contaSel = ZoZo.ui.Select(contas.map((x) => ({ value: x.id, label: x.nome + (x.ultimos4Digitos ? " " + x.ultimos4Digitos : "") })), { value: padrao.id, ariaLabel: "Conta do arquivo" }) as HTMLSelectElement;
+    const contaSel = ZoZo.ui.Select([{ value: "", label: "Escolha a conta do arquivo" }].concat(contas.map((x) => ({ value: x.id, label: x.nome + (x.ultimos4Digitos ? " " + x.ultimos4Digitos : "") }))),
+      { value: unica ? unica.id : "", ariaLabel: "Conta do arquivo" }) as HTMLSelectElement;
+    const sinalSel = ZoZo.ui.Select([{ value: "positivo", label: "Compras positivas no arquivo" }, { value: "negativo", label: "Compras negativas no arquivo" }],
+      { value: positivos >= itens.length - positivos ? "positivo" : "negativo", ariaLabel: "Sinal das compras no arquivo do cartão" }) as HTMLSelectElement;
     const perfilSel = perfis.length ? ZoZo.ui.Select([{ value: "", label: "Escolha o perfil" }].concat(perfis.map((p) => ({ value: p.id, label: p.nome }))), { ariaLabel: "Perfil das transações" }) as HTMLSelectElement : null;
     const linhasEl = h("ul", { class: "tw:m-0 tw:p-0 tw:list-none tw:max-h-64 tw:overflow-y-auto tw:flex tw:flex-col tw:gap-1.5", "aria-label": "Transações do arquivo" });
     const resumoEl = h("p", { class: "tw:m-0 tw:text-[13px] tw:text-zz-secondary" });
@@ -700,7 +757,10 @@
     let linhas: Linha[] = [];
     const nomesTipo: Record<string, string> = { regular: "Compra", estorno: "Crédito", debito: "Débito", receita: "Receita" };
     const desenhar = () => {
-      const conta = contas.find((x) => x.id === contaSel.value) || padrao;
+      const conta = contas.find((x) => x.id === contaSel.value);
+      sinalSel.hidden = !conta || conta.tipo !== "cartao";
+      if (!conta) { linhas = []; mount(linhasEl); contar(); return; }
+      const compraPositiva = sinalSel.value === "positivo";
       linhas = itens.map((item, i) => {
         const tipo = conta.tipo === "cartao" ? ((item.valor > 0) === compraPositiva ? "regular" : "estorno") : (item.valor < 0 ? "debito" : "receita");
         const marcado = h("input", { type: "checkbox", class: "tw:size-4 tw:flex-none tw:accent-zz-primary", "aria-label": "Importar " + item.descricao }) as HTMLInputElement;
@@ -722,30 +782,34 @@
     };
     function contar() {
       const n = linhas.filter((l) => l.marcado.checked).length;
-      importarBtn.textContent = "Importar " + n;
+      importarBtn.textContent = contaSel.value ? "Importar " + n : "Escolha a conta";
       importarBtn.disabled = !n;
       resumoEl.textContent = itens.length + " linhas no arquivo" + (lido.ignoradas ? ", " + lido.ignoradas + " sem data ou valor ficaram de fora" : "")
         + ". As categorias vêm do seu histórico. Créditos no cartão (como o pagamento da fatura) começam desmarcados.";
     }
     contaSel.addEventListener("change", desenhar);
+    sinalSel.addEventListener("change", desenhar);
     const cartao = h("div", { class: Z.cartao, role: "group", "aria-label": "Importar " + arquivo.name },
       h("p", { class: Z.cartaoTitulo }, "Importar " + arquivo.name),
-      h("div", { class: "tw:flex tw:flex-wrap tw:gap-2" }, contaSel, perfilSel), resumoEl, linhasEl,
+      h("div", { class: "tw:flex tw:flex-wrap tw:gap-2" }, contaSel, sinalSel, perfilSel), resumoEl, linhasEl,
       h("div", { class: Z.botoes }, importarBtn, cancelarBtn));
     logEl.appendChild(cartao); rolar();
     desenhar();
-    const travar = () => { [importarBtn, cancelarBtn, contaSel, ...(perfilSel ? [perfilSel] : [])].forEach((x) => { x.disabled = true; }); linhas.forEach((l) => { l.marcado.disabled = true; l.categoria.disabled = true; }); };
+    const travar = () => { [importarBtn, cancelarBtn, contaSel, sinalSel, ...(perfilSel ? [perfilSel] : [])].forEach((x) => { x.disabled = true; }); linhas.forEach((l) => { l.marcado.disabled = true; l.categoria.disabled = true; }); };
     cancelarBtn.addEventListener("click", () => { travar(); nota("Importação cancelada"); });
     importarBtn.addEventListener("click", () => {
+      if (minha !== geracao) return;
+      if (!contaSel.value) { nota("Escolha a conta do arquivo."); contaSel.focus(); return; }
       if (perfilSel && !perfilSel.value) { nota("Escolha o perfil das transações."); perfilSel.focus(); return; }
-      const escolhidas = linhas.filter((l) => l.marcado.checked).map((l) => ({ data: l.item.data, descricao: l.item.descricao, valor: Math.abs(l.item.valor), tipo: l.tipo, categoriaId: l.categoria.value || null }));
+      const escolhidas = linhas.filter((l) => l.marcado.checked).map((l) => Object.assign({ data: l.item.data, descricao: l.item.descricao, valor: Math.abs(l.item.valor), tipo: l.tipo,
+        categoriaId: l.categoria.value || null }, l.item.origemId ? { origemId: l.item.origemId } : {}));
       travar();
       c.bridge.request(A.importarLancamentos, { contaId: contaSel.value, perfilId: perfilSel ? perfilSel.value : null, itens: escolhidas }).then((r) => {
         const conta = contas.find((x) => x.id === contaSel.value);
         nota("Importei " + r.importados + (r.importados === 1 ? " transação" : " transações") + " em " + (conta ? conta.nome : "conta") + "."
           + (r.repetidos ? " " + r.repetidos + " já existiam e ficaram de fora." : ""));
         return c.recarregarTudo();
-      }).catch((e: ErroPonte) => { nota(e.friendly || FR.OPERATION_FAILED); importarBtn.disabled = false; cancelarBtn.disabled = false; contaSel.disabled = false; if (perfilSel) perfilSel.disabled = false; linhas.forEach((l) => { l.marcado.disabled = false; l.categoria.disabled = false; }); });
+      }).catch((e: ErroPonte) => { nota(e.friendly || FR.OPERATION_FAILED); importarBtn.disabled = false; cancelarBtn.disabled = false; contaSel.disabled = false; sinalSel.disabled = false; if (perfilSel) perfilSel.disabled = false; linhas.forEach((l) => { l.marcado.disabled = false; l.categoria.disabled = false; }); });
     });
   }
 

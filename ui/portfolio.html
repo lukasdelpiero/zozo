@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Portfólio · Lukas Del Piero Barros · ZoZo</title>
   <meta name="description" content="Como o ZoZo e o Zo foram construídos orientando o Claude Code e o Codex: números, processo com vários agentes e os prompts que fizeram a diferença.">
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="alternate icon" type="image/png" href="/assets/img/favicon.png">
   <link rel="stylesheet" href="/src/estilos.css">
 </head>
-<!-- Página pública e estática (sem JavaScript), no visual da apresentação (/sobre): fundo #f8f9fb, cartões brancos,
+<!-- Página pública e estática (o único JavaScript é o do formulário de contato, src/portfolio.ts), no visual da apresentação (/sobre): fundo #f8f9fb, cartões brancos,
      logo e fonte Matter. Portfólio do autor: como o ZoZo e o Zo foram feitos com agentes de IA. Números levantados
      dos registros das sessões (Claude Code e Codex) e do repositório em 03/11/2026; ao atualizar, mude a data. -->
 <body class="tw:overflow-y-auto tw:bg-[#f8f9fb] tw:text-zz-text">
@@ -21,7 +21,10 @@
       <img src="/assets/img/zozo-logo.svg" alt="" width="32" height="32" class="tw:size-8 tw:rounded-lg tw:shadow-[0_4px_10px_rgba(15,39,66,0.12),0_1px_2px_rgba(15,39,66,0.10)]">
       ZoZo
     </a>
-    <a href="/" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Entrar no ZoZo</a>
+    <nav aria-label="Atalhos" class="tw:flex tw:items-center tw:gap-5">
+      <a href="#contato" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Contatos</a>
+      <a href="/" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Entrar no ZoZo</a>
+    </nav>
   </header>
 
   <main id="conteudo" class="tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:mb-10 tw:flex tw:flex-col tw:gap-10">
@@ -346,10 +349,49 @@ atualizados e então me retorne.</pre>
       </ul>
       <p class="tw:mt-6 tw:mb-0 tw:text-[15px] tw:leading-[1.65] tw:text-zz-secondary">Quer ver como os dados ficam protegidos? A <a href="/sobre" class="tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline">apresentação do ZoZo</a> e a <a href="/politica-privacidade" class="tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline">política de privacidade</a> explicam em linguagem simples.</p>
     </section>
+
+    <!-- Contato: o envio e todas as conferências que valem ficam em api/portfolio/src/contato.ts -->
+    <section id="contato" aria-labelledby="contato-t" class="tw:scroll-mt-6 tw:px-14 tw:py-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-8">
+      <h2 id="contato-t" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Vamos conversar</h2>
+      <p class="tw:m-0 tw:mb-7 tw:max-w-[620px] tw:text-[15px] tw:leading-[1.6] tw:text-zz-secondary">Escreva direto para mim. Todos os campos são obrigatórios; respondo no e-mail que você deixar.</p>
+      <form id="form-contato" action="/portfolio/contato" method="post" novalidate data-sitekey="0x4AAAAAAFQjiDFKjsHDDIAe" class="tw:flex tw:flex-col tw:gap-5 tw:max-w-[620px]">
+        <div class="tw:flex tw:flex-col tw:gap-1.5">
+          <label for="c-nome" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">Nome</label>
+          <input id="c-nome" name="nome" type="text" required minlength="2" maxlength="80" autocomplete="name" aria-describedby="erro-nome" class="tw:w-full tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]">
+          <p data-erro="nome" id="erro-nome" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        </div>
+        <div class="tw:flex tw:flex-col tw:gap-1.5">
+          <label for="c-email" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">E-mail</label>
+          <input id="c-email" name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="off" aria-describedby="erro-email" class="tw:w-full tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]">
+          <p data-erro="email" id="erro-email" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        </div>
+        <div class="tw:flex tw:flex-col tw:gap-1.5">
+          <label for="c-titulo" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">Título</label>
+          <input id="c-titulo" name="titulo" type="text" required minlength="3" maxlength="120" autocomplete="off" aria-describedby="erro-titulo" class="tw:w-full tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]">
+          <p data-erro="titulo" id="erro-titulo" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        </div>
+        <div class="tw:flex tw:flex-col tw:gap-1.5">
+          <label for="c-mensagem" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">Mensagem</label>
+          <textarea id="c-mensagem" name="mensagem" required minlength="10" maxlength="4000" rows="6" aria-describedby="erro-mensagem" class="tw:w-full tw:resize-y tw:min-h-[140px] tw:leading-[1.55] tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]"></textarea>
+          <p data-erro="mensagem" id="erro-mensagem" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        </div>
+        <!-- armadilha para robôs: invisível para pessoas; preenchida, o servidor finge que enviou -->
+        <div class="tw:absolute tw:-left-[10000px] tw:w-px tw:h-px tw:overflow-hidden" aria-hidden="true">
+          <label for="c-site">Site (deixe em branco)</label>
+          <input id="c-site" name="site" type="text" tabindex="-1" autocomplete="off">
+        </div>
+        <div data-captcha class="tw:min-h-[65px]"></div>
+        <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-4">
+          <button type="submit" class="tw:inline-flex tw:items-center tw:justify-center tw:h-[46px] tw:px-6 tw:rounded-xl tw:border-0 tw:cursor-pointer tw:text-[15px] tw:font-[650] tw:text-white tw:bg-[#6948D8] tw:bg-(image:--botao-roxo) tw:shadow-[0_1px_2px_rgba(15,39,66,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] tw:hover:bg-(image:--botao-roxo-hover) tw:disabled:opacity-60 tw:disabled:cursor-wait tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2">Enviar mensagem</button>
+          <p data-aviso role="status" class="tw:m-0 tw:text-[14px] tw:text-zz-secondary tw:data-[tipo=erro]:text-[#c81e1e] tw:data-[tipo=ok]:text-[#0f7b3f] tw:data-[tipo=ok]:font-[550]"></p>
+        </div>
+      </form>
+    </section>
   </main>
 
   <footer class="tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:pb-8 tw:text-center tw:text-[13px] tw:text-zz-secondary">
     © 2026 ZoZo · Lukas Del Piero Barros · <a href="https://github.com/lukasdelpiero/zozo" rel="noopener" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">GitHub</a> · <a href="/sobre" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Sobre o ZoZo</a> · <a href="/termos-uso" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Termos de uso</a> · <a href="/politica-privacidade" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Política de privacidade</a>
   </footer>
+  <script type="module" src="/src/portfolio.ts"></script>
 </body>
 </html>

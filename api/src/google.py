@@ -161,7 +161,11 @@ async def trocar_codigo(servicos: _Servicos, client_id: str, client_secret: str,
         return None
     aud = claims.get("aud")
     exp = claims.get("exp")
-    if (claims.get("iss") not in EMISSORES or (aud != client_id and not (isinstance(aud, list) and client_id in aud))
+    # OIDC Core 3.1.3.7: com vários destinatários em aud, o azp (quem pediu o token) tem de ser este app; e azp, se
+    # vier, sempre este app (um token emitido para outro cliente não entra, mesmo listando o ZoZo em aud)
+    azp = claims.get("azp")
+    aud_ok = aud == client_id or (isinstance(aud, list) and client_id in aud and (len(aud) == 1 or azp == client_id))
+    if (claims.get("iss") not in EMISSORES or not aud_ok or (azp is not None and azp != client_id)
             or not isinstance(exp, (int, float)) or exp < agora - 60
             or not isinstance(claims.get("nonce"), str) or not hmac.compare_digest(claims["nonce"], nonce)
             or claims.get("email_verified") is not True or not isinstance(claims.get("email"), str)):

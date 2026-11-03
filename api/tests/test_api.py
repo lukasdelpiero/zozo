@@ -979,7 +979,9 @@ class TesteGoogle(Base):
 
     def test_ataques_recusados(self):
         for extra in ({"aud": "outro-app"}, {"iss": "https://evil.exemplo.com"}, {"email_verified": False},
-                      {"nonce": "outro"}, {"exp": T0 - 3600}, {"email": None}):
+                      {"nonce": "outro"}, {"exp": T0 - 3600}, {"email": None},
+                      # aud com vários destinatários sem azp deste app, e azp de outro cliente (auditoria B4)
+                      {"aud": [self.CID, "outro-app"]}, {"aud": [self.CID, "outro-app"], "azp": "outro-app"}, {"azp": "outro-app"}):
             self.q = self.iniciar()
             self.assertEqual(self.voltar(self.token(**extra)), "/?google=erro", extra)
         self.q = self.iniciar()
@@ -990,6 +992,8 @@ class TesteGoogle(Base):
         self.q = self.iniciar()
         self.assertEqual(self.voltar(self.token(), state="state-de-outro-site"), "/?google=erro")      # CSRF
         self.assertEqual(self.cli("GET", "/api/google/identidade")[0], 404)
+        self.q = self.iniciar()                  # vários destinatários com o azp certo: aceito
+        self.assertNotEqual(self.voltar(self.token(aud=[self.CID, "outro-app"], azp=self.CID)), "/?google=erro")
 
     def test_cookie_adulterado_e_vencido(self):
         self.q = self.iniciar()
@@ -1771,13 +1775,78 @@ class TesteZo(Base):
             self.assertIn(fica, bruto)
         self.assertEqual(zo.mascarar(zo.mascarar(conversa[0]["texto"])), zo.mascarar(conversa[0]["texto"]))
 
+    def test_resposta_com_chamada_inexecutavel_e_recusada_inteira(self):
+        # antes: a ferramenta desconhecida e o argumento torto sumiam e o resto era executado (o texto podia dizer
+        # "feito" sem a parte que caiu). Agora a resposta inteira é recusada e nada chega ao navegador.
+        self.consentir()
+        for ruim in [("apagar_tudo", {}), ("criar_conta", "não é json"), ("listar_perfis", "[1, 2]"),
+                     ("listar_contas", {"x": "y" * zo.LIMITE_ARGUMENTOS})]:
+            self.serv.ia_resposta = ia_chamadas(("listar_contas", {}), ruim, texto="Pronto, feito.")
+            st, r = self.falar([{"papel": "usuario", "texto": "minhas contas"}])
+            self.assertEqual((st, r.get("erro")), (502, "ZO_FAILED"), ruim[0])
+        self.serv.ia_resposta = ia_chamadas(*[("listar_contas", {})] * (zo.LIMITE_CHAMADAS + 1))
+        self.assertEqual(self.falar([{"papel": "usuario", "texto": "minhas contas"}])[0], 502)
+
+    def test_resposta_cortada_pelo_limite_de_tokens_nao_vale(self):
+        self.consentir()
+        self.serv.ia_resposta = json.dumps({"choices": [{"message": {"role": "assistant", "content": "Lancei a despesa e"},
+                                                         "finish_reason": "length"}]})
+        self.assertEqual(self.falar([{"papel": "usuario", "texto": "lança 10"}])[0], 502)
+
+    def test_ids_repetidos_ganham_ids_novos(self):
+        self.consentir()
+        lista = [{"id": "dup", "type": "function", "function": {"name": n, "arguments": "{}"}} for n in ("listar_contas", "listar_categorias")]
+        self.serv.ia_resposta = json.dumps({"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": lista},
+                                                         "finish_reason": "tool_calls"}]})
+        st, r = self.falar([{"papel": "usuario", "texto": "contas e categorias"}])
+        self.assertEqual(st, 200)
+        ids = [c["id"] for c in r["chamadas"]]
+        self.assertEqual(len(set(ids)), 2)
+        # a ida seguinte, com os dois resultados, é aceita
+        conversa = [{"papel": "usuario", "texto": "contas e categorias"}, {"papel": "assistente", "texto": None, "chamadas": r["chamadas"]},
+                    *[{"papel": "ferramenta", "id": i, "resultado": "[]"} for i in ids]]
+        self.serv.ia_resposta = ia_texto("Nada cadastrado ainda.")
+        self.assertEqual(self.falar(conversa)[0], 200)
+
+    def test_argumento_fora_do_esquema_vem_marcado_e_sem_valores(self):
+        self.consentir()
+        self.serv.ia_resposta = ia_chamadas(("criar_transacao", {"valor": "10", "tipo": "salario", "data": "2026-02-3", "parcelas": 1000,
+                                                                 "conta": "x", "descricao": "Mercado"}))
+        st, r = self.falar([{"papel": "usuario", "texto": "lança"}])
+        self.assertEqual(st, 200)
+        problemas = r["chamadas"][0]["problemas"]
+        self.assertEqual(sorted(problemas), sorted(["valor: tipo", "tipo: valor fora da lista", "data: formato",
+                                                    "parcelas: fora da faixa", "conta: campo desconhecido"]))
+        self.assertNotIn("salario", " ".join(problemas))
+        # dentro do esquema: sem a marca (campo ausente não é problema: o navegador pergunta o que falta)
+        self.serv.ia_resposta = ia_chamadas(("criar_transacao", {"valor": 10, "tipo": "despesa"}))
+        self.assertNotIn("problemas", self.falar([{"papel": "usuario", "texto": "lança"}])[1]["chamadas"][0])
+
+    def test_mascara_telefone_fixo_invisiveis_senha_e_codigo(self):
+        casos = {"Contato (11) 3456-7890": "Contato [telefone oculto]", "fixo 3456-7890": "fixo [telefone oculto]",
+                 "CPF 123\u200b.456.789-09": "CPF [CPF oculto]", "minha senha é Abc!123 ok": "minha senha é [oculto] ok",
+                 "código do 2fa: 482913": "código do 2fa: [código oculto]"}
+        for entrada, saida in casos.items():
+            self.assertEqual(zo.mascarar(entrada), saida, entrada)
+        # valores, datas e anos continuam como estão
+        for igual in ["Gastei 1.234,56 em 2026-11-03", "pague 2026 3456", "R$ 3456,78", "parcela 3/10"]:
+            self.assertEqual(zo.mascarar(igual), igual)
+
+    def test_uso_de_tokens_vai_para_o_log_sem_conteudo(self):
+        self.consentir()
+        self.serv.ia_resposta = json.dumps({"choices": [{"message": {"role": "assistant", "content": "Oi"}, "finish_reason": "stop"}],
+                                            "usage": {"prompt_tokens": 6600, "completion_tokens": 40}})
+        self.assertEqual(self.falar([{"papel": "usuario", "texto": "segredo 12345"}])[0], 200)
+        tempo = [json.loads(x) for x in self.zo.logs if '"zo_tempo"' in x][-1]
+        self.assertEqual((tempo["tokens_entrada"], tempo["tokens_saida"]), (6600, 40))
+        self.assertFalse(any("segredo" in x for x in self.zo.logs))
+
     def test_chamadas_e_resultados_viram_o_formato_da_openai(self):
         self.consentir()
-        self.serv.ia_resposta = ia_chamadas(("listar_contas", {}), ("apagar_tudo", {}), ("buscar_transacoes", {"texto": "uber"}),
-                                                ("criar_conta", "não é json"), ("listar_perfis", "[1, 2]"))
+        self.serv.ia_resposta = ia_chamadas(("listar_contas", {}), ("buscar_transacoes", {"texto": "uber"}))
         st, r = self.falar([{"papel": "usuario", "texto": "minhas contas"}])
         self.assertEqual(st, 200)
-        self.assertEqual([c["nome"] for c in r["chamadas"]], ["listar_contas", "buscar_transacoes"])   # desconhecida e argumento torto somem
+        self.assertEqual([c["nome"] for c in r["chamadas"]], ["listar_contas", "buscar_transacoes"])
         self.assertEqual(json.loads(r["chamadas"][1]["argumentos"]), {"texto": "uber"})
         a, b = r["chamadas"]
         self.serv.ia_resposta = ia_texto("Você tem duas contas.")
@@ -2250,7 +2319,7 @@ class TesteAuditoria30(Base):
         self.assertEqual(velho("GET", "/api/sessao")[0], 204)
 
     def test_nome_vazio_nao_apaga_o_nome(self):
-        for ruim in ("", "   ", "​", None):
+        for ruim in ("", "   ", "\u200b", None):
             st, r = self.api("PUT", "/api/conta/nome", {"nome": ruim}, prova=self.prova)
             self.assertEqual((st, r["erro"]), (400, "INVALID_REQUEST"), repr(ruim))
         self.assertEqual(self.con.execute("SELECT nome FROM contas WHERE email = ?", (EMAIL,)).fetchone()[0], "Ana")

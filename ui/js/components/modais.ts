@@ -560,7 +560,9 @@
 
   function novaRecorrencia(ctx: ContextoApp) {
     ctx.loadData("lancamentos", A.getLancamentos).then((dados) => {
-      const candidatos = (dados.lancamentos || []).filter((l) => l.tipo !== "recorrente" || String(l.serieId || "").startsWith("removida:")).slice(0, 300);
+      // só despesa e débito viram recorrência (receita, estorno e transferência perderiam a natureza: RECURRENCE_TYPE)
+      const candidatos = (dados.lancamentos || []).filter((l) => l.tipo === "regular" || l.tipo === "debito"
+        || (l.tipo === "recorrente" && String(l.serieId || "").startsWith("removida:"))).slice(0, 300);
       const passoLista = (api: ApiJanela): ReturnType<PassoJanela> => {
         let termo = "";
         const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
