@@ -129,6 +129,15 @@ if ($Ambiente -eq "producao") {
   Write-Host "4/6 (prévia: banco de testes, sem ponto de restauração)" -ForegroundColor Cyan
 }
 
+# Pacotes Python do Worker (Pyodide) ANTES das migrações: se falhar, nada muda no banco.
+# O projeto fica no OneDrive, que marca pastas como somente leitura; o pywrangler apaga e recria a
+# .venv-workers e o python_modules e recebia "Acesso negado". Tirar a marca antes resolve.
+foreach ($pasta in ".venv-workers", "python_modules") {
+  if (Test-Path $pasta) { attrib -R $pasta 2>$null; attrib -R "$pasta\*" /S /D 2>$null }
+}
+uv run python -m pywrangler sync
+if ($LASTEXITCODE -ne 0) { Parar "Falha ao preparar os pacotes Python do Worker: nada foi publicado e o banco não mudou." }
+
 Write-Host "5/6 Migrações do banco $banco..." -ForegroundColor Cyan
 npx --no-install wrangler d1 migrations apply $banco --remote @extra
 if ($LASTEXITCODE -ne 0) { Parar "Falha nas migrações: nada foi publicado." }
