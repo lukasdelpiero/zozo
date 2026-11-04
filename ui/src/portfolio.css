@@ -122,6 +122,14 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 /* ---------- números ---------- */
 .numeros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (min-width: 760px) { .numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; } }
+@media (min-width: 960px) { .numeros.cinco { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* data dos números, à vista (antes só num comentário do HTML) */
+.data-numeros { margin-top: 14px; font-size: 13px; color: var(--fg-2); }
+.processo { margin-top: 28px; }
+.nota-tabela { margin-top: 16px; max-width: 820px; font-size: 14px; line-height: 1.55; color: var(--fg-2); }
+.fim p.email-direto { font-size: 16px; }
+.fim p.email-direto a { text-decoration: underline; text-underline-offset: 3px; }
+.cabeca p a { text-decoration: underline; text-underline-offset: 3px; }
 .numero { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--sombra); }
 .numero .chip { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 4px; }
 .numero .chip .ico { width: 18px; height: 18px; }

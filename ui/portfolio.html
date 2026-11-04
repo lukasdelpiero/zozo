@@ -118,15 +118,12 @@
   <!-- ===== números ===== -->
   <section class="faixa faixa-numeros" aria-label="O projeto em números">
     <div class="miolo numeros">
-      <div class="numero revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-balao"/></svg></span><b>213</b><span>prompts, 176 ao Claude Code e 37 ao Codex</span></div>
-      <div class="numero revela"><span class="chip c-azul"><svg class="ico"><use href="#i-documento"/></svg></span><b>10,5 mil</b><span>linhas de prompts, especificações e auditorias</span></div>
-      <div class="numero revela"><span class="chip c-teal"><svg class="ico"><use href="#i-terminal"/></svg></span><b>3,6 mil</b><span>comandos executados pelos agentes</span></div>
-      <div class="numero revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-codigo"/></svg></span><b>30 mil</b><span>linhas de código em TypeScript, Python e SQL</span></div>
-      <div class="numero revela"><span class="chip c-verde"><svg class="ico"><use href="#i-frasco"/></svg></span><b>325</b><span>testes automatizados</span></div>
-      <div class="numero revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-repete"/></svg></span><b>123</b><span>commits em 35 versões publicadas</span></div>
-      <div class="numero revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-brilho"/></svg></span><b>36</b><span>ferramentas do Zo</span></div>
-      <div class="numero revela"><span class="chip c-azul"><svg class="ico"><use href="#i-raio"/></svg></span><b>4</b><span>semanas, de 6/10 a 3/11/2026</span></div>
+      <div class="numero revela"><span class="chip c-verde"><svg class="ico"><use href="#i-ok"/></svg></span><b>No ar</b><span>publicado em usezozo.com.br, com cadastro aberto</span></div>
+      <div class="numero revela"><span class="chip c-azul"><svg class="ico"><use href="#i-raio"/></svg></span><b>4</b><span>semanas, de 6/10 a 3/11/2026, da versão 2.0 à 3.20</span></div>
+      <div class="numero revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-brilho"/></svg></span><b>36</b><span>ferramentas que o Zo pode usar</span></div>
+      <div class="numero revela"><span class="chip c-teal"><svg class="ico"><use href="#i-frasco"/></svg></span><b>325</b><span>testes automatizados</span></div>
     </div>
+    <p class="miolo data-numeros">Números de 03/11/2026, levantados dos registros das sessões e do repositório.</p>
   </section>
 
   <!-- ===== funções ===== -->
@@ -159,8 +156,8 @@
     <div class="miolo">
       <div class="cabeca revela">
         <span class="pilula"><svg class="ico"><use href="#i-escudo"/></svg>Destaque</span>
-        <h2 id="seguranca-t">Segurança que <em>não depende de confiança.</em></h2>
-        <p>Auditada contra o OWASP ASVS 5.0 nível 2, com um teste negativo para cada controle.</p>
+        <h2 id="seguranca-t">Segurança <em>incorporada ao desenvolvimento.</em></h2>
+        <p>Revisada por agentes de IA, em sessões separadas, com o OWASP ASVS 5.0 nível 2 como referência. Cada controle de segurança tem um teste negativo, e os relatórios das revisões estão no <a href="https://github.com/lukasdelpiero/zozo/tree/main/docs">repositório</a>.</p>
       </div>
       <div class="grade quatro">
         <article class="funcao revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-cadeado"/></svg></span><h3>Ponta a ponta</h3><p>AES-256-GCM pela Web Crypto. O servidor só guarda o documento cifrado.</p></article>
@@ -245,7 +242,7 @@
       <div class="cabeca revela">
         <span class="pilula"><svg class="ico"><use href="#i-pessoas"/></svg>Como foi feito</span>
         <h2 id="agentes-t">Um time de três. <em>Dois são agentes.</em></h2>
-        <p>Cada um tem um papel definido, e nenhum revisa o próprio trabalho.</p>
+        <p>Cada um tem um papel definido, e o que um agente implementa recebe a revisão de outro.</p>
       </div>
       <div class="agentes">
         <article class="agente voce revela">
@@ -269,14 +266,14 @@
           <p class="medida"><b>3,6 mil</b>comandos executados</p>
         </article>
         <article class="agente codex revela">
-          <div class="topo"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><div><small>Auditoria independente</small><h3>Codex</h3></div></div>
+          <div class="topo"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><div><small>Revisão por um segundo agente</small><h3>Codex</h3></div></div>
           <ul>
-            <li><svg class="ico"><use href="#i-ok"/></svg>Audita segurança, backend e interface em outra sessão</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Revisa segurança, backend e interface em outra sessão</li>
             <li><svg class="ico"><use href="#i-ok"/></svg>Escreve laudos endereçados ao Claude Code</li>
             <li><svg class="ico"><use href="#i-ok"/></svg>Declara o que não conseguiu provar</li>
             <li><svg class="ico"><use href="#i-ok"/></svg>Entrega pacotes de correção para revisão</li>
           </ul>
-          <p class="medida"><b>12</b>relatórios de auditoria</p>
+          <p class="medida"><b>12</b>relatórios de revisão</p>
         </article>
       </div>
       <div class="regras revela" aria-label="Regras compartilhadas entre as sessões">
@@ -285,6 +282,14 @@
         <span class="regra"><svg class="ico"><use href="#i-frasco"/></svg>teste negativo obrigatório</span>
         <span class="regra"><svg class="ico"><use href="#i-terminal"/></svg><code>publicar.ps1</code> não publica se algo falhar</span>
       </div>
+      <div class="numeros cinco processo" aria-label="O processo em números">
+      <div class="numero revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-balao"/></svg></span><b>213</b><span>prompts, 176 ao Claude Code e 37 ao Codex</span></div>
+      <div class="numero revela"><span class="chip c-azul"><svg class="ico"><use href="#i-documento"/></svg></span><b>10,5 mil</b><span>linhas de prompts, especificações e revisões</span></div>
+      <div class="numero revela"><span class="chip c-teal"><svg class="ico"><use href="#i-terminal"/></svg></span><b>3,6 mil</b><span>comandos executados pelos agentes</span></div>
+      <div class="numero revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-codigo"/></svg></span><b>30 mil</b><span>linhas de código em TypeScript, Python e SQL</span></div>
+      <div class="numero revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-repete"/></svg></span><b>123</b><span>commits em 35 versões publicadas</span></div>
+      </div>
+      <p class="data-numeros">Números de 03/11/2026, levantados dos registros das sessões e do repositório.</p>
     </div>
   </section>
 
@@ -298,7 +303,7 @@
       <ol class="ciclo">
         <li class="passo revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-documento"/></svg></span><div class="corpo"><b>1. Especificar</b><p>Um pedido com critérios que dá para conferir: medidas, estados, exemplos e o que nunca pode acontecer.</p><span class="quem c-laranja">Eu</span></div></li>
         <li class="passo revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-codigo"/></svg></span><div class="corpo"><b>2. Construir</b><p>Implementação com teste negativo para cada controle de segurança e cada regra de dinheiro.</p><span class="quem c-roxo">Claude Code</span></div></li>
-        <li class="passo revela"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><div class="corpo"><b>3. Auditar</b><p>Outro agente revisa o mesmo código em outra sessão e escreve um laudo.</p><span class="quem c-azul">Codex</span></div></li>
+        <li class="passo revela"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><div class="corpo"><b>3. Revisar</b><p>Outro agente revisa o mesmo código em outra sessão e escreve um relatório.</p><span class="quem c-azul">Codex</span></div></li>
         <li class="passo revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-busca"/></svg></span><div class="corpo"><b>4. Triar</b><p>Cada achado é conferido no código: pertinente, já corrigido ou decisão de produto.</p><span class="quem c-roxo">Claude Code</span></div></li>
         <li class="passo revela"><span class="chip c-verde"><svg class="ico"><use href="#i-celular"/></svg></span><div class="corpo"><b>5. Validar</b><p>Testes, tipos, build e o app real no navegador, no computador e no celular.</p><span class="quem c-roxo">Claude Code</span></div></li>
         <li class="passo revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-raio"/></svg></span><div class="corpo"><b>6. Decidir</b><p>Teste na prévia e publicação em produção, com confirmação manual.</p><span class="quem c-laranja">Eu</span></div></li>
@@ -316,8 +321,35 @@
       </div>
       <div class="galeria" id="galeria-prompts" role="region" aria-roledescription="carrossel" aria-label="Prompts em destaque">
         <article class="cartao">
+          <div class="topo"><span class="chip c-roxo"><svg class="ico"><use href="#i-brilho"/></svg></span><small>Instruções do Zo · prompt de sistema</small></div>
+          <h3>As regras que decidem quando o Zo pergunta, grava ou recusa.</h3>
+          <pre>Como agir
+1. Entenda o pedido mesmo quando vier informal.
+   "Compra na amazon de 350 reais em 3x" é uma
+   despesa de R$ 350,00 parcelada em 3 vezes.
+2. Antes de criar ou editar, consulte as
+   ferramentas de leitura para obter os ids
+   reais. Nunca invente ids, nomes, valores
+   ou datas.
+3. Para criar uma despesa é obrigatório ter
+   conta e categoria. (...) Se faltar algo,
+   use oferecer_opcoes para a pessoa escolher
+   entre as opções reais.
+4. Quando tiver todos os dados, chame a
+   ferramenta de gravação. O próprio app
+   mostra um resumo e pede a confirmação.
+6. Se uma ferramenta devolver erro, explique
+   de forma simples e ajude a corrigir.
+
+O que você NÃO faz
+1. Não pede nem aceita senha, código de
+   verificação em duas etapas, CPF, chave Pix
+   ou outros dados de acesso. (...)</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> O que falta vira pergunta com as opções reais da pessoa, e nada é gravado antes do Confirmar.</span></p>
+        </article>
+        <article class="cartao">
           <div class="topo"><span class="chip c-roxo"><svg class="ico"><use href="#i-documento"/></svg></span><small>Especificação · Zo · 1.268 linhas</small></div>
-          <h3>Um assistente inteiro descrito antes de qualquer código.</h3>
+          <h3>A janela do assistente descrita antes de qualquer código.</h3>
           <pre>1. Como acessar?
    1. Botão de Ação Flutuante no canto inferior
       direito, border-radius de 50%, fundo branco
@@ -331,7 +363,7 @@
                6. Hover
                   1. Cor de fundo rgba(9,14,21,0.1)
                   2. Border radius 10px</pre>
-          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> 36 ferramentas e a janela nas medidas do documento.</span></p>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> A janela do Zo construída nas medidas do documento.</span></p>
         </article>
         <article class="cartao">
           <div class="topo"><span class="chip c-verde"><svg class="ico"><use href="#i-escudo"/></svg></span><small>Especificação · ZoZo · 122 linhas</small></div>
@@ -439,6 +471,7 @@ explorar o Zo e buscar falhas nele.</pre>
           </tbody>
         </table>
       </div>
+      <p class="nota-tabela revela">Teste exploratório de 02/11/2026, com dados fictícios. Cada modelo rodou uma vez cada um dos quatro cenários, com as instruções e as 36 ferramentas reais do Zo. Contou como acerto a resposta igual à esperada, com os valores exatos, as ferramentas e os argumentos certos e a recusa da pergunta política. A tabela mostra seis dos dez modelos testados. Com uma execução por cenário, ela indica uma tendência, não uma medida estatística.</p>
     </div>
   </section>
 
@@ -490,8 +523,8 @@ explorar o Zo e buscar falhas nele.</pre>
         <article class="camada revela"><div class="topo"><span class="chip c-laranja"><svg class="ico"><use href="#i-nuvem"/></svg></span><h3>Servidor</h3></div><ul><li><b>Python</b> no Cloudflare Workers</li><li>Pyodide</li><li>FastAPI + Pydantic</li><li>mypy estrito</li></ul></article>
         <article class="camada revela"><div class="topo"><span class="chip c-teal"><svg class="ico"><use href="#i-banco"/></svg></span><h3>Dados</h3></div><ul><li><b>Cloudflare D1</b> (SQLite)</li><li>SQL só parametrizado</li><li>13 migrações</li><li>Backup diário cifrado com age</li></ul></article>
         <article class="camada revela"><div class="topo"><span class="chip c-roxo"><svg class="ico"><use href="#i-cadeado"/></svg></span><h3>Criptografia</h3></div><ul><li><b>AES-256-GCM</b></li><li>Argon2id</li><li>HMAC</li><li>TOTP</li><li>WebAuthn ES256 e RS256</li></ul></article>
-        <article class="camada revela"><div class="topo"><span class="chip c-rosa"><svg class="ico"><use href="#i-brilho"/></svg></span><h3>Inteligência artificial</h3></div><ul><li><b>Workers AI</b></li><li>gpt-oss-120b</li><li>qwen3.8-27b (reserva)</li><li>Function calling</li><li>Retenção zero</li></ul></article>
-        <article class="camada revela"><div class="topo"><span class="chip c-verde"><svg class="ico"><use href="#i-acesso"/></svg></span><h3>Qualidade</h3></div><ul><li><b>325 testes</b></li><li>node:test e unittest</li><li>WCAG 2.2 AA com axe-core</li><li>OWASP ASVS 5.0</li><li>LGPD</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-rosa"><svg class="ico"><use href="#i-brilho"/></svg></span><h3>Inteligência artificial</h3></div><ul><li><b>Workers AI</b></li><li>gpt-oss-120b</li><li>qwen3.8-27b (reserva)</li><li>Function calling</li><li>Sem retenção dos pedidos (Workers AI)</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-verde"><svg class="ico"><use href="#i-acesso"/></svg></span><h3>Qualidade</h3></div><ul><li><b>325 testes</b></li><li>node:test e unittest</li><li>Telas conferidas com axe-core (WCAG 2.2 AA)</li><li>OWASP ASVS 5.0 como referência</li><li>Política de privacidade (LGPD)</li></ul></article>
       </div>
 
       <div class="apis">
@@ -518,6 +551,7 @@ explorar o Zo e buscar falhas nele.</pre>
       <span class="pilula revela"><svg class="ico"><use href="#i-balao"/></svg>Contato</span>
       <h2 id="fim-t" class="revela">Vamos conversar.</h2>
       <p class="revela">Escreva direto para mim. Todos os campos são obrigatórios. Respondo no e-mail que você deixar.</p>
+      <p class="email-direto revela">Prefere e-mail? Escreva para <a href="mailto:lukas.delpiero@outlook.com.br">lukas.delpiero@outlook.com.br</a>.</p>
       <form id="form-contato" class="form-contato revela" action="/portfolio/contato" method="post" novalidate data-sitekey="0x4AAAAAAFQjiDFKjsHDDIAe">
         <div class="campo">
           <label for="c-nome">Nome</label>
