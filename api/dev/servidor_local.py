@@ -15,7 +15,8 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_PORTA        porta (padrão 8787)
   ZOZO_DEV_BANCO        outro arquivo SQLite (ex.: um banco descartável para testes)
   ZOZO_DEV_RECURSOS     e-mails com Perfis, boletos e Pix (separados por vírgula; a conta demo sempre tem)
-  ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
+  ZOZO_DEV_TURNSTILE=1  liga o CAPTCHA com as chaves de TESTE da Cloudflare (padrão: desligado). O token de teste
+                        volta com o domínio example.com e sem ação, que o servidor recusa: serve só para ver a recusa
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
   ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
   ZOZO_DEV_ZO=simulado     Zo sem o Workers AI: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
@@ -126,7 +127,7 @@ def _zo_simulado(corpo):
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
 if os.environ.get("ZOZO_DEV_GOOGLE_ID") and os.environ.get("ZOZO_DEV_GOOGLE_SECRET"):
     CONFIG["GOOGLE_CLIENT_ID"], CONFIG["GOOGLE_CLIENT_SECRET"] = os.environ["ZOZO_DEV_GOOGLE_ID"], os.environ["ZOZO_DEV_GOOGLE_SECRET"]
-if os.environ.get("ZOZO_DEV_TURNSTILE", "1") != "0":
+if os.environ.get("ZOZO_DEV_TURNSTILE", "0") == "1":
     CONFIG["TURNSTILE_SITE_KEY"], CONFIG["TURNSTILE_SECRET"] = TURNSTILE_TESTE
 
 # Mesmos cabeçalhos que o Cloudflare envia com a interface (fonte única: api/cabecalhos_ui.json)
