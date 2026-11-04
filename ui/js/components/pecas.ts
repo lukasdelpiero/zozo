@@ -9,7 +9,7 @@
    por contexto ([&_.cat-pill]:… nas linhas) se apoiam nelas.
    Classes sempre escritas por inteiro (o Tailwind só gera o que lê).
    ============================================================= */
-(function (ZoZo: ZoZoGlobal) {
+const classes = (function (ZoZo: ZoZoGlobal) {
   "use strict";
 
   // Etiqueta de perfil e pílula de categoria: fundo na cor (14%/12%), texto no mesmo tom mais escuro
@@ -72,7 +72,9 @@
   const LP_BOTAO_CINZA = "tw:inline-flex tw:items-center tw:gap-1.5 tw:px-1.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:bg-transparent tw:text-zz-cinza "
     + "tw:text-[.8125rem] tw:font-[550] tw:hover:bg-zz-surface-hover tw:hover:text-zz-text";
   const LP_CAMPO = "tw:border tw:border-transparent tw:rounded-lg tw:bg-transparent tw:text-[20px] tw:font-[550] tw:tracking-[-0.01em] tw:text-zz-text tw:py-0.5 tw:px-1.5 "
-    + "tw:min-w-0 tw:outline-none tw:focus:[box-shadow:none]";
+    + "tw:min-w-0 tw:outline-none tw:focus:[box-shadow:none] "
+    // sem outline, o foco precisa aparecer: a borda (já reservada, transparente) ganha a cor de foco, sem mexer no layout
+    + "tw:focus-visible:border-[color:var(--color-focus)]";
 
   const P = {
     /* Etiqueta de perfil (UI.Tag) — tag--upper: maiúsculas (listas e painéis) */
@@ -155,16 +157,16 @@
     vazioTexto: "tw:text-[15px]",
 
     /* Avisos (toasts): só erros e avisos aparecem */
-    aviso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-alerta-fundo),var(--color-aviso-alerta-fundo))] tw:text-(--color-aviso-alerta) tw:text-[14px] "
+    aviso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-alerta-fundo),var(--color-aviso-alerta-fundo))] tw:text-(--color-aviso-alerta-texto) tw:[&_svg]:text-(--color-aviso-alerta) tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
-    avisoErro: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-erro-fundo),var(--color-aviso-erro-fundo))] tw:text-(--color-aviso-erro) tw:text-[14px] "
+    avisoErro: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-erro-fundo),var(--color-aviso-erro-fundo))] tw:text-(--color-aviso-erro-texto) tw:[&_svg]:text-(--color-aviso-erro) tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
     // fundo: a cor translúcida pedida por cima do branco (o aviso flutua sobre a página e não pode ficar transparente)
-    avisoSucesso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-sucesso-fundo),var(--color-aviso-sucesso-fundo))] tw:text-(--color-aviso-sucesso) tw:text-[14px] "
+    avisoSucesso: "toast tw:flex tw:items-start tw:gap-2.5 tw:w-max tw:max-w-full tw:py-[11px] tw:px-4 tw:rounded-xl tw:bg-zz-surface tw:bg-[linear-gradient(var(--color-aviso-sucesso-fundo),var(--color-aviso-sucesso-fundo))] tw:text-(--color-aviso-sucesso-texto) tw:[&_svg]:text-(--color-aviso-sucesso) tw:text-[14px] "
       + "tw:font-[450] tw:leading-[1.45] tw:text-left tw:[box-shadow:var(--shadow-popover)] tw:opacity-0 tw:[transform:translateY(8px)] "
       + "tw:[transition:opacity_var(--duration-medium)_var(--easing),transform_var(--duration-medium)_var(--easing)] tw:[&.is-visible]:opacity-100 "
       + "tw:[&.is-visible]:[transform:none]",
@@ -496,4 +498,8 @@
 
   ZoZo.pecas = P;
   ZoZo.pecasFn = { botao, botaoIcone };
+  return P;
 })(window.ZoZo);
+
+/** Nomes FECHADOS do mapa (globais.d.ts): ZoZo.pecas.nomeErrado não compila (auditoria de UI/UX 03/11, F09) */
+export type ClassesPecas = typeof classes;

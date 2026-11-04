@@ -1,6 +1,9 @@
-// Confere se node_modules corresponde EXATAMENTE ao package-lock.json (versão e integridade de cada pacote).
+// Confere se a instalação REGISTRADA em node_modules (node_modules/.package-lock.json) bate com o package-lock.json:
+// versão e integridade anotadas de cada pacote. NÃO calcula o hash dos arquivos instalados: um arquivo editado dentro
+// de node_modules passa. Por isso a publicação em produção sempre reinstala do zero (npm ci, que confere o hash do
+// que baixa); este atalho fica só para a prévia.
 // Saída 0 = em dia (não precisa reinstalar); 1 = diferente ou ausente (rodar npm ci).
-// Usado pelo api/publicar.ps1: evita apagar node_modules à toa (arquivos em uso pelo "npm run dev" travam o npm ci no Windows).
+// Evita apagar node_modules à toa na prévia (arquivos em uso pelo "npm run dev" travam o npm ci no Windows).
 import { readFileSync } from "node:fs";
 
 const ler = (p) => { try { return JSON.parse(readFileSync(p, "utf8")).packages || {}; } catch { return null; } };

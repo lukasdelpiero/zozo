@@ -61,7 +61,8 @@ button:disabled { cursor: not-allowed; }
 
 .icon { flex: none; display: block; }
 
-/* Valores financeiros: algarismos tabulares, alinhados à direita (seção 12) */
+/* Valores financeiros: algarismos proporcionais (o visual do produto desde a 2.0; tabular-nums alinharia as colunas
+   dígito a dígito), alinhados à direita (seção 12) */
 .money {
   font-variant-numeric: lining-nums proportional-nums;
   font-weight: var(--font-weight-medium);
@@ -103,5 +104,6 @@ button:disabled { cursor: not-allowed; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  /* iteration-count: os giros e brilhos infinitos (carregando) param no 1º quadro, um indicador estático */
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }

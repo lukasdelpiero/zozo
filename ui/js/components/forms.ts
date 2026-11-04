@@ -35,13 +35,13 @@
       const opcoes = (campo.opcoes || []).map((o) => (typeof o === "string" ? { value: o, label: o } : o));
       const sel: HTMLSelectElement = UI.Select(opcoes, { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
       sel.addEventListener("change", aoMudar);
-      return { el: sel, ler: () => sel.value, foco: sel };
+      return { el: sel, ler: () => sel.value, foco: sel, input: sel };      // input: recebe aria-invalid como os outros
     }
     if (t === "cor") {
       let atual = F.cor(valor, ZoZo.regras.paleta[9]);
       const wrap = h("div");
-      const desenhar = (): void => { mount(wrap, UI.ColorPicker(atual, (c: string) => { atual = c; desenhar(); aoMudar(); }, { label: campo.rotulo })); };
-      desenhar();
+      // a paleta marca a cor sozinha (sem redesenhar): o foco do teclado fica na cor escolhida
+      mount(wrap, UI.ColorPicker(atual, (c: string) => { atual = c; aoMudar(); }, { label: campo.rotulo }));
       return { el: wrap, ler: () => atual, foco: null, semLabelFor: true };
     }
     if (t === "emoji") {
@@ -107,7 +107,9 @@
         atualizar = () => itens.forEach(({ campo, wrap }) => { wrap.hidden = campo.mostrarSe ? !campo.mostrarSe(valores) : false; });
         atualizar();
 
-        const erroEl = h("div", { class: ZoZo.pecas.erroForm, role: "alert" });
+        // o campo com erro aponta para a mensagem (aria-describedby): o leitor de tela lê o motivo ao focar o campo
+        const erroId = "erro-form-" + Math.random().toString(36).slice(2, 10);
+        const erroEl = h("div", { class: ZoZo.pecas.erroForm, role: "alert", id: erroId });
         const salvar = h("button", { type: "submit", class: ZoZo.pecas.botaoPrimario }, icon("check", { size: 16 }), h("span", { class: ZoZo.pecas.rotuloBotao }, cfg.textoSalvar || "Salvar"));
 
         const form = h("form", { class: T.form, novalidate: true },
@@ -129,14 +131,20 @@
 
         form.addEventListener("submit", (e) => {
           e.preventDefault();
-          itens.forEach(({ c }) => c.input && c.input.removeAttribute("aria-invalid"));
+          // o erro vai junto da dica do campo (aria-describedby original guardado em data-descr), nunca no lugar dela
+          const descrever = (el: HTMLElement, comErro: boolean) => {
+            if (el.dataset.descr === undefined) el.dataset.descr = el.getAttribute("aria-describedby") || "";
+            const ids = (el.dataset.descr + (comErro ? " " + erroId : "")).trim();
+            if (ids) el.setAttribute("aria-describedby", ids); else el.removeAttribute("aria-describedby");
+          };
+          itens.forEach(({ c }) => { if (c.input) { c.input.removeAttribute("aria-invalid"); descrever(c.input, false); } });
           const faltando = itens.filter(({ campo, c, wrap }) => {
             if (wrap.hidden || !campo.obrigatorio) return false;
             const v = c.ler();
             return v === "" || v === null || (typeof v === "number" && !Number.isFinite(v));
           });
           if (faltando.length) {
-            faltando.forEach(({ c }) => c.input && c.input.setAttribute("aria-invalid", "true"));
+            faltando.forEach(({ c }) => { if (c.input) { c.input.setAttribute("aria-invalid", "true"); descrever(c.input, true); } });
             erroEl.textContent = "Preencha os campos obrigatórios: " + faltando.map((x) => x.campo.rotulo).join(", ") + ".";
             if (faltando[0].c.foco) faltando[0].c.foco.focus();
             return;

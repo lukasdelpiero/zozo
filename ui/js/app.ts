@@ -38,11 +38,12 @@
       const p = (bridge.request(action, payload) as Promise<Dado>).then((data): Dado => {
         if (minha !== geracao) throw new ZoZo.messages.BridgeError("SESSION_EXPIRED", FR.SESSION_EXPIRED);   // outra sessão
         if (pedido !== ordem[key]) return store.get().data[key] as Dado;                                       // chegou uma mais nova
-        const stale = Object.assign({}, store.get().stale); delete stale[key];
         // Mesmo conteúdo: mantém o objeto atual (não redesenha nem interrompe animações)
         const atual = store.get().data[key] as Dado | null | undefined;
         const igual = !!atual && JSON.stringify(atual) === JSON.stringify(data);
-        store.set({ data: igual ? {} : ({ [key]: data } as DadosNoEstado), loading: { [key]: false }, stale });
+        // stale: false explícito. O set mescla o 2º nível, então apagar a chave de uma cópia não a tirava do estado
+        // (a coleção ficava "desatualizada" para sempre e relia a cada visita)
+        store.set({ data: igual ? {} : ({ [key]: data } as DadosNoEstado), loading: { [key]: false }, stale: { [key]: false } });
         return igual && atual ? atual : data;
       }).catch((err) => {
         if (minha !== geracao) throw err;
@@ -59,12 +60,12 @@
 
     /** Marca coleções como desatualizadas (recarregam na próxima visita) */
     invalidate(keys: string[]) {
-      const stale = Object.assign({}, store.get().stale);
+      const stale: Record<string, boolean> = {};
       keys.forEach((k) => { stale[k] = true; });
-      store.set({ stale });
+      store.set({ stale });                                // o set mescla com as outras chaves
     },
 
-    navigate: (id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }) => ctx.router.navigate(id, opts),
+    navigate: (id: string, opts?: OpcoesNavegar) => ctx.router.navigate(id, opts),
     abrirConfiguracoes: (aba?: string) => ZoZo.configuracoes.abrir(ctx, aba),
 
     /** Após qualquer alteração de dados: tudo fica desatualizado; recarrega a página atual e a sidebar */
@@ -397,7 +398,12 @@
     const detailEl = h("aside", { class: E.painel, id: "detail", "aria-label": "Painel de informações" });
     const workspace = h("div", { class: E.trabalho, "data-conteudo": "nao" },
       h("div", { class: E.trabalhoPrincipal }, topbarEl, mainEl), detailEl);
-    mount(shellRoot, sidebarEl, workspace);
+    // "Pular para o conteúdo", como nas páginas públicas: aparece no primeiro Tab. Botão (não link #main): o endereço
+    // guarda a página (#/pagina) e não pode virar #main
+    const pular = h("button", { type: "button", onClick: () => mainEl.focus(),
+      class: "tw:sr-only tw:focus:not-sr-only tw:focus:fixed tw:focus:top-3 tw:focus:left-3 tw:focus:z-60 tw:focus:px-3 tw:focus:py-2 tw:focus:rounded-lg "
+        + "tw:focus:bg-zz-surface tw:focus:text-zz-text tw:focus:[border:1px_solid_var(--color-border-strong)]" }, "Pular para o conteúdo");
+    mount(shellRoot, pular, sidebarEl, workspace);
 
     // Recolher / expandir o menu lateral (o painel de informações continua fixo).
     // Celular: o menu começa oculto e abre como gaveta (entra da esquerda e sai para a esquerda).
@@ -470,6 +476,8 @@
   }
 
   /* ---------------- Reação ao estado de sessão ---------------- */
+  // link direto (#/lancamentos): guardado antes de o boot limpar o endereço; vale para o primeiro login desta aba
+  let rotaInicial = ZoZo.router.rotaDoEndereco();
   let statusAnterior: string | null = null;
   store.subscribe((s) => {
     const status = s.session.status;
@@ -481,10 +489,20 @@
       montarShell();
       ctx.loadData("contas", A.getContas).catch(() => null);
       ctx.loadData("config", A.getConfig).catch(() => null);
-      ctx.router.navigate("dashboard");
+      ctx.router.navigate(rotaInicial || "dashboard", { historico: "substituir" });
+      rotaInicial = null;
     } else {
       renderAuth();
+      document.title = "ZoZo";
+      // fora da sessão o endereço não guarda a página de antes (a próxima pessoa nesta aba começa no Dashboard)
+      if (/^#\//.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
     }
+  });
+  // Voltar/Avançar (ou o endereço editado à mão): abre a página do #/pagina, sem empilhar de novo
+  window.addEventListener("popstate", () => {
+    const id = ZoZo.router.rotaDoEndereco();
+    if (!id || !store.get().session.authenticated || !ctx.router) return;
+    if (ctx.router.current() !== ZoZo.pages[id]) ctx.router.navigate(id, { historico: "nao" });
   });
 
   // Integridade dos dados (avisos do host)
@@ -621,16 +639,36 @@
   ZoZo.zo.montar(ctx);                           // Zo: botão flutuante quando há sessão (some ao sair e na demo)
 
   // painel de testes: só no endereço local e na prévia, num pacote à parte (o site publicado não o baixa)
-  if (ZoZo.testeHost) import("./components/teste").then(() => ZoZo.teste && ZoZo.teste.iniciar(ctx, {
-    tela: telaTeste,
-    entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
-    sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
-    // conta simulada com dados de exemplo (sem servidor): o painel precisa de dados para abrir painéis e janelas
-    entrarSimulado: () => {
-      if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
-      return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r) => entrar(r));
-    },
-  })).catch(() => null);
+  // conta simulada com dados de exemplo (sem servidor): o painel e o Design precisam de dados para abrir painéis e janelas
+  const entrarSimulado = () => {
+    if (ZoZo.testeHost) ZoZo.testeHost.simular(true);
+    return bridge.request(A.login, { email: "exemplo@exemplo.test", senha: "simulada" }).then((r) => entrar(r));
+  };
+  // páginas de Design (#design/<seção>): guia aberta pelo painel. Lida antes do boot, que limpa o endereço com sessão aberta.
+  const designPedido = () => { const m = /^#design\/([a-z]+)$/.exec(location.hash); return m ? m[1] : null; };
+  const designInicial = ZoZo.testeHost ? designPedido() : null;
+  function abrirDesign(secao: string) {
+    const pronto = () => new Promise<void>((ok) => {          // espera o boot decidir a sessão
+      const ver = () => { if (store.get().session.status !== "loading") { ok(); return true; } return false; };
+      if (ver()) return;
+      const t0 = Date.now(), id = setInterval(() => { if (ver() || Date.now() - t0 > 10000) { clearInterval(id); ok(); } }, 150);
+    });
+    import("./components/design").then(() => pronto())
+      .then(() => (secao === "janelas" && !store.get().session.authenticated ? entrarSimulado() : null))
+      .then(() => ZoZo.design && ZoZo.design.mostrar(secao, ctx))
+      .catch(() => ctx.toast("Não deu para abrir a página de design.", { tone: "error" }));
+  }
+  if (ZoZo.testeHost) import("./components/teste").then(() => {
+    if (!ZoZo.teste) return;
+    ZoZo.teste.iniciar(ctx, {
+      tela: telaTeste,
+      entradaMudou: () => { if (!store.get().session.authenticated) renderAuth(); },
+      sessaoExpirada: () => ctx.logout(FR.SESSION_EXPIRED),
+      entrarSimulado,
+    });
+    if (designInicial) abrirDesign(designInicial);
+    window.addEventListener("hashchange", () => { const s = designPedido(); if (s) abrirDesign(s); });
+  }).catch(() => null);
 
   boot();
 })(window.ZoZo);

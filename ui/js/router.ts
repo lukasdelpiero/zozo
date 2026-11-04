@@ -81,12 +81,20 @@
       topbar.setPage(page.titulo, page.topbar ? page.topbar(ctx) : [], page.prefixo ? page.prefixo(ctx) : null);
     }
 
-    function navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }) {
+    function navigate(id: string, opts?: OpcoesNavegar) {
       const o = opts || {};
-      const alvo = ZoZo.pages[id];
+      const alvo = Object.hasOwn(ZoZo.pages, id) ? ZoZo.pages[id] : undefined;
       if (!alvo) return;
-      // Página de um recurso que a conta não tem (ex.: Perfis): vai para o Dashboard
-      if (alvo.recurso && !ZoZo.recursos[alvo.recurso]()) { if (id !== "dashboard") navigate("dashboard"); return; }
+      // Página de um recurso que a conta não tem (ex.: Perfis): vai para o Dashboard (no lugar, sem deixar a rota no histórico)
+      if (alvo.recurso && !ZoZo.recursos[alvo.recurso]()) { if (id !== "dashboard") navigate("dashboard", { historico: "substituir" }); return; }
+      // Endereço (#/pagina) e título da aba: Voltar/Avançar, atualizar e link direto (auditoria de UI/UX 03/11, F06).
+      // Só o nome da página vai para a URL, nunca dados.
+      const destino = "#/" + id;
+      if (o.historico !== "nao" && location.hash !== destino) {
+        const url = location.pathname + location.search + destino;
+        if (o.historico === "substituir" || !page) history.replaceState(null, "", url); else history.pushState(null, "", url);
+      }
+      document.title = alvo.titulo + " · ZoZo";
       ZoZo.menu.fechar();
       ctx.detail.close({ silencioso: true });
       const mudou = !page || page !== alvo;
@@ -110,7 +118,13 @@
     return { navigate, refreshTopbar, current: () => page };
   }
 
-  const api: ZoZoRouter = { create };
+  /** Página pedida no endereço (#/pagina). Os outros hashes (#recuperar=, #confirmar=, #design/) são do app.ts */
+  function rotaDoEndereco(): string | null {
+    const m = /^#\/([a-z]+)$/.exec(location.hash);
+    return m && Object.hasOwn(ZoZo.pages, m[1]) ? m[1] : null;
+  }
+
+  const api: ZoZoRouter = { create, rotaDoEndereco };
   ZoZo.router = api;
   ZoZo.pages = ZoZo.pages || {};
 })(window.ZoZo);

@@ -131,6 +131,29 @@ def dois_fatores_desativado(nome: str | None, agora: float) -> Mensagem:
                    rodape="Não foi você? Troque sua senha e ative o 2FA de novo.")
 
 
+def codigo_backup_usado(nome: str | None, agora: float, restantes: int) -> Mensagem:
+    resta = "Não sobrou nenhum código de backup" if restantes == 0 else (
+        "Sobrou 1 código de backup" if restantes == 1 else f"Sobraram {restantes} códigos de backup")
+    return _montar("Um código de backup foi usado", _ola(nome),
+                   [f"Um código de backup da verificação em duas etapas da sua conta no ZoZo foi usado em {_quando(agora)} (horário de Brasília).",
+                    resta + ". Você gera códigos novos em Configurações › Segurança."],
+                   rodape="Não foi você? Troque sua senha e gere códigos novos.")
+
+
+def codigos_backup_gerados(nome: str | None, agora: float) -> Mensagem:
+    return _montar("Novos códigos de backup", _ola(nome),
+                   [f"Novos códigos de backup da verificação em duas etapas foram gerados para a sua conta no ZoZo em {_quando(agora)} (horário de Brasília).",
+                    "Os códigos anteriores deixaram de valer."],
+                   rodape="Não foi você? Troque sua senha e gere códigos novos.")
+
+
+def chave_acesso(nome: str | None, agora: float, aparelho: str, adicionada: bool) -> Mensagem:
+    acao = "adicionada" if adicionada else "removida"
+    return _montar("Biometria " + acao, _ola(nome),
+                   [f"A biometria ou chave de acesso \"{aparelho}\" foi {acao} na sua conta do ZoZo em {_quando(agora)} (horário de Brasília)."],
+                   rodape="Não foi você? Troque sua senha e confira as chaves em Configurações › Segurança.")
+
+
 def conta_excluida(nome: str | None, agora: float) -> Mensagem:
     return _montar("Sua conta do ZoZo foi excluída", _ola(nome),
                    [f"A sua conta no ZoZo foi excluída em {_quando(agora)} (horário de Brasília).",

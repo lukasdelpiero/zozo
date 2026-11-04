@@ -57,7 +57,7 @@
       const usuario: UsuarioSessao = state.session.user || {};
       const foto = state.data.config && state.data.config.foto;
       const cfg: Partial<RespostaConfig> = state.data.config || {};
-      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto, String(!!cfg.multicambio), String(cfg.moeda)].map((x) => (typeof x === "object" ? x : String(x)));
+      const sig = [state.currentPage, contas, state.ui.gruposFechados, state.loading.contas, usuario, foto, String(!!cfg.multicambio), String(cfg.moeda), String(state.ui.avisosDemo)].map((x) => (typeof x === "object" ? x : String(x)));
       const antes = assinatura;
       if (antes && sig.every((v, i) => v === antes[i])) return;
       assinatura = sig;
@@ -65,7 +65,7 @@
       mount(navEl, NAV.filter(visivel).map((n) => navItem(n, state.currentPage, ctx.navigate)));
       mount(cambioEl, ZoZo.cambio.Seletor(ctx));            // Câmbio (só com o multicâmbio ligado)
       // Conta de demonstração: nada é gravado
-      mount(avisoEl, ZoZo.recursos.demo()
+      mount(avisoEl, ZoZo.recursos.demo() && ZoZo.demonstracao.avisos()
         ? h("p", { class: E.demo, role: "note" }, icon("alerta", { size: 14, class: E.demoIcone }), "Conta de demonstração: dados fictícios, nada é salvo.")
         : null);
 

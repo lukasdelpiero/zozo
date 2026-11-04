@@ -27,17 +27,22 @@
   /**
    * Anima de 0 a 1 em "dur" ms chamando passo(p), contando a partir de "inicio" (performance.now()).
    * Começa na hora — como antes da 2.8: o gráfico se desenha enquanto a página entra.
+   * el: o gráfico; se ele sair da tela (troca de página no meio da animação), os quadros param. Devolve quem cancela
+   * (destroy do gráfico). Auditoria de UI/UX 03/11, F12.
    */
-  function animar(dur: number, passo: (p: number) => void, inicio?: number | null) {
-    if (reduzir()) { passo(1); return; }
+  function animar(dur: number, passo: (p: number) => void, inicio?: number | null, el?: Element): () => void {
+    if (reduzir()) { passo(1); return () => {}; }
     const ini = inicio || performance.now();
     ZoZo.charts.ultimoInicio = ini;
+    let id = 0, parado = false;
     const frame = (agora: number) => {
+      if (parado || (el && !el.isConnected)) return;
       const t = Math.max(0, Math.min(1, (agora - ini) / dur));
       passo(easeOut(t));
-      if (t < 1) requestAnimationFrame(frame);
+      if (t < 1) id = requestAnimationFrame(frame);
     };
-    requestAnimationFrame(frame);
+    id = requestAnimationFrame(frame);
+    return () => { parado = true; cancelAnimationFrame(id); };
   }
 
   /**
@@ -145,8 +150,13 @@
     function draw() {
       const W = Math.max(160, holder.clientWidth);
       const H = o.height;
-      const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 6 };      // modo filtro: espaço para a data em cima do ponto
+      // l: 0 = a linha e a 1ª data começam na borda do conteúdo do card, alinhadas ao título
+      const m = { t: o.aoPassar ? 28 : 14, r: 14, b: o.semEixo ? 8 : 36, l: 0 };      // modo filtro: espaço para a data em cima do ponto
       const iw = W - m.l - m.r, ih = H - m.t - m.b;
+      // o.eixo: as datas do eixo inteiro (ex.: todos os dias do mês). Sem ele, cada série ocupa a largura toda; com
+      // ele, a série curta (o gasto até hoje) vai só até o seu último dia em vez de esticar (no dia 1, um ponto só
+      // ficava solto na beira direita)
+      const N = o.eixo && o.eixo.length ? Math.max(o.eixo.length, ...validas.map((sr) => sr.points.length)) : 0;
       const n = Math.max(...validas.map((sr) => sr.points.length));
 
       const escala = (pts: PontoGrafico[]) => {
@@ -171,7 +181,7 @@
           sr._base = m.t + ih;
         }
       });
-      const x = (i: number, len: number) => m.l + (len <= 1 ? iw : (i / (len - 1)) * iw);
+      const x = (i: number, len: number) => { const total = N || len; return m.l + (total <= 1 ? iw : (i / (total - 1)) * iw); };
 
       if (svg) svg.remove();
       const tela = s("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": o.ariaLabel, class: P.graficoSvg });
@@ -179,22 +189,27 @@
 
 
       if (!o.semEixo) {
-        const ref = validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
+        const ref = o.eixo && o.eixo.length ? o.eixo.map((data) => ({ data, valor: 0 }))
+          : validas.reduce((a, b) => (a.points.length >= b.points.length ? a : b)).points;
         // Início, meio e fim — sem repetir (séries curtas) e sem o do meio quando não cabe entre os outros dois
         const ultimo = ref.length - 1, meio = Math.floor(ultimo / 2);
+        // gráfico puxado até a borda do card (margem esquerda negativa): a linha encosta, a 1ª data fica alinhada ao texto
+        const recuo = Math.max(0, -parseFloat(getComputedStyle(container).marginLeft) || 0);
         const indices = ultimo <= 0 ? [0] : (meio > 0 && meio < ultimo && iw >= 240) ? [0, meio, ultimo] : [0, ultimo];
         indices.forEach((i) => {
           if (!ref[i]) return;
           const dt = F.parseData(ref[i].data) || new Date();
           const ancora = i === 0 ? "start" : i === ultimo ? "end" : "middle";
-          if (o.rotuloX) tela.appendChild(s("text", { x: x(i, ref.length), y: H - 6, class: P.graficoRotulo, "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
-          else rotuloDuasLinhas(tela, x(i, ref.length), H - 2, String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()), String(dt.getFullYear()), ancora);
+          const xr = x(i, ref.length) + (i === 0 ? recuo : 0);
+          if (o.rotuloX) tela.appendChild(s("text", { x: xr, y: H - 6, class: P.graficoRotulo, "text-anchor": ancora, text: o.rotuloX(ref[i]) }));
+          else rotuloDuasLinhas(tela, xr, H - 2, String(dt.getDate()).padStart(2, "0") + " " + F.mesAbrev(dt.getMonth()), String(dt.getFullYear()), ancora);
         });
       }
 
       // Conteúdo revelado da esquerda para a direita
       const clipId = "zz-clip-" + (++seq);
-      const clipRect = s("rect", { x: 0, y: 0, width: W * progresso, height: H });
+      // x: -8 = a bolinha do 1º ponto, agora na borda (m.l = 0), aparece inteira
+      const clipRect = s("rect", { x: -8, y: 0, width: W * progresso + 8, height: H });
       clipAtual = { rect: clipRect, W };
       tela.appendChild(s("defs", null, s("clipPath", { id: clipId }, clipRect)));
       const g = s("g", { "clip-path": `url(#${clipId})` });
@@ -272,7 +287,8 @@
       const mostrar = (clientX: number) => {
         const r = tela.getBoundingClientRect();
         const rel = Math.max(0, Math.min(iw, clientX - r.left - m.l));
-        mostrarPonto(Math.round((rel / iw) * (n - 1)));
+        // com eixo: a posição no eixo inteiro, presa ao último dia que tem valor
+        mostrarPonto(Math.min(n - 1, Math.round((rel / iw) * ((N || n) - 1))));
       };
       /** mostra o ponto i (mouse ou teclado) e devolve o texto que o leitor de tela anuncia */
       const mostrarPonto = (i: number): string => {
@@ -324,17 +340,18 @@
 
       if (!iniciada && holder.isConnected && holder.clientWidth) {
         iniciada = true;
-        animar(duracao(), (p) => { progresso = p; if (clipAtual) clipAtual.rect.setAttribute("width", String(clipAtual.W * p)); }, inicio);
+        cancelar = animar(duracao(), (p) => { progresso = p; if (clipAtual) clipAtual.rect.setAttribute("width", String(clipAtual.W * p + 8)); }, inicio, holder);
       }
     }
 
+    let cancelar = () => {};
     draw();
     let conectado = false;
     const ro = new ResizeObserver(() => {
-      if (holder.isConnected) { conectado = true; draw(); } else if (conectado) ro.disconnect();
+      if (holder.isConnected) { conectado = true; draw(); } else if (conectado) { ro.disconnect(); cancelar(); }
     });
     ro.observe(holder);
-    return { destroy() { ro.disconnect(); } };
+    return { destroy() { ro.disconnect(); cancelar(); } };
   }
 
   /* ================= Donut =================
@@ -399,7 +416,7 @@
       });
     };
     if (ZoZo.charts.permitirAnimacao === false) pintar(1);
-    else { const inicio = inicioAnimacao(); pintar(progressoInicial(inicio)); quandoVisivel(container, () => animar(duracao(), pintar, inicio)); }
+    else { const inicio = inicioAnimacao(); pintar(progressoInicial(inicio)); quandoVisivel(container, () => { animar(duracao(), pintar, inicio, container); }); }
     return svg;
   }
 
@@ -466,24 +483,24 @@
       pintarAtual(progresso);
       if (!iniciada) {
         iniciada = true;
-        animar(duracao(), (p) => { progresso = p; pintarAtual(p); }, inicio);
+        cancelar = animar(duracao(), (p) => { progresso = p; pintarAtual(p); }, inicio, holder);
       }
     }
 
     // Mesmo cuidado do gráfico de linha: um redesenho no meio da animação continua de onde parou
-    let iniciada = ZoZo.charts.permitirAnimacao === false, pintarAtual = (_p: number): void => {};
+    let iniciada = ZoZo.charts.permitirAnimacao === false, pintarAtual = (_p: number): void => {}, cancelar = () => {};
     const inicio = iniciada ? 0 : inicioAnimacao();
     let progresso = iniciada ? 1 : progressoInicial(inicio);
     let conectado = false;
     const ro = new ResizeObserver(() => {
       // saiu da tela depois de ter aparecido (troca de página/painel): para de observar
-      if (!holder.isConnected) { if (conectado) ro.disconnect(); return; }
+      if (!holder.isConnected) { if (conectado) { ro.disconnect(); cancelar(); } return; }
       conectado = true;
       if (!holder.clientWidth) return;
       draw();
     });
     ro.observe(holder);
-    return { destroy() { ro.disconnect(); } };
+    return { destroy() { ro.disconnect(); cancelar(); } };
   }
 
   const api: ZoZoCharts = { renderLineChart, renderDonutChart, renderBarChart, permitirAnimacao: true, continuarDe: null, ultimoInicio: null };

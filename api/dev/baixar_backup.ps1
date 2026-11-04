@@ -28,7 +28,9 @@ if (Test-Path $registro) { $baixados = @(Get-Content $registro | Where-Object { 
 
 $saida = gh run list --repo $Repositorio --workflow backup-d1.yml --status success --limit 40 --json databaseId
 if ($LASTEXITCODE -ne 0) { Parar "Não foi possível listar as execuções do backup (repositório $Repositorio). O workflow backup-d1.yml precisa estar no branch principal (main) do GitHub." }
-$execucoes = @(($saida -join "`n") | ConvertFrom-Json)
+# no Windows PowerShell 5.1 o ConvertFrom-Json solta a lista inteira como um item só: guardar antes de @()
+$lista = ($saida -join "`n") | ConvertFrom-Json
+$execucoes = @($lista)
 
 $novos = 0
 foreach ($e in $execucoes) {

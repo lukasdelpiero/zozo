@@ -1,0 +1,67 @@
+# ZoZo — portfólio do autor (usezozo.com.br/portfolio), publicado SEPARADO do app:
+#   .\api\publicar-portfolio.ps1 previa     → https://zozo-portfolio-previa.zozo-finance-app.workers.dev/portfolio
+#   .\api\publicar-portfolio.ps1 producao   → https://usezozo.com.br/portfolio
+# Arquivos estáticos (a página vem de npm run build:portfolio → api/portfolio/public) e um único endereço com código:
+# POST /portfolio/contato (src/index.ts → src/contato.ts), o formulário de contato, que envia e-mail pelo Resend.
+# Segredos do formulário (rodar dentro de app\api; na prévia, acrescentar --env previa):
+#   npx wrangler secret put TURNSTILE_SECRET --config portfolio/wrangler.toml   (a mesma do app: o widget é o mesmo)
+#   npx wrangler secret put RESEND_API_KEY --config portfolio/wrangler.toml
+# Sem eles o formulário responde "indisponível" e a página continua no ar.
+# As rotas abaixo ficam no MESMO domínio do app. Uma rota tem prioridade sobre o Custom Domain do Worker "zozo"
+# no mesmo endereço (developers.cloudflare.com/workers/configuration/routing/routes), então só /portfolio e
+# /portifolio vêm para cá; o resto do usezozo.com.br continua no app. Publicar um não mexe no outro.
+name = "zozo-portfolio"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+preview_urls = false
+routes = [
+  { pattern = "usezozo.com.br/portfolio*", zone_name = "usezozo.com.br" },
+  { pattern = "usezozo.com.br/portifolio*", zone_name = "usezozo.com.br" },
+]
+
+# /portfolio → portfolio.html (padrão do Cloudflare: html_handling = "auto-trailing-slash"); _headers e _redirects
+# (/portifolio → /portfolio) vêm do build
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/portfolio/contato"]     # só o formulário passa pelo código; o resto sai direto dos arquivos
+
+# Formulário de contato: destino fixo (nunca vem do pedido) e origens aceitas
+[vars]
+ORIGENS = "https://usezozo.com.br"
+CONTATO_PARA = "lukas.delpiero@outlook.com.br"
+EMAIL_REMETENTE = "ZoZo Portfólio <nao-responda@usezozo.com.br>"
+
+# Limites de envio: 2 por minuto por IP e 10 por minuto no total (namespace_id: número livre, único na conta)
+[[ratelimits]]
+name = "LIMITE_IP"
+namespace_id = "7101"
+simple = { limit = 2, period = 60 }
+
+[[ratelimits]]
+name = "LIMITE_GERAL"
+namespace_id = "7102"
+simple = { limit = 10, period = 60 }
+
+# Prévia: endereço próprio no workers.dev, sem rota no domínio (para conferir antes de publicar)
+[env.previa]
+name = "zozo-portfolio-previa"
+workers_dev = true
+routes = []
+
+# vars e limites não são herdados pelos ambientes: repetidos aqui (o widget do Turnstile precisa aceitar este domínio)
+[env.previa.vars]
+ORIGENS = "https://zozo-portfolio-previa.zozo-finance-app.workers.dev"
+CONTATO_PARA = "lukas.delpiero@outlook.com.br"
+EMAIL_REMETENTE = "ZoZo Portfólio <nao-responda@usezozo.com.br>"
+
+[[env.previa.ratelimits]]
+name = "LIMITE_IP"
+namespace_id = "7103"
+simple = { limit = 2, period = 60 }
+
+[[env.previa.ratelimits]]
+name = "LIMITE_GERAL"
+namespace_id = "7104"
+simple = { limit = 10, period = 60 }

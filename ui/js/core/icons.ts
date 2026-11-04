@@ -72,9 +72,12 @@
     receita: [P("M12 19V5"), P("m5 12 7-7 7 7")],     // entra dinheiro: seta para cima
     regular: [P("M12 5v14"), P("m19 12-7 7-7-7")],     // sai dinheiro: seta para baixo
     "seta-voltar": [P("m12 19-7-7 7-7"), P("M19 12H5")],
+    desfazer: [P("M9 14 4 9l5-5"), P("M4 9h10.5a5.5 5.5 0 0 1 0 11H11")],
     "baixar-circulo": [["circle", { cx: 12, cy: 12, r: 9.5 }], P("M12 7.5v8.5"), P("m8.5 12.5 3.5 3.5 3.5-3.5")],
     dividir: [P("M16 3h5v5"), P("M8 3H3v5"), P("M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3"), P("m15 9 6-6")],   // seta de divisão
     info: [["circle", { cx: 12, cy: 12, r: 9.5 }], P("M12 11v5.5"), P("M12 7.6v.2")],
+    // Configurações › Segurança
+    escudo: [P("M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z")],
     painel: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 3 }], P("M9 4v16"), P("M5.5 8h1.5"), P("M5.5 11h1.5")],
     selecionar: [["rect", { x: 3, y: 3, width: 18, height: 18, rx: 4 }], P("m8 12 3 3 5-6")],
     camera: [P("M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"), ["circle", { cx: 12, cy: 13, r: 3 }]],
@@ -82,6 +85,11 @@
     arquivar: [["rect", { x: 2, y: 3, width: 20, height: 5, rx: 1 }], P("M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"), P("M10 12h4")],
     desarquivar: [["rect", { x: 2, y: 3, width: 20, height: 5, rx: 1 }], P("M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"), P("m9 15 3-3 3 3"), P("M12 12v6")],
     "chevron-left": [P("m15 18-6-6 6-6")],
+    "chevron-up": [P("m18 15-6-6-6 6")],
+    // janela do Zo: expandir (setas para os cantos inferior esquerdo e superior direito) e recolher (setas para o centro)
+    expandir: [P("M15 3h6v6"), P("M9 21H3v-6"), P("M21 3l-7 7"), P("M3 21l7-7")],
+    recolher: [P("M4 10h6V4"), P("M20 14h-6v6"), P("M3 3l7 7"), P("M21 21l-7-7")],
+    sorriso: [["circle", { cx: 12, cy: 12, r: 10 }], P("M8 14s1.5 2 4 2 4-2 4-2"), P("M9 9h.01"), P("M15 9h.01")],
     ordenar: [P("m3 16 4 4 4-4"), P("M7 20V4"), P("m21 8-4-4-4 4"), P("M17 4v16")],
     copiar: [P("M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z"), P("M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2")],
     nota: [P("M12 20h9"), P("M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z")],

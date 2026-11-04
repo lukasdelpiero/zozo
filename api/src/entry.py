@@ -10,8 +10,9 @@ este código só recebe os caminhos /api/*.
 Variáveis (wrangler.toml): TURNSTILE_SITE_KEY, GOOGLE_CLIENT_ID
   API_FASTAPI = "1"  → os pedidos passam pelo app FastAPI + Pydantic (app_fastapi.py) antes do
                        núcleo. Ligado na prévia; produção só depois de aprovado lá.
-Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO, RESEND_API_KEY,
-  GEMINI_API_KEY (Zo, o assistente; sem ela o Zo fica desligado). Variável ZO_MODELO (wrangler.toml): o modelo do Gemini.
+Segredos (wrangler secret put): SEGREDO, TURNSTILE_SECRET, GOOGLE_CLIENT_SECRET, RECURSOS_AVANCADOS, RECURSOS_CAMBIO,
+  RECURSOS_FATURA_DIA11 (fatura "até o dia 11 do mês seguinte"), RESEND_API_KEY,
+  Zo, o assistente: binding AI (Workers AI, [ai] no wrangler.toml) e a variável ZO_MODELO ("@cf/…", principal,reserva).
 Variáveis de e-mail (wrangler.toml): EMAIL_REMETENTE, URL_PUBLICA
 """
 import json
@@ -24,6 +25,7 @@ from pyodide.ffi import to_js
 from workers import Request, Response, WorkerEntrypoint, fetch
 
 import nucleo
+import zo
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -35,7 +37,9 @@ except ImportError:                   # pragma: no cover
     _JSNULL = None
 
 _CONFIG = ("SEGREDO", "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RECURSOS_AVANCADOS", "RECURSOS_CAMBIO",
-           "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "GEMINI_API_KEY", "ZO_MODELO")
+           "RECURSOS_FATURA_DIA11", "RESEND_API_KEY", "EMAIL_REMETENTE", "URL_PUBLICA", "EMAIL_OBRIGATORIO", "ZO_MODELO")
+# Toda variável do wrangler.toml que o núcleo lê precisa estar aqui (teste em test_api.py confere): fora da lista,
+# o núcleo recebe vazio e a regra cai no padrão sem avisar (EMAIL_OBRIGATORIO já ficou de fora assim)
 _CABECALHOS = ("cf-connecting-ip", "content-type", "content-length", "cookie", "origin", "sec-fetch-site", "x-zozo-prova")
 
 
@@ -81,6 +85,9 @@ class BancoD1:
 
 
 class Servicos:
+    def __init__(self, env: Any) -> None:
+        self.env = env
+
     async def http_get(self, url: str, cabecalhos: Mapping[str, str]) -> tuple[int, str]:
         r = await fetch(url, method=HTTPMethod.GET, headers=dict(cabecalhos))
         return int(r.status), await r.text()
@@ -92,7 +99,57 @@ class Servicos:
 
     async def http_post_json(self, url: str, cabecalhos: Mapping[str, str], corpo: str, limite: int = 2000) -> tuple[int, str]:
         r = await fetch(url, method=HTTPMethod.POST, body=corpo, headers=dict(cabecalhos))
-        return int(r.status), (await r.text())[:limite]        # Resend: só o começo interessa; Zo (Gemini): até zo.LIMITE_RESPOSTA
+        return int(r.status), (await r.text())[:limite]        # Resend: só o começo interessa
+
+    async def ia(self, modelo: str, corpo: str, limite: int) -> tuple[int, str]:
+        """Zo: o modelo do Workers AI pelo binding AI (sem chave: é a própria conta do Worker)."""
+        ai = getattr(self.env, "AI", None)
+        if ai is None:
+            return 0, ""
+        try:
+            # o SDK converte o dict para JS na ida e a resposta para Python (dict) na volta
+            r = await ai.run(modelo, json.loads(corpo))
+        except Exception as ex:  # noqa: BLE001 — o erro do Workers AI vira um código curto (nada do conteúdo)
+            return _erro_ia(str(ex))
+        return 200, zo.resposta_em_json(r)[:limite]
+
+    async def verificar_assinatura(self, alg: int, jwk: Mapping[str, str], dados: bytes, assinatura: bytes) -> bool:
+        """WebAuthn: assinatura conferida pelo WebCrypto do Worker (ES256 = ECDSA P-256 r ‖ s; RS256 = PKCS#1 v1.5)."""
+        from js import Object, crypto
+        if alg == -7:
+            importar, conferir = {"name": "ECDSA", "namedCurve": "P-256"}, {"name": "ECDSA", "hash": "SHA-256"}
+        elif alg == -257:
+            importar, conferir = {"name": "RSASSA-PKCS1-v1_5", "hash": "SHA-256"}, {"name": "RSASSA-PKCS1-v1_5"}
+        else:
+            return False
+        def js(v: Any) -> Any:
+            return to_js(v, dict_converter=Object.fromEntries)
+        try:
+            chave = await crypto.subtle.importKey("jwk", js(dict(jwk)), js(importar), False, js(["verify"]))
+            return bool(await crypto.subtle.verify(js(conferir), chave, js(assinatura), js(dados)))
+        except Exception:  # noqa: BLE001 — chave ou assinatura ruim: recusa, nunca erro 500
+            return False
+
+
+def _erro_ia(mensagem: str) -> tuple[int, str]:
+    """
+    Erro do Workers AI → (status, {"error": {"code": …}}). Só o código vai para os logs (zo.motivo_erro); a mensagem
+    original pode citar partes do pedido e nunca sai daqui.
+    """
+    m = mensagem.lower()
+    if "neuron" in m or "daily" in m or "3036" in m:
+        status, codigo = 429, "cota_diaria"              # cota grátis do dia (10 mil neurons) no fim
+    elif "capacity" in m or "too many" in m or "3040" in m or "429" in m:
+        status, codigo = 429, "sem_capacidade"
+    elif "not available on the workers free plan" in m or "403" in m:
+        status, codigo = 403, "modelo_fora_do_plano"
+    elif "bad input" in m or "5006" in m:
+        status, codigo = 400, "pedido_invalido"
+    elif "timeout" in m or "timed out" in m:
+        status, codigo = 504, "demorou"
+    else:
+        status, codigo = 502, "erro_do_modelo"
+    return status, json.dumps({"error": {"code": codigo}})
 
 
 def _cabecalhos(request: Request) -> dict[str, str]:
@@ -120,7 +177,7 @@ try:
 except ImportError:                                  # pragma: no cover — pacote fora do Worker
     _APP_FASTAPI = None
 else:
-    _APP_FASTAPI = criar_app(lambda req: {"banco": BancoD1(req.scope["env"].DB), "servicos": Servicos(),
+    _APP_FASTAPI = criar_app(lambda req: {"banco": BancoD1(req.scope["env"].DB), "servicos": Servicos(req.scope["env"]),
                                           "config": _config(req.scope["env"])})
 
 
@@ -163,7 +220,7 @@ class Default(WorkerEntrypoint):
         if not pedido.caminho.startswith("/api/"):
             return _responder(nucleo.Resposta(404, {"erro": "NOT_FOUND"}))
 
-        resposta = await nucleo.atender(pedido, BancoD1(env.DB), Servicos(), config)
+        resposta = await nucleo.atender(pedido, BancoD1(env.DB), Servicos(env), config)
         return _responder(resposta)
 
 

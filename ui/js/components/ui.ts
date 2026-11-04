@@ -8,7 +8,7 @@
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
   "use strict";
-  const { h, id: uid } = ZoZo.dom;
+  const { h, mount, id: uid } = ZoZo.dom;
   const { icon } = ZoZo.icons;
   const F = ZoZo.format;
   const P = ZoZo.pecas;                       // classes Tailwind das peças (components/pecas.ts)
@@ -66,10 +66,13 @@
     let controlId: string | undefined;
     if (alvo) { controlId = alvo.id || uid("campo"); alvo.id = controlId; }
     else { control.setAttribute("role", "group"); control.setAttribute("aria-labelledby", rotuloId); }
+    // a dica é lida junto com o campo (aria-describedby), não só quando o leitor passa por ela
+    const dicaId = o.hint ? uid("dica") : undefined;
+    if (dicaId) { const quem = alvo || control; quem.setAttribute("aria-describedby", ((quem.getAttribute("aria-describedby") || "") + " " + dicaId).trim()); }
     return h("div", { class: [P.campo, o.class] },
       h("label", { class: P.campoRotulo, for: controlId, id: rotuloId }, label),
       o.prefix ? h("div", { class: P.afixo }, h("span", { class: P.prefixo, "aria-hidden": "true" }, o.prefix), control) : control,
-      o.hint ? h("p", { class: P.campoDica }, o.hint) : null);
+      o.hint ? h("p", { class: P.campoDica, id: dicaId }, o.hint) : null);
   }
 
   function Input(opts?: OpcoesEntrada): HTMLInputElement {
@@ -118,9 +121,10 @@
     return t;
   }
 
-  function Toggle(label: string, opts?: { checked?: boolean; onChange?: (ligado: boolean) => void }): HTMLElement {
+  /** ariaLabel: nome do interruptor quando o texto visível fica fora dele (ex.: o nome da conta numa linha) */
+  function Toggle(label: string, opts?: { checked?: boolean; ariaLabel?: string; onChange?: (ligado: boolean) => void }): HTMLElement {
     const o = opts || {};
-    const input = h("input", { type: "checkbox", class: P.interruptorEntrada, role: "switch",
+    const input = h("input", { type: "checkbox", class: P.interruptorEntrada, role: "switch", "aria-label": o.ariaLabel,
       onChange: (e: Event) => o.onChange && o.onChange((e.target as HTMLInputElement).checked) }) as HTMLInputElement;
     input.checked = !!o.checked;
     return h("label", { class: P.interruptor }, input, h("span", { class: P.interruptorTrilho, "aria-hidden": "true" }, h("span", { class: P.interruptorBolinha })),
@@ -379,23 +383,33 @@
     const cantos: Record<number, string> = col === 4 ? { 0: "tw:rounded-tl-lg", 3: "tw:rounded-tr-lg", 12: "tw:rounded-bl-lg", 15: "tw:rounded-br-lg" }
       : { 0: "tw:rounded-tl-[10px]", 7: "tw:rounded-tr-[10px]", 8: "tw:rounded-bl-[10px]", 15: "tw:rounded-br-[10px]" };
     const quadrado = !o.cheio ? P.quadrado : o.altura === 40 ? P.quadradoCheio40 : P.quadradoCheio36;
+    const botoes: HTMLButtonElement[] = [];
+    /** Marca a cor nos MESMOS botões (o foco fica onde está). Cor fora da paleta: o 1º quadrado é a entrada do Tab */
+    const marcar = (valorAtual: string) => {
+      const naPaleta = cores.some((c) => c.toLowerCase() === valorAtual);
+      botoes.forEach((b, i) => {
+        const ativo = cores[i].toLowerCase() === valorAtual;
+        b.className = [quadrado, cantos[i], ativo && P.quadradoAtivo].filter(Boolean).join(" ");
+        b.setAttribute("aria-checked", String(ativo));
+        b.tabIndex = ativo || (!naPaleta && i === 0) ? 0 : -1;
+        mount(b, ativo ? icon("check", { size: 14, stroke: 2.5, class: P.quadradoMarca }) : null);
+      });
+    };
     cores.forEach((cor, i) => {
-      const ativo = cor.toLowerCase() === atual;
-      wrap.appendChild(h("button", {
-        type: "button", role: "radio", class: [quadrado, cantos[i], ativo && P.quadradoAtivo],
-        style: { "--swatch": F.cor(cor, "#000") }, "aria-checked": String(ativo), "aria-label": "Cor " + (i + 1),
-        tabindex: ativo || (!atual && i === 0) ? "0" : "-1",
-        onClick: () => onChange(cor),
+      botoes.push(wrap.appendChild(h("button", {
+        type: "button", role: "radio",
+        style: { "--swatch": F.cor(cor, "#000") }, "aria-label": "Cor " + (i + 1),
+        onClick: () => { marcar(cor.toLowerCase()); onChange(cor); },
         onKeydown: (e: KeyboardEvent) => {
           const colunas = o.colunas || 8;
           const passo = ({ ArrowRight: 1, ArrowLeft: -1, ArrowDown: colunas, ArrowUp: -colunas } as Record<string, number>)[e.key];
           if (!passo) return;
           e.preventDefault();
-          const btns = wrap.querySelectorAll<HTMLElement>("button");
-          btns[(i + passo + cores.length) % cores.length].focus();
+          botoes[(i + passo + cores.length) % cores.length].focus();
         },
-      }, ativo ? icon("check", { size: 14, stroke: 2.5, class: P.quadradoMarca }) : null));
+      })) as HTMLButtonElement);
     });
+    marcar(atual);
     return wrap;
   }
 

@@ -1,0 +1,47 @@
+# Testes a cada pull request e a cada push no main: interface (node:test + TypeScript), portfólio e API (unittest + mypy).
+# Nenhum segredo, nenhuma publicação: só confere o código. Ações fixadas pelo hash do commit (como no backup-d1.yml).
+name: Testes
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
+        with:
+          node-version: "26"           # os testes importam TypeScript direto (remoção de tipos do Node)
+      - run: npm ci                    # .npmrc: ignore-scripts=true
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:portfolio
+
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2   # v10.3.3
+      - run: uv sync --locked --python 3.14
+      - run: uv run python -B -m unittest discover -s tests -p "test_*.py"
+      - run: uv run mypy

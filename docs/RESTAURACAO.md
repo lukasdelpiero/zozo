@@ -41,7 +41,7 @@ O artifact do GitHub vence em 30 dias e fica na mesma conta do código. Para uma
 **B) Para uma pasta sincronizada no seu computador** — OneDrive, **Proton Drive**, Google Drive para computador, Dropbox ou um HD externo. Nenhuma senha de nuvem fica no GitHub.
 - Precisa do GitHub CLI com login: `winget install GitHub.cli` e `gh auth login`.
 - Teste: `.\api\dev\baixar_backup.ps1 -Pasta "$env:USERPROFILE\OneDrive\ZoZo-backups"` (troque pela pasta do Proton Drive, Google Drive etc.). Ele baixa só os backups que ainda não estão lá. `-ManterDias 365` apaga os de mais de um ano.
-- Agendar todo dia às 09:00 (num terminal, uma vez): `schtasks /Create /SC DAILY /ST 09:00 /TN "ZoZo backup" /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Lukas\Downloads\ZoZo17\ZoZo\api\dev\baixar_backup.ps1 -Pasta C:\Users\Lukas\OneDrive\ZoZo-backups"`. Se o computador estiver desligado, o dia seguinte pega o que faltou (os artifacts duram 30 dias).
+- Agendar todo dia às 09:00 (num terminal, uma vez): `schtasks /Create /SC DAILY /ST 09:00 /TN "ZoZo backup" /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\Lukas\OneDrive\2026\zozo\app\api\dev\baixar_backup.ps1 -Pasta C:\Users\Lukas\OneDrive\ZoZo-backups"`. Se o computador estiver desligado, o dia seguinte pega o que faltou (os artifacts duram 30 dias).
 
 ### Abrir um backup
 

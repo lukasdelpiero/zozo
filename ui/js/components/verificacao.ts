@@ -1,11 +1,13 @@
 /* =============================================================
    ZoZo — Verificação: CAPTCHA (Turnstile), código de 6 dígitos e QR code
    ------------------------------------------------------------
-   • Captcha(sitekey): widget do Cloudflare Turnstile. O script só é
+   • Captcha(sitekey, ação): widget do Cloudflare Turnstile. O script só é
      carregado quando o CAPTCHA é exigido (4ª tentativa de login em diante
      e cadastro). A validação de verdade acontece no servidor.
    • CampoCodigo(cfg): seis caixas de um dígito (avança sozinho, aceita
      colar o código inteiro, Backspace volta) → cfg.onCompleto(codigo).
+     cfg.backup: link "Usar um código de backup" troca as caixas por um campo
+     "XXXXX-XXXXX" (Base32 de Crockford; o servidor confere e gasta o código).
    • QR(texto, px): QR code em SVG montado com ZoZo.dom (sem innerHTML),
      usando a biblioteca qrcode-generator (npm, baixada só quando um QR aparece).
    TypeScript: tipos em src/globais.d.ts (ZoZoVerificacao).
@@ -31,13 +33,14 @@
     return carregando;
   }
 
-  function Captcha(sitekey: string): CaptchaWidget {
+  function Captcha(sitekey: string, acao: "cadastro" | "login"): CaptchaWidget {
     const el = h("div", { class: "tw:flex tw:justify-center tw:min-h-[65px]", "aria-live": "polite" });
     let token = "", id: string | null = null;
     carregarTurnstile().then((ts) => {
       requestAnimationFrame(() => {                    // espera o elemento estar na página
         id = ts.render(el, {
-          sitekey, language: "pt-br", appearance: "always", "refresh-expired": "auto",
+          sitekey, action: acao, language: "pt-br",   // o servidor confere a ação (_captcha_ok)
+          appearance: "always", "refresh-expired": "auto",
           callback: (t: string) => { token = t; },
           "expired-callback": () => { token = ""; },
           "error-callback": () => { token = ""; },
@@ -63,9 +66,37 @@
         + "tw:base:focus:[box-shadow:0_0_0_3px_var(--color-primary-soft)] tw:base:focus:bg-zz-surface tw:in-[.is-erro]:border-(--color-danger)!", c.classeCaixa],
       autocomplete: i === 0 ? "one-time-code" : "off", "aria-label": "Dígito " + (i + 1) + " de 6",
     }) as HTMLInputElement);
-    const el = h("div", { class: ["codigo6 tw:base:flex tw:base:justify-center tw:base:gap-2 tw:[&.is-ocupado]:opacity-60", c.classe], role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);
-    const valor = () => caixas.map((x) => x.value).join("");
-    const conferir = () => { const v = valor(); if (/^\d{6}$/.test(v) && c.onCompleto) c.onCompleto(v); };
+    const grupo = h("div", { class: ["codigo6 tw:base:flex tw:base:justify-center tw:base:gap-2 tw:[&.is-ocupado]:opacity-60", c.classe], role: "group", "aria-label": c.rotulo || "Código de 6 dígitos" }, caixas);
+    // código de backup (opcional): 10 caracteres do Base32 de Crockford, com o hífen no meio; O vira 0 e I ou L viram 1
+    let modoBackup = false;
+    const backup = h("input", {
+      type: "text", hidden: true, maxlength: "11", autocomplete: "off", autocapitalize: "characters", spellcheck: "false",
+      placeholder: "XXXXX-XXXXX", "aria-label": "Código de backup",
+      class: ["tw:block tw:mx-auto tw:w-[220px] tw:h-[50px] tw:px-3 tw:text-center tw:text-[18px] tw:font-[550] tw:tracking-[0.12em] "
+        + "tw:[font-variant-numeric:tabular-nums] tw:text-zz-text tw:bg-(--color-surface-hover,#f4f5f7) tw:border tw:border-zz-border tw:rounded-lg "
+        + "tw:focus:outline-none tw:focus:border-zz-primary tw:focus:[box-shadow:0_0_0_3px_var(--color-primary-soft)] tw:focus:bg-zz-surface "
+        + "tw:in-[.is-erro]:border-(--color-danger)! tw:in-[.is-ocupado]:opacity-60", c.classe],
+    }) as HTMLInputElement;
+    const backupLimpo = () => backup.value.toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1").replace(/[^0-9A-HJKMNP-TV-Z]/g, "").slice(0, 10);
+    const trocar = c.backup ? h("button", { type: "button", class: "tw:block tw:mx-auto tw:mt-3 tw:bg-transparent tw:border-0 tw:p-0 tw:text-[13px] tw:text-zz-primary tw:underline tw:cursor-pointer",
+      onClick: () => usarBackup(!modoBackup) }, "Usar um código de backup") : null;
+    const el = c.backup ? h("div", { class: "codigo6-area" }, grupo, backup, trocar) : grupo;
+    function usarBackup(sim: boolean) {
+      modoBackup = sim;
+      grupo.hidden = sim; backup.hidden = !sim;
+      if (trocar) trocar.textContent = sim ? "Usar o código do aplicativo" : "Usar um código de backup";
+      el.classList.remove("is-erro");
+      (sim ? backup : caixas[0]).focus();
+    }
+    const valor = () => (modoBackup ? backupLimpo() : caixas.map((x) => x.value).join(""));
+    const completo = () => (modoBackup ? backupLimpo().length === 10 : /^\d{6}$/.test(valor()));
+    const conferir = () => { if (completo() && c.onCompleto) c.onCompleto(valor()); };
+    backup.addEventListener("input", () => {
+      const v = backupLimpo();
+      backup.value = v.length > 5 ? v.slice(0, 5) + "-" + v.slice(5) : v;
+      if (c.onDigitar) c.onDigitar();
+      conferir();
+    });
     function preencher(inicio: number, texto: string) {
       const d = String(texto || "").replace(/\D/g, "").slice(0, 6 - inicio);
       d.split("").forEach((ch, k) => { caixas[inicio + k].value = ch; });
@@ -90,10 +121,10 @@
       cx.addEventListener("focus", () => cx.select());
     });
     return {
-      el, valor,
-      limpar() { caixas.forEach((x) => { x.value = ""; }); caixas[0].focus(); },
-      foco() { caixas[0].focus(); },
-      desabilitar(v: boolean) { caixas.forEach((x) => { x.disabled = !!v; }); el.classList.toggle("is-ocupado", !!v); },
+      el, valor, completo,
+      limpar() { caixas.forEach((x) => { x.value = ""; }); backup.value = ""; (modoBackup ? backup : caixas[0]).focus(); },
+      foco() { (modoBackup ? backup : caixas[0]).focus(); },
+      desabilitar(v: boolean) { caixas.forEach((x) => { x.disabled = !!v; }); backup.disabled = !!v; el.classList.toggle("is-ocupado", !!v); },
       marcarErro(v: boolean) { el.classList.toggle("is-erro", !!v); },
     };
   }

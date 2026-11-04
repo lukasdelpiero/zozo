@@ -22,7 +22,7 @@
     metade: "tw:flex tw:flex-col tw:items-center tw:gap-1 tw:text-center",
     legenda: "tw:inline-flex tw:items-center tw:gap-1.5 tw:text-zz-secondary tw:text-[13px] tw:font-medium",
     valor: "money tw:text-[28px] tw:font-semibold tw:tracking-[-0.02em] tw:leading-[1.15] tw:text-center tw:area460:text-[17px]",
-    grafico: "tw:relative tw:mt-4 tw:mb-2",
+    grafico: "tw:relative tw:mb-2 tw:-ml-6",           // encosta na borda esquerda do card (só a esquerda)
     filtros: "tw:flex tw:justify-center",
   };
 
@@ -33,19 +33,29 @@
         const inv = ZoZo.store.get().data.investimentos;
         if (!inv) return;
         const excluidas = ZoZo.store.get().ui.invExcluidas || [];
-        ZoZo.dom.mount(el, h("div", { class: ZoZo.estrutura.menuSecao }, "Contas incluídas"),
-          (inv.contas || []).map((c) => h("div", { class: ZoZo.estrutura.menuInterruptor },
-            h("span", { class: ZoZo.estrutura.menuAmostra, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
-            h("span", { class: ZoZo.estrutura.menuInterruptorRotulo }, L.nomeComDigitos(c.nome, c.ultimos4Digitos)),
-            UI.Toggle("", { checked: !excluidas.includes(c.id), onChange: (v: boolean) => {
+        // redesenhar recria os interruptores: o foco volta ao da mesma conta (marcar por teclado sem perder o lugar)
+        const focado = document.activeElement instanceof HTMLElement && el.contains(document.activeElement) ? document.activeElement.dataset.conta : undefined;
+        ZoZo.dom.mount(el, h("div", { class: ZoZo.estrutura.menuSecao, "aria-hidden": "true" }, "Contas incluídas"),
+          (inv.contas || []).map((c) => {
+            const nome = L.nomeComDigitos(c.nome, c.ultimos4Digitos);
+            // o nome da conta fica ao lado (fora do label do interruptor): vai também como nome acessível do interruptor
+            const texto = c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : "");
+            const chave = UI.Toggle("", { checked: !excluidas.includes(c.id), ariaLabel: texto, onChange: (v: boolean) => {
               const atual = new Set(ZoZo.store.get().ui.invExcluidas || []);
               if (v) atual.delete(c.id); else atual.add(c.id);
               ZoZo.store.set({ ui: { invExcluidas: Array.from(atual) } });
               ctx.loadData("investimentos", A.getInvestimentos, { excluir: Array.from(atual) }, { force: true }).then(desenhar).catch(() => null);
-            } }))));
+            } });
+            (chave.querySelector("input") as HTMLInputElement).dataset.conta = c.id;
+            return h("div", { class: ZoZo.estrutura.menuInterruptor },
+              h("span", { class: ZoZo.estrutura.menuAmostra, style: { background: F.cor(c.cor, "var(--palette-16)") } }),
+              h("span", { class: ZoZo.estrutura.menuInterruptorRotulo, "aria-hidden": "true" }, nome), chave);
+          }));
+        if (focado) { const volta = Array.from(el.querySelectorAll<HTMLInputElement>("input[data-conta]")).find((i) => i.dataset.conta === focado); if (volta) volta.focus(); }
       };
       desenhar();
-    } }, { posicao: "direita", largura: 290, label: "Contas incluídas" });
+      // interruptores não são itens de menu: painel com nome (role="dialog", como o calendário), não role="menu"
+    } }, { posicao: "direita", largura: 290, label: "Contas incluídas", papel: "dialog" });
   }
 
   function EvolucaoCard(state: EstadoZoZo, ctx: ContextoApp) {
@@ -55,7 +65,7 @@
     const chart = h("div", { class: T.grafico });
     // Uma única linha: verde quando sobe, vermelha quando desce (seção 30)
     ZoZo.charts.renderLineChart(chart, [{ name: "Evolução", colorBySlope: true, points: serie.map((p) => ({ data: p.data, valor: p.valor })) }],
-      { height: 190, ariaLabel: "Evolução dos investimentos" });
+      { height: 149, ariaLabel: "Evolução dos investimentos" });            // card com 308 px, como o de Contas
 
     const engrenagem = UI.IconButton("configuracoes", "Contas incluídas no gráfico", { class: T.engrenagem, expanded: false });
     engrenagem.addEventListener("click", () => abrirContasIncluidas(engrenagem, ctx));

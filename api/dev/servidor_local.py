@@ -15,12 +15,15 @@ Configuração local (variáveis de ambiente opcionais):
   ZOZO_DEV_PORTA        porta (padrão 8787)
   ZOZO_DEV_BANCO        outro arquivo SQLite (ex.: um banco descartável para testes)
   ZOZO_DEV_RECURSOS     e-mails com Perfis, boletos e Pix (separados por vírgula; a conta demo sempre tem)
-  ZOZO_DEV_TURNSTILE=0  desliga o CAPTCHA (padrão: chaves de TESTE da Cloudflare, que sempre aprovam)
+  ZOZO_DEV_TURNSTILE=1  liga o CAPTCHA com as chaves de TESTE da Cloudflare (padrão: desligado). O token de teste
+                        volta com o domínio example.com e sem ação, que o servidor recusa: serve só para ver a recusa
   ZOZO_DEV_GOOGLE_ID / ZOZO_DEV_GOOGLE_SECRET   ativa o "Continuar com Google" local
   ZOZO_DEV_EMAIL=console   liga a confirmação de e-mail e mostra os e-mails no terminal (nada é enviado)
-  ZOZO_DEV_ZO=simulado     Zo sem o Gemini: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
-                           "senha" e "orçamento" usam as ferramentas da fase 2, "importar", "categorizar"; "OFENSA-TESTE" cai no filtro)
-  ZOZO_DEV_GEMINI_KEY / ZOZO_DEV_ZO_MODELO   Zo com o Gemini de verdade (plano gratuito: use só dados de teste)
+  ZOZO_DEV_ZO=simulado     Zo sem o Workers AI: respostas fixas para testar a tela ("contas" lê, "teste" grava, "filtrar",
+                           "senha" e "orçamento" usam as ferramentas da fase 2, "importar", "categorizar"; "OFENSA-TESTE"
+                           e "POLITICA-TESTE" caem no bloqueio; o resto ecoa a mensagem JÁ MASCARADA)
+  ZOZO_DEV_CF_CONTA / ZOZO_DEV_CF_TOKEN / ZOZO_DEV_ZO_MODELO   Zo com o Workers AI de verdade, pela API REST
+                           (token com permissão Workers AI; use só dados de teste)
 """
 import asyncio
 import http.server
@@ -77,47 +80,54 @@ CONFIG.update({
     "COOKIE_SEGURO": "0",                         # http://127.0.0.1 não tem HTTPS
 })
 if os.environ.get("ZOZO_DEV_ZO") == "simulado":
-    CONFIG.update({"GEMINI_API_KEY": "simulado", "ZO_MODELO": "simulado"})
-elif os.environ.get("ZOZO_DEV_GEMINI_KEY"):
-    CONFIG.update({"GEMINI_API_KEY": os.environ["ZOZO_DEV_GEMINI_KEY"], "ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "gemini-2.5-flash")})
+    CONFIG.update({"ZO_MODELO": "@cf/zozo/simulado"})
+elif os.environ.get("ZOZO_DEV_CF_CONTA") and os.environ.get("ZOZO_DEV_CF_TOKEN"):
+    CONFIG.update({"ZO_MODELO": os.environ.get("ZOZO_DEV_ZO_MODELO", "@cf/openai/gpt-oss-120b,@cf/qwen/qwen3.8-27b")})
 
 
 def _zo_simulado(corpo):
-    """Resposta fixa no formato do Gemini: o bastante para testar a janela, a leitura, a confirmação e as telas."""
-    ultima = json.loads(corpo)["contents"][-1]
-    parte = ultima["parts"][0]
-    texto = str(parte.get("text") or "").lower()
-    chamar = lambda nome, args: {"functionCall": {"name": nome, "args": args}}   # noqa: E731
-    if "functionResponse" in parte:
-        partes = [{"text": "Pronto. Modo simulado do Zo. Posso ajudar em mais alguma coisa?"}]
-    elif "ofensa-teste" in texto:                     # o filtro de segurança barra a fala
-        return 200, json.dumps({"promptFeedback": {"blockReason": "SAFETY",
-                                                   "safetyRatings": [{"category": "HARM_CATEGORY_HATE_SPEECH", "probability": "HIGH", "blocked": True}]}})
+    """Resposta fixa no formato do Workers AI (o da OpenAI): o bastante para testar a janela, a leitura, a confirmação e as telas."""
+    ultima = json.loads(corpo)["messages"][-1]
+    texto = str(ultima.get("content") or "").lower()
+    chamadas = []
+
+    def chamar(nome, args):
+        chamadas.append({"id": "sim" + secrets.token_hex(4), "type": "function", "function": {"name": nome, "arguments": json.dumps(args)}})
+    fala = None
+    if ultima["role"] == "tool":
+        fala = "Pronto. Modo simulado do Zo. Posso ajudar em mais alguma coisa?"
+    elif "ofensa-teste" in texto:                     # cai no bloqueio por categoria
+        chamar("barrar_mensagem", {"motivo": "odio"})
+    elif "politica-teste" in texto:
+        chamar("barrar_mensagem", {"motivo": "politica"})
     elif "conta" in texto:
-        partes = [chamar("listar_contas", {})]
+        chamar("listar_contas", {})
     elif "teste" in texto:
-        partes = [chamar("criar_categoria", {"nome": "Teste do Zo", "icone": "🧪"})]
+        chamar("criar_categoria", {"nome": "Teste do Zo", "icone": "🧪"})
     elif "filtr" in texto:
-        partes = [chamar("filtrar_transacoes", {"texto": "itaú", "periodo": "mes"})]
+        chamar("filtrar_transacoes", {"texto": "itaú", "periodo": "mes"})
     elif "senha" in texto:
-        partes = [chamar("abrir_configuracoes", {"assunto": "senha"})]
+        chamar("abrir_configuracoes", {"assunto": "senha"})
     elif "orçamento" in texto or "orcamento" in texto:
-        partes = [chamar("configurar", {"orcamento": False})]
+        chamar("configurar", {"orcamento": False})
     elif "importa" in texto:
-        partes = [chamar("importar_arquivo", {})]
+        chamar("importar_arquivo", {})
     elif "categoriz" in texto:
-        partes = [chamar("categorizar_em_lote", {})]
+        chamar("categorizar_em_lote", {})
     elif "opç" in texto or "opc" in texto:
-        partes = [chamar("oferecer_opcoes", {"pergunta": "Qual opção?", "opcoes": ["Primeira", "Segunda"]})]
+        chamar("oferecer_opcoes", {"pergunta": "Qual opção?", "opcoes": ["Primeira", "Segunda"]})
     else:
-        partes = [{"text": "Modo simulado do Zo. Recebi a sua mensagem."}]
-    return 200, json.dumps({"candidates": [{"content": {"role": "model", "parts": partes}, "finishReason": "STOP"}]})
+        fala = "Modo simulado do Zo. Recebi a sua mensagem: " + str(ultima.get("content") or "")[:200]
+    mensagem = {"role": "assistant", "content": fala}
+    if chamadas:
+        mensagem["tool_calls"] = chamadas
+    return 200, json.dumps({"choices": [{"index": 0, "message": mensagem, "finish_reason": "tool_calls" if chamadas else "stop"}]})
 
 
 # "Continuar com Google" local: crie um cliente OAuth com o endereço http://127.0.0.1:8787/api/google/retorno
 if os.environ.get("ZOZO_DEV_GOOGLE_ID") and os.environ.get("ZOZO_DEV_GOOGLE_SECRET"):
     CONFIG["GOOGLE_CLIENT_ID"], CONFIG["GOOGLE_CLIENT_SECRET"] = os.environ["ZOZO_DEV_GOOGLE_ID"], os.environ["ZOZO_DEV_GOOGLE_SECRET"]
-if os.environ.get("ZOZO_DEV_TURNSTILE", "1") != "0":
+if os.environ.get("ZOZO_DEV_TURNSTILE", "0") == "1":
     CONFIG["TURNSTILE_SITE_KEY"], CONFIG["TURNSTILE_SECRET"] = TURNSTILE_TESTE
 
 # Mesmos cabeçalhos que o Cloudflare envia com a interface (fonte única: api/cabecalhos_ui.json)
@@ -144,16 +154,33 @@ class Servicos:
     async def http_get(self, url, cabecalhos):
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, headers=cabecalhos))
 
+    async def verificar_assinatura(self, alg, jwk, dados, assinatura):
+        # WebAuthn local (biometria em http://localhost): Python puro; no Worker é o WebCrypto
+        import assinatura_local
+        try:
+            return assinatura_local.verificar(alg, jwk, dados, assinatura)
+        except (KeyError, ValueError, TypeError):
+            return False
+
     async def http_post(self, url, campos):
         dados = urllib.parse.urlencode(campos).encode("utf-8")
         return await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=dados, method="POST"))
 
+    async def ia(self, modelo, corpo, limite):
+        if modelo == "@cf/zozo/simulado":
+            return _zo_simulado(corpo)
+        conta, token = os.environ.get("ZOZO_DEV_CF_CONTA", ""), os.environ.get("ZOZO_DEV_CF_TOKEN", "")
+        if not conta or not token:
+            return 0, ""
+        # o mesmo modelo pela API REST (no Worker é o binding AI); a resposta vem dentro de "result"
+        url = f"https://api.cloudflare.com/client/v4/accounts/{conta}/ai/run/{modelo}"
+        status, texto = await asyncio.to_thread(self._baixar, urllib.request.Request(
+            url, data=corpo.encode("utf-8"), headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}, method="POST"))
+        if status != 200:
+            return status, json.dumps({"error": {"code": "cota_diaria" if status == 429 else "erro_do_modelo"}})
+        return 200, json.dumps(json.loads(texto).get("result") or {})[:limite]
+
     async def http_post_json(self, url, cabecalhos, corpo, limite=2000):
-        if url.startswith("https://generativelanguage.googleapis.com/"):
-            if CONFIG.get("GEMINI_API_KEY") == "simulado":
-                return _zo_simulado(corpo)
-            status, texto = await asyncio.to_thread(self._baixar, urllib.request.Request(url, data=corpo.encode("utf-8"), headers=cabecalhos, method="POST"))
-            return status, texto[:limite]
         if CONFIG.get("RESEND_API_KEY") == "console":
             # modo console: mostra o e-mail aqui (assunto e texto, com o link) e não envia nada
             m = json.loads(corpo)

@@ -69,6 +69,40 @@ class CodigoDoisFatores(Modelo):
     codigo: Codigo
 
 
+B64Url = Annotated[str, StringConstraints(min_length=1, max_length=16000, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+class RegistroWebAuthn(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=1400, pattern=r"^[A-Za-z0-9_-]+$")]
+    clientDataJSON: B64Url
+    attestationObject: B64Url
+    nome: Annotated[str, StringConstraints(min_length=1, max_length=80)]
+    prf: bool = False
+
+
+class ConfirmacaoWebAuthn(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=1400, pattern=r"^[A-Za-z0-9_-]+$")]
+    clientDataJSON: B64Url
+    authenticatorData: B64Url
+    signature: Annotated[str, StringConstraints(min_length=1, max_length=1024, pattern=r"^[A-Za-z0-9_-]+$")]
+    userHandle: Annotated[str, StringConstraints(max_length=200)] | None = None
+
+
+class RemoverChave(Modelo):
+    id: Annotated[str, StringConstraints(min_length=1, max_length=1400)]
+    codigo: Codigo | None = None
+
+
+class ApagarDados(Modelo):
+    versaoAnterior: Versao
+    conteudo: Conteudo
+    codigo: Codigo | None = None                  # conta com 2FA: código atual
+
+
+class CodigoAtual(Modelo):
+    codigo: Codigo | None = None                  # código atual (aplicativo ou backup)
+
+
 class NovoNome(Modelo):
     nome: Nome
 
@@ -78,17 +112,18 @@ class Documento(Modelo):
     conteudo: Conteudo
 
 
+class VersaoCifrada(Modelo):
+    versao: Versao
+    conteudo: Conteudo
+
+
 class NovaSenha(Documento):
     sal: Sal
     iteracoes: Iteracoes
     prova: Prova
     kdf: Kdf | None = None
     codigo: Codigo | None = None                  # conta com 2FA: código atual
-
-
-class VersaoCifrada(Modelo):
-    versao: Versao
-    conteudo: Conteudo
+    historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []   # recifrado com a chave nova
 
 
 class NovoKdf(Documento):
@@ -115,6 +150,13 @@ class Custodia(Modelo):
 class Protecao(Modelo):
     avancada: bool
     codigo: Codigo | None = None                  # desligar, com 2FA: código atual
+    # ligar: troca de chave (mesma senha, sal novo), documento e histórico recifrados
+    sal: Sal | None = None
+    kdf: Literal["argon2id-1"] | None = None
+    prova: Prova | None = None
+    versaoAnterior: Versao | None = None
+    conteudo: Conteudo | None = None
+    historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []
 
 
 class ExcluirConta(Modelo):
@@ -188,6 +230,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/conta/senha"): NovaSenha,
     ("PUT", "/api/conta/kdf"): NovoKdf,
     ("PUT", "/api/conta/kdf/historico"): KdfEtapa,
+    ("PUT", "/api/conta/chave/historico"): KdfEtapa,
     ("PUT", "/api/custodia"): Custodia,
     ("PUT", "/api/conta/protecao"): Protecao,
     ("DELETE", "/api/conta"): ExcluirConta,
@@ -196,9 +239,14 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/recuperacao/historico"): EtapaRecuperacao,
     ("PUT", "/api/recuperacao/concluir"): ConcluirRecuperacao,
     ("PUT", "/api/documento"): Documento,
-    ("POST", "/api/documento/apagar"): Documento,
+    ("POST", "/api/documento/apagar"): ApagarDados,
     ("POST", "/api/2fa/confirmar"): CodigoDoisFatores,
     ("POST", "/api/2fa/desativar"): CodigoDoisFatores,
+    ("POST", "/api/2fa/codigos"): CodigoAtual,
+    ("POST", "/api/webauthn/registro/opcoes"): CodigoAtual,
+    ("POST", "/api/webauthn/registro"): RegistroWebAuthn,
+    ("POST", "/api/webauthn/confirmacao"): ConfirmacaoWebAuthn,
+    ("DELETE", "/api/webauthn/chaves"): RemoverChave,
     ("POST", "/api/zo"): ZoConversa,
     ("PUT", "/api/zo/consentimento"): ZoConsentimento,
 }

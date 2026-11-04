@@ -55,7 +55,9 @@
     gastoNumeroAcima: "money tw:[font-weight:inherit] tw:text-(--color-negative)",
     gastoPalavra: "tw:font-semibold",
     gastoNota: "tw:text-zz-cinza tw:text-[.9375rem] tw:font-[550]",
-    grafico: "tw:relative tw:mt-4 tw:mb-2",
+    grafico: "tw:relative tw:mb-2",
+    // Patrimônio total: o gráfico encosta na borda esquerda do card (a margem negativa = o padding do card)
+    graficoNaBorda: "tw:-ml-5 tw:na-tela:baixa860:-ml-4",
     // Top categorias: [bolinha | seta do grupo] [ícone | quantidade] nome ..... gasto  reservado
     tops: "tw:flex tw:flex-col tw:-mx-5 tw:na-tela:min-h-0 tw:na-tela:overflow-hidden",
     top: "tw:grid tw:grid-cols-[16px_26px_minmax(0,1fr)_auto_112px] tw:gap-2.5 tw:items-center tw:min-h-9 tw:px-5 tw:text-[15px] tw:font-[450] "
@@ -164,9 +166,11 @@
     const chart = h("div", { class: T.grafico });
     const cs = getComputedStyle(document.documentElement);
     const series: SerieGrafico[] = [{ name: "Gasto", color: cs.getPropertyValue(acima ? "--color-progress-over" : "--color-primary").trim(), points: g.dias, area: true }];
+    // o eixo é o mês inteiro: o gasto vai até hoje e o ritmo do orçamento (tracejado) atravessa o mês todo
+    const eixo = Array.from({ length: g.ultimoDia }, (_, i) => g.mes + "-" + String(i + 1).padStart(2, "0"));
     if (g.orcamento > 0 && g.dias.length) {
       series.push({ name: "Orçamento", color: cs.getPropertyValue("--color-text-muted").trim(), tracejado: true,
-        points: g.dias.map((d) => ({ data: d.data, valor: Math.round((g.orcamento * Number(d.data.slice(8, 10)) / g.ultimoDia) * 100) / 100 })) });
+        points: eixo.map((data, i) => ({ data, valor: Math.round((g.orcamento * (i + 1) / g.ultimoDia) * 100) / 100 })) });
     }
     // Centro: quanto resta (ou quanto passou) e, abaixo, o valor reservado no mês
     const comOrcamento = g.orcamento > 0;
@@ -179,7 +183,7 @@
     };
     resumo();
     // passar o mouse "filtra": o topo mostra o gasto acumulado até o dia do ponto
-    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês",
+    ZoZo.charts.renderLineChart(chart, series, { height: alturaGraficos(), ariaLabel: "Gasto acumulado no mês", eixo,
       aoPassar: (pts) => {
         const p = pts && pts[0];
         if (!p) { resumo(); return; }
@@ -225,7 +229,7 @@
 
       const cardPatrimonio = d.contas ? Card("Patrimônio total", "Contas", () => ctx.navigate("contas"), true,
         ZoZo.contasShared.ContasChartCard(d.contas, state.ui, { compact: true, embedded: true, filtros: true, alturaGrafico: alturaGraficos(),
-          intervalo: state.ui.intervaloPatrimonio || "3M", chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
+          intervalo: state.ui.intervaloPatrimonio || "3M", classeGrafico: T.graficoNaBorda, chaveIntervalo: "intervaloPatrimonio", rotuloFiltro: "Período do patrimônio" })) : null;
 
       const cats = d.categorias ? (d.categorias.categorias || []).filter((c) => c.status === "regular") : [];
       const cardCats = Card("Top categorias", "Categorias", () => ctx.navigate("categorias"), false,

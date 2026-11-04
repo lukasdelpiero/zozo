@@ -203,15 +203,32 @@ function servidorFalso() {
       contas.delete(s.logado); s.logado = null; s.envelope = null;
       return new Response(null, { status: 204 });
     }
+    // troca de chave (senha nova ou proteção avançada), como o servidor: o histórico passa a ser o recifrado (junto + etapas
+    // do mesmo sal); o que não veio some
+    const trocarChave = (extra) => {
+      if (corpo.versaoAnterior !== (c.doc ? c.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
+      const existentes = new Set(c.historico.map((x) => x.versao));
+      const todas = (corpo.historico || []).concat((c.etapas || []).filter((x) => x.sal === corpo.sal).map((x) => ({ versao: x.versao, conteudo: x.conteudo })));
+      if (todas.some((x) => !existentes.has(x.versao))) return json(400, { erro: "INVALID_REQUEST" });
+      Object.assign(c, { sal: corpo.sal, kdf: "argon2id-1", iteracoes: corpo.iteracoes || 600000, provaHash: sha256(corpo.prova), custodia: null, etapas: [],
+        doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: todas.sort((a, b) => a.versao - b.versao) }, extra);
+      return null;
+    };
+    if (metodo === "PUT" && caminho === "/conta/chave/historico") {
+      if (!c.historico.some((x) => x.versao === corpo.versao)) return json(400, { erro: "INVALID_REQUEST" });
+      c.etapas = (c.etapas || []).filter((x) => x.sal === corpo.sal && x.versao !== corpo.versao).concat([corpo]);
+      return json(200, { ok: true });
+    }
     if (metodo === "PUT" && caminho === "/conta/protecao") {
-      c.avancada = corpo.avancada === true;
-      if (c.avancada) c.custodia = null;
-      return json(200, { avancada: c.avancada });
+      if (corpo.avancada !== true) { c.avancada = false; return json(200, { avancada: false }); }
+      // ligar sem trocar a chave é recusado (auditoria de segurança 03/11, A1)
+      if (!corpo.sal || !corpo.prova || sha256(corpo.prova) === c.provaHash) return json(400, { erro: "INVALID_REQUEST" });
+      const r = trocarChave({ avancada: true });
+      return r || json(200, { avancada: true, versao: c.doc.versao });
     }
     if (metodo === "PUT" && caminho === "/conta/senha") {
-      if (corpo.versaoAnterior !== (c.doc ? c.doc.versao : 0)) return json(409, { erro: "DATA_CHANGED" });
-      Object.assign(c, { sal: corpo.sal, iteracoes: corpo.iteracoes, kdf: corpo.kdf, provaHash: sha256(corpo.prova), doc: { versao: corpo.versaoAnterior + 1, conteudo: corpo.conteudo }, historico: [] });
-      return json(200, { alterada: true });
+      const r = trocarChave({});
+      return r || json(200, { versao: c.doc.versao });
     }
     return json(404, { erro: "NOT_FOUND" });
   };
@@ -522,10 +539,10 @@ test("recursos da conta: só o valor booleano true libera", async () => {
   const srv = servidorFalso();
   const senha = novaSenha();
   await cadastrar(srv, "ana@exemplo.test", senha);
-  srv.contas.get("ana@exemplo.test").recursos = { perfis: "true", boleto: 1, pix: true, cambio: { sim: true } };
+  srv.contas.get("ana@exemplo.test").recursos = { perfis: "true", boleto: 1, pix: true, cambio: { sim: true }, faturaDia11: "true" };
   const h = carregarHost({ fetch: srv.fetch });
   const r = await h.chamar("login", { email: "ana@exemplo.test", senha });
-  assert.deepEqual(r.user.recursos, { perfis: false, boleto: false, pix: true, cambio: false });
+  assert.deepEqual(r.user.recursos, { perfis: false, boleto: false, pix: true, cambio: false, faturaDia11: false });
 });
 
 test("conta de demonstração: nada é gravado no servidor e ações de conta são recusadas", async () => {
@@ -572,6 +589,31 @@ test("trocar a senha e desligar a proteção avançada levam o código do 2FA; l
   assert.equal("codigo" in corpoDe("PUT", "/api/conta/protecao"), false);
   await h.chamar("setProtecao", { avancada: false, senha: nova, codigo: "222222" });
   assert.equal(corpoDe("PUT", "/api/conta/protecao").codigo, "222222");
+});
+
+test("códigos de backup: só o formato certo chega à tela; gerar novos leva o código atual e a prova", async () => {
+  const srv = servidorFalso();
+  const h = await cadastrar(srv, "ana@exemplo.test", novaSenha());
+  const resposta = (corpo) => new Response(JSON.stringify(corpo), { status: 200, headers: { "content-type": "application/json" } });
+  const bons = ["ABCDE-12345", "0Z9Y8-XW7V6"];
+  srv.resposta = (metodo, caminho) => {
+    if (caminho === "/api/2fa/confirmar") return resposta({ doisFatores: true, codigosBackup: [...bons, "<img src=x>", 12345, "abcde-12345", "ILOUU-00000"] });
+    if (metodo === "GET" && caminho === "/api/2fa/codigos") return resposta({ restantes: 7 });
+    if (metodo === "POST" && caminho === "/api/2fa/codigos") return resposta({ codigosBackup: bons });
+    return null;
+  };
+  const ativado = await h.chamar("confirmar2FA", { codigo: "123456" });
+  assert.deepEqual(ativado.codigosBackup, bons);                     // nada fora do formato vira texto na tela
+  assert.equal(ativado.user.doisFatores, true);
+  assert.deepEqual(await h.chamar("statusCodigosBackup"), { restantes: 7 });
+  assert.deepEqual(await h.chamar("gerarCodigosBackup", { codigo: "ABCDE-12345" }), { codigosBackup: bons });
+  const pedido = srv.pedidos.findLast((p) => p.metodo === "POST" && p.caminho === "/api/2fa/codigos");
+  assert.deepEqual(JSON.parse(pedido.corpo), { codigo: "ABCDE-12345" });
+  assert.ok(pedido.prova, "vai com a prova da senha");
+  // resposta sem nenhum código válido: erro, nunca uma lista vazia como se tivesse dado certo
+  srv.resposta = (metodo, caminho) => (caminho === "/api/2fa/codigos" ? resposta({ codigosBackup: ["x"], restantes: 99 }) : null);
+  await assert.rejects(h.chamar("gerarCodigosBackup", { codigo: "123456" }), codigo("OPERATION_FAILED"));
+  assert.deepEqual(await h.chamar("statusCodigosBackup"), { restantes: 0 });
 });
 
 test("ação desconhecida ou herdada de Object: NOT_IMPLEMENTED", async () => {
@@ -665,6 +707,71 @@ test("proteção avançada: sem cópia da chave; recomeçar vazia só com confir
   await depois.chamar("login", { email, senha: nova });
   assert.equal((await depois.chamar("loadUserData")).documento, null);
   assert.deepEqual(await depois.chamar("setProtecao", { avancada: false, senha: nova }), { avancada: false, recuperacao: true });
+});
+
+test("proteção avançada troca a chave: a cópia antiga da custódia (num backup) não abre nada gravado depois", async () => {
+  // auditoria de segurança 03/11 (A1): antes, ligar só apagava a cópia; a chave continuava a mesma
+  const srv = servidorFalso(), email = "troca@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  await h.chamar("loadUserData");
+  for (let i = 1; i <= 3; i++) await h.chamar("saveUserData", { documento: { texto: "antes-" + i } });
+  const chaveDoBackup = await abrirCopia(srv, email);                 // o que um backup antigo + o SEGREDO revelariam
+  const salAntes = srv.contas.get(email).sal;
+  assert.deepEqual(await h.chamar("setProtecao", { avancada: true, senha }), { avancada: true, recuperacao: false });
+  const c = srv.contas.get(email);
+  assert.notEqual(c.sal, salAntes);
+  assert.equal(c.custodia, null);
+  // documento e histórico foram recifrados: a chave antiga não abre nenhum, a nova abre todos
+  const ref = await derivarRef(senha, Buffer.from(c.sal, "base64"), "argon2id-1");
+  for (const v of [c.doc, ...c.historico]) {
+    await assert.rejects(abrirRef(chaveDoBackup, email, v.versao, v.conteudo));
+    await abrirRef(ref.dados, email, v.versao, v.conteudo);
+  }
+  assert.deepEqual(c.historico.map((x) => x.versao), [1, 2]);
+  // a sessão segue com a chave nova: gravar depois funciona, e a chave antiga continua sem abrir
+  await h.chamar("saveUserData", { documento: { texto: "criado depois da protecao avancada" } });
+  await assert.rejects(abrirRef(chaveDoBackup, email, c.doc.versao, c.doc.conteudo));
+  assert.deepEqual((await h.chamar("loadUserData")).documento, { texto: "criado depois da protecao avancada" });
+  // a mesma senha continua entrando (sal novo) em outro aparelho
+  const outro = carregarHost({ fetch: srv.fetch });
+  await outro.chamar("login", { email, senha });
+  assert.deepEqual((await outro.chamar("loadUserData")).documento, { texto: "criado depois da protecao avancada" });
+  // ligar sem trocar a chave (cliente antigo) é recusado
+  const so = srv.pedidos.filter((p) => p.caminho === "/api/conta/protecao").pop();
+  assert.ok(JSON.parse(so.corpo).sal && JSON.parse(so.corpo).prova);
+});
+
+test("proteção avançada: conexão caída depois da troca não perde a sessão (o sal novo confirma)", async () => {
+  const srv = servidorFalso(), email = "trocacaiu@exemplo.test", senha = novaSenha();
+  const h = await cadastrar(srv, email, senha);
+  await h.chamar("loadUserData");
+  await h.chamar("saveUserData", { documento: { texto: "x" } });
+  srv.perder = (m, cam) => cam === "/api/conta/protecao";
+  assert.deepEqual(await h.chamar("setProtecao", { avancada: true, senha }), { avancada: true, recuperacao: false });
+  srv.perder = null;
+  await h.chamar("saveUserData", { documento: { texto: "depois" } });                 // a sessão já usa a chave nova
+  assert.deepEqual((await h.chamar("loadUserData")).documento, { texto: "depois" });
+});
+
+test("troca de senha mantém o histórico, recifrado com a chave nova (junto ou em etapas)", async () => {
+  // auditoria de segurança 03/11 (A3): antes, a troca normal apagava o histórico inteiro
+  for (const grande of [false, true]) {
+    const srv = servidorFalso(), email = `historico${grande ? "g" : "p"}@exemplo.test`, senha = novaSenha();
+    const h = await cadastrar(srv, email, senha);
+    await h.chamar("loadUserData");
+    // grande: dado aleatório (não comprime) em cada versão; juntas passam do limite de um pedido
+    const aleatorio = new Uint8Array(grande ? 600000 : 0);
+    for (let i = 0; i < aleatorio.length; i += 65536) webcrypto.getRandomValues(aleatorio.subarray(i, i + 65536));
+    const texto = (i) => b64(aleatorio) + "v" + i;
+    for (let i = 1; i <= 4; i++) await h.chamar("saveUserData", { documento: { texto: texto(i) } });
+    const nova = novaSenha();
+    await h.chamar("changePassword", { senhaAtual: senha, novaSenha: nova });
+    const c = srv.contas.get(email);
+    assert.deepEqual(c.historico.map((x) => x.versao), [1, 2, 3]);
+    const ref = await derivarRef(nova, Buffer.from(c.sal, "base64"), "argon2id-1");
+    for (const v of c.historico) assert.equal((await abrirRef(ref.dados, email, v.versao, v.conteudo)).texto.slice(-2), "v" + v.versao);
+    assert.equal(srv.pedidos.some((p) => p.caminho === "/api/conta/chave/historico"), grande);
+  }
 });
 
 test("recuperação com 2FA pede o código; cópia adulterada não recupera (só recomeçar)", async () => {
@@ -905,7 +1012,7 @@ test("prévia/local: conta simulada sem servidor — cadastro, dados e ações d
     T.simular(true);
     const r = await h.chamar("registerUser", { email: "Sim@Exemplo.test", senha: novaSenha(), nomeUsuario: "Simulada" });
     assert.equal(r.authenticated, true);
-    assert.deepEqual(r.user.recursos, { perfis: true, boleto: true, pix: true, cambio: true });
+    assert.deepEqual(r.user.recursos, { perfis: true, boleto: true, pix: true, cambio: true, faturaDia11: false });
     assert.equal(r.user.simulada, true);
     assert.equal((await h.chamar("loadUserData")).documento, null);
     await h.chamar("saveUserData", { documento: { texto: "simulado" } });

@@ -17,7 +17,8 @@ async function cenario(t, cartaoExtra = {}) {
   const { perfil } = await t.req(t.A.createPerfil, { perfil: { nome: "Mãe" } });
   return { cartao, banco, perfil };
 }
-const fatura = (t, perfilId, mes, ano) => t.req(t.A.getBoletoData, { perfilId, mes, ano });
+// mês atual em cartão sem fechamento = fatura em aberto: estes testes conferem o que entra com "Incluir valores em aberto"
+const fatura = (t, perfilId, mes, ano) => t.req(t.A.getBoletoData, { perfilId, mes, ano, incluirAberto: true });
 
 test("fatura: pagar o cartão (Pagar fatura, transferência de entrada, Receita à mão e o formato antigo) não abate a cobrança do perfil", async () => {
   const t = carregar();
@@ -40,7 +41,7 @@ test("fatura: pagar o cartão (Pagar fatura, transferência de entrada, Receita 
   const pag = (await t.req(t.A.getLancamentos)).lancamentos.find((l) => l.tipo === "fatura");
   await t.req(t.A.updateLancamento, { id: pag.id, lancamento: { data: dia, descricao: "Pagamento fatura", valor: 90, tipo: "fatura", contaId: banco.id, perfilId: perfil.id } });
   assert.equal((await fatura(t, perfil.id, mes, ano)).lancamentos.length, 2);
-  assert.equal((await t.req(t.A.getBoletoData, { perfilId: "todos", mes, ano })).lancamentos.length, 2);
+  assert.equal((await t.req(t.A.getBoletoData, { perfilId: "todos", mes, ano, incluirAberto: true })).lancamentos.length, 2);
 });
 
 test("fatura: ciclo do dia seguinte ao fechamento anterior até o dia do fechamento; sem fechamento, o mês", async () => {

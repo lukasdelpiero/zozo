@@ -13,7 +13,7 @@
    Classes sem tw: que sobraram são ganchos para o JS ou para peças
    ainda no CSS antigo (main, detail, detail__body, side-group__header).
    ============================================================= */
-(function (ZoZo: ZoZoGlobal) {
+const classes = (function (ZoZo: ZoZoGlobal) {
   "use strict";
 
   // Botões de ícone (componente antigo .icon-btn) dentro do cabeçalho do painel: cinza, fundo claro ao passar
@@ -273,4 +273,8 @@
   } as const;
 
   ZoZo.estrutura = E;
+  return E;
 })(window.ZoZo);
+
+/** Nomes FECHADOS do mapa (globais.d.ts): ZoZo.estrutura.nomeErrado não compila (auditoria de UI/UX 03/11, F09) */
+export type ClassesEstrutura = typeof classes;

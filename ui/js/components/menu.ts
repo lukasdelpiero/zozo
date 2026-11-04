@@ -180,7 +180,16 @@
         } else fechar(true);
         return;
       }
-      const painel = ativo.niveis.find((p) => p.el.contains(focado)) || ativo.niveis[ativo.niveis.length - 1];
+      // só as teclas de quem está no menu (ou no botão que o abriu): foco em outro campo segue normal (F02 da auditoria)
+      const dentro = ativo.niveis.find((p) => p.el.contains(focado));
+      const noBotao = !focado || focado === document.body || anchor.contains(focado);
+      if (!dentro && !noBotao) return;
+      if (e.key === "Tab") {
+        // Tab sai do menu: o foco segue a ordem normal e o menu fecha depois (sem puxar o foco de volta)
+        setTimeout(() => { if (ativo && !ativo.niveis.some((p) => p.el.contains(document.activeElement))) fechar(); }, 0);
+        return;
+      }
+      const painel = dentro || ativo.niveis[ativo.niveis.length - 1];
       if (e.key === "ArrowLeft" && painel.nivel > 0 && (!focado || focado.tagName !== "INPUT")) {
         e.preventDefault();
         const origem = painel.origem;

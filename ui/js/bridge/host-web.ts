@@ -56,11 +56,12 @@
   type Kdf = typeof KDF_PBKDF2 | typeof KDF_ARGON2;
   /** Chaves de uma senha: a dos dados (e os bytes dela, para guardar cifrada) e a prova */
   type Chaves = { chave: CryptoKey; bits: Bytes; prova: string };
-  type RecursosConta = { perfis: boolean; boleto: boolean; pix: boolean; cambio: boolean };
+  type RecursosConta = { perfis: boolean; boleto: boolean; pix: boolean; cambio: boolean; faturaDia11: boolean };
   type Sessao = {
     email: string; nome: string; chave: CryptoKey; prova: string; envelope: string; versao: number;
     doisFatores: boolean; demo: boolean; recursos: RecursosConta;
     simulada?: boolean;                        // modo de teste: conta sem servidor (só nesta aba)
+    biometrias?: BiometriaTela[];              // modo de teste: biometrias simuladas
   };
 
   let sessao: Sessao | null = null;
@@ -79,7 +80,7 @@
   const HOSTS_PREVIA = ["zozo-previa.zozo-finance-app.workers.dev"];
   const hostAtual = typeof location !== "undefined" ? location.hostname : "";
   const TESTE = hostAtual === "127.0.0.1" || hostAtual === "localhost" || hostAtual === "[::1]" || hostAtual.endsWith(".localhost") || HOSTS_PREVIA.includes(hostAtual);
-  const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true };
+  const TUDO: RecursosConta = { perfis: true, boleto: true, pix: true, cambio: true, faturaDia11: false };     // a regra do dia 11 é de contas específicas
   const CHAVE_SIMULAR = "zozo.teste.simular";
   const teste = { simular: false, falha: null as string | null, conflito: false, protecao: false, emailSimulado: "", docSimulado: null as unknown, zoAceito: false };
   try { teste.simular = TESTE && sessionStorage.getItem(CHAVE_SIMULAR) === "1"; } catch (e) { /* sem sessionStorage */ }
@@ -167,9 +168,9 @@
     if (r.status === 400 && codigo === "TOKEN_INVALID") throw erro(codigo);
     if (r.status === 403) throw erro("ACCESS_DENIED");                   // pedido recusado pela checagem de origem
     if (r.status === 428) throw erro("CAPTCHA_REQUIRED");
-    if (r.status === 429) throw erro(["ZO_LIMIT", "ZO_PAUSED", "ZO_BUSY"].includes(codigo) ? codigo : "TOO_MANY_ATTEMPTS", extra);
+    if (r.status === 429) throw erro(["ZO_LIMIT", "ZO_PAUSED", "ZO_BUSY", "ZO_DAILY"].includes(codigo) ? codigo : "TOO_MANY_ATTEMPTS", extra);
     if (r.status === 413) throw erro("DOCUMENT_TOO_LARGE");
-    if (codigo === "ZO_UNAVAILABLE" || codigo === "ZO_FAILED") throw erro(codigo);          // Zo desligado ou Gemini fora
+    if (["ZO_UNAVAILABLE", "ZO_FAILED", "ZO_TIMEOUT"].includes(codigo)) throw erro(codigo); // Zo desligado, modelo fora ou lento demais
     throw erro("STORAGE_UNAVAILABLE");
   }
   const parametros = (email: string) => api("GET", "/conta/parametros?email=" + encodeURIComponent(normalizarEmail(email)));
@@ -255,7 +256,7 @@
   /** Recursos que o servidor liberou para a conta (só valores booleanos conhecidos) */
   const lerRecursos = (r: unknown): RecursosConta => {
     const x = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
-    return { perfis: x.perfis === true, boleto: x.boleto === true, pix: x.pix === true, cambio: x.cambio === true };
+    return { perfis: x.perfis === true, boleto: x.boleto === true, pix: x.pix === true, cambio: x.cambio === true, faturaDia11: x.faturaDia11 === true };
   };
   const novaSessao = (r: RespostaApi, k: { chave: CryptoKey; prova: string }): Sessao => ({
     email: r.email, nome: r.nome, chave: k.chave, prova: k.prova, envelope: r.envelope, versao: 0,
@@ -268,7 +269,7 @@
   const aadCustodia = (email: string, nonce: string) => enc.encode("zozo|custodia|v1|" + email + "|" + nonce);
   /**
    * Guarda a cópia da chave. true = guardada (ou já estava, ou proteção avançada: nada a guardar); false = falhou
-   * (sem cópia, "Esqueci minha senha" não recupera os dados até o próximo login ou o reparo em Configurações › Conta).
+   * (sem cópia, "Esqueci minha senha" não recupera os dados até o próximo login ou o reparo em Configurações › Segurança).
    */
   async function guardarCustodia(s: Sessao | null, bits: Bytes): Promise<boolean> {
     if (!s || s.demo) return true;
@@ -439,6 +440,64 @@
     }
   }
 
+  /* ---------------- troca da chave dos dados: senha nova ou proteção avançada ----------------
+     Documento e histórico são lidos com a chave atual e recifrados com a nova; o fechamento (PUT /conta/senha ou
+     /conta/protecao) troca tudo numa transação. Cópia do histórico que já não abria fica de fora (o servidor a apaga:
+     estava cifrada com a chave anterior). Histórico grande: uma cópia por pedido antes (/conta/chave/historico). */
+  type LidoParaTroca = { versao: number; documento: unknown; historico: Array<{ versao: number; claro: unknown }> };
+  async function lerParaTrocarChave(email: string, atual: Chaves): Promise<LidoParaTroca> {
+    const doc = await api("GET", "/documento", undefined, atual.prova);     // senha errada → WRONG_PASSWORD
+    let documento: unknown = null;
+    if (doc) { try { documento = await decifrar(atual.chave, email, doc.versao, doc.conteudo); } catch (e) { throw erro("LOAD_FAILED"); } }
+    const h = await api("GET", "/historico", undefined, atual.prova);
+    const historico: LidoParaTroca["historico"] = [];
+    for (const v of (h && Array.isArray(h.versoes) ? h.versoes : [])) {
+      try { historico.push({ versao: v.versao, claro: await decifrar(atual.chave, email, v.versao, v.conteudo) }); } catch (e) { /* já não abria */ }
+    }
+    return { versao: doc ? doc.versao : 0, documento, historico };
+  }
+  async function recifrarParaChave(email: string, lido: LidoParaTroca, nova: Chaves, sal: Bytes, provaAtual: string) {
+    const conteudo = await cifrar(nova.chave, email, lido.versao + 1, lido.documento);
+    let historico: Array<{ versao: number; conteudo: string }> = [];
+    let tamanho = conteudo.length + 1000;
+    for (const v of lido.historico) {
+      const c = await cifrar(nova.chave, email, v.versao, v.claro);
+      tamanho += c.length + 40;
+      historico.push({ versao: v.versao, conteudo: c });
+    }
+    if (tamanho > LIMITE_PEDIDO) {
+      for (const r of historico) await api("PUT", "/conta/chave/historico", { sal: b64(sal), versao: r.versao, conteudo: r.conteudo }, provaAtual);
+      historico = [];
+    }
+    return { conteudo, historico };
+  }
+
+  /**
+   * Proteção avançada: além de apagar a cópia de recuperação, troca a chave dos dados (mesma senha, sal novo). Sem a
+   * troca, uma cópia antiga da custódia guardada num backup do banco abriria também o que fosse gravado depois.
+   */
+  async function ligarProtecao(s: Sessao, atual: Chaves, senha: unknown): Promise<void> {
+    const lido = await lerParaTrocarChave(s.email, atual);
+    const sal = aleatorio(16);
+    const nova = await derivar(senha, sal, ITERACOES, KDF_ARGON2);
+    try {
+      const corpo = await recifrarParaChave(s.email, lido, nova, sal, atual.prova);
+      try {
+        await api("PUT", "/conta/protecao", { avancada: true, sal: b64(sal), kdf: KDF_ARGON2, prova: nova.prova, versaoAnterior: lido.versao, ...corpo }, atual.prova);
+      } catch (e) {
+        // sem resposta: a troca pode ter acontecido. O sal novo no servidor é a prova (nunca repete às cegas)
+        if (!incerto(e)) throw e;
+        const par = await parametros(s.email).catch(() => null);
+        if (!par || par.sal !== b64(sal)) throw e;
+      }
+      if (sessao === s) {
+        Object.assign(s, { chave: nova.chave, prova: nova.prova, versao: lido.versao + 1 });
+        await guardarChaveLocal(s.email, s.envelope, nova.bits, nova.prova);
+      }
+      await lembrarVersao(s.email, lido.versao + 1);
+    } finally { nova.bits.fill(0); }
+  }
+
   /* ---------------- última versão vista neste navegador ---------------- */
   const chaveVersao = async (email: string) => "zozo.versao." + hex(await crypto.subtle.digest("SHA-256", enc.encode(email))).slice(0, 24);
   async function versaoConhecida(email: string): Promise<number> {
@@ -467,7 +526,7 @@
   // No ambiente de teste a demo (e a conta simulada) aparece como conta completa: todos os recursos e opções
   const usuario = () => (sessao ? { nomeUsuario: sessao.nome, email: sessao.email, doisFatores: sessao.doisFatores,
     demo: sessao.demo && !TESTE, recursos: Object.assign({}, TESTE && (sessao.demo || sessao.simulada) ? TUDO : sessao.recursos),
-    teste: TESTE, simulada: !!sessao.simulada } : null);
+    teste: TESTE, simulada: !!sessao.simulada, contaDemo: sessao.demo === true } : null);
   const sessaoData = () => ({ authenticated: !!sessao, user: usuario() });
   function exigirSessao(): Sessao { if (!sessao) throw erro("SESSION_EXPIRED"); return sessao; }
   /** Conta real (a demo não troca senha, nome, 2FA, nem apaga ou exclui; o servidor também recusa); no ambiente de teste também a demo e a simulada (quem chama simula a ação) */
@@ -652,17 +711,17 @@
       if (simulada(s)) { if (s.doisFatores && !/^\d{6}$/.test(codigo || "")) throw erro(codigo ? "CODE_INVALID" : "CODE_REQUIRED"); return { alterada: true }; }
       const atual = await derivarConta(d.senhaAtual, await parametros(s.email));
       atual.bits.fill(0);
-      const doc = await api("GET", "/documento", undefined, atual.prova);     // senha errada → WRONG_PASSWORD
+      const lido = await lerParaTrocarChave(s.email, atual);                  // senha errada → WRONG_PASSWORD
       if (await senhaVazada(d.novaSenha)) throw erro("PASSWORD_BREACHED");
-      let documento: unknown = null;
-      if (doc) { try { documento = await decifrar(atual.chave, s.email, doc.versao, doc.conteudo); } catch (e) { throw erro("LOAD_FAILED"); } }
-      const va: number = doc ? doc.versao : 0;
       const sal = aleatorio(16);
       const nova = await derivar(d.novaSenha, sal, ITERACOES, KDF_ARGON2);           // senha nova já em Argon2id
-      const conteudo = await cifrar(nova.chave, s.email, va + 1, documento);
-      // troca atômica no servidor: novo sal + nova prova + documento recifrado (e os outros dispositivos saem)
+      const va = lido.versao;
+      let corpo: { conteudo: string; historico: Array<{ versao: number; conteudo: string }> };
+      try { corpo = await recifrarParaChave(s.email, lido, nova, sal, atual.prova); }
+      catch (e) { nova.bits.fill(0); throw e; }
+      // troca atômica no servidor: novo sal + nova prova + documento e histórico recifrados (e os outros dispositivos saem)
       try {
-        await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va, codigo }, atual.prova);
+        await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, versaoAnterior: va, codigo, ...corpo }, atual.prova);
       } catch (e) { nova.bits.fill(0); throw incerto(e) ? erro("PASSWORD_UNCONFIRMED") : e; }   // trocou ou não: a tela orienta
       let recuperacaoPendente = false;
       if (sessao === s) {
@@ -695,7 +754,8 @@
       const doc = await api("GET", "/documento", undefined, k.prova);         // confere a senha e a versão atual
       const va: number = doc ? doc.versao : 0;
       const conteudo = await cifrar(k.chave, s.email, va + 1, null);
-      await api("POST", "/documento/apagar", { versaoAnterior: va, conteudo }, k.prova);
+      // com 2FA, o servidor pede um código atual (a ação apaga também o histórico)
+      await api("POST", "/documento/apagar", d.codigo ? { versaoAnterior: va, conteudo, codigo: String(d.codigo) } : { versaoAnterior: va, conteudo }, k.prova);
       if (sessao === s) s.versao = va + 1;
       await esquecerVersao(s.email);              // recomeço deliberado: vale também depois de "documento sumido"
       await lembrarVersao(s.email, va + 1);
@@ -831,13 +891,16 @@
       }
       const k = await derivarConta(d.senha, await parametros(s.email));
       try {
-        await api("PUT", "/conta/protecao", { avancada: d.avancada === true, codigo }, k.prova);   // senha errada → WRONG_PASSWORD
-        if (d.avancada !== true) await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
+        if (d.avancada === true) await ligarProtecao(s, k, d.senha);
+        else {
+          await api("PUT", "/conta/protecao", { avancada: false, codigo }, k.prova);   // senha errada → WRONG_PASSWORD
+          await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
+        }
       } finally { k.bits.fill(0); }
       return ACOES.getProtecao({});
     },
 
-    /* ---- Zo, o assistente: consentimento e conversa (a API leva ao Gemini; as ferramentas rodam aqui, no navegador) ---- */
+    /* ---- Zo, o assistente: consentimento e conversa (a API leva ao Workers AI; as ferramentas rodam aqui, no navegador) ---- */
     async zoConsentimento(d) {
       const s = exigirConta();
       const aceito = d && typeof d.aceito === "boolean" ? d.aceito : undefined;
@@ -849,7 +912,7 @@
     },
     async zoConversar(d) {
       const s = exigirConta();
-      if (simulada(s)) return { texto: "Modo teste. O Zo de verdade responde com a API local ou na prévia.", chamadas: [] };
+      if (simulada(s)) return { texto: "Esta é uma conta de teste, então eu não falo com o servidor. Para conversar comigo de verdade, entre com uma conta criada na prévia ou no servidor local.", chamadas: [] };
       const r = await comProvaDaSessao(() => api("POST", "/zo", { mensagens: d && Array.isArray(d.mensagens) ? d.mensagens : [] }, s.prova));
       const chamadas = r && Array.isArray(r.chamadas) ? r.chamadas.filter((c: RespostaApi) => c && typeof c.id === "string" && typeof c.nome === "string" && typeof c.argumentos === "string")
         .map((c: RespostaApi) => ({ id: c.id as string, nome: c.nome as string, argumentos: c.argumentos as string })) : [];
@@ -857,6 +920,89 @@
     },
 
     /* ---- 2FA (a senha já foi provada no login: usa a prova da sessão) ---- */
+    /* ---- biometria e chaves de acesso (WebAuthn): o servidor confere tudo; aqui só a conversa com o aparelho ---- */
+    async biometriaDisponivel() {
+      const PKC = window.PublicKeyCredential;
+      if (!PKC || !navigator.credentials || typeof navigator.credentials.create !== "function") return { disponivel: false, plataforma: false };
+      const plataforma = await PKC.isUserVerifyingPlatformAuthenticatorAvailable().catch(() => false);
+      return { disponivel: true, plataforma: !!plataforma };
+    },
+    async listarBiometrias() {
+      const s = exigirConta();
+      if (simulada(s)) return { chaves: (s.biometrias || []).slice() };
+      const r = await comProvaDaSessao(() => api("GET", "/webauthn/chaves", undefined, s.prova));
+      const lista: unknown[] = r && Array.isArray(r.chaves) ? r.chaves : [];
+      return { chaves: lista.filter((c): c is Record<string, unknown> => !!c && typeof c === "object").map((c) => ({
+        id: String(c.id || ""), nome: String(c.nome || "").slice(0, 40), prf: c.prf === true,
+        criadoEm: typeof c.criadoEm === "string" ? c.criadoEm : null, usadoEm: typeof c.usadoEm === "string" ? c.usadoEm : null })).filter((c) => /^[A-Za-z0-9_-]{16,1400}$/.test(c.id)) };
+    },
+    async registrarBiometria(d) {
+      const s = exigirConta();
+      const nome = String((d && d.nome) || "").trim().slice(0, 40) || "Este aparelho";
+      if (simulada(s)) {
+        s.biometrias = (s.biometrias || []).concat({ id: b64url(aleatorio(32)), nome, prf: true, criadoEm: new Date().toISOString(), usadoEm: null });
+        return { nome };
+      }
+      if (!window.PublicKeyCredential || !navigator.credentials) throw erro("WEBAUTHN_UNSUPPORTED");
+      // 1) opções do servidor (com 2FA, o código atual vai aqui: nada é criado no aparelho antes de conferir)
+      const op = await comProvaDaSessao(() => api("POST", "/webauthn/registro/opcoes", d && d.codigo ? { codigo: String(d.codigo) } : {}, s.prova));
+      if (!op || typeof op.challenge !== "string" || !op.rp || !op.user) throw erro("OPERATION_FAILED");
+      // 2) o aparelho cria a credencial (biometria ou PIN); PRF pedido já agora para, no futuro, entrar sem senha
+      let cred: PublicKeyCredential | null;
+      try {
+        cred = await navigator.credentials.create({ publicKey: {
+          challenge: de64url(op.challenge), rp: { id: String(op.rp.id), name: String(op.rp.name) },
+          user: { id: de64url(op.user.id), name: String(op.user.name), displayName: String(op.user.displayName) },
+          pubKeyCredParams: (op.pubKeyCredParams || []).map((p: { alg: number }) => ({ type: "public-key" as const, alg: Number(p.alg) })),
+          authenticatorSelection: { residentKey: "preferred", userVerification: "required" },
+          excludeCredentials: (op.excludeCredentials || []).map((c: { id: string }) => ({ type: "public-key" as const, id: de64url(c.id) })),
+          attestation: "none", timeout: Number(op.timeout) || 120000,
+          extensions: { prf: {} } as AuthenticationExtensionsClientInputs,
+        } }) as PublicKeyCredential | null;
+      } catch (e) { throw erroDoAparelho(e); }
+      if (!cred) throw erro("WEBAUTHN_CANCELLED");
+      const resp = cred.response as AuthenticatorAttestationResponse;
+      const ext = cred.getClientExtensionResults() as { prf?: { enabled?: boolean } };
+      const r = await comProvaDaSessao(() => api("POST", "/webauthn/registro", {
+        id: cred.id, clientDataJSON: b64url(new Uint8Array(resp.clientDataJSON)), attestationObject: b64url(new Uint8Array(resp.attestationObject)),
+        nome, prf: !!(ext.prf && ext.prf.enabled) }, s.prova));
+      return { nome: String((r && r.nome) || nome) };
+    },
+    async removerBiometria(d) {
+      const s = exigirConta();
+      const id = String((d && d.id) || "");
+      if (!/^[A-Za-z0-9_-]{16,1400}$/.test(id)) throw erro("OPERATION_FAILED");
+      if (simulada(s)) { s.biometrias = (s.biometrias || []).filter((c) => c.id !== id); return { removida: true }; }
+      await comProvaDaSessao(() => api("DELETE", "/webauthn/chaves", d && d.codigo ? { id, codigo: String(d.codigo) } : { id }, s.prova));
+      return { removida: true };
+    },
+    /**
+     * Confirmar com biometria (relatórios do Zo): o servidor confere a assinatura. É uma trava DESTA tela, não uma
+     * autorização no servidor: as ações sem volta não pedem biometria (com 2FA, pedem o código atual; sem 2FA, bastam a
+     * sessão e a prova da senha). Auditoria de segurança 03/11, A2.
+     */
+    async confirmarBiometria() {
+      const s = exigirConta();
+      if (simulada(s)) { if (!(s.biometrias || []).length) throw erro("WEBAUTHN_NONE"); return { confirmado: true }; }
+      if (!window.PublicKeyCredential || !navigator.credentials) throw erro("WEBAUTHN_UNSUPPORTED");
+      const op = await comProvaDaSessao(() => api("POST", "/webauthn/confirmacao/opcoes", undefined, s.prova));
+      if (!op || typeof op.challenge !== "string") throw erro("OPERATION_FAILED");
+      let cred: PublicKeyCredential | null;
+      try {
+        cred = await navigator.credentials.get({ publicKey: {
+          challenge: de64url(op.challenge), rpId: String(op.rpId), userVerification: "required", timeout: Number(op.timeout) || 120000,
+          allowCredentials: (op.allowCredentials || []).map((c: { id: string }) => ({ type: "public-key" as const, id: de64url(c.id) })),
+        } }) as PublicKeyCredential | null;
+      } catch (e) { throw erroDoAparelho(e); }
+      if (!cred) throw erro("WEBAUTHN_CANCELLED");
+      const resp = cred.response as AuthenticatorAssertionResponse;
+      await comProvaDaSessao(() => api("POST", "/webauthn/confirmacao", {
+        id: cred.id, clientDataJSON: b64url(new Uint8Array(resp.clientDataJSON)),
+        authenticatorData: b64url(new Uint8Array(resp.authenticatorData)), signature: b64url(new Uint8Array(resp.signature)) }, s.prova));
+      return { confirmado: true };
+    },
+
+    /* códigos de backup: só o formato "XXXXX-XXXXX" (Base32 de Crockford) passa para a tela */
     async iniciar2FA() {
       const s = exigirConta();
       if (simulada(s)) { const c = base32(aleatorio(20)); return { chave: c, uri: "otpauth://totp/ZoZo:" + encodeURIComponent(s.email) + "?secret=" + c + "&issuer=ZoZo%20(teste)" }; }
@@ -866,19 +1012,69 @@
     },
     async confirmar2FA(d) {
       const s = exigirConta();
-      if (simulada(s)) { if (!/^\d{6}$/.test(String(d.codigo || ""))) throw erro("CODE_INVALID"); s.doisFatores = true; return sessaoData(); }
-      await comProvaDaSessao(() => api("POST", "/2fa/confirmar", { codigo: String(d.codigo || "") }, s.prova));
+      if (simulada(s)) {
+        if (!/^\d{6}$/.test(String(d.codigo || ""))) throw erro("CODE_INVALID");
+        s.doisFatores = true;
+        return Object.assign(sessaoData(), { codigosBackup: codigosSimulados() });
+      }
+      const r = await comProvaDaSessao(() => api("POST", "/2fa/confirmar", { codigo: String(d.codigo || "") }, s.prova));
       s.doisFatores = true;
-      return sessaoData();
+      return Object.assign(sessaoData(), { codigosBackup: listaDeCodigos(r && r.codigosBackup) });
+    },
+    async statusCodigosBackup() {
+      const s = exigirConta();
+      if (simulada(s)) return { restantes: s.doisFatores ? 10 : 0 };
+      const r = await comProvaDaSessao(() => api("GET", "/2fa/codigos", undefined, s.prova));
+      const n = Number(r && r.restantes);
+      return { restantes: Number.isInteger(n) && n >= 0 && n <= 10 ? n : 0 };
+    },
+    async gerarCodigosBackup(d) {
+      const s = exigirConta();
+      if (simulada(s)) { if (!codigoOuBackup(d && d.codigo)) throw erro("CODE_INVALID"); return { codigosBackup: codigosSimulados() }; }
+      const r = await comProvaDaSessao(() => api("POST", "/2fa/codigos", { codigo: String((d && d.codigo) || "") }, s.prova));
+      const lista = listaDeCodigos(r && r.codigosBackup);
+      if (!lista.length) throw erro("OPERATION_FAILED");
+      return { codigosBackup: lista };
     },
     async desativar2FA(d) {
       const s = exigirConta();
-      if (simulada(s)) { if (!/^\d{6}$/.test(String((d && d.codigo) || ""))) throw erro("CODE_INVALID"); s.doisFatores = false; return sessaoData(); }
+      if (simulada(s)) { if (!codigoOuBackup(d && d.codigo)) throw erro("CODE_INVALID"); s.doisFatores = false; return sessaoData(); }
       await comProvaDaSessao(() => api("POST", "/2fa/desativar", { codigo: String((d && d.codigo) || "") }, s.prova));
       s.doisFatores = false;
       return sessaoData();
     },
   };
+
+  /** base64url (WebAuthn) ⇄ bytes */
+  function b64url(b: Uint8Array): string {
+    let s = "";
+    b.forEach((x) => { s += String.fromCharCode(x); });
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function de64url(t: unknown): Uint8Array<ArrayBuffer> {
+    const s = String(t || "");
+    if (!/^[A-Za-z0-9_-]+$/.test(s)) throw erro("OPERATION_FAILED");
+    const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  }
+  /** Erro do aparelho → código da ponte: cancelou ou demorou (NotAllowedError), já cadastrado, sem suporte */
+  function erroDoAparelho(e: unknown) {
+    const nome = e && typeof e === "object" && "name" in e ? String((e as { name: unknown }).name) : "";
+    if (nome === "InvalidStateError") return erro("WEBAUTHN_EXISTS");
+    if (nome === "NotSupportedError" || nome === "SecurityError") return erro("WEBAUTHN_UNSUPPORTED");
+    return erro("WEBAUTHN_CANCELLED");
+  }
+
+  /** Códigos de backup vindos do servidor: só os que têm o formato "XXXXX-XXXXX" (no máximo dez) */
+  function listaDeCodigos(v: unknown): string[] {
+    return Array.isArray(v) ? v.filter((c): c is string => typeof c === "string" && /^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/.test(c)).slice(0, 10) : [];
+  }
+  /** Conta simulada: código do aplicativo (6 dígitos) ou de backup (10 caracteres, com ou sem hífen) */
+  const codigoOuBackup = (v: unknown) => /^(\d{6}|[0-9A-Za-z]{5}-?[0-9A-Za-z]{5})$/.test(String(v || ""));
+  function codigosSimulados(): string[] {
+    const alfabeto = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    return Array.from({ length: 10 }, () => { const b = aleatorio(10); const c = Array.from(b, (x) => alfabeto[x % 32]).join(""); return c.slice(0, 5) + "-" + c.slice(5); });
+  }
 
   async function handle(req: PedidoPonte): Promise<RespostaPonte> {
     const base = { type: "response" as const, action: req.action, requestId: req.requestId };

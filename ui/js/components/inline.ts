@@ -9,17 +9,38 @@
   const { h } = ZoZo.dom;
   const F = ZoZo.format;
 
-  /** Campo de texto que salva ao sair (Enter também). aoSalvar(v) → Promise; em erro, volta ao valor anterior */
+  /**
+   * Gravações em sequência de um campo: a resposta de uma tentativa ANTIGA nunca desfaz uma edição mais nova.
+   * Erro só volta ao último valor confirmado se for da tentativa mais recente; sucesso só vale se for mais novo que o
+   * último confirmado; e nada é escrito no campo enquanto a pessoa está editando.
+   */
+  function gravacoes<T>(inicial: T, mostrar: (v: T) => void, editando: () => boolean) {
+    let confirmado = inicial, tentativa = 0, ultimaOk = 0;
+    return (v: T, salvar: () => unknown, aoVoltar: (v: T) => void) => {
+      const minha = ++tentativa;
+      let pedido: Promise<unknown>;
+      try { pedido = Promise.resolve(salvar()); } catch (e) { pedido = Promise.reject(e); }   // grava na hora, como antes
+      pedido.then(() => {
+        if (minha > ultimaOk) { ultimaOk = minha; confirmado = v; }
+      }, (e: ErroPonte | undefined) => {
+        if (minha === tentativa) { aoVoltar(confirmado); if (!editando()) mostrar(confirmado); }
+        ZoZo.feedback.toast((e && e.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" });
+      });
+    };
+  }
+
+  /** Campo de texto que salva ao sair (Enter também). aoSalvar(v) → Promise; em erro, volta ao último valor confirmado */
   function texto(cfg: CampoTextoNoLugar): HTMLInputElement {
     let atual = cfg.valor || "";
     const input = h("input", { type: "text", class: [ZoZo.pecas.noLugar, cfg.classe], value: atual, placeholder: cfg.placeholder || "", maxlength: String(cfg.max || 80), "aria-label": cfg.rotulo || "Editar" }) as HTMLInputElement;
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = atual; input.blur(); } });
+    const gravar = gravacoes(atual, (v) => { input.value = v; }, () => document.activeElement === input);
     input.addEventListener("blur", () => {
       const v = input.value.trim();
       if (!v) { input.value = atual; return; }
       if (v === atual) return;
-      const antes = atual; atual = v;
-      Promise.resolve(cfg.aoSalvar(v)).catch((e: ErroPonte | undefined) => { atual = antes; input.value = antes; ZoZo.feedback.toast((e && e.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }); });
+      atual = v;
+      gravar(v, () => cfg.aoSalvar(v), (voltou) => { atual = voltou; });
     });
     return input;
   }
@@ -54,6 +75,7 @@
     // editando, o símbolo da moeda continua na frente do valor (data-com-simbolo: ver format.mascararValor)
     const input = h("input", { type: "text", inputmode: "decimal", class: [ZoZo.pecas.noLugar, ZoZo.pecas.noLugarValor, "money", cfg.classe], value: F.moeda(atual),
       "data-com-simbolo": "", "aria-label": cfg.rotulo || "Valor" }) as HTMLInputElement;
+    const gravar = gravacoes(atual, (v) => { input.value = F.moeda(v); }, () => document.activeElement === input);
     // ao clicar para editar o cursor vai para o fim (nada selecionado; Backspace apaga o último dígito)
     input.addEventListener("focus", () => { input.value = F.valorParaEditar(input, atual); F.cursorNoFim(input); });
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); input.blur(); } if (e.key === "Escape") { input.value = F.valorParaEditar(input, atual); input.blur(); } });
@@ -61,8 +83,9 @@
       const v = F.parseMoeda(input.value);
       const valido = Number.isFinite(v) && (cfg.permitirNegativo || v >= 0) && (cfg.permitirZero !== false || v > 0) && Math.abs(v) < 1e12;
       if (valido && Math.round(v * 100) !== Math.round(atual * 100)) {
-        const antes = atual; atual = Math.round(v * 100) / 100;
-        Promise.resolve(cfg.aoSalvar(atual)).catch((e: ErroPonte | undefined) => { atual = antes; input.value = F.moeda(antes); ZoZo.feedback.toast((e && e.friendly) || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }); });
+        const novo = Math.round(v * 100) / 100;
+        atual = novo;
+        gravar(novo, () => cfg.aoSalvar(novo), (voltou) => { atual = voltou; });
       }
       input.value = F.moeda(atual);
     });

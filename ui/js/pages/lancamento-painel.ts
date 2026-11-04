@@ -414,7 +414,8 @@
             h("div", { class: ZoZo.pecas.lpPilula }, chipCat, cat ? seta(cat.nome, () => ZoZo.categoriasShared.abrirDetalhe(cat, ctx, { voltar: voltarParaCa })) : null)) : null,
           comPerfis ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Perfil"),
             h("div", { class: ZoZo.pecas.lpPilula }, campoPerfil(), perfil ? seta(perfil.nome, () => ZoZo.perfilShared.abrirDetalhe(perfil, ctx, { voltar: voltarParaCa })) : null)) : null,
-          temCategoria(d) && d.tipo !== "fatura" ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Recorrência"),
+          // recorrência: só despesa e débito (estorno repetido viraria gasto; o serviço recusa: RECURRENCE_TYPE)
+          temCategoria(d) && d.tipo !== "fatura" && d.tipo !== "estorno" ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Recorrência"),
             h("div", { class: ZoZo.pecas.lpPilula }, chipRec, recAtual ? seta(recAtual.descricao || "recorrência", () => abrirRecorrencia(recAtual.id || d.serieId)) : null)) : null,
           // Divisão entre perfis: rachada → resumo; senão o "+" (igual ao da recorrência; também em recorrentes já criadas)
           podeDividir ? h("div", { class: [ZoZo.pecas.lpProp, ZoZo.pecas.ctxPilulasPainel] }, h("span", { class: ZoZo.pecas.lpPropRotulo }, "Divisão"),
@@ -454,7 +455,7 @@
     const excluir = () => {
       const origemParcelada = gravada.recorrencia === "parcelada" && (!gravada.serieId || gravada.serieId === gravada.id);
       ZoZo.feedback.confirmarExclusao("Excluir transação?", "Tem certeza de que deseja excluir esta transação?" +
-        (origemParcelada ? " As parcelas futuras desta compra também serão excluídas; as já pagas continuam." : ""))
+        (origemParcelada ? " As parcelas futuras desta compra também serão excluídas. As parcelas já pagas continuam." : ""))
         .then((ok) => ok && ctx.bridge.request(A.deleteLancamento, { id: gravada.id }).then(() => {
           ctx.detail.close({ silencioso: true }); ctx.toast("Transação excluída."); return ctx.recarregarTudo();
         }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })));

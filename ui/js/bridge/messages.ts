@@ -49,6 +49,13 @@
     iniciar2FA: "iniciar2FA",
     confirmar2FA: "confirmar2FA",
     desativar2FA: "desativar2FA",
+    statusCodigosBackup: "statusCodigosBackup",
+    gerarCodigosBackup: "gerarCodigosBackup",
+    biometriaDisponivel: "biometriaDisponivel",
+    listarBiometrias: "listarBiometrias",
+    registrarBiometria: "registrarBiometria",
+    removerBiometria: "removerBiometria",
+    confirmarBiometria: "confirmarBiometria",
 
     // Documento do usuário (cifrado no navegador e guardado no banco SQL do Cloudflare)
     loadUserData: "loadUserData",
@@ -99,11 +106,16 @@
     updateGrupo: "updateGrupo",
     desagruparCategorias: "desagruparCategorias",
     transferirMoeda: "transferirMoeda",
+    // lixeira temporal do Zo (só na memória da aba)
+    abrirMarco: "abrirMarco",
+    fecharMarco: "fecharMarco",
+    descartarMarcos: "descartarMarcos",
+    desfazerMarco: "desfazerMarco",
     getLancamentosOutrasMoedas: "getLancamentosOutrasMoedas",
   });
 
   /** Ações cujo payload nunca pode aparecer em log */
-  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
+  const SENSITIVE: ReadonlySet<string> = new Set([ACTIONS.login, ACTIONS.verificar2FA, ACTIONS.confirmar2FA, ACTIONS.gerarCodigosBackup, ACTIONS.desativar2FA, ACTIONS.registrarBiometria, ACTIONS.removerBiometria, ACTIONS.registerUser, ACTIONS.updateUser, ACTIONS.changePassword, ACTIONS.wipeUserData, ACTIONS.deleteUser, ACTIONS.saveUserData,
     ACTIONS.setProtecao, ACTIONS.repararRecuperacao, ACTIONS.concluirRecuperacao, ACTIONS.abrirRecuperacao, ACTIONS.zoConversar]);
 
   /** Mensagens amigáveis exibidas ao usuário (seções 4.1.8 e 56) */
@@ -130,7 +142,14 @@
     WEAK_PASSWORD: "Use uma senha com pelo menos 8 caracteres.",
     TOO_MANY_ATTEMPTS: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
     CAPTCHA_REQUIRED: "Confirme que você não é um robô para continuar.",
-    CODE_INVALID: "Esse código não funcionou. Tente o código mais recente do seu aplicativo 2FA.",
+    CODE_INVALID: "Esse código não funcionou. Tente o código mais recente do seu aplicativo 2FA ou um código de backup.",
+    UNDO_UNAVAILABLE: "Essa alteração não pode mais ser desfeita.",
+    WEBAUTHN_INVALID: "Não deu para confirmar com a biometria. Tente de novo.",
+    WEBAUTHN_CANCELLED: "A biometria foi cancelada ou demorou demais. Tente de novo.",
+    WEBAUTHN_NONE: "Nenhuma biometria cadastrada. Cadastre em Configurações › Segurança.",
+    WEBAUTHN_LIMIT: "Você chegou ao limite de 10 biometrias. Remova uma para cadastrar outra.",
+    WEBAUTHN_EXISTS: "Este aparelho já está cadastrado.",
+    WEBAUTHN_UNSUPPORTED: "Este navegador ou aparelho não oferece biometria nem chave de acesso.",
     CODE_INVALID_AGAIN: "Algo deu errado. Por favor, tente novamente ou entre em contato com o suporte se o problema persistir.",
     "2FA_ALREADY_ON": "A autenticação de dois fatores já está ativada.",
     "2FA_NOT_PENDING": "Gere um novo código QR e tente novamente.",
@@ -153,9 +172,13 @@
     ZO_PAUSED: "O Zo fez uma pausa por hoje por causa de mensagens ofensivas. Amanhã ele volta a responder.",
     ZO_UNAVAILABLE: "O Zo ainda não está disponível. Tente de novo mais tarde.",
     ZO_FAILED: "O Zo não conseguiu responder agora. Tente de novo em instantes.",
+    ZO_TIMEOUT: "O Zo demorou demais para responder. Tente de novo em instantes.",
     IMPORT_ACCOUNT: "Escolha uma conta da moeda atual para importar.",
     IMPORT_INVALID: "O arquivo tem uma linha que não deu para importar. Nada foi importado: confira o arquivo e tente de novo.",
     ZO_BUSY: "O Zo está com muitos pedidos agora. Tente de novo em alguns minutos.",
+    ZO_DAILY: "O Zo chegou ao limite de uso de hoje. Ele volta a responder à noite, depois das 21h.",
+    RECURRENCE_TYPE: "Só despesas e débitos podem repetir ou ser parcelados. Receitas, estornos e transferências ainda não viram recorrência.",
+    STALE_PROPOSAL: "Isso mudou depois que o Zo preparou a confirmação. Nada foi gravado: peça de novo para ver os dados atuais.",
     PAYMENT_TYPE_LOCKED: "O pagamento de fatura não muda de tipo. Para corrigir, edite o valor, a data ou a conta, ou exclua o pagamento.",
     DIGITS_INVALID: "Use exatamente 4 números (os últimos dígitos do cartão ou da conta).",
     CARD_CYCLE_INVALID: "Informe o fechamento e o vencimento juntos (dias de 1 a 31).",

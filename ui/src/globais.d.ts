@@ -1,10 +1,10 @@
 /* =============================================================
-   ZoZo — tipos globais (transição para TypeScript)
+   ZoZo — tipos globais da interface
    ------------------------------------------------------------
-   A interface ainda é formada por módulos que se registram em
-   window.ZoZo (js/**). Cada módulo convertido para .ts ganha aqui
-   o tipo da sua API; os que ainda são .js ficam como `any` até
-   serem convertidos (um por vez).
+   Os módulos de js/** são TypeScript e se registram em window.ZoZo;
+   aqui fica o tipo da API de cada um (os dados do documento estão
+   em src/dados.d.ts). Os mapas de classes (estrutura, pecas) vêm
+   com os nomes fechados dos próprios arquivos.
    ============================================================= */
 export {};
 
@@ -30,13 +30,15 @@ declare global {
     ajusteEmoji(texto: string, fontes?: string): string;
   }
 
-  /** js/core/state.ts — estado central (os dados de cada tela ainda são `any`: vêm de módulos em JS) */
-  type RecursoConta = "perfis" | "boleto" | "pix" | "cambio";
+  /** js/core/state.ts — estado central (os dados de cada tela têm os tipos de src/dados.d.ts) */
+  type RecursoConta = "perfis" | "boleto" | "pix" | "cambio" | "faturaDia11";
   interface UsuarioSessao {
     nomeUsuario?: string;
     email?: string;
     doisFatores?: boolean;
     demo?: boolean;
+    /** é a conta de demonstração, mesmo no modo teste (onde ela aparece como conta completa): atalho Alt + Shift + D */
+    contaDemo?: boolean;
     recursos?: Partial<Record<RecursoConta, boolean>>;
     teste?: boolean;          // ambiente de teste (local ou prévia)
     simulada?: boolean;       // conta simulada sem servidor (modo de teste)
@@ -74,6 +76,8 @@ declare global {
     /** grupos de categoria abertos no Dashboard; contas ocultas à mostra (por grupo) em Contas */
     dashGruposAbertos?: Record<string, boolean>;
     mostrarOcultas?: Record<string, boolean>;
+    /** conta demo: avisos de demonstração visíveis (Alt + Shift + D) */
+    avisosDemo?: boolean;
     [outro: string]: unknown;
   }
   interface EstadoZoZo {
@@ -101,6 +105,8 @@ declare global {
     boleto(): boolean;
     pix(): boolean;
     cambio(): boolean;
+    /** fatura do mês com o que fecha ou vence até o dia 11 do mês seguinte (regra de contas específicas) */
+    faturaDia11(): boolean;
     demo(): boolean;
   }
   interface ZoZoLog {
@@ -299,11 +305,13 @@ declare global {
     atualizarLinhas?(state: EstadoZoZo, ctx: ContextoApp): boolean;
   }
   interface Roteador {
-    navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
+    navigate(id: string, opts?: OpcoesNavegar): void;
     refreshTopbar(): void;
     current(): PaginaZoZo | null;
   }
-  interface ZoZoRouter { create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador }
+  /** historico: "empilhar" (padrão: Voltar volta para a anterior), "substituir" (entrada, redirecionamento) ou "nao" (Voltar/Avançar) */
+  interface OpcoesNavegar { force?: boolean; select?: { tipo: string; id: string }; historico?: "empilhar" | "substituir" | "nao" }
+  interface ZoZoRouter { create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador; rotaDoEndereco(): string | null }
 
   /** js/components/feedback.ts — aviso (toast), janela modal e confirmação */
   /** importante: mostra mesmo uma confirmação (tone "success"), que normalmente não aparece */
@@ -428,13 +436,13 @@ declare global {
     reset(id: string): void;
   }
   interface CaptchaWidget { el: HTMLElement; token(): string; reset(): void }
-  interface ConfigCodigo { rotulo?: string; classe?: string; classeCaixa?: string; onCompleto?(codigo: string): void; onDigitar?(): void }
+  interface ConfigCodigo { rotulo?: string; classe?: string; classeCaixa?: string; backup?: boolean; onCompleto?(codigo: string): void; onDigitar?(): void }
   interface CampoCodigo6 {
-    el: HTMLElement; valor(): string; limpar(): void; foco(): void;
+    el: HTMLElement; valor(): string; completo(): boolean; limpar(): void; foco(): void;
     desabilitar(v: boolean): void; marcarErro(v: boolean): void;
   }
   interface ZoZoVerificacao {
-    Captcha(sitekey: string): CaptchaWidget;
+    Captcha(sitekey: string, acao: "cadastro" | "login"): CaptchaWidget;
     CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6;
     QR(texto: string, px?: number, rotulo?: string, margem?: number): SVGElement;
     protegerSenha(input: HTMLInputElement): HTMLInputElement;
@@ -468,7 +476,7 @@ declare global {
     Input(opts?: OpcoesEntrada): HTMLInputElement;
     Select(options: OpcaoLista[], opts?: OpcoesLista): HTMLSelectElement;
     Textarea(opts?: { class?: string; name?: string; rows?: number; placeholder?: string; ariaLabel?: string; value?: string }): HTMLTextAreaElement;
-    Toggle(label: string, opts?: { checked?: boolean; onChange?: (ligado: boolean) => void }): HTMLElement;
+    Toggle(label: string, opts?: { checked?: boolean; ariaLabel?: string; onChange?: (ligado: boolean) => void }): HTMLElement;
     Tag(nome: string | null | undefined, cor: unknown, opts?: { class?: string; placeholder?: string; onClick?: (e: MouseEvent) => void; title?: string }): HTMLElement | null;
     CategoryLabel(cat: CategoriaRotulo | null | undefined, opts?: { pill?: boolean; class?: string; vazio?: string }): HTMLElement | null;
     PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string; passivo?: boolean }): HTMLElement;
@@ -496,7 +504,7 @@ declare global {
   /** js/components/pecas.ts — classes montadas por função (variante do botão) */
   interface ZoZoPecasFn { botao(variante?: string, pequeno?: boolean, cheio?: boolean): string; botaoIcone(tom?: string, pequeno?: boolean): string }
 
-  /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
+  /** js/components/list.ts — linhas das listas (itens com os tipos de src/dados.d.ts) */
   interface ZoZoList {
     ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number; semMais?: boolean }): HTMLElement;
     LaunchRow(l: LancamentoTela, opts?: Record<string, unknown>): HTMLElement;
@@ -515,6 +523,8 @@ declare global {
   interface SerieGrafico { name?: string; color?: string; colorBySlope?: boolean; points: PontoGrafico[]; area?: boolean; tracejado?: boolean; pontos?: boolean }
   interface OpcoesGraficoLinha {
     height?: number; ariaLabel?: string; animar?: boolean; semEixo?: boolean; independentScale?: boolean;
+    /** datas do eixo inteiro (ex.: todos os dias do mês): séries mais curtas vão só até o seu último ponto */
+    eixo?: string[];
     formatValue?: (v: number) => string; rotuloX?: (p: PontoGrafico) => string; rotuloTooltip?: (p: PontoGrafico) => string;
     /** passar o mouse "filtra": data em cima do ponto, o resto esmaecido e quem chama atualiza o topo
         (pontos = o ponto de cada série no lugar do mouse; null = saiu do gráfico) */
@@ -592,7 +602,7 @@ declare global {
     /** Lê pelo estado (store.data[key]) ou pela ação que preenche a chave; o tipo vem de DadosEstado */
     loadData<K extends ChaveDados>(key: K, action: LeituraDaChave[K], payload?: unknown, opts?: { force?: boolean }): Promise<DadosEstado[K]>;
     invalidate(keys: string[]): void;
-    navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
+    navigate(id: string, opts?: OpcoesNavegar): void;
     abrirConfiguracoes(aba?: string): void;
     recarregarTudo(): Promise<unknown>;
     router: Roteador;
@@ -605,10 +615,15 @@ declare global {
   }
 
   /* ---------- Módulos das páginas (o que cada um expõe em window.ZoZo) ---------- */
-  /** js/data/servico.js (ainda em JavaScript): regras financeiras sobre o documento decifrado */
+  /** js/data/servico.ts: regras financeiras sobre o documento decifrado */
   interface ZoZoServico {
     /** a resposta é RespostaDe<ação> (quem chama pela ponte recebe o tipo certo: transporte.ts) */
     handle(action: string, data?: unknown): Promise<unknown>;
+    /**
+     * Várias gravações como UMA: o passo recebe exec(ação, dados), que roda leituras e gravações do serviço no mesmo
+     * documento, em sequência. Um erro em qualquer etapa desfaz todas e nada é gravado; no fim, uma gravação só.
+     */
+    lote<T>(passo: (exec: <K extends NomeAcao>(acao: K, dados?: unknown) => RespostaDe<K>) => T): Promise<T>;
     atende(action: string): boolean;
     reset(): void;
     FREQUENCIAS: Readonly<Record<string, { dias?: number; meses?: number; rotulo: string; texto: string }>>;
@@ -675,6 +690,8 @@ declare global {
   interface OpcoesCardContas {
     intervalo?: string; embedded?: boolean; compact?: boolean; filtros?: boolean; alturaGrafico?: number;
     chaveIntervalo?: string; rotuloFiltro?: string;
+    /** classes do gráfico (ex.: a margem negativa que o leva até a borda esquerda do card de quem embute) */
+    classeGrafico?: string;
   }
   interface OpcoesPainelConta { editandoCiclo?: boolean; voltar?: () => void }
   interface ZoZoContasShared {
@@ -722,7 +739,7 @@ declare global {
     | { tipo: "opcoes"; pergunta: string; opcoes: string[] }
     | { tipo: "arquivo" };
   /** Importar do banco (data/importar.ts): linhas com o valor COM SINAL, como vieram no arquivo */
-  interface LinhaImportada { data: string; descricao: string; valor: number }
+  interface LinhaImportada { data: string; descricao: string; valor: number; origemId?: string }
   interface ResultadoImportacao { formato: "csv" | "ofx"; cartao: boolean; itens: LinhaImportada[]; ignoradas: number }
   interface ZoZoImportar {
     ler(texto: string): ResultadoImportacao;
@@ -730,21 +747,41 @@ declare global {
     data(bruto: string): string | null;
     valor(bruto: string): number | null;
   }
-  interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string): Promise<ResultadoFerramentaZo>; nomes: string[] }
+  interface ZoZoZoFerramentasInstancia { executar(nome: string, argumentos: string, problemas?: string[]): Promise<ResultadoFerramentaZo>; nomes: string[] }
   /** Ações de tela que a janela do Zo entrega às ferramentas (nada aqui grava dados sem o serviço) */
   interface TelaZo {
     abrirFatura(o: { perfilId: string | null; cartaoId: string; mes: number; ano: number }): void;
     filtrar(filtros: Partial<FiltrosLancamentos>, busca: string): void;
-    abrirConfiguracoes(aba: "geral" | "conta"): void;
+    abrirConfiguracoes(aba: "geral" | "conta" | "seguranca"): void;
     exportar(): Promise<void>;
     sair(): void;
     seguranca(): Promise<{ doisFatores: boolean; protecaoAvancada: boolean }>;
+    /** Antes do que não tem volta: "ok" (2FA ligado ou biometria confirmada), "negado" ou "sem_metodo" (nem 2FA nem biometria) */
+    verificarIdentidade(): Promise<"ok" | "negado" | "sem_metodo">;
   }
-  interface OpcoesFerramentasZo { perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo }
+  /** aoGravar: gravação confirmada que pode ser desfeita (lixeira temporal; o marco vale só nesta aba) */
+  interface OpcoesFerramentasZo {
+    perfis(): boolean; fatura?(): boolean; cambio?(): boolean; tela?: TelaZo; aoGravar?(titulo: string, marco: string): void;
+    /** a conversa que preparou a confirmação ainda vale (nova conversa, sair ou retirar o consentimento: não grava) */
+    vigente?(): boolean;
+    /** gravações compostas numa só (padrão: ZoZo.servico.lote); os testes trocam para simular falhas */
+    lote?: ZoZoServico["lote"];
+  }
   interface ZoZoZoFerramentas { criar(req: PedidoZo, opcoes: OpcoesFerramentasZo): ZoZoZoFerramentasInstancia }
   interface ZoZoZo { montar(ctx: ContextoApp): void; abrir(): void; fechar(): void }
 
+  /** js/core/captura.ts — elemento da tela em PNG, sem biblioteca (fatura e páginas de Design) */
+  interface ZoZoCaptura {
+    png(el: HTMLElement, nomeArquivo: string, opts?: { fundo?: string; escala?: number; semSombra?: boolean }): Promise<void>;
+    baixar(conteudo: Blob, nomeArquivo: string): void;
+  }
+  interface ItemCatalogoTeste { secao: string; sub?: string; rotulo: string; tipo: "tela" | "painel" | "janela" | "menu" | "externo"; abrir(): unknown; conta?: boolean }
   interface ZoZoGlobal {
+    captura: ZoZoCaptura;
+    /** js/components/demonstracao.ts — conta demo: avisos e botão do painel (Alt + Shift + D) */
+    demonstracao: { avisos(): boolean; abrir(): void; aplicarPainel(): void };
+    /** páginas de Design (só modo teste, components/design.ts, carregado sob demanda) */
+    design?: { mostrar(secao: string, ctx: ContextoApp): Promise<void> };
     dom: ZoZoDom;
     notasVersao: readonly NotaVersao[];
     novidades: ZoZoNovidades;
@@ -757,9 +794,9 @@ declare global {
     format: ZoZoFormat;
     busca: ZoZoBusca;
     /** js/components/estrutura.ts — classes Tailwind do menu lateral, barra superior e painel */
-    estrutura: Readonly<Record<string, string>>;
+    estrutura: import("../js/components/estrutura.ts").ClassesEstrutura;
     /** js/components/pecas.ts — classes Tailwind das peças compartilhadas (ui.ts e afins) */
-    pecas: Readonly<Record<string, string>>;
+    pecas: import("../js/components/pecas.ts").ClassesPecas;
     pix: ZoZoPix;
     icons: ZoZoIcons;
     regras: ZoZoRegras;
@@ -791,7 +828,15 @@ declare global {
     /** js/core/simbolos.ts — "R$" e "%" menores e no alto do número */
     simbolos?: { realcar(raiz: Node): void };
     /** js/components/teste.ts — painel de testes (só existe com testeHost) */
-    teste?: { iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void; entrarSimulado(): Promise<unknown> }): void };
+    teste?: {
+      iniciar(ctx: ContextoApp, app: { tela(nome: string): void; entradaMudou(): void; sessaoExpirada(): void; entrarSimulado(): Promise<unknown> }): void;
+      /** tudo o que o painel abre (telas, painéis, janelas, menus, gráficos): o Design fotografa a mesma lista */
+      catalogo(ctx: ContextoApp): ItemCatalogoTeste[];
+      mostrarBotao(sim: boolean): void;
+      /** galerias do painel, também usadas pela página de Design › Elementos */
+      componentes(): HTMLElement;
+      graficos(): HTMLElement;
+    };
     servico: ZoZoServico;
     auth: ZoZoAuth;
     demo: ZoZoDemo;
@@ -803,7 +848,8 @@ declare global {
     perfilShared: ZoZoPerfilShared;
     recorrenciasShared: ZoZoRecorrenciasShared;
     usuario: { Avatar(foto: string | null | undefined, nome: string | undefined, tamanho?: number): HTMLElement };
-    exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): void;
+    /** true = o download foi pedido ao navegador; false = falhou (o aviso de erro já apareceu) */
+    exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): Promise<boolean>;
     configuracoes: { abrir(ctx: ContextoApp, aba?: string): void; desativar2FA(ctx: ContextoApp): void };
     emojiPicker: ZoZoEmojiPicker;
     /** contexto da interface (app.ts), para depuração e para os módulos que não o recebem por parâmetro */

@@ -44,6 +44,8 @@ declare global {
     debitado?: { contaId: Id; valor: number };          // formato anterior (2.8–3.1)
     /** Formato anterior do "Pagar fatura" (débito na conta + receita no cartão): convertido para o tipo "fatura" ao abrir */
     pagamentoCartao?: boolean;
+    /** Identificador da transação no extrato do banco (FITID do OFX): reimportar o mesmo extrato não duplica */
+    origemId?: string;
     /** Pagamento de fatura (tipo "fatura"): as duas transações têm o mesmo grupo; "pagante" aparece em Transações, "cartao" não */
     pagamento?: { grupo: Id; lado: "pagante" | "cartao" };
     /** Receita que quita a fatura de um perfil: o mês ("AAAA-MM") da fatura paga (o perfil é o do lançamento) */
@@ -124,17 +126,26 @@ declare global {
     gastoMensal: { mes: string; dias: Array<{ data: string; valor: number }>; total: number; orcamento: number; ultimoDia: number };
     contas: RespostaContas; categorias: RespostaCategorias; recorrencias: RespostaRecorrencias; ultimosLancamentos: LancamentoTela[];
   }
-  /** todos: perfil "Todos"; cartaoId: o cartão escolhido (null = todos); consulta: sem ajustes, recebidos, saldo anterior e Pix */
+  /**
+   * todos: perfil "Todos"; cartaoId: a conta escolhida (null = todas); consulta: sem ajustes, recebidos, saldo anterior e Pix;
+   * incluirAberto: faturas de cartão em aberto entraram (até hoje); dia11: a conta usa a regra "até o dia 11 do mês seguinte".
+   * periodos: uma linha por faixa de cada conta (aberta: o fechamento ainda não passou).
+   */
   interface RespostaFatura {
     perfil: Perfil | null; todos: boolean; cartaoId: Id | null; consulta: boolean; mes: string; moeda: Moeda;
+    incluirAberto: boolean; hoje: string; dia11: boolean;
     lancamentos: LancamentoTela[];
     ajustes: FaturaGuardada;
-    periodos: Array<{ contaId: Id; nome: string; ultimos4Digitos: string; inicio: string; fim: string; semFechamento: boolean }>;
+    periodos: Array<{ contaId: Id; nome: string; ultimos4Digitos: string; inicio: string; fim: string; semFechamento: boolean; aberta: boolean; emprestimo: boolean }>;
     recebimentos: LancamentoTela[]; saldoAnterior: number; pix: ChavePix | null;
   }
 
   /** Leituras do serviço → resposta (o serviço é conferido contra esta tabela) */
   interface RespostasLeitura {
+    /** lixeira temporal do Zo: cópias do documento antes e depois de cada gravação (só na memória da aba) */
+    abrirMarco: { marco: string };
+    fecharMarco: { fechado: boolean };
+    descartarMarcos: { descartados: boolean };
     getLancamentos: RespostaLancamentos;
     getLancamentosOutrasMoedas: { moeda: Moeda; lancamentos: Array<{ id: Id; data: string; descricao: string; valor: number; moeda: Moeda; tipo: string; recorrencia: string | null }> };
     getContas: RespostaContas;
@@ -158,18 +169,19 @@ declare global {
     | "getSession" | "registerUser" | "reenviarConfirmacao" | "conferirLink" | "pedirRecuperacao" | "abrirRecuperacao" | "concluirRecuperacao"
     | "getProtecao" | "setProtecao" | "repararRecuperacao" | "zoConsentimento" | "zoConversar" | "login" | "verificar2FA" | "logout" | "getArmazenamento" | "getGoogle" | "verificarAtualizacao"
     | "createLancamento" | "updateLancamento" | "deleteLancamento" | "updateUser" | "changePassword" | "wipeUserData" | "deleteUser"
-    | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "loadUserData" | "saveUserData"
+    | "iniciar2FA" | "confirmar2FA" | "desativar2FA" | "statusCodigosBackup" | "gerarCodigosBackup" | "biometriaDisponivel" | "listarBiometrias" | "registrarBiometria" | "removerBiometria" | "confirmarBiometria" | "loadUserData" | "saveUserData"
     | "createConta" | "updateConta" | "updateCicloCartao" | "deleteConta"
     | "createCategoria" | "updateCategoria" | "deleteCategoria" | "createCategoriasSugeridas"
     | "createPerfil" | "updatePerfil" | "deletePerfil" | "arquivarPerfil"
     | "updateLancamentosEmLote" | "deleteLancamentos" | "updateConfig"
     | "pagarRecorrencia" | "encerrarRecorrencia" | "excluirRecorrencia" | "tornarRecorrente" | "vincularRecorrencia" | "desvincularRecorrencia"
     | "dividirLancamento" | "pagarFatura" | "salvarFatura" | "receberFatura" | "importarLancamentos"
-    | "updateGrupo" | "desagruparCategorias" | "transferirMoeda";
+    | "updateGrupo" | "desagruparCategorias" | "transferirMoeda" | "desfazerMarco";
   /* ---------------- sessão e conta (host-web.ts, conferido contra esta tabela) ---------------- */
   /* ---------------- Zo, o assistente ---------------- */
   /** Chamada de ferramenta escolhida pelo Zo (argumentos em JSON, conferidos no navegador antes de usar) */
-  interface ChamadaZo { id: string; nome: string; argumentos: string }
+  /** problemas: argumentos fora do esquema (o servidor marca; o navegador não executa e devolve ao modelo) */
+  interface ChamadaZo { id: string; nome: string; argumentos: string; problemas?: string[] }
   interface RespostaZo { texto: string | null; chamadas: ChamadaZo[] }
   /** Uma mensagem da conversa como a API recebe (sem papel de sistema: as instruções ficam no servidor) */
   type MensagemZo = { papel: "usuario"; texto: string } | { papel: "assistente"; texto: string | null; chamadas: ChamadaZo[] }
@@ -177,6 +189,8 @@ declare global {
   /** Por que a recuperação não traz os dados: escolha da pessoa, cópia ainda não guardada, cópia que não abre, dados ilegíveis */
   type MotivoRecuperacao = "avancada" | "sem_copia" | "copia_invalida" | "dados_ilegiveis";
   /** Sessão como a interface a recebe; doisFatores sem authenticated = falta o código do 2FA */
+  /** Biometria ou chave de acesso cadastrada (só o nome e as datas; a chave pública fica no servidor) */
+  interface BiometriaTela { id: string; nome: string; prf: boolean; criadoEm: string | null; usadoEm: string | null }
   interface RespostaSessao { authenticated: boolean; user?: UsuarioSessao | null; email?: string; doisFatores?: boolean }
   interface RespostasHost {
     getArmazenamento: { available: boolean; turnstile?: string | null; google?: boolean; desafio?: boolean };
@@ -206,17 +220,28 @@ declare global {
     /** documento decifrado (o serviço confere tudo em normalizar); aviso: restaurado da cópia, documento sumido… */
     loadUserData: { documento: unknown; aviso: string | null; somenteLeitura?: boolean };
     saveUserData: { salvo: boolean };
-    /** recuperacaoPendente: a senha mudou, mas a cópia nova da chave não foi guardada (Configurações › Conta repara) */
+    /** recuperacaoPendente: a senha mudou, mas a cópia nova da chave não foi guardada (Configurações › Segurança repara) */
     changePassword: { alterada: boolean; recuperacaoPendente?: boolean };
     updateUser: RespostaSessao;
     wipeUserData: { apagado: boolean };
     deleteUser: { excluido: boolean };
     iniciar2FA: { chave: string; uri: string };
-    confirmar2FA: RespostaSessao;
+    /** codigosBackup: os dez códigos de uso único, mostrados só nesta resposta */
+    confirmar2FA: RespostaSessao & { codigosBackup?: string[] };
     desativar2FA: RespostaSessao;
+    statusCodigosBackup: { restantes: number };
+    gerarCodigosBackup: { codigosBackup: string[] };
+    /** plataforma: o próprio aparelho tem biometria ou PIN (Windows Hello, Touch ID, desbloqueio do celular) */
+    biometriaDisponivel: { disponivel: boolean; plataforma: boolean };
+    listarBiometrias: { chaves: BiometriaTela[] };
+    registrarBiometria: { nome: string };
+    removerBiometria: { removida: boolean };
+    confirmarBiometria: { confirmado: boolean };
   }
   /** Gravações do serviço → resposta (o serviço é conferido contra esta tabela) */
   interface RespostasEscrita {
+    /** desfeitas: o que voltou; conflitos: o que foi mexido depois e ficou como está */
+    desfazerMarco: { desfeitas: number; conflitos: number };
     createLancamento: { lancamento: LancamentoTela };
     updateLancamento: { lancamento: LancamentoTela };
     deleteLancamento: { id: Id };

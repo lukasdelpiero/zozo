@@ -47,6 +47,10 @@
   const PASSIVOS: readonly string[] = ["cartao", "emprestimo"];
   /** Contas de onde sai o pagamento da fatura (investimento, empréstimo e cartão não) */
   const CONTAS_PAGAMENTO: readonly string[] = ["corrente", "poupanca", "outros"];
+  // Recorrência: só despesa e débito (e o que já foi recorrente, de série desfeita). As ocorrências contam como gasto.
+  const TIPOS_RECORRIVEIS: readonly string[] = ["regular", "debito", "recorrente"];
+  // Tipos que ENTRAM na conta (o resto sai; transferência pelo sentido)
+  const ENTRADAS: readonly string[] = ["receita", "estorno"];
 
   // Documento do usuário em memória. Antes de carregar (ou depois de descartado) fica vazio e temDoc = false:
   // toda ação passa por garantirCarregado antes de ler ou mudar o documento.
@@ -70,6 +74,8 @@
   const boletoLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.boleto());
   const ehDemo = () => !!(ZoZo.recursos && ZoZo.recursos.demo());
   const cambioLiberado = () => !!(ZoZo.recursos && ZoZo.recursos.cambio && ZoZo.recursos.cambio());
+  /** Fatura "até o dia 11 do mês seguinte" (contas liberadas no servidor: RECURSOS_FATURA_DIA11) */
+  const faturaDia11 = () => !!(ZoZo.recursos && ZoZo.recursos.faturaDia11 && ZoZo.recursos.faturaDia11());
   function exigir(liberado: boolean) { if (!liberado) throw erro("FEATURE_UNAVAILABLE"); }
   /** Demonstração: além do que foi gerado, só 1 perfil, conta, cartão, categoria, lançamento e recorrência */
   const LIMITE_DEMO = 1;
@@ -292,7 +298,90 @@
     return exec;
   }
 
-  function reset() { esquecer(); carregando = null; fila = Promise.resolve(); aplicadas = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; }
+  function reset() { esquecer(); carregando = null; fila = Promise.resolve(); aplicadas = Promise.resolve(); criadosDemo = {}; somenteLeitura = false; motivoBloqueio = "DOCUMENT_MISSING_LOCKED"; marcos.clear(); }
+
+  /* ---------------- Lixeira temporal (Zo) ----------------
+     Antes e depois de cada gravação confirmada no Zo, uma cópia do documento fica SÓ na memória desta aba (some ao sair,
+     ao trocar de conta, na nova conversa e por inatividade: LGPD). Desfazer aplica o inverso só do que aquela gravação
+     mudou, e só onde o dado continua como ela deixou: o que foi mexido depois fica como está e conta como conflito.
+     Saldo: segue pelas anotações de efeito (reverter o atual; sincronizarSaldos aplica o antigo), nunca copiando o saldo. */
+  type Marco = { antes: Documento; depois: Documento | null };
+  const marcos = new Map<string, Marco>();
+  const MAX_MARCOS = 30;
+  const MAX_MARCOS_GRANDE = 10;
+  const igual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const semEfeito = (l: Lancamento): Lancamento => { const x = clone(l); delete x.efeito; return x; };
+  const semHistorico = (c: Conta) => { const x: Partial<Conta> = Object.assign({}, c); delete x.historico; return x; };
+
+  /** Inverso de uma lista com id: tira o que a gravação criou, devolve o que ela tirou, volta o que ela mudou */
+  function inverterLista<T extends { id: Id }>(atuais: T[], antes: T[], depois: T[], o: {
+    mesmo(a: T, b: T): boolean; podeTirar?(x: T): boolean; aoTirar?(x: T): void; devolver(x: T): T; voltar(atual: T, velho: T): T;
+  }): { lista: T[]; feitas: number; conflitos: number } {
+    const A = new Map(antes.map((x) => [x.id, x] as const)), B = new Map(depois.map((x) => [x.id, x] as const));
+    let lista = atuais.slice(), feitas = 0, conflitos = 0;
+    B.forEach((b, id) => {
+      const a = A.get(id), i = lista.findIndex((x) => x.id === id);
+      if (a && o.mesmo(a, b)) return;                                     // a gravação não mexeu
+      if (!a) {                                                           // criado pela gravação
+        if (i < 0) return;                                                // já não existe: nada a desfazer
+        if (!o.mesmo(lista[i], b) || (o.podeTirar && !o.podeTirar(lista[i]))) { conflitos += 1; return; }
+        if (o.aoTirar) o.aoTirar(lista[i]);
+        lista.splice(i, 1); feitas += 1; return;
+      }
+      if (i < 0 || !o.mesmo(lista[i], b)) { conflitos += 1; return; }    // mudado depois (ou apagado): fica como está
+      lista[i] = o.voltar(lista[i], a); feitas += 1;
+    });
+    A.forEach((a, id) => {
+      if (B.has(id)) return;                                              // apagado pela gravação
+      if (lista.some((x) => x.id === id)) { conflitos += 1; return; }
+      const pos = Math.min(antes.findIndex((x) => x.id === id), lista.length);
+      lista = lista.slice(0, pos).concat([o.devolver(a)], lista.slice(pos)); feitas += 1;
+    });
+    return { lista, feitas, conflitos };
+  }
+  /** Inverso de um registro por chave (grupos, faturas) e da configuração */
+  function inverterRegistro<T>(atual: Record<string, T>, antes: Record<string, T>, depois: Record<string, T>) {
+    const r = Object.assign({}, atual);
+    let feitas = 0, conflitos = 0;
+    new Set(Object.keys(antes).concat(Object.keys(depois))).forEach((k) => {
+      const a = antes[k], b = depois[k];
+      if (igual(a, b)) return;
+      if (!igual(r[k], b)) { conflitos += 1; return; }
+      if (a === undefined) delete r[k]; else r[k] = clone(a);
+      feitas += 1;
+    });
+    return { registro: r, feitas, conflitos };
+  }
+  function desfazerMarco(m: Marco & { depois: Documento }): { desfeitas: number; conflitos: number } {
+    let feitas = 0, conflitos = 0;
+    const somar = (r: { feitas: number; conflitos: number }) => { feitas += r.feitas; conflitos += r.conflitos; };
+    // 1) transações primeiro (assim as contas, categorias e perfis criados ficam livres para sair)
+    const l = inverterLista(doc.lancamentos, m.antes.lancamentos, m.depois.lancamentos, {
+      mesmo: (a, b) => igual(semEfeito(a), semEfeito(b)),
+      aoTirar: (x) => { reverterEfeito(x); },
+      devolver: (x) => semEfeito(x),
+      voltar: (atual, velho) => { reverterEfeito(atual); return semEfeito(velho); },
+    });
+    doc.lancamentos = l.lista; somar(l);
+    const usado = (campo: "contaId" | "categoriaId" | "perfilId") => (x: { id: Id }) => !doc.lancamentos.some((y) => y[campo] === x.id);
+    const c = inverterLista<Conta>(doc.contas, m.antes.contas, m.depois.contas, {
+      mesmo: (a, b) => igual(semHistorico(a), semHistorico(b)), podeTirar: usado("contaId"),
+      devolver: (x) => clone(x), voltar: (atual, velho) => Object.assign(clone(velho), { historico: atual.historico }),
+    });
+    doc.contas = c.lista; somar(c);
+    const k = inverterLista<Categoria>(doc.categorias, m.antes.categorias, m.depois.categorias, { mesmo: igual, podeTirar: usado("categoriaId"), devolver: (x) => clone(x), voltar: (_a, v) => clone(v) });
+    doc.categorias = k.lista; somar(k);
+    const p = inverterLista<Perfil>(doc.perfis, m.antes.perfis, m.depois.perfis, { mesmo: igual, podeTirar: usado("perfilId"), devolver: (x) => clone(x), voltar: (_a, v) => clone(v) });
+    doc.perfis = p.lista; somar(p);
+    const g = inverterRegistro(doc.grupos, m.antes.grupos, m.depois.grupos);
+    doc.grupos = g.registro; somar(g);
+    const f = inverterRegistro(doc.faturas, m.antes.faturas, m.depois.faturas);
+    doc.faturas = f.registro; somar(f);
+    if (!igual(m.antes.config, m.depois.config)) {
+      if (igual(doc.config, m.depois.config)) { doc.config = clone(m.antes.config); feitas += 1; } else conflitos += 1;
+    }
+    return { desfeitas: feitas, conflitos };
+  }
   const gravando = () => pendentes > 0;
   /** Outro dispositivo gravou: esquece o documento (a próxima leitura baixa a versão nova). Nunca com gravação pendente. */
   function recarregarDoServidor() {
@@ -875,6 +964,29 @@
   const A = M.ACTIONS;
   // cada leitura devolve exatamente o tipo de ui/src/dados.d.ts (RespostasLeitura): o compilador confere
   const LEITURAS: { readonly [K in NomeLeitura]: (d: Dados) => RespostasLeitura[K] } = {
+    /** Lixeira temporal: guarda o documento antes de uma gravação do Zo (o id é só desta aba) */
+    [A.abrirMarco]: () => {
+      const id = novoId("m");
+      const antes = clone(doc);
+      marcos.set(id, { antes, depois: null });
+      // memória: cada marco guarda duas cópias do documento inteiro; documento grande (mais de 1 milhão de caracteres,
+      // milhares de transações) guarda só os 10 últimos marcos
+      const limite = JSON.stringify(antes).length > 1_000_000 ? MAX_MARCOS_GRANDE : MAX_MARCOS;
+      while (marcos.size > limite) marcos.delete(marcos.keys().next().value as string);
+      return { marco: id };
+    },
+    /** ...e depois dela (sem o "depois", não há o que desfazer) */
+    [A.fecharMarco]: (d) => {
+      const m = marcos.get(String(d.marco || ""));
+      if (!m || m.depois) throw erro("OPERATION_FAILED");
+      m.depois = clone(doc);
+      return { fechado: true };
+    },
+    /** Um marco (gravação que falhou) ou todos (fim da conversa, inatividade) */
+    [A.descartarMarcos]: (d) => {
+      if (d.marco) marcos.delete(String(d.marco)); else marcos.clear();
+      return { descartados: true };
+    },
     [A.getLancamentos]: getLancamentos,
     /** Multicâmbio: transações das OUTRAS moedas, para trazer para a moeda escolhida (lê o documento inteiro) */
     [A.getLancamentosOutrasMoedas]: () => {
@@ -1012,10 +1124,10 @@
       };
     },
     /**
-     * Fatura (cobrança): transações de cartão de crédito de um perfil (ou de todos, "todos") num cartão (ou em todos),
-     * o período de cada cartão e, só com UM perfil e todos os cartões, os ajustes guardados, os pagamentos recebidos,
-     * o saldo anterior e o Pix (guardados por perfil e mês). Com Todos ou um cartão escolhido é só consulta
-     * (regras em cobrancaDoMes / saldoAnterior).
+     * Fatura (cobrança): transações de cartão de crédito (faturas fechadas; as em aberto só com incluirAberto, até hoje)
+     * e de empréstimos de um perfil (ou de todos, "todos") numa dessas contas (ou em todas), o período de cada conta e,
+     * só com UM perfil e todas as contas, os ajustes guardados, os pagamentos recebidos, o saldo anterior e o Pix
+     * (guardados por perfil e mês). Com Todos ou um cartão escolhido é só consulta (regras em faixasDaConta / cobrancaDoMes).
      */
     [A.getBoletoData]: (d) => {
       exigir(boletoLiberado() && avancado());
@@ -1024,26 +1136,34 @@
       const perfil = todos ? null : doc.perfis.find((p) => p.id === d.perfilId) || null;
       let cartaoId: Id | null = null;
       if (d.cartaoId !== undefined && d.cartaoId !== null && d.cartaoId !== "" && d.cartaoId !== TODOS) {
-        const c = doc.contas.find((x) => x.id === d.cartaoId && x.tipo === "cartao");
+        const c = doc.contas.find((x) => x.id === d.cartaoId && PASSIVOS.includes(x.tipo));
         if (!c) throw erro("OPERATION_FAILED");
         cartaoId = c.id;
       }
       const consulta = todos || !!cartaoId;
-      const itens = perfil || todos ? cobrancaDoMes(perfil ? perfil.id : null, mes, cartaoId) : [];
+      if (d.incluirAberto !== undefined && typeof d.incluirAberto !== "boolean") throw erro("OPERATION_FAILED");
+      const incluirAberto = d.incluirAberto === true, hoje = hojeIso();
+      const itens = perfil || todos ? cobrancaDoMes(perfil ? perfil.id : null, mes, cartaoId, incluirAberto) : [];
       const guardada = perfil && !consulta ? doc.faturas[perfil.id + "|" + mes] : undefined;
       const ajustes = { contribuicoes: guardada ? guardada.contribuicoes : [], descontos: guardada ? guardada.descontos : [], arredondamentos: guardada ? guardada.arredondamentos : [] };
-      // período de cada cartão que aparece na fatura (do dia seguinte ao fechamento anterior até o dia do fechamento)
-      const periodos = doc.contas.filter((c) => c.tipo === "cartao" && (c.id === cartaoId || itens.some((l) => l.contaId === c.id))).map((c) => {
-        const f = faixaDoCartao(c, mes);
-        return { contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f ? f.inicio : mes + "-01", fim: f ? diaAnterior(f.fim) : dataNoMes(mes, 31), semFechamento: !f };
-      });
+      // período de cada conta da fatura (faixasDaConta): a escolhida, as que entraram e as que têm algo numa fatura em
+      // aberto deixada de fora (para a pessoa saber que existe). aberta: o fechamento ainda não passou.
+      const doPerfil = (l: Lancamento) => (perfil ? l.perfilId === perfil.id : todos) && !l.valorInvalido;
+      const periodos = doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (!cartaoId || c.id === cartaoId) && (perfil || moedaDe(c) === moedaAtual()))
+        .flatMap((c) => {
+          const faixas = faixasDaConta(c, mes, hoje);
+          const tem = c.id === cartaoId || doc.lancamentos.some((l) => l.contaId === c.id && doPerfil(l) && !pagamentoDoCartao(l, c)
+            && faixas.some((f) => l.data >= f.inicio && l.data < f.fim));
+          return tem ? faixas.map((f) => ({ contaId: c.id, nome: c.nome, ultimos4Digitos: c.ultimos4Digitos || "", inicio: f.inicio, fim: diaAnterior(f.fim),
+            semFechamento: f.semFechamento, aberta: f.aberta, emprestimo: c.tipo === "emprestimo" })) : [];
+        });
       const cheia = !!perfil && !consulta;
       return {
-        perfil, todos, cartaoId, consulta, mes, moeda: moedaAtual(),
+        perfil, todos, cartaoId, consulta, mes, moeda: moedaAtual(), incluirAberto, hoje, dia11: faturaDia11(),
         lancamentos: itens.map(enriquecer),
         ajustes, periodos,
         recebimentos: cheia && perfil ? recebimentosDoMes(perfil.id, mes).map(enriquecer) : [],
-        saldoAnterior: cheia && perfil ? saldoAnterior(perfil.id, mes) : 0,
+        saldoAnterior: cheia && perfil ? saldoAnterior(perfil.id, mes, incluirAberto) : 0,
         // Pix da fatura: chave e nome do recebedor guardados no documento cifrado
         pix: cheia && pixLiberado() && moedaAtual() === "BRL" && doc.config.pix ? Object.assign({}, doc.config.pix) : null,
       };
@@ -1057,9 +1177,9 @@
   const PALAVRAS_COMUNS = new Set(["compra", "pagamento", "parcela", "parcelado", "debito", "credito", "cartao", "pix", "transferencia", "com", "para", "das", "dos", "ltda"]);
 
   /* ---------------- Fatura de perfis (cobrança) ----------------
-     • Entram as transações do perfil (ou de todos) em cartão de crédito (empréstimo não). Cartão com fechamento: as
-       compras do dia seguinte ao fechamento anterior até o dia do fechamento do mês, inclusive; sem fechamento, o mês
-       do calendário.
+     • Entram as transações do perfil (ou de todos) em cartão de crédito e em empréstimo (faixas em faixasDaConta).
+       Cartão: fatura FECHADA (o dia do fechamento já passou) entra inteira; fatura EM ABERTO só com "Incluir valores
+       em aberto", e então só o que tem data até hoje. Empréstimo: sempre, inclusive vencimentos futuros da faixa.
      • Pagar o CARTÃO (o par do tipo Fatura, o formato antigo e a transferência de entrada no cartão) é você pagando o
        banco: não aparece nem abate a cobrança do perfil. O que abate são os pagamentos RECEBIDOS do perfil (receberFatura).
      • Saldo anterior: a partir da 1ª fatura com pagamento registrado, o que ficou em aberto (ou pago a mais)
@@ -1089,28 +1209,51 @@
   }
   // pagamento do cartão gravado antes da marca pagamentoCartao (3.17 e anteriores): o texto que o "Pagar fatura" gerava
   const PAGAMENTO_ANTIGO = "Pagamento da fatura do cartão de crédito ";
-  /** Pagamento ou crédito no cartão, nunca um gasto: Fatura, transferência de entrada e qualquer Receita (inclusive o
-   *  pagamento lançado à mão como Receita). Estorno não entra aqui: devolução de compra continua abatendo a fatura. */
+  /** Pagamento ou crédito no cartão ou no empréstimo, nunca um gasto: Fatura, transferência de entrada e qualquer
+   *  Receita (inclusive o pagamento lançado à mão como Receita). Estorno não entra aqui: devolução de compra continua
+   *  abatendo a fatura. */
   function pagamentoDoCartao(l: Lancamento, conta: Conta): boolean {
     if (l.tipo === "fatura") return true;
-    if (conta.tipo !== "cartao") return false;
+    if (!PASSIVOS.includes(conta.tipo)) return false;
     if (l.tipo === "interno") return l.sentido === "entrada";
     return l.tipo === "receita";
   }
   /**
-   * Transações cobradas na fatura do mês, em ordem de data: só cartão de crédito. perfilId null = todos os perfis
-   * (inclusive as compras sem perfil, nos cartões da moeda atual); cartaoId null = todos os cartões.
+   * Faixas [inicio, fim) de uma conta na fatura do mês:
+   *  • cartão: o ciclo do mês (do dia seguinte ao fechamento anterior até o fechamento); sem fechamento, o mês do
+   *    calendário. aberta = o dia do fechamento ainda não passou (no próprio dia, a fatura ainda recebe compras);
+   *  • empréstimo: o mês do calendário, inclusive vencimentos futuros (nunca "em aberto");
+   *  • regra do dia 11 (faturaDia11): a fatura do mês M leva o que fecha ou vence de 12/M a 11/(M+1). No cartão, cada
+   *    ciclo cujo fechamento cai nessa janela (dois, se o fechamento mudar de um mês para o outro; nenhum, se não cair).
+   *    Cada fechamento e cada vencimento pertence a uma fatura só: nada é cobrado duas vezes.
    */
-  function cobrancaDoMes(perfilId: Id | null, mes: string, cartaoId: Id | null = null): Lancamento[] {
-    const contas = new Map(doc.contas.filter((c) => c.tipo === "cartao" && (!cartaoId || c.id === cartaoId)
+  type FaixaFatura = { inicio: string; fim: string; aberta: boolean; semFechamento: boolean };
+  function faixasDaConta(c: Conta, mes: string, hoje: string): FaixaFatura[] {
+    const dia11 = faturaDia11();
+    const calendario = dia11 ? { inicio: mes + "-12", fim: somarMes(mes, 1) + "-12" } : { inicio: mes + "-01", fim: somarMes(mes, 1) + "-01" };
+    if (c.tipo === "emprestimo") return [Object.assign({ aberta: false, semFechamento: false }, calendario)];
+    const ciclos = (dia11 ? [mes, somarMes(mes, 1)] : [mes]).map((m) => faixaDoCartao(c, m));
+    if (ciclos.every((f) => !f)) return [Object.assign({ aberta: hoje < calendario.fim, semFechamento: true }, calendario)];
+    return ciclos.filter((f): f is { inicio: string; fim: string } => !!f)
+      .filter((f) => !dia11 || (f.fim > calendario.inicio && f.fim <= calendario.fim))      // fechamento (fim − 1 dia) na janela
+      .map((f) => ({ inicio: f.inicio, fim: f.fim, aberta: hoje < f.fim, semFechamento: false }));
+  }
+  /**
+   * Transações cobradas na fatura do mês, em ordem de data: cartão de crédito e empréstimo. perfilId null = todos os
+   * perfis (inclusive as compras sem perfil, nas contas da moeda atual); cartaoId null = todos os cartões e empréstimos.
+   * Fatura de cartão em aberto: só com incluirAberto, e só até hoje.
+   */
+  function cobrancaDoMes(perfilId: Id | null, mes: string, cartaoId: Id | null = null, incluirAberto = false): Lancamento[] {
+    const contas = new Map(doc.contas.filter((c) => PASSIVOS.includes(c.tipo) && (!cartaoId || c.id === cartaoId)
       && (perfilId || moedaDe(c) === moedaAtual())).map((c) => [c.id, c] as const));
-    const faixas = new Map<Id, { inicio: string; fim: string } | null>();
+    const hoje = hojeIso();
+    const faixas = new Map<Id, FaixaFatura[]>();
     return doc.lancamentos.filter((l) => {
       const c = (perfilId === null || l.perfilId === perfilId) && !l.valorInvalido && l.contaId ? contas.get(l.contaId) : undefined;
       if (!c || pagamentoDoCartao(l, c)) return false;
-      if (!faixas.has(c.id)) faixas.set(c.id, faixaDoCartao(c, mes));
-      const f = faixas.get(c.id);
-      return f ? l.data >= f.inicio && l.data < f.fim : l.data.startsWith(mes);
+      if (!faixas.has(c.id)) faixas.set(c.id, faixasDaConta(c, mes, hoje));
+      const f = (faixas.get(c.id) as FaixaFatura[]).find((x) => l.data >= x.inicio && l.data < x.fim);
+      return !!f && (!f.aberta || (incluirAberto && l.data <= hoje));
     }).sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
   }
   /** Pagamentos recebidos do perfil para a fatura do mês */
@@ -1136,13 +1279,13 @@
   }
   const somaRecebida = (lista: Lancamento[]) => lista.reduce((s, l) => s + centavos(l.valor), 0) / 100;
   /** O que ficou em aberto (positivo) ou pago a mais (negativo) nas faturas anteriores, desde a 1ª com pagamento registrado */
-  function saldoAnterior(perfilId: Id, mes: string): number {
+  function saldoAnterior(perfilId: Id, mes: string, incluirAberto = false): number {
     const meses = doc.lancamentos.filter((l) => l.tipo === "receita" && l.perfilId === perfilId && mesFaturaValido(l.faturaPerfil)).map((l) => l.faturaPerfil as string).sort();
     if (!meses.length || meses[0] >= mes) return 0;
     let saldo = 0;
     for (let k = meses[0], n = 0; k < mes && n < 1200; k = somarMes(k, 1), n++) {
       const g = doc.faturas[perfilId + "|" + k];
-      const t = calcularFatura(Object.assign({ lancamentos: cobrancaDoMes(perfilId, k) }, g || {}));
+      const t = calcularFatura(Object.assign({ lancamentos: cobrancaDoMes(perfilId, k, null, incluirAberto) }, g || {}));
       saldo += centavos(t.total) - centavos(somaRecebida(recebimentosDoMes(perfilId, k)));
     }
     return saldo / 100;
@@ -1194,6 +1337,14 @@
 
   // cada gravação devolve exatamente RespostasEscrita[ação] (ui/src/dados.d.ts): o compilador confere
   const ESCRITAS: { readonly [K in NomeEscrita]: (d: Dados) => RespostasEscrita[K] } = {
+    /** Desfazer uma gravação do Zo (lixeira temporal). Só uma vez: o marco sai da lixeira. */
+    [A.desfazerMarco]: (d) => {
+      const id = String(d.marco || ""), m = marcos.get(id);
+      if (!m || !m.depois) throw erro("UNDO_UNAVAILABLE");
+      const r = desfazerMarco(m as Marco & { depois: Documento });
+      marcos.delete(id);
+      return r;
+    },
     /* Lançamentos */
     [A.createLancamento]: (d) => {
       const tipo = d.lancamento && d.lancamento.tipo === "recorrente" ? "recorrencia" : "lancamento";
@@ -1209,7 +1360,8 @@
       if (i < 0) throw erro("OPERATION_FAILED");
       const antigo = doc.lancamentos[i];
       if (antigo.tipo === "fatura") return { lancamento: enriquecer(editarPagamentoFatura(antigo, objeto(d.lancamento) ? d.lancamento : {})) };
-      const novo = Object.assign({ id: d.id }, lerLancamento(d.lancamento, antigo));
+      const novo: Lancamento = Object.assign({ id: d.id }, lerLancamento(d.lancamento, antigo));
+      if (antigo.origemId) novo.origemId = antigo.origemId;               // editar não faz a reimportação duplicar
       const divisaoAntiga = antigo.divisao;
       if (divisaoAntiga) {
         novo.divisao = divisaoAntiga;
@@ -1272,6 +1424,9 @@
       conferirLimiteDemo("recorrencia");
       const l = doc.lancamentos.find((x) => x.id === d.id);
       if (!l || l.tipo === "fatura" || (l.serieId && l.serieId !== l.id && !String(l.serieId).startsWith("removida:"))) throw erro("OPERATION_FAILED");
+      // a série gera ocorrências do tipo "recorrente", que contam como gasto: receita, estorno e transferência
+      // perderiam a natureza (uma receita mensal viraria despesa). Só despesa e débito repetem.
+      if (!TIPOS_RECORRIVEIS.includes(l.tipo)) throw erro("RECURRENCE_TYPE");
       const rec = recorrenciaValida(d.recorrencia);
       let pa = null, pt = null;
       if (rec === "parcelada") {
@@ -1446,18 +1601,32 @@
       const itens: Dados[] = Array.isArray(d.itens) ? d.itens : [];
       if (!itens.length || itens.length > 500) throw erro("IMPORT_INVALID");
       const permitidos = conta.tipo === "cartao" ? ["regular", "estorno"] : ["debito", "receita"];
-      const chave = (data: string, valor: number, descricao: string) => data + "|" + Math.round(valor * 100) + "|" + chaveDescricao(descricao);
-      const existentes = new Map<string, number>();
-      doc.lancamentos.forEach((l) => { if (l.contaId === conta.id) { const k = chave(l.data, l.valor, l.descricao); existentes.set(k, (existentes.get(k) || 0) + 1); } });
+      // repetido = mesmo sentido (entrada ou saída), data, valor e descrição: uma receita não some por ter o mesmo
+      // nome e valor de um débito. Com o identificador do banco (FITID do OFX), vale ele.
+      const chave = (l: { data: string; valor: number; descricao: string; tipo: string; sentido?: Sentido | null }) =>
+        (ENTRADAS.includes(l.tipo) || (l.tipo === "interno" && l.sentido === "entrada") ? "e" : "s") + "|" + l.data + "|" + Math.round(l.valor * 100) + "|" + chaveDescricao(l.descricao);
+      const existentes = new Map<string, number>(), origens = new Set<string>();
+      doc.lancamentos.forEach((l) => {
+        if (l.contaId !== conta.id) return;
+        const k = chave(l); existentes.set(k, (existentes.get(k) || 0) + 1);
+        if (l.origemId) origens.add(l.origemId);
+      });
       // tudo é conferido ANTES de gravar qualquer coisa: um item ruim recusa o arquivo inteiro
       const novos: Lancamento[] = [];
       let repetidos = 0;
       itens.forEach((it) => {
         if (!objeto(it) || !permitidos.includes(it.tipo)) throw erro("IMPORT_INVALID");
-        const l = Object.assign({ id: novoId("l") }, lerLancamento({ data: it.data, descricao: it.descricao, valor: it.valor, tipo: it.tipo, contaId: conta.id,
+        const l: Lancamento = Object.assign({ id: novoId("l") }, lerLancamento({ data: it.data, descricao: it.descricao, valor: it.valor, tipo: it.tipo, contaId: conta.id,
           categoriaId: it.categoriaId || null, perfilId: d.perfilId || null, notas: "Importada de arquivo do banco." }, null));
-        const k = chave(l.data, l.valor, l.descricao), ja = existentes.get(k) || 0;
-        if (ja > 0) { existentes.set(k, ja - 1); repetidos += 1; return; }
+        const origemId = typeof it.origemId === "string" && /^[!-~]{1,80}$/.test(it.origemId) ? it.origemId : "";
+        if (origemId) {
+          if (origens.has(origemId)) { repetidos += 1; return; }
+          origens.add(origemId);
+          l.origemId = origemId;
+        } else {
+          const k = chave(l), ja = existentes.get(k) || 0;
+          if (ja > 0) { existentes.set(k, ja - 1); repetidos += 1; return; }
+        }
         novos.push(l);
       });
       novos.forEach((l) => doc.lancamentos.push(l));
@@ -1841,11 +2010,27 @@
     try { return clone(LEITURAS[action](d)); } finally { doc = real; }
   }
 
+  /** Várias ações numa gravação só (tipo em globais.d.ts: ZoZoServico.lote). Usado pelo Zo: criar + repetir, editar
+      vários campos, categorizar vários grupos e conferir que nada mudou desde a confirmação, tudo ou nada. */
+  function lote<T>(passo: (exec: <K extends NomeAcao>(acao: K, dados?: unknown) => RespostaDe<K>) => T): Promise<T> {
+    const exec = (action: string, data?: unknown): unknown => {
+      const d = (data && typeof data === "object" ? data : {}) as Dados;
+      if (ehEscrita(action)) return clone(ESCRITAS[action](d));
+      if (ehLeitura(action) && action !== A.abrirMarco && action !== A.fecharMarco && action !== A.descartarMarcos) {
+        sincronizarSaldos();                                      // a leitura no meio do lote vê o efeito das etapas anteriores
+        return action === A.getConfig || action === A.getLancamentosOutrasMoedas ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d);
+      }
+      throw erro("OPERATION_FAILED");
+    };
+    return alterar(() => passo(exec as <K extends NomeAcao>(acao: K, dados?: unknown) => RespostaDe<K>)).catch((e) => { throw amigavel(e); });
+  }
+
   function handle(action: string, data?: unknown): Promise<unknown> {
     const d = (data && typeof data === "object" ? data : {}) as Dados;
     if (ehLeitura(action)) {
       // getConfig e a lista para transferir entre moedas enxergam o documento inteiro; o resto, só a moeda escolhida
-      const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas;
+      const inteiro = action === A.getConfig || action === A.getLancamentosOutrasMoedas
+        || action === A.abrirMarco || action === A.fecharMarco || action === A.descartarMarcos;     // a lixeira copia o documento inteiro
       return aplicadas.then(() => garantirCarregado()).then(() => (inteiro ? clone(LEITURAS[action](d)) : lerNaMoeda(action, d))).catch((e) => { throw amigavel(e); });
     }
     if (ehEscrita(action)) {
@@ -1857,5 +2042,5 @@
   /** Promessa que resolve quando todas as gravações pendentes terminarem (antes de sair, trocar senha ou apagar dados) */
   const aguardarGravacoes = () => fila.catch(() => null);
 
-  ZoZo.servico = { handle, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor, calcularFatura };
+  ZoZo.servico = { handle, lote, atende, reset, FREQUENCIAS, aguardarGravacoes, gravando, recarregarDoServidor, calcularFatura };
 })(window.ZoZo);

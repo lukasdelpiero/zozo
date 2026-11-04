@@ -29,15 +29,18 @@ Write-Host "1/6 Testes automáticos..." -ForegroundColor Cyan
 # uv run: usa o ambiente do projeto (FastAPI/Pydantic nas mesmas versões do Worker; mypy do grupo dev)
 uv run python -m unittest discover -s tests
 if ($LASTEXITCODE -ne 0) { Parar "Testes da API falharam: nada foi publicado." }
-uv run mypy
+uv run python -m mypy        # "python -m": os atalhos .exe do .venv podem guardar o caminho antigo da pasta (ZoZo → app)
 if ($LASTEXITCODE -ne 0) { Parar "Erros de tipo no back-end (mypy): nada foi publicado." }
 Push-Location ..
 # Dependências da interface exatamente como no package-lock.json (sem scripts de instalação: .npmrc)
 # Exatamente como no package-lock.json (versão e integridade de cada pacote). Se o node_modules já confere,
 # não reinstala — no Windows, arquivos em uso (ex.: "npm run dev" aberto) impediriam o npm ci de apagá-lo.
-node scripts/deps-em-dia.mjs
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "   Dependências diferentes do package-lock.json: reinstalando (npm ci)..." -ForegroundColor Gray
+# Produção: sempre do zero (npm ci confere o hash de cada pacote baixado). Prévia: só reinstala se o node_modules
+# não bate com o package-lock.json (o deps-em-dia compara versão e integridade REGISTRADAS, não o conteúdo dos arquivos)
+$reinstalar = $Ambiente -eq "producao"
+if (-not $reinstalar) { node scripts/deps-em-dia.mjs; $reinstalar = $LASTEXITCODE -ne 0 }
+if ($reinstalar) {
+  Write-Host "   Instalando as dependências do package-lock.json (npm ci)..." -ForegroundColor Gray
   npm ci
   if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências da interface (npm ci). Se apareceu EPERM, feche o 'npm run dev' (e a tarefa 'ZoZo: interface (Vite)' do VS Code) e publique de novo." }
 } else {
@@ -63,7 +66,7 @@ if ($Ambiente -eq "producao") {
 Write-Host "2/6 Segredos do ambiente..." -ForegroundColor Cyan
 # A lista precisa vir certa: uma falha (rede, login vencido) NUNCA pode parecer "segredo ausente".
 # Trocar o SEGREDO sem querer deixa o 2FA de todos sem funcionar.
-$saida = npx wrangler secret list @extra 2>$null
+$saida = npx --no-install wrangler secret list @extra 2>$null
 if ($LASTEXITCODE -ne 0) { Parar "Não foi possível listar os segredos (rede ou login do wrangler). Nada foi publicado e nenhum segredo foi alterado." }
 try { $segredos = @(($saida -join "`n") | ConvertFrom-Json) } catch { Parar "Resposta inesperada ao listar os segredos. Nada foi publicado e nenhum segredo foi alterado." }
 $nomes = @($segredos | ForEach-Object { $_.name })
@@ -73,7 +76,7 @@ if ($nomes -notcontains "SEGREDO") {
     Parar "SEGREDO não encontrado em produção. Se é mesmo a primeira publicação, crie-o de propósito: npx wrangler secret put SEGREDO (um texto aleatório longo). Nada foi publicado."
   }
   Write-Host "   SEGREDO não existe na prévia: gerando um aleatório (não aparece na tela)..."
-  python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | npx wrangler secret put SEGREDO @extra
+  python -c "import secrets; print(secrets.token_urlsafe(48), end='')" | npx --no-install wrangler secret put SEGREDO @extra
   if ($LASTEXITCODE -ne 0) { Parar "Não foi possível criar o SEGREDO." }
 }
 if ($nomes -notcontains "TURNSTILE_SECRET") {
@@ -88,12 +91,12 @@ if ($nomes -notcontains "RESEND_API_KEY") {
   # produção exige o e-mail (EMAIL_OBRIGATORIO no wrangler.toml): sem ele o cadastro seria recusado
   if ($Ambiente -eq "producao") { Parar "Configure o RESEND_API_KEY e publique de novo: nada foi publicado." }
 }
-if ($nomes -notcontains "GEMINI_API_KEY") {
-  Write-Host "   Aviso: GEMINI_API_KEY não configurado — o Zo (assistente) fica desligado." -ForegroundColor Yellow
-  Write-Host "   Para ligar: npx wrangler secret put GEMINI_API_KEY $($extra -join ' ')  (chave em aistudio.google.com › Get API key)" -ForegroundColor Yellow
-}
 if ($nomes -notcontains "RECURSOS_CAMBIO") {
   Write-Host "   Aviso: RECURSOS_CAMBIO não configurado — levar transações entre moedas fica só para a demonstração e as contas de RECURSOS_AVANCADOS." -ForegroundColor Yellow
+}
+if ($nomes -notcontains "RECURSOS_FATURA_DIA11") {
+  Write-Host "   Aviso: RECURSOS_FATURA_DIA11 não configurado — a fatura 'até o dia 11 do mês seguinte' não vale para nenhuma conta (as demais seguem a regra comum)." -ForegroundColor Yellow
+  Write-Host "   Para ligar na sua conta: npx wrangler secret put RECURSOS_FATURA_DIA11 $($extra -join ' ')  (e-mails separados por vírgula; a conta precisa estar também em RECURSOS_AVANCADOS)" -ForegroundColor Yellow
 }
 if ($nomes -notcontains "RECURSOS_AVANCADOS") {
   Write-Host "   Aviso: RECURSOS_AVANCADOS não configurado — Perfis, boletos e Pix ficam só na conta de demonstração." -ForegroundColor Yellow
@@ -110,7 +113,7 @@ if (-not (Test-Path "public/_headers")) { Parar "Interface montada sem os cabeç
 
 if ($Ambiente -eq "producao") {
   Write-Host "4/6 Ponto de restauração do banco (antes das migrações)..." -ForegroundColor Cyan
-  $info = (npx wrangler d1 time-travel info $banco 2>$null) -join "`n"
+  $info = (npx --no-install wrangler d1 time-travel info $banco 2>$null) -join "`n"
   $marcador = [regex]::Match($info, "bookmark[^\w]*([0-9a-f\-]{20,})").Groups[1].Value
   if ($marcador) {
     Add-Content -Path (Join-Path $PSScriptRoot "restauracao.log") -Value "$(Get-Date -Format s)  $banco  $marcador"
@@ -126,12 +129,21 @@ if ($Ambiente -eq "producao") {
   Write-Host "4/6 (prévia: banco de testes, sem ponto de restauração)" -ForegroundColor Cyan
 }
 
+# Pacotes Python do Worker (Pyodide) ANTES das migrações: se falhar, nada muda no banco.
+# O projeto fica no OneDrive, que marca pastas como somente leitura; o pywrangler apaga e recria a
+# .venv-workers e o python_modules e recebia "Acesso negado". Tirar a marca antes resolve.
+foreach ($pasta in ".venv-workers", "python_modules") {
+  if (Test-Path $pasta) { attrib -R $pasta 2>$null; attrib -R "$pasta\*" /S /D 2>$null }
+}
+uv run python -m pywrangler sync
+if ($LASTEXITCODE -ne 0) { Parar "Falha ao preparar os pacotes Python do Worker: nada foi publicado e o banco não mudou." }
+
 Write-Host "5/6 Migrações do banco $banco..." -ForegroundColor Cyan
-npx wrangler d1 migrations apply $banco --remote @extra
+npx --no-install wrangler d1 migrations apply $banco --remote @extra
 if ($LASTEXITCODE -ne 0) { Parar "Falha nas migrações: nada foi publicado." }
 
 Write-Host "6/6 Publicando ($Ambiente)..." -ForegroundColor Cyan
-uv run pywrangler deploy @extra
+uv run python -m pywrangler deploy @extra
 # As migrações acima já valeram no banco: por isso elas são sempre aditivas (a versão anterior do site continua funcionando)
 if ($LASTEXITCODE -ne 0) { Parar "Falha ao publicar o código. Atenção: as migrações do banco JÁ foram aplicadas (são compatíveis com a versão no ar). Corrija e publique de novo." }
 Write-Host ""

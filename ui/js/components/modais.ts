@@ -81,8 +81,7 @@
         const linhaOrc = h("div", { class: ZoZo.pecas.campo }, h("span", { class: ZoZo.pecas.campoRotulo }, "Orçamento"), orc.el);
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
-        const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor", cheio: true, altura: 36 }));
-        desenharCores();
+        mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; }, { label: "Cor", cheio: true, altura: 36 }));     // marca sozinha: o foco fica
         linhaOrc.hidden = !orcamentoAtivo;
         let criar: HTMLButtonElement | undefined;
         const enviar = () => {
@@ -120,8 +119,7 @@
         nome.maxLength = ZoZo.regras.limiteNome; nome.dataset.autofocus = "";
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
-        const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor do perfil", cheio: true, altura: 36 }));
-        desenharCores();
+        mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; }, { label: "Cor do perfil", cheio: true, altura: 36 }));     // marca sozinha: o foco fica
         const enviar = (btn: HTMLButtonElement | null) => {
           const v = nome.value.trim();
           if (!v) { erro.textContent = "Informe o nome do perfil."; nome.focus(); return; }
@@ -183,8 +181,7 @@
         const saldo = campoDinheiro(0); campos.saldo = saldo;
         const erro = h("p", { class: ZoZo.pecas.erroForm, role: "alert" });
         const cores = h("div");
-        const desenharCores = () => mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; desenharCores(); }, { label: "Cor", cheio: true, altura: 36 }));
-        desenharCores();
+        mount(cores, UI.ColorPicker(d.cor, (c) => { d.cor = c; }, { label: "Cor", cheio: true, altura: 36 }));     // marca sozinha: o foco fica
 
         let linhas: FilhoDom[];
         let lerEmprestimo: (() => string | { saldo: number; emprestimo: Record<string, unknown> }) | null = null;
@@ -344,7 +341,9 @@
               ? h("span", { class: P.lpContaLinha }, h("span", { class: P.lpContaPonto, style: { background: F.cor(conta.cor, "var(--palette-16)") } }),
                 h("span", { class: "tw:truncate" }, conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "")))
               : h("span", { class: P.campoMenuVazio }, contas.length ? "Selecione a conta" : "Nenhuma conta disponível"), seta());
-            saldoConta.textContent = conta ? "Saldo: " + F.moeda(conta.valor) : "Corrente, poupança ou outros";
+            // sem conta escolhida, nada abaixo do campo (a linha da dica some)
+            saldoConta.textContent = conta ? "Saldo: " + F.moeda(conta.valor) : "";
+            if (saldoConta.parentElement) saldoConta.parentElement.hidden = !conta;
             contaBtn.setAttribute("aria-label", contaBtn.textContent!.trim() + ", conta a debitar");
           };
           contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
@@ -375,6 +374,8 @@
               .catch((e: ErroPonte) => { erro.textContent = e.friendly; btn.disabled = false; });
           };
           const semFatura = !(fatura > 0);
+          const campoConta = UI.Field("Conta a debitar", contaBtn, { hint: saldoConta });
+          desenharConta();                                  // agora a dica existe: some enquanto não há conta
           return {
             corpo: h("div", { class: ZoZo.estrutura.janelaForm },
               semFatura ? h("p", { class: ZoZo.estrutura.modalTexto }, FR.NO_INVOICE) : null,
@@ -382,7 +383,7 @@
               h("div", { class: P.linhaForm2 }, UI.Field("4 últimos dígitos", leitura(cartao.ultimos4Digitos || "—")), UI.Field("Saldo (fatura atual)", valor.el)),
               h("div", { class: perfilBtn ? P.linhaForm2 : undefined },
                 perfilBtn ? UI.Field("Perfil", perfilBtn) : null,
-                UI.Field("Conta a debitar", contaBtn, { hint: saldoConta })),
+                campoConta),
               erro),
             rodapeEsquerda: h("div", { class: P.restante }, h("span", null, "Restante a pagar"), restanteEl),
             botoes: [
@@ -419,7 +420,7 @@
               ? h("span", { class: P.lpContaLinha }, h("span", { class: P.lpContaPonto, style: { background: F.cor(conta.cor, "var(--palette-16)") } }),
                 h("span", { class: "tw:truncate" }, conta.nome + (conta.ultimos4Digitos ? " " + conta.ultimos4Digitos : "")))
               : h("span", { class: P.campoMenuVazio }, contas.length ? "Selecione a conta" : "Nenhuma conta disponível"), seta());
-            contaBtn.setAttribute("aria-label", contaBtn.textContent!.trim() + ", conta onde o dinheiro entrou");
+            contaBtn.setAttribute("aria-label", contaBtn.textContent!.trim() + ", conta a creditar");
           };
           contaBtn.addEventListener("click", () => ZoZo.menu.contas(contaBtn, {
             contas, atual: conta && conta.id, vazio: "Nenhuma conta corrente, poupança ou outros",
@@ -440,10 +441,8 @@
           };
           return {
             corpo: h("div", { class: ZoZo.estrutura.janelaForm },
-              h("p", { class: ZoZo.estrutura.modalTexto }, "Entra como receita no perfil " + cfg.perfil.nome + " e abate da fatura de "
-                + F.mesNome(cfg.mes - 1).toLowerCase() + " de " + cfg.ano + "."),
               h("div", { class: P.linhaForm2 }, UI.Field("Valor recebido", valor.el), UI.Field("Data", dataCampo)),
-              UI.Field("Conta onde o dinheiro entrou", contaBtn, { hint: "Corrente, poupança ou outros" }),
+              UI.Field("Conta a creditar", contaBtn),
               erro),
             botoes: [
               { label: "Cancelar", onClick: () => api.fechar() },
@@ -563,7 +562,9 @@
 
   function novaRecorrencia(ctx: ContextoApp) {
     ctx.loadData("lancamentos", A.getLancamentos).then((dados) => {
-      const candidatos = (dados.lancamentos || []).filter((l) => l.tipo !== "recorrente" || String(l.serieId || "").startsWith("removida:")).slice(0, 300);
+      // só despesa e débito viram recorrência (receita, estorno e transferência perderiam a natureza: RECURRENCE_TYPE)
+      const candidatos = (dados.lancamentos || []).filter((l) => l.tipo === "regular" || l.tipo === "debito"
+        || (l.tipo === "recorrente" && String(l.serieId || "").startsWith("removida:"))).slice(0, 300);
       const passoLista = (api: ApiJanela): ReturnType<PassoJanela> => {
         let termo = "";
         const norm = (t: unknown) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -638,7 +639,7 @@
           let frase: HTMLInputElement | null = null, senha: HTMLInputElement | null = null, codigo: CampoCodigo6 | null = null;
           let botao: HTMLButtonElement | null = null, ocupado = false;
           const pronto = () => !ocupado && (!frase || normalizar(frase.value) === cfg.frase) && (!senha || !!senha.value)
-            && (!codigo || /^\d{6}$/.test(codigo.valor()));
+            && (!codigo || codigo.completo());
           const atualizar = () => { if (botao) botao.disabled = !pronto(); };
           const confirmar = () => {
             if (!pronto()) return;
@@ -670,7 +671,7 @@
             campos.push(UI.Field("Senha", ZoZo.verificacao.ComRevelar(senha)));       // oculta, com "mostrar" e sem copiar
           }
           if (cfg.codigo2FA) {
-            const c = ZoZo.verificacao.CampoCodigo({ rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-1",
+            const c = ZoZo.verificacao.CampoCodigo({ rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-1", backup: true,
               onDigitar: () => { c.marcarErro(false); atualizar(); }, onCompleto: () => { atualizar(); if (!frase && !senha) confirmar(); } });
             codigo = c;
             campos.push(h("div", null, h("p", { class: E.modalTexto }, "Código atual do seu aplicativo 2FA"), c.el));

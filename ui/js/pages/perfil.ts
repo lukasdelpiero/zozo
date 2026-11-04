@@ -309,8 +309,8 @@
   }
 
   /** Gera o CSV no próprio navegador e baixa (nada passa pelo servidor). Atenção: o arquivo baixado NÃO é cifrado. */
-  function exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement) {
-    if (botao.disabled) return;
+  function exportarCsv(ctx: ContextoApp, botao: HTMLButtonElement): Promise<boolean> {
+    if (botao.disabled) return Promise.resolve(false);
     // Carregando: ícone animado no lugar do ícone do botão (pelo menos 600 ms, para dar para ver)
     const iconeOriginal = botao.querySelector("svg");
     const giro = h("span", { class: ZoZo.pecas.girandoBotao, "aria-hidden": "true" });
@@ -318,20 +318,26 @@
     botao.disabled = true;
     botao.setAttribute("aria-busy", "true");
     const minimo = new Promise((r) => setTimeout(r, 600));
-    ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
+    let pedido = false;
+    return ctx.loadData("lancamentos", A.getLancamentos, null, { force: true }).then((d) => {
       const cfg: Partial<RespostaConfig> = store.get().data.config || {};
       const moeda = cfg.multicambio ? cfg.moeda || "BRL" : null;            // o serviço só devolve moeda válida
       const conteudo = gerarCsv(d.lancamentos || [], moeda);
-      const nome = "ZoZo-transacoes-" + (moeda ? moeda + "-" : "") + F.iso(new Date()) + ".csv";
+      // zozo-transacoes-câmbio-dd-mm-aaaa.csv (brl, eur ou dol; sem multicâmbio, o Real)
+      const cambio = ({ BRL: "brl", EUR: "eur", USD: "dol" } as Record<string, string>)[moeda || cfg.moeda || "BRL"] || "brl";
+      const agora = new Date(), dois = (n: number) => String(n).padStart(2, "0");
+      const nome = "zozo-transacoes-" + cambio + "-" + dois(agora.getDate()) + "-" + dois(agora.getMonth() + 1) + "-" + agora.getFullYear() + ".csv";
       const url = URL.createObjectURL(new Blob([conteudo], { type: "text/csv;charset=utf-8" }));
       const a = h("a", { href: url, download: nome, rel: "noopener" });
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+      pedido = true;
       // fora do ZoZo os dados ficam legíveis: avisa toda vez (inclusive pelo botão de Transações)
       ctx.toast("Arquivo baixado. Ele não é cifrado: guarde-o em local seguro.", { tone: "aviso" });
     }).catch((e: Partial<ErroPonte>) => ctx.toast(e.friendly || ZoZo.messages.FRIENDLY.OPERATION_FAILED, { tone: "error" }))
       .then(() => minimo)
-      .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); });
+      .finally(() => { if (iconeOriginal) giro.replaceWith(iconeOriginal); else giro.remove(); botao.disabled = false; botao.removeAttribute("aria-busy"); })
+      .then(() => pedido);
   }
 
   /** Ações de conta esperam as gravações em andamento (evita conflito de versão com elas) */
@@ -382,7 +388,7 @@
           check.hidden = false;                                     // ✓ ao lado de "Insira o código de seis dígitos."
           store.set({ session: { user: r.user || null } });
           if (aoAtivar) aoAtivar();
-          setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); }, 700);
+          setTimeout(() => { fechar(); ctx.toast("Verificação em duas etapas ativada."); if (r.codigosBackup && r.codigosBackup.length) mostrarCodigosBackup(ctx, r.codigosBackup); }, 700);
         }).catch((e: ErroPonte) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
@@ -395,12 +401,12 @@
       h("span", { class: P2.numero, "aria-hidden": "true" }, String(n)),
       h("div", null, h("p", { class: P2.passoTitulo }, titulo, n === 4 ? check : null), extra || null));
 
-    const painel = h("div", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
+    const painel = h("div", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Verificação em duas etapas" },
       h("header", { class: P2.topo },
-        h("h3", { class: P2.titulo }, "Autenticação de Dois Fatores"),
+        h("h3", { class: P2.titulo }, "Verificação em duas etapas"),
         h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),
       h("ol", { class: P2.passos },
-        passo(1, PASSOS_2FA[0], h("p", { class: P2.dica }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator, Authy ou o do seu gerenciador de senhas.")),
+        passo(1, PASSOS_2FA[0], h("p", { class: P2.dica }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator ou outro de sua preferência.")),
         passo(2, PASSOS_2FA[1]),
         passo(3, PASSOS_2FA[2], h("div", null, qrArea, h("div", { class: P2.chaveLinha }, chaveTexto, copiar))),
         passo(4, PASSOS_2FA[3], h("div", null, campo.el, erro))));
@@ -420,19 +426,118 @@
     }).catch((e: ErroPonte) => { mount(qrArea, h("p", { class: P2.erro }, e.friendly)); qrArea.removeAttribute("aria-busy"); });
   }
 
+  /**
+   * Os dez códigos de backup, mostrados UMA vez (o servidor guarda só o HMAC): copiar, baixar em .txt e "Já guardei".
+   * Cada código entra uma vez no lugar do código do aplicativo (login, ações sem volta, recuperação, desligar o 2FA).
+   */
+  function mostrarCodigosBackup(ctx: ContextoApp, codigos: string[]) {
+    const texto = () => "ZoZo · códigos de backup da verificação em duas etapas\n"
+      + "Gerados em " + new Date().toLocaleString("pt-BR") + ". Cada código funciona uma vez só.\n\n" + codigos.join("\n") + "\n";
+    const copiar = UI.Button("Copiar", { size: "sm", icon: "copiar", onClick: (e) => {
+      const b = e.currentTarget as HTMLElement;
+      navigator.clipboard.writeText(codigos.join("\n")).then(() => UI.confirmarNoBotao(b, "Códigos copiados"), () => ctx.toast("Não foi possível copiar.", { tone: "error" }));
+    } });
+    const baixar = UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: () => {
+      const url = URL.createObjectURL(new Blob([texto()], { type: "text/plain;charset=utf-8" }));
+      const a = h("a", { href: url, download: "zozo-codigos-de-backup.txt", rel: "noopener" });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } });
+    const janela = ZoZo.feedback.modal({
+      title: "Guarde seus códigos de backup", class: "modal--confirm",
+      body: h("div", null,
+        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Se você perder o celular, use um destes códigos no lugar do código do aplicativo. Cada um funciona uma vez só. Guarde em um lugar seguro, fora deste aparelho. Eles não aparecem de novo."),
+        h("ol", { class: "tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-1.5 tw:my-4 tw:mx-auto tw:p-3 tw:w-fit tw:list-none tw:rounded-lg tw:bg-(--color-surface-hover,#f4f5f7) "
+          + "tw:font-mono tw:text-[15px] tw:tracking-[0.06em] tw:text-zz-text", "aria-label": "Códigos de backup" },
+          codigos.map((c) => h("li", null, c))),
+        h("div", { class: "tw:flex tw:justify-center tw:gap-2 tw:flex-wrap" }, copiar, baixar,
+          UI.Button("Já guardei", { size: "sm", variant: "primary", onClick: () => janela.fechar(true) }))),
+    });
+  }
+
+  /** Gerar códigos novos: pede o código atual (do aplicativo ou de backup) e troca todos os antigos */
+  function gerarCodigosBackup(ctx: ContextoApp, aoGerar?: () => void) {
+    let codigos: string[] = [];
+    ZoZo.modais.confirmarSeguro({ titulo: "Gerar novos códigos de backup?", botao: "Gerar códigos", codigo2FA: true,
+      mensagem: "Os códigos de backup atuais deixam de valer. Para confirmar, digite o código atual do seu aplicativo 2FA.",
+      executar: ({ codigo }) => ctx.bridge.request(A.gerarCodigosBackup, { codigo }).then((r) => { codigos = r.codigosBackup; }) })
+      .then((feito) => { if (feito && codigos.length) { mostrarCodigosBackup(ctx, codigos); if (aoGerar) aoGerar(); } });
+  }
+
+  /** Linha "Códigos de backup" (só com 2FA): quantos ainda valem e o botão para gerar novos */
+  function linhaCodigosBackup(ctx: ContextoApp) {
+    const descricao = h("span", { class: ZoZo.pecas.cfgSub }, "Use no lugar do código do aplicativo se perder o celular.");
+    const atualizar = () => ctx.bridge.request(A.statusCodigosBackup).then((r) => {
+      descricao.textContent = r.restantes === 0 ? "Nenhum código de backup restante. Gere códigos novos."
+        : (r.restantes === 1 ? "1 código restante" : r.restantes + " códigos restantes") + ". Use no lugar do código do aplicativo se perder o celular.";
+    }).catch(() => null);
+    atualizar();
+    const P = ZoZo.pecas;
+    return h("div", { class: P.cfgLinha },
+      h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Códigos de backup"), descricao),
+      h("div", { class: [P.cfgDireita, P.ctxInterruptorAjustado] }, UI.Button("Gerar novos", { size: "sm", onClick: () => gerarCodigosBackup(ctx, atualizar) })));
+  }
+
+  /** Nome sugerido para a biometria deste aparelho (a pessoa vê na lista e no e-mail de aviso) */
+  function nomeDoAparelho(): string {
+    const ua = navigator.userAgent;
+    return /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Celular Android"
+      : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "Este aparelho";
+  }
+
+  /**
+   * Biometria e chaves de acesso (WebAuthn): lista, adicionar e remover. Com 2FA, adicionar e remover pedem o código atual.
+   * Serve para confirmar ações sem volta e relatórios do Zo em contas sem 2FA (o servidor confere cada assinatura).
+   */
+  function linhaBiometria(ctx: ContextoApp, u: UsuarioSessao) {
+    const P = ZoZo.pecas;
+    const sub = h("span", { class: P.cfgSub }, "Utilize biometria ou PIN para executar ações de acesso restrito.");
+    const lista = h("ul", { class: "tw:m-0 tw:mt-2 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-1.5 tw:empty:hidden", "aria-label": "Biometrias cadastradas" });
+    // o servidor grava em UTC: a data mostrada é a do aparelho (no fim da noite, UTC já é o dia seguinte)
+    const dataBr = (iso: string | null) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : ""; };
+    const desenhar = () => ctx.bridge.request(A.listarBiometrias).then((r) => mount(lista, r.chaves.map((c) => h("li", { class: "tw:flex tw:items-center tw:justify-between tw:gap-3 tw:text-[13px] tw:text-zz-text" },
+      h("span", null, c.nome, h("span", { class: "tw:text-zz-secondary" }, " · cadastrada em " + dataBr(c.criadoEm) + (c.usadoEm ? " · usada em " + dataBr(c.usadoEm) : ""))),
+      UI.Button("Remover", { size: "sm", variant: "danger-ghost", onClick: () => remover(c) }))))).catch(() => null);
+    const remover = (c: BiometriaTela) => ZoZo.modais.confirmarSeguro({ titulo: "Remover biometria?", botao: "Remover", codigo2FA: !!u.doisFatores,
+      mensagem: "\u201C" + c.nome + "\u201D deixa de servir para confirmar ações no ZoZo." + (u.doisFatores ? " Para confirmar, digite o código atual do seu aplicativo 2FA." : ""),
+      executar: ({ codigo }) => ctx.bridge.request(A.removerBiometria, { id: c.id, codigo }).then(() => undefined) })
+      .then((feito) => { if (feito) { ctx.toast("Biometria removida."); desenhar(); } });
+    const cadastrar = (codigo?: string) => ctx.bridge.request(A.registrarBiometria, { nome: nomeDoAparelho(), codigo }, { timeout: 180000 })
+      .then(() => { ctx.toast("Biometria cadastrada."); desenhar(); });
+    const adicionar = UI.Button("Adicionar", { size: "sm", onClick: () => {
+      if (u.doisFatores) {
+        ZoZo.modais.confirmarSeguro({ titulo: "Cadastrar biometria?", botao: "Continuar", codigo2FA: true,
+          mensagem: "Para cadastrar a biometria deste aparelho, digite o código atual do seu aplicativo 2FA. Depois, o aparelho pede a digital, o rosto ou o PIN.",
+          executar: ({ codigo }) => cadastrar(codigo) });
+        return;
+      }
+      cadastrar().catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+    } });
+    ctx.bridge.request(A.biometriaDisponivel).then((d) => {
+      if (d.disponivel) return;
+      adicionar.disabled = true;
+      sub.textContent = "Este navegador ou aparelho não oferece biometria nem chave de acesso.";
+    }).catch(() => null);
+    desenhar();
+    return h("div", { class: P.cfgLinhaBloco },
+      h("div", { class: "tw:flex tw:items-start tw:justify-between tw:gap-3" },
+        h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Biometria e chaves de acesso"), sub), adicionar),
+      lista);
+  }
+
   /** Desativar o 2FA pede um código ATUAL do aplicativo (o servidor confere): sessão aberta não basta */
   function desativar2FA(ctx: ContextoApp) {
     const erro = h("p", { class: [P2.erro, "tw:text-center"], role: "alert" });
     let erros = 0;
     const campo = ZoZo.verificacao.CampoCodigo({
-      rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-4",
+      rotulo: "Código de 6 dígitos do aplicativo 2FA", classe: "tw:mt-4", backup: true,
       onDigitar: () => campo.marcarErro(false),
       onCompleto: (codigo) => {
         campo.desabilitar(true);
         ctx.bridge.request(A.desativar2FA, { codigo }).then((r) => {
           janela.fechar(true);
           store.set({ session: { user: r.user || null } });
-          ctx.toast("Autenticação de dois fatores desativada.");
+          ctx.toast("Verificação em duas etapas desativada.");
         }).catch((e: ErroPonte) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
@@ -441,9 +546,9 @@
       },
     });
     const janela = ZoZo.feedback.modal({
-      title: "Desativar 2FA?", class: "modal--confirm",
+      title: "Desativar verificação em duas etapas?", class: "modal--confirm",
       body: h("div", null,
-        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA."),
+        h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA ou um código de backup."),
         campo.el, erro),
     });
     requestAnimationFrame(() => campo.foco());
@@ -531,7 +636,7 @@
       erro);
   }
 
-  /* ---------------- Configurações: Geral | Conta ---------------- */
+  /* ---------------- Configurações: Geral | Conta | Segurança | Sobre ---------------- */
   const FRASE_EXCLUIR = "EXCLUIR CONTA";        // o servidor exige exatamente esta frase para excluir a conta
   let abaConfig = "geral";
 
@@ -561,7 +666,7 @@
       entrada.disabled = true;
       ZoZo.modais.confirmarSeguro(ligar
         ? { titulo: "Ativar proteção avançada?", botao: "Ativar", senha: true,
-          mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar.",
+          mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados. Digite sua senha para confirmar.",
           executar: ({ senha }) => ctx.bridge.request(A.setProtecao, { avancada: true, senha }, { timeout: 120000 }).then(mostrar) }
         : { titulo: "Desativar proteção avançada?", botao: "Desativar", senha: true, codigo2FA: com2FA,
           mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha"
@@ -573,7 +678,7 @@
     const entrada = interruptor.querySelector("input") as HTMLInputElement;
     entrada.disabled = true;                            // até saber o estado atual
     ctx.bridge.request(A.getProtecao).then((r) => { mostrar(r); entrada.disabled = false; }).catch(() => null);
-    return [linhaConfig("Proteção avançada", "Só você abre seus dados. Se esquecer a senha, a conta recomeça vazia (sem recuperação pelo e-mail).", interruptor), pendente];
+    return [linhaConfig("Proteção avançada", "Aumente a privacidade dos seus dados.", interruptor), pendente];
   }
 
   function linhaConfig(titulo: string, sub: string | null, direita: FilhoDom) {
@@ -597,7 +702,7 @@
       const P = ZoZo.pecas;
       const nav = h("nav", { class: CF.nav, "aria-label": "Seções das configurações" },
         h("p", { class: CF.navTitulo }, "Configurações"),
-        [["geral", "configuracoes", "Geral"], ["conta", "perfil", "Conta"], ["sobre", "info", "Sobre"]].map(([id, ic, rot]) => h("button", {
+        [["geral", "configuracoes", "Geral"], ["conta", "perfil", "Conta"], ["seguranca", "escudo", "Segurança"], ["sobre", "info", "Sobre"]].map(([id, ic, rot]) => h("button", {
           type: "button", class: abaConfig === id ? CF.navItemAtivo : CF.navItem, "aria-current": abaConfig === id ? "page" : undefined,
           onClick: () => { abaConfig = id; redesenhar(); },
         }, icon(ic, { size: 16 }), h("span", null, rot))));
@@ -610,11 +715,23 @@
         conteudo = [
           h("h3", { class: "tw:m-0 tw:mb-(--space-2) tw:pb-(--space-2) tw:border-b tw:border-zz-border tw:text-(length:--t-15) tw:font-[550]" }, "Sobre"),
           linha("Versão", "ZoZo v" + ZoZo.sobre.versao),
+          linha("Autor", ZoZo.sobre.autor),
           linha("Novidades", h("button", { type: "button", class: "tw:[border:0] tw:bg-transparent tw:p-0 tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline",
             onClick: () => ZoZo.novidades.abrir() }, "O que há de novo")),
-          linha("Autor", ZoZo.sobre.autor),
           linha("Termos", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/termos-uso", target: "_blank", rel: "noopener" }, "Termos de uso")),
           linha("Privacidade", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade")),
+        ];
+      } else if (abaConfig === "seguranca") {
+        // Segurança: verificação em duas etapas, códigos de backup, biometria e proteção avançada
+        conteudo = [
+          h("h3", { class: P.cfgSecao }, "Proteção"),
+          demo && ZoZo.demonstracao.avisos() ? h("p", { class: CF.nota }, "Conta de demonstração: a verificação em duas etapas, a biometria e a proteção avançada ficam disponíveis na sua própria conta.") : null,
+          demo ? null : linhaConfig("Verificação em duas etapas", null, u.doisFatores
+            ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
+            : UI.Button("Ativar 2FA", { size: "sm", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
+          demo || !u.doisFatores ? null : linhaCodigosBackup(ctx),
+          demo ? null : linhaBiometria(ctx, u),
+          demo ? null : linhaProtecao(ctx),
         ];
       } else if (abaConfig === "geral") {
         conteudo = [
@@ -622,11 +739,11 @@
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
               .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })), "Ativar orçamento")),
-          // Pix das faturas: só contas com o recurso
-          ZoZo.recursos.pix() ? h("h3", { class: P.cfgSecao }, "Pix das faturas") : null,
-          ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
           h("h3", { class: P.cfgSecao }, "Multicâmbio"),
           ZoZo.cambio.SecaoConfig(ctx, cfg),
+          // PIX das faturas: só contas com o recurso
+          ZoZo.recursos.pix() ? h("h3", { class: P.cfgSecao }, "PIX") : null,
+          ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
           h("h3", { class: P.cfgSecao }, "Armazenamento"),
           linhaConfig(
             demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
@@ -659,7 +776,7 @@
             senhaAtual.value = ""; novaSenha.value = "";
             ctx.toast("Senha alterada.", { tone: "success", importante: true });
             // a cópia nova da chave não foi guardada: a linha "Recuperação pendente" aparece ao redesenhar
-            if (r && typeof r === "object" && r.recuperacaoPendente) { ctx.toast("Guarde a cópia de recuperação em Configurações › Conta.", { tone: "aviso" }); redesenhar(); }
+            if (r && typeof r === "object" && r.recuperacaoPendente) { ctx.toast("Guarde a cópia de recuperação em Configurações › Segurança.", { tone: "aviso" }); redesenhar(); }
           };
           let resposta: RespostaDe<"changePassword"> | undefined;
           if (u.doisFatores) {
@@ -677,9 +794,12 @@
             .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }))
             .finally(() => { btn.disabled = false; });
         };
-        const apagarDados = () => ZoZo.modais.confirmarComSenha({ titulo: "Apagar todos os dados?", botao: "Apagar dados",
-          mensagem: "Transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita." })
-          .then((senha: string | null) => senha && depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha })).then(() => {
+        // a senha e, com 2FA, o código atual (o servidor confere: a ação apaga também o histórico)
+        const apagarDados = () => ZoZo.modais.confirmarSeguro({ titulo: "Apagar todos os dados?", botao: "Apagar dados", senha: true, codigo2FA: !!u.doisFatores,
+          mensagem: "Transações, contas, categorias" + (ZoZo.recursos.perfis() ? " e perfis" : "") + " serão apagados. Seu login continua funcionando. Essa ação não pode ser desfeita."
+            + (u.doisFatores ? " Digite sua senha e o código do seu aplicativo 2FA para confirmar." : " Digite sua senha para confirmar."),
+          executar: ({ senha, codigo }) => depoisDasGravacoes(() => ctx.bridge.request(A.wipeUserData, { senha, codigo })).then(() => undefined) })
+          .then((feito) => feito && Promise.resolve().then(() => {
             ZoZo.servico.reset();
             // Filtros, seleção e preferências apontavam para itens que não existem mais
             store.set({ ui: { filtros: null, selecionados: [], busca: "", invExcluidas: [], mostrarOcultas: {}, gruposFechados: {} }, selectedItem: null });
@@ -706,15 +826,11 @@
                 return ctx.bridge.request(A.updateUser, { nomeUsuario: v, email: u.email, senhaAtual: senha });
               }).then((sessao) => { store.set({ session: { user: sessao.user || null } }); ctx.toast("Nome alterado."); }) })),
           linhaConfig("E-mail", null, h("span", { class: CF.leitura }, u.email || "")),
-          demo ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
+          demo && ZoZo.demonstracao.avisos() ? h("p", { class: CF.nota }, "Conta de demonstração: nome, senha, 2FA e exclusão ficam disponíveis na sua própria conta.") : null,
           // Senha: título em cima e, abaixo, senha atual · nova senha · Alterar (sem espremer o título ao lado)
           demo ? null : h("div", { class: P.cfgLinhaBloco },
             h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Alterar senha")),
             h("div", { class: CF.senha }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget as HTMLButtonElement) }))),
-          demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
-            ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
-            : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
-          demo ? null : linhaProtecao(ctx),
           h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda || "BRL"] || "Real") : "Exportar todas as transações",
             "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : "") + ". O arquivo não é cifrado: guarde-o em local seguro.", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget as HTMLButtonElement) })),
@@ -768,7 +884,7 @@
       const ativo = document.activeElement;
       if (!ativo || !area.contains(ativo) || ativo.tagName !== "INPUT") principal();
     });
-    abaConfig = aba === "conta" || aba === "sobre" ? aba : "geral";
+    abaConfig = aba === "conta" || aba === "seguranca" || aba === "sobre" ? aba : "geral";
     principal();
     ctx.loadData("config", A.getConfig, null, { force: true }).catch(() => null);
   }

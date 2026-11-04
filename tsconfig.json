@@ -17,5 +17,5 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["ui/src/**/*.ts", "ui/js/**/*.ts"]
+  "include": ["ui/src/**/*.ts", "ui/js/**/*.ts", "api/portfolio/src/**/*.ts"]
 }

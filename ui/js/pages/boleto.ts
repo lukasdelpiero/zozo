@@ -25,6 +25,8 @@
   /** Estado do editor: perfil e mês escolhidos, o que veio do serviço e os ajustes como estão na tela */
   interface EstadoFatura {
     perfilId: string; perfil: Perfil | null; cartaoId: string; consulta: boolean; mes: number; ano: number; dataFatura: string;
+    /** "Incluir valores em aberto": faturas de cartão ainda abertas entram, só até hoje (hoje: a data do serviço) */
+    incluirAberto: boolean; hoje: string;
     lancamentos: LancamentoTela[] | null; carregadoPara: string | null; carregando: boolean; erro: string | null;
     contribuicoes: AjusteTela[]; descontos: AjusteTela[]; arredondamentos: AjusteTela[];
     pix: ChavePix | null; pixCodigo: string | null;
@@ -63,7 +65,7 @@
     periodosCartao: "tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-0.5 tw:text-[13px] tw:text-zz-secondary tw:empty:hidden",
     // pagamentos recebidos do perfil
     recebidos: "tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:empty:hidden",
-    recebido: "tw:grid tw:grid-cols-[46px_minmax(0,1fr)_auto] tw:gap-3 tw:items-center tw:min-h-8 tw:px-2 tw:text-[13px] tw:-mx-2 tw:odd:bg-(--color-background) tw:odd:rounded-md",
+    recebido: "tw:grid tw:grid-cols-[46px_minmax(0,1fr)_auto_auto] tw:gap-3 tw:items-center tw:min-h-8 tw:px-2 tw:text-[13px] tw:-mx-2 tw:odd:bg-(--color-background) tw:odd:rounded-md",
     selo: "tw:self-start tw:inline-flex tw:items-center tw:gap-1.5 tw:h-6 tw:px-2.5 tw:rounded-(--radius-pill) tw:text-[12px] tw:font-[620] tw:empty:hidden",
     seloPago: "tw:bg-(--color-aviso-sucesso-fundo) tw:text-(--color-aviso-sucesso)",
     seloFalta: "tw:bg-zz-warning-soft tw:text-zz-warning-text",
@@ -158,7 +160,7 @@
   /** Os dados na tela correspondem exatamente ao perfil e ao período escolhidos? (pode imprimir/copiar Pix) */
   const invalido = (st: EstadoFatura) => [st.contribuicoes, st.descontos, st.arredondamentos].some((l) => (l || []).some((x) => x.invalido));
   const pronto = (st: EstadoFatura) => !!(st.perfilId && st.lancamentos && !st.carregando && !st.erro && st.carregadoPara === chaveFiltro(st) && !invalido(st));
-  const chaveFiltro = (st: EstadoFatura) => st.perfilId + "|" + st.cartaoId + "|" + st.ano + "-" + st.mes;
+  const chaveFiltro = (st: EstadoFatura) => st.perfilId + "|" + st.cartaoId + "|" + st.ano + "-" + st.mes + "|" + (st.incluirAberto ? "aberto" : "fechado");
   /** Nome no topo do documento e no arquivo: o perfil (ou "Todos os perfis") e o cartão escolhido */
   function nomeDaFatura(st: EstadoFatura, cartoes: ContaTela[]): string {
     const quem = st.perfilId === TODOS ? "Todos os perfis" : st.perfil ? st.perfil.nome : "";
@@ -171,7 +173,7 @@
     if (st.carregando) return UI.Skeleton(4, { short: true });
     if (st.erro) return UI.ErrorState(st.erro, () => { if (atual) atual.carregar(); });
     if (!st.perfilId) return UI.EmptyState("Selecione um perfil.", { icon: "perfil", class: "tw:min-h-[90px]! tw:p-4!" });
-    if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão de crédito no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
+    if (!st.lancamentos || !st.lancamentos.length) return UI.EmptyState("Nenhuma transação de cartão ou empréstimo no período.", { icon: "lancamentos", class: "tw:min-h-[90px]! tw:p-4!" });
     return h("ul", null, st.lancamentos.map((l) => h("li", { class: T.item },
       h("span", { class: T.itemData }, diaMes(l.data)),
       h("span", { class: T.itemDesc },
@@ -302,9 +304,14 @@
      não correspondem ao perfil/período escolhidos, o documento não é impresso
      (nem pelo Ctrl+P: veja print.css, .doc[aria-busy="true"]).
      O título da página vira o nome sugerido do arquivo (sem caracteres inválidos). */
-  function imprimirDocumento(st: EstadoFatura, nome: string) {
-    const titulo = ("Fatura " + nome + " " + F.mesNome(st.mes - 1) + " " + st.ano)
-      .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").replace(/\s+/g, " ").trim().slice(0, 120);
+  /** Nome dos arquivos da fatura: fatura-perfil-mês-aaaa (ex.: fatura-lukas-outubro-2026), sem acento, minúsculas e hífens */
+  function nomeDoArquivo(st: EstadoFatura): string {
+    const slug = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+    const quem = st.perfilId === TODOS ? "todos" : st.perfil ? st.perfil.nome : "";
+    return ["fatura", slug(quem) || "perfil", slug(F.mesNome(st.mes - 1)), String(st.ano)].join("-");
+  }
+  function imprimirDocumento(st: EstadoFatura) {
+    const titulo = nomeDoArquivo(st);                // "Salvar como PDF" sugere fatura-perfil-mês-aaaa.pdf
     const tituloAnterior = document.title;
     const fim = () => {
       document.body.classList.remove("is-printing-boleto");
@@ -317,6 +324,15 @@
     window.print();
   }
 
+  /* ---------------- PNG ----------------
+     A folha é montada fora da tela, na largura A4 e sem a escala da prévia (que mudaria as medidas calculadas), e
+     vira imagem em ZoZo.captura (sem biblioteca, dentro da CSP). Nada sai do aparelho. */
+  async function fotografar(folha: HTMLElement, nomeArquivo: string) {
+    const caixa = h("div", { class: T.papel + " tw:fixed tw:left-[-12000px] tw:top-0", "aria-hidden": "true" }, folha);
+    document.body.appendChild(caixa);
+    try { await ZoZo.captura.png(caixa, nomeArquivo, { semSombra: true }); } finally { caixa.remove(); }
+  }
+
   /* ---------------- Editor (janela em tela cheia) ---------------- */
   function open(ctx: ContextoApp, opts?: { perfilId?: string | null; receber?: boolean; cartaoId?: string; mes?: number; ano?: number }) {
     if (atual) return;
@@ -327,6 +343,7 @@
     const st: EstadoFatura = {
       perfilId: o.perfilId || "", perfil: null, cartaoId: o.cartaoId || TODOS, consulta: false,
       mes: o.mes && o.mes >= 1 && o.mes <= 12 ? o.mes : hoje.getMonth() + 1, ano: o.ano || hoje.getFullYear(), dataFatura: F.iso(hoje),
+      incluirAberto: false, hoje: F.iso(hoje),
       lancamentos: null, carregadoPara: null, carregando: false, erro: null,
       contribuicoes: [], descontos: [], arredondamentos: [], pix: null, pixCodigo: null,
       recebimentos: [], saldoAnterior: 0, periodos: [],
@@ -344,7 +361,8 @@
     const avisoPix = h("p", { class: T.avisoPix });
     const copiarPix = UI.Button("Copiar Pix copia e cola", { size: "sm", variant: "secondary", icon: "copiar", class: "btn--block",
       onClick: (e) => { const b = e.currentTarget as HTMLElement; if (pronto(st) && st.pixCodigo) navigator.clipboard.writeText(st.pixCodigo).then(() => UI.confirmarNoBotao(b, "Código Pix copiado"), () => ctx.toast("Não foi possível copiar.", { tone: "error" })); } });
-    const imprimirBtn = UI.Button("Imprimir", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
+    const imprimirBtn = UI.Button("Imprimir ou salvar PDF", { variant: "primary", icon: "imprimir", class: "btn--block", onClick: () => imprimir() });
+    const pngBtn: HTMLButtonElement = UI.Button("Baixar imagem PNG", { variant: "secondary", icon: "baixar", class: "btn--block", onClick: () => baixarPng(pngBtn) });
 
     function atualizarResumo() {
       const sit = pronto(st) ? situacao(calcular(st)) : null;
@@ -354,25 +372,35 @@
       mount(docEl, Documento(st, nomeDaFatura(st, cartoes)));
       copiarPix.hidden = !st.pixCodigo;
       imprimirBtn.disabled = !pronto(st);
+      pngBtn.disabled = !pronto(st);
       avisoPix.textContent = invalido(st) ? "Corrija o valor marcado em vermelho para imprimir a fatura."
-        : pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › Pix." : "";
+        : pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › PIX." : "";
     }
     function atualizarLista() {
       contadorEl.textContent = st.lancamentos && !st.carregando ? String(st.lancamentos.length) : "";
       mount(listaEl, ListaTransacoes(st));
       const ok = pronto(st);
-      mount(periodosEl, ok ? st.periodos.map((p) => h("li", null,
-        p.nome + (p.ultimos4Digitos ? " " + p.ultimos4Digitos : "") + (p.semFechamento ? ": mês inteiro (cadastre o fechamento no cartão para usar o ciclo)"
-        : ": compras de " + F.dataCurta(p.inicio) + " a " + F.dataCurta(p.fim)))) : null);
+      mount(periodosEl, ok ? st.periodos.map((p) => h("li", null, p.nome + (p.ultimos4Digitos ? " " + p.ultimos4Digitos : "") + textoPeriodo(p))) : null);
       mount(recebidosEl, ok ? st.recebimentos.map((l) => h("li", { class: T.recebido },
         h("span", { class: T.itemData }, diaMes(l.data)),
         h("span", { class: T.itemNome }, l.nomeConta || "Conta"),
-        h("span", { class: "money money--income" }, F.moeda(l.valor)))) : null);
+        h("span", { class: "money money--income" }, F.moeda(l.valor)),
+        UI.IconButton("excluir", "Excluir pagamento recebido de " + F.moeda(l.valor) + " em " + F.dataCurta(l.data),
+          { class: "icon-btn--danger", size: 14, onClick: () => excluirPagamento(l) }))) : null);
       receberBtn.disabled = !ok;
       // consulta (Todos ou um cartão): sem ajustes, recebidos e Pix, que são guardados por perfil e mês
       secoesDoPerfil.forEach((s) => s.classList.toggle("tw:hidden", st.consulta));   // as seções são flex: o atributo hidden não basta
       avisoPix.hidden = st.consulta;
       atualizarResumo();
+    }
+    /** Como cada conta entra: fechada (o ciclo), em aberto (só até hoje, com a opção) ou fora; empréstimo pelos vencimentos */
+    function textoPeriodo(p: RespostaFatura["periodos"][number]): string {
+      const de = F.dataCurta(p.inicio), ate = F.dataCurta(p.fim);
+      if (p.emprestimo) return ": vencimentos de " + de + " a " + ate;
+      const ciclo = p.semFechamento ? "mês inteiro (cadastre o fechamento no cartão para usar o ciclo)" : "compras de " + de + " a " + ate;
+      if (!p.aberta) return ": " + ciclo;
+      return st.incluirAberto ? ": fatura em aberto, " + (p.semFechamento ? "mês" : "compras de " + de) + " até hoje (" + F.dataCurta(st.hoje) + ")"
+        : ": fatura em aberto (fecha " + ate + "), fora desta fatura";
     }
     /* Ajustes ficam guardados para o perfil e o mês: grava um pouco depois da última digitação (e ao fechar) */
     let espera: ReturnType<typeof setTimeout> | null = null;
@@ -402,11 +430,11 @@
       if (!st.perfilId) { st.perfil = null; st.erro = null; st.carregando = false; atualizarLista(); return; }
       const chave = chaveFiltro(st);
       st.carregando = true; st.erro = null; atualizarLista();
-      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, cartaoId: st.cartaoId, mes: st.mes, ano: st.ano }).then((d) => {
+      ctx.bridge.request(A.getBoletoData, { perfilId: st.perfilId, cartaoId: st.cartaoId, mes: st.mes, ano: st.ano, incluirAberto: st.incluirAberto }).then((d) => {
         if (meu !== token || chave !== chaveFiltro(st)) return;
         st.carregando = false; st.lancamentos = d.lancamentos || []; st.perfil = d.perfil || (d.todos ? null : st.perfil); st.pix = d.pix || null;
         st.consulta = !!d.consulta;
-        st.recebimentos = d.recebimentos || []; st.saldoAnterior = F.numero(d.saldoAnterior) || 0; st.periodos = d.periodos || [];
+        st.recebimentos = d.recebimentos || []; st.saldoAnterior = F.numero(d.saldoAnterior) || 0; st.periodos = d.periodos || []; st.hoje = d.hoje || st.hoje;
         const aj = d.ajustes || {};
         repor(st.contribuicoes, aj.contribuicoes); repor(st.descontos, aj.descontos); repor(st.arredondamentos, aj.arredondamentos);
         editoresAjuste.forEach((e) => e.desenhar());
@@ -436,12 +464,12 @@
     if (!perfisData) ctx.loadData("perfis", A.getPerfis).then((d) => { perfis = d.perfis || []; preencherPerfis(perfis); carregar(); }).catch(() => null);
     perfilSel.addEventListener("change", () => { st.perfilId = perfilSel.value; st.perfil = perfis.find((p) => p.id === st.perfilId) || null; carregar(); });
 
-    // Cartão: os cartões de crédito cadastrados e, no fim, Todos (todos os cartões do perfil escolhido)
+    // Conta: os cartões de crédito e os empréstimos cadastrados e, no fim, Todos (todos os do perfil escolhido)
     const contasData = ZoZo.store.get().data.contas;
     const cartaoSel = UI.Select([], { name: "cartao" });
     let cartoes: ContaTela[] = [];
     const preencherCartoes = (lista: ContaTela[]) => {
-      cartoes = lista.filter((c) => c.tipo === "cartao");
+      cartoes = lista.filter((c) => c.tipo === "cartao" || c.tipo === "emprestimo");
       clear(cartaoSel);
       cartoes.forEach((c) => cartaoSel.appendChild(h("option", { value: c.id }, c.nome + (c.ultimos4Digitos ? " " + c.ultimos4Digitos : ""))));
       cartaoSel.appendChild(h("option", { value: TODOS }, "Todos"));
@@ -467,7 +495,16 @@
       if (!st.perfilId) { ctx.toast("Selecione um perfil para imprimir.", { tone: "error" }); perfilSel.focus(); return; }
       if (invalido(st)) { ctx.toast("Há um valor inválido nos ajustes da fatura.", { tone: "error" }); return; }
       if (!pronto(st)) { ctx.toast("Espere as transações carregarem para imprimir.", { tone: "error" }); return; }
-      imprimirDocumento(st, nomeDaFatura(st, cartoes));
+      imprimirDocumento(st);
+    }
+    function baixarPng(botao: HTMLButtonElement) {
+      if (!st.perfilId) { ctx.toast("Selecione um perfil.", { tone: "error" }); perfilSel.focus(); return; }
+      if (invalido(st)) { ctx.toast("Há um valor inválido nos ajustes da fatura.", { tone: "error" }); return; }
+      if (!pronto(st)) { ctx.toast("Espere as transações carregarem.", { tone: "error" }); return; }
+      botao.disabled = true;
+      fotografar(Documento(st, nomeDaFatura(st, cartoes)), nomeDoArquivo(st) + ".png")
+        .catch(() => ctx.toast("Não foi possível gerar a imagem. Use Imprimir e salve como PDF.", { tone: "error" }))
+        .finally(() => { botao.disabled = !pronto(st); });
     }
 
     const editoresAjuste: Array<{ desenhar(): void }> = [];
@@ -483,9 +520,22 @@
       if (!pronto(st) || !st.perfil) return;
       ZoZo.modais.receberFatura(ctx, { perfil: st.perfil, mes: st.mes, ano: st.ano, aPagar: calcular(st).aPagar, aoReceber: () => carregar() });
     }
+    /* Excluir um pagamento registrado por engano: a Receita sai da conta (o saldo volta) e a fatura volta a cobrar o valor */
+    function excluirPagamento(l: LancamentoTela) {
+      ZoZo.feedback.confirmarExclusao("Excluir pagamento recebido?",
+        "O pagamento de " + F.moeda(l.valor) + " recebido em " + F.dataCurta(l.data) + " sai desta fatura, e a receita é excluída da conta "
+          + (l.nomeConta || "") + ". Essa ação não pode ser desfeita.")
+        .then((ok) => {
+          if (!ok) return;
+          return ctx.bridge.request(A.deleteLancamento, { id: l.id })
+            .then(() => { ctx.toast("Pagamento excluído."); return ctx.recarregarTudo(); })
+            .then(() => carregar())
+            .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+        });
+    }
     const receberBtn = UI.Button("Registrar pagamento recebido", { variant: "secondary", size: "sm", icon: "mais", class: "btn--block", onClick: () => registrarPagamento() });
     const recebidosEl = h("ul", { class: T.recebidos, "aria-label": "Pagamentos recebidos" });
-    const periodosEl = h("ul", { class: T.periodosCartao, "aria-label": "Período de cada cartão" });
+    const periodosEl = h("ul", { class: T.periodosCartao, "aria-label": "Período de cada conta" });
     const seloEl = h("span", { class: T.selo, role: "status" });
 
     // ajustes e pagamentos recebidos são do perfil e do mês: somem na consulta (Todos ou um cartão)
@@ -498,14 +548,16 @@
     const editor = h("div", { class: T.editor },
       h("section", { class: T.secao },
         UI.Field("Perfil", perfilSel),
-        UI.Field("Cartão", cartaoSel),
+        UI.Field("Conta", cartaoSel),
         h("div", { class: ZoZo.pecas.campo }, h("label", { class: ZoZo.pecas.campoRotulo, for: periodoId }, "Fatura de"), h("div", { class: T.periodo }, mesSel, anoSel), periodosEl),
+        // desmarcada: só faturas de cartão já fechadas e empréstimos; marcada: também as abertas, até hoje
+        UI.Checkbox(false, (v) => { st.incluirAberto = v; carregar(); }, { texto: "Incluir valores em aberto", class: "tw:mt-1" }),
         UI.Field("Data da fatura", dataInput)),
       h("section", { class: T.secao },
         h("h2", { class: T.secaoTitulo }, "Transações", contadorEl),
         listaEl),
       ...secoesDoPerfil,
-      h("section", { class: T.secaoResumo }, seloEl, resumoEl, avisoPix, copiarPix, imprimirBtn));
+      h("section", { class: T.secaoResumo }, seloEl, resumoEl, avisoPix, copiarPix, imprimirBtn, pngBtn));
 
     // área com rolagem própria: focável (Tab) e com nome, para rolar pelo teclado (WCAG 2.1.1)
     const preview = h("div", { class: T.previa, tabindex: "0", role: "region", "aria-label": "Prévia da fatura" }, h("div", { class: T.escala }, docEl));
