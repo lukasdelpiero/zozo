@@ -229,7 +229,7 @@
       const senha = campoSenha("current-password");
       senha.input.dataset.autofocus = "";
       const enviar = botao("Continuar");
-      const captcha = cfg.captchaLogin && cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile) : null;
+      const captcha = cfg.captchaLogin && cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile, "login") : null;
       const msg = aviso(erro);
       const nota = estado.google ? h("p", { class: C.nota }, "E-mail confirmado pelo Google. Digite sua senha do ZoZo: é ela que protege seus dados com criptografia.") : null;
       corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {
@@ -263,7 +263,7 @@
       senha.input.dataset.autofocus = "";
       senha.input.setAttribute("minlength", "8");
       const enviar = botao("Continuar");
-      const captcha = cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile) : null;   // Google já confirmou a pessoa
+      const captcha = cfg.turnstile && !estado.google ? V().Captcha(cfg.turnstile, "cadastro") : null;   // Google já confirmou a pessoa
       const msg = aviso(erro);
       const nota = estado.google ? h("p", { class: C.nota }, "E-mail confirmado pelo Google. Crie a senha do ZoZo: ela é a chave da criptografia dos seus dados e não pode ser recuperada.") : null;
       corpo = h("form", { class: C.form, method: "post", action: "#", novalidate: true, onSubmit: (e: SubmitEvent) => {

@@ -434,13 +434,14 @@ async def _limpar_login(ctx: Contexto, email: str) -> None:
                              f"login|{h}|%", f"conta|{h}", f"2fa|{h}")
 
 
-async def _captcha_ok(ctx: Contexto, token: object) -> bool:
+async def _captcha_ok(ctx: Contexto, token: object, acao: str) -> bool:
     """
     Turnstile. Sem CAPTCHA configurado (nem chave pública nem secreta: desenvolvimento), a etapa é pulada
     (o bloqueio continua valendo). Chave pública SEM a secreta é configuração incompleta: recusa (não
-    deixa a proteção desligada sem ninguém perceber).
+    deixa a proteção desligada sem ninguém perceber). O token tem de ter sido resolvido neste site e na
+    tela certa (`acao`): um token do login não serve para cadastrar.
     """
-    segredo = str(ctx.config.get("TURNSTILE_SECRET") or "")
+    segredo = str(ctx.config.get("TURNSTILE_SECRET") or "").strip()   # espaço ou Enter colado junto no secret put
     if not segredo:
         if str(ctx.config.get("TURNSTILE_SITE_KEY") or ""):
             ctx.evento("captcha_sem_segredo")
@@ -450,12 +451,15 @@ async def _captcha_ok(ctx: Contexto, token: object) -> bool:
         return False
     status, texto = await ctx.servicos.http_post(TURNSTILE_URL, {"secret": segredo, "response": token, "remoteip": ctx.pedido.ip})
     if status != 200:
+        # 400 aqui é quase sempre a chave secreta errada (invalid-input-secret): sem este evento, o cadastro
+        # só mostrava "não foi possível falar com o servidor" e nada aparecia nos registros
+        ctx.evento("captcha_indisponivel", status=status)
         raise Falha(503, "UNAVAILABLE")
     try:
         d = json.loads(texto)
         # o desafio tem de ter sido resolvido NESTE site: a mesma chave pública vale em produção e na prévia
         # (auditoria de segurança 03/11), e um token de outro domínio que use a chave não serve aqui
-        return d.get("success") is True and d.get("hostname") == ctx.pedido.host.split(":")[0]
+        return d.get("success") is True and d.get("hostname") == ctx.pedido.host.split(":")[0] and d.get("action") == acao
     except (ValueError, AttributeError):
         return False
 
@@ -691,7 +695,7 @@ async def _cadastrar(ctx: Contexto) -> Resposta:
     email = _email(b.get("email"))
     if email == DEMO_EMAIL:                       # a conta de demonstração já existe (migração) e não é recriada
         raise Falha(409, "EMAIL_IN_USE")
-    if not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile")):
+    if not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile"), "cadastro"):
         raise Falha(428, "CAPTCHA_REQUIRED")
     sal, it, prova, kdf = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _prova(b.get("prova")), _kdf(b.get("kdf"))
     nome = _nome(b.get("nome"))
@@ -1086,7 +1090,7 @@ async def _entrar(ctx: Contexto) -> Resposta:
         raise bloqueio
     suspeita = conta_lim is not None and ctx.agora - conta_lim["ultima"] < CONTA_JANELA_S and conta_lim["falhas"] >= CONTA_CAPTCHA
     precisa = _proxima(ctx, linha) > LOGIN_SEM_CAPTCHA or suspeita
-    if precisa and not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile")):
+    if precisa and not _google_confirmado(ctx, email) and not await _captcha_ok(ctx, b.get("turnstile"), "login"):
         raise Falha(428, "CAPTCHA_REQUIRED")
     r = await _reservar(ctx, chave)
     if not r:                                         # bloqueado por um pedido simultâneo

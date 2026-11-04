@@ -1,7 +1,7 @@
 /* =============================================================
    ZoZo — Verificação: CAPTCHA (Turnstile), código de 6 dígitos e QR code
    ------------------------------------------------------------
-   • Captcha(sitekey): widget do Cloudflare Turnstile. O script só é
+   • Captcha(sitekey, ação): widget do Cloudflare Turnstile. O script só é
      carregado quando o CAPTCHA é exigido (4ª tentativa de login em diante
      e cadastro). A validação de verdade acontece no servidor.
    • CampoCodigo(cfg): seis caixas de um dígito (avança sozinho, aceita
@@ -33,13 +33,14 @@
     return carregando;
   }
 
-  function Captcha(sitekey: string): CaptchaWidget {
+  function Captcha(sitekey: string, acao: "cadastro" | "login"): CaptchaWidget {
     const el = h("div", { class: "tw:flex tw:justify-center tw:min-h-[65px]", "aria-live": "polite" });
     let token = "", id: string | null = null;
     carregarTurnstile().then((ts) => {
       requestAnimationFrame(() => {                    // espera o elemento estar na página
         id = ts.render(el, {
-          sitekey, language: "pt-br", appearance: "always", "refresh-expired": "auto",
+          sitekey, action: acao, language: "pt-br",   // o servidor confere a ação (_captcha_ok)
+          appearance: "always", "refresh-expired": "auto",
           callback: (t: string) => { token = t; },
           "expired-callback": () => { token = ""; },
           "error-callback": () => { token = ""; },

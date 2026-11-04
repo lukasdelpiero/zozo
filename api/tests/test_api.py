@@ -103,6 +103,7 @@ class FakeServicos:
         self.chamadas = []
         self.captcha_ok = captcha_ok
         self.captcha_host = "zozo.exemplo.com"         # onde o desafio foi resolvido (o Siteverify devolve)
+        self.captcha_status = 200                      # 400 = a Cloudflare recusou a chave secreta
 
     async def http_get(self, url, cabecalhos):
         self.chamadas.append((url, dict(cabecalhos)))
@@ -115,7 +116,10 @@ class FakeServicos:
     async def http_post(self, url, campos):
         self.chamadas.append((url, dict(campos)))
         if url == nucleo.TURNSTILE_URL:
-            return 200, json.dumps({"success": self.captcha_ok and campos.get("response") == "ok", "hostname": self.captcha_host})
+            # token de teste: "ok" (resolvido na tela de cadastro) ou "ok:<ação>" (outra tela)
+            valido, _, acao = str(campos.get("response")).partition(":")
+            return self.captcha_status, json.dumps({"success": self.captcha_ok and valido == "ok", "hostname": self.captcha_host,
+                                                    "action": acao or "cadastro"})
         if url == google.TOKEN:
             return (200, json.dumps({"id_token": self.google_token})) if self.google_token else (400, "{}")
         return 404, ""
@@ -327,6 +331,17 @@ class TesteContaESessao(Base):
         self.assertEqual(self.cadastrar(cli, "novo@exemplo.com", prova()), (503, {"erro": "UNAVAILABLE"}))
         self.assertIsNone(self.con.execute("SELECT 1 FROM contas WHERE email = 'novo@exemplo.com'").fetchone())
 
+    def test_captcha_chave_secreta_recusada(self):
+        # a Cloudflare recusa a chave secreta (400 invalid-input-secret): nada é criado e fica um evento, só com o status
+        cli = Cliente(self.banco, config=dict(CONFIG, TURNSTILE_SECRET=" segredo-turnstile\n"), ip="198.51.100.6")
+        cli.servicos.captcha_status = 400
+        self.assertEqual(self.cadastrar(cli, "novo@exemplo.com", prova(), turnstile="ok"), (503, {"erro": "UNAVAILABLE"}))
+        self.assertIsNone(self.con.execute("SELECT 1 FROM contas WHERE email = 'novo@exemplo.com'").fetchone())
+        eventos = [json.loads(x) for x in cli.logs if '"captcha_indisponivel"' in x]
+        self.assertEqual([e["status"] for e in eventos], [400])
+        self.assertNotIn("segredo-turnstile", "".join(cli.logs))
+        self.assertEqual(cli.servicos.chamadas[-1][1]["secret"], "segredo-turnstile")   # sem o espaço e o Enter colados
+
     def test_cadastro_aberto_e_duplicado(self):
         outro = Cliente(self.banco, ip="198.51.100.1")
         self.assertEqual(self.cadastrar(outro, EMAIL, prova())[1], {"erro": "EMAIL_IN_USE"})
@@ -359,6 +374,8 @@ class TesteContaESessao(Base):
             outro_ip = Cliente(self.banco, config=cfg, ip=f"198.51.100.{20 + i}")            # há limite de cadastros por IP
             outro_ip.servicos.captcha_host = host
             self.assertEqual(self.cadastrar(outro_ip, OUTRO, prova(), turnstile="ok")[0], 428, host)
+        # token resolvido na tela de login (ação "login"): não serve para cadastrar
+        self.assertEqual(self.cadastrar(cli, OUTRO, prova(), turnstile="ok:login")[0], 428)
         self.assertEqual(self.cadastrar(cli, OUTRO, prova(), turnstile="ok")[0], 201)
         url, campos = cli.servicos.chamadas[-1]
         self.assertEqual((url, campos["remoteip"]), (nucleo.TURNSTILE_URL, "198.51.100.10"))
@@ -445,18 +462,18 @@ class TesteBloqueio(Base):
             self.assertEqual(st, 401)
         self.assertTrue(b["captcha"])                                       # avisa que a próxima pede CAPTCHA
         self.assertEqual(self.errar()[1], {"erro": "CAPTCHA_REQUIRED"})     # 4ª sem CAPTCHA: nem conta
-        self.assertEqual(self.errar("ok")[0], 401)                          # 4ª
-        st, b = self.errar("ok")                                            # 5ª → 15 min
+        self.assertEqual(self.errar("ok:login")[0], 401)                          # 4ª
+        st, b = self.errar("ok:login")                                            # 5ª → 15 min
         self.assertEqual((st, b["espera"]), (401, nucleo.BLOQUEIO_1_S))
-        st, b = self.entrar(self.cli, turnstile="ok")                       # nem a senha certa entra agora
+        st, b = self.entrar(self.cli, turnstile="ok:login")                       # nem a senha certa entra agora
         self.assertEqual((st, b["erro"]), (429, "TOO_MANY_ATTEMPTS"))
         self.cli.agora += nucleo.BLOQUEIO_1_S
         for _ in range(4):                                                  # 6ª a 9ª (com CAPTCHA)
-            self.assertEqual(self.errar("ok")[0], 401)
-        st, b = self.errar("ok")                                            # 10ª → 24 h
+            self.assertEqual(self.errar("ok:login")[0], 401)
+        st, b = self.errar("ok:login")                                            # 10ª → 24 h
         self.assertEqual(b["espera"], nucleo.BLOQUEIO_2_S)
         self.cli.agora += nucleo.BLOQUEIO_1_S
-        self.assertEqual(self.entrar(self.cli, turnstile="ok")[0], 429)
+        self.assertEqual(self.entrar(self.cli, turnstile="ok:login")[0], 429)
         # Outro IP (o usuário em outra rede) continua entrando
         casa = Cliente(self.banco, config=self.cfg, ip="192.0.2.99")
         self.assertEqual(self.entrar(casa)[0], 200)
@@ -468,7 +485,8 @@ class TesteBloqueio(Base):
             self.errar(cli=Cliente(self.banco, config=self.cfg, ip=f"10.0.{i}.1"))
         novo = Cliente(self.banco, config=self.cfg, ip="10.9.9.9")
         self.assertEqual(self.entrar(novo)[1], {"erro": "CAPTCHA_REQUIRED"})
-        self.assertEqual(self.entrar(novo, turnstile="ok")[0], 200)
+        self.assertEqual(self.entrar(novo, turnstile="ok")[1], {"erro": "CAPTCHA_REQUIRED"})   # token da tela de cadastro
+        self.assertEqual(self.entrar(novo, turnstile="ok:login")[0], 200)
 
     def test_contador_esquece_depois_de_24h(self):
         for _ in range(3):

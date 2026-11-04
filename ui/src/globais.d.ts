@@ -442,7 +442,7 @@ declare global {
     desabilitar(v: boolean): void; marcarErro(v: boolean): void;
   }
   interface ZoZoVerificacao {
-    Captcha(sitekey: string): CaptchaWidget;
+    Captcha(sitekey: string, acao: "cadastro" | "login"): CaptchaWidget;
     CampoCodigo(cfg?: ConfigCodigo): CampoCodigo6;
     QR(texto: string, px?: number, rotulo?: string, margem?: number): SVGElement;
     protegerSenha(input: HTMLInputElement): HTMLInputElement;

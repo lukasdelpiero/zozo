@@ -130,11 +130,13 @@ async function lerCorpo(req: Request): Promise<Uint8Array | null> {
 }
 
 async function captchaOk(env: Ambiente, token: string, ip: string, host: string): Promise<boolean> {
-  const form = new URLSearchParams({ secret: String(env.TURNSTILE_SECRET), response: token });
+  // trim: espaço ou Enter colado junto no secret put faz a Cloudflare recusar a chave
+  const form = new URLSearchParams({ secret: String(env.TURNSTILE_SECRET).trim(), response: token });
   if (ip) form.set("remoteip", ip);
   try {
     const r = await fetch(TURNSTILE_URL, { method: "POST", body: form, signal: AbortSignal.timeout(ESPERA_MS) });
-    if (!r.ok) return false;
+    // 400 aqui é quase sempre a chave secreta errada (invalid-input-secret): fica um evento, só com o status
+    if (!r.ok) { console.log(JSON.stringify({ evento: "captcha_indisponivel", status: r.status })); return false; }
     const d = (await r.json()) as { success?: unknown; action?: unknown; hostname?: unknown };
     return d.success === true && d.action === ACAO_CAPTCHA && d.hostname === host;
   } catch { return false; }

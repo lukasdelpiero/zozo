@@ -224,6 +224,20 @@ test("CAPTCHA recusado, de outra ação ou de outro domínio: não envia", async
   }
 });
 
+test("Chave secreta recusada pela Cloudflare: não envia e registra só o status", async () => {
+  globalThis.fetch = async (url, init) => {
+    chamadas.push({ url: String(url), init });
+    return new Response('{"success":false,"error-codes":["invalid-input-secret"]}', { status: 400 });
+  };
+  const r = await resposta(await contato(pedido(), ambiente({ TURNSTILE_SECRET: " segredo\n" })));
+  assert.equal(r.status, 400);
+  assert.ok(!enviou());
+  assert.equal(new URLSearchParams(String(chamadas[0].init.body)).get("secret"), "segredo");   // sem o espaço e o Enter
+  const eventos = logs.map((l) => JSON.parse(l)).filter((e) => e.evento === "captcha_indisponivel");
+  assert.deepEqual(eventos, [{ evento: "captcha_indisponivel", status: 400 }]);
+  assert.ok(!logs.join("").includes("segredo"));
+});
+
 test("Turnstile fora do ar: recusa (falha fechada)", async () => {
   globalThis.fetch = async () => { throw new Error("rede"); };
   assert.equal((await contato(pedido(), ambiente())).status, 400);
