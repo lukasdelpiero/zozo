@@ -1,10 +1,10 @@
 /* =============================================================
-   ZoZo — tipos globais (transição para TypeScript)
+   ZoZo — tipos globais da interface
    ------------------------------------------------------------
-   A interface ainda é formada por módulos que se registram em
-   window.ZoZo (js/**). Cada módulo convertido para .ts ganha aqui
-   o tipo da sua API; os que ainda são .js ficam como `any` até
-   serem convertidos (um por vez).
+   Os módulos de js/** são TypeScript e se registram em window.ZoZo;
+   aqui fica o tipo da API de cada um (os dados do documento estão
+   em src/dados.d.ts). Os mapas de classes (estrutura, pecas) vêm
+   com os nomes fechados dos próprios arquivos.
    ============================================================= */
 export {};
 
@@ -30,7 +30,7 @@ declare global {
     ajusteEmoji(texto: string, fontes?: string): string;
   }
 
-  /** js/core/state.ts — estado central (os dados de cada tela ainda são `any`: vêm de módulos em JS) */
+  /** js/core/state.ts — estado central (os dados de cada tela têm os tipos de src/dados.d.ts) */
   type RecursoConta = "perfis" | "boleto" | "pix" | "cambio" | "faturaDia11";
   interface UsuarioSessao {
     nomeUsuario?: string;
@@ -305,11 +305,13 @@ declare global {
     atualizarLinhas?(state: EstadoZoZo, ctx: ContextoApp): boolean;
   }
   interface Roteador {
-    navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
+    navigate(id: string, opts?: OpcoesNavegar): void;
     refreshTopbar(): void;
     current(): PaginaZoZo | null;
   }
-  interface ZoZoRouter { create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador }
+  /** historico: "empilhar" (padrão: Voltar volta para a anterior), "substituir" (entrada, redirecionamento) ou "nao" (Voltar/Avançar) */
+  interface OpcoesNavegar { force?: boolean; select?: { tipo: string; id: string }; historico?: "empilhar" | "substituir" | "nao" }
+  interface ZoZoRouter { create(ctx: ContextoApp, topbar: BarraSuperior, mainEl: HTMLElement): Roteador; rotaDoEndereco(): string | null }
 
   /** js/components/feedback.ts — aviso (toast), janela modal e confirmação */
   /** importante: mostra mesmo uma confirmação (tone "success"), que normalmente não aparece */
@@ -474,7 +476,7 @@ declare global {
     Input(opts?: OpcoesEntrada): HTMLInputElement;
     Select(options: OpcaoLista[], opts?: OpcoesLista): HTMLSelectElement;
     Textarea(opts?: { class?: string; name?: string; rows?: number; placeholder?: string; ariaLabel?: string; value?: string }): HTMLTextAreaElement;
-    Toggle(label: string, opts?: { checked?: boolean; onChange?: (ligado: boolean) => void }): HTMLElement;
+    Toggle(label: string, opts?: { checked?: boolean; ariaLabel?: string; onChange?: (ligado: boolean) => void }): HTMLElement;
     Tag(nome: string | null | undefined, cor: unknown, opts?: { class?: string; placeholder?: string; onClick?: (e: MouseEvent) => void; title?: string }): HTMLElement | null;
     CategoryLabel(cat: CategoriaRotulo | null | undefined, opts?: { pill?: boolean; class?: string; vazio?: string }): HTMLElement | null;
     PercentageChange(valor: unknown, opts?: { plain?: boolean; class?: string; title?: string; contexto?: string; passivo?: boolean }): HTMLElement;
@@ -502,7 +504,7 @@ declare global {
   /** js/components/pecas.ts — classes montadas por função (variante do botão) */
   interface ZoZoPecasFn { botao(variante?: string, pequeno?: boolean, cheio?: boolean): string; botaoIcone(tom?: string, pequeno?: boolean): string }
 
-  /** js/components/list.ts — linhas das listas (itens do documento ainda como any) */
+  /** js/components/list.ts — linhas das listas (itens com os tipos de src/dados.d.ts) */
   interface ZoZoList {
     ListaPainel<L extends LancamentoTela>(itens: L[], opts?: { onClick?: (l: L) => void; valorDe?: (l: L) => number; semMais?: boolean }): HTMLElement;
     LaunchRow(l: LancamentoTela, opts?: Record<string, unknown>): HTMLElement;
@@ -600,7 +602,7 @@ declare global {
     /** Lê pelo estado (store.data[key]) ou pela ação que preenche a chave; o tipo vem de DadosEstado */
     loadData<K extends ChaveDados>(key: K, action: LeituraDaChave[K], payload?: unknown, opts?: { force?: boolean }): Promise<DadosEstado[K]>;
     invalidate(keys: string[]): void;
-    navigate(id: string, opts?: { force?: boolean; select?: { tipo: string; id: string } }): void;
+    navigate(id: string, opts?: OpcoesNavegar): void;
     abrirConfiguracoes(aba?: string): void;
     recarregarTudo(): Promise<unknown>;
     router: Roteador;
@@ -613,7 +615,7 @@ declare global {
   }
 
   /* ---------- Módulos das páginas (o que cada um expõe em window.ZoZo) ---------- */
-  /** js/data/servico.js (ainda em JavaScript): regras financeiras sobre o documento decifrado */
+  /** js/data/servico.ts: regras financeiras sobre o documento decifrado */
   interface ZoZoServico {
     /** a resposta é RespostaDe<ação> (quem chama pela ponte recebe o tipo certo: transporte.ts) */
     handle(action: string, data?: unknown): Promise<unknown>;
@@ -750,7 +752,7 @@ declare global {
   interface TelaZo {
     abrirFatura(o: { perfilId: string | null; cartaoId: string; mes: number; ano: number }): void;
     filtrar(filtros: Partial<FiltrosLancamentos>, busca: string): void;
-    abrirConfiguracoes(aba: "geral" | "conta"): void;
+    abrirConfiguracoes(aba: "geral" | "conta" | "seguranca"): void;
     exportar(): Promise<void>;
     sair(): void;
     seguranca(): Promise<{ doisFatores: boolean; protecaoAvancada: boolean }>;
@@ -792,9 +794,9 @@ declare global {
     format: ZoZoFormat;
     busca: ZoZoBusca;
     /** js/components/estrutura.ts — classes Tailwind do menu lateral, barra superior e painel */
-    estrutura: Readonly<Record<string, string>>;
+    estrutura: import("../js/components/estrutura.ts").ClassesEstrutura;
     /** js/components/pecas.ts — classes Tailwind das peças compartilhadas (ui.ts e afins) */
-    pecas: Readonly<Record<string, string>>;
+    pecas: import("../js/components/pecas.ts").ClassesPecas;
     pix: ZoZoPix;
     icons: ZoZoIcons;
     regras: ZoZoRegras;

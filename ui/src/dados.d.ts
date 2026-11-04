@@ -220,7 +220,7 @@ declare global {
     /** documento decifrado (o serviço confere tudo em normalizar); aviso: restaurado da cópia, documento sumido… */
     loadUserData: { documento: unknown; aviso: string | null; somenteLeitura?: boolean };
     saveUserData: { salvo: boolean };
-    /** recuperacaoPendente: a senha mudou, mas a cópia nova da chave não foi guardada (Configurações › Conta repara) */
+    /** recuperacaoPendente: a senha mudou, mas a cópia nova da chave não foi guardada (Configurações › Segurança repara) */
     changePassword: { alterada: boolean; recuperacaoPendente?: boolean };
     updateUser: RespostaSessao;
     wipeUserData: { apagado: boolean };

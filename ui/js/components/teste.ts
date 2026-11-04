@@ -138,9 +138,10 @@
     const CC = "Configurações e confirmações";
     add(J, CC, "janela", "Configurações: Geral", () => ZoZo.configuracoes.abrir(ctx, "geral"));
     add(J, CC, "janela", "Configurações: Conta", () => ZoZo.configuracoes.abrir(ctx, "conta"));
+    add(J, CC, "janela", "Configurações: Segurança", () => ZoZo.configuracoes.abrir(ctx, "seguranca"));
     add(J, CC, "janela", "Configurações: Sobre", () => ZoZo.configuracoes.abrir(ctx, "sobre"));
     add(J, CC, "janela", "2FA: ativar (passo a passo)", () => {
-      ZoZo.configuracoes.abrir(ctx, "conta");
+      ZoZo.configuracoes.abrir(ctx, "seguranca");
       setTimeout(() => { const b = Array.from(document.querySelectorAll<HTMLButtonElement>(".modal button")).find((x) => /Ativar 2FA|Desativar 2FA/.test(x.textContent || "")); if (b) b.click(); }, 400);
     });
     add(J, CC, "janela", "2FA: desativar (código)", () => ZoZo.configuracoes.desativar2FA(ctx));
@@ -284,7 +285,7 @@
      Ao criar uma confirmação nova no app, acrescente-a aqui também. */
   const CONFIRMACOES: Array<[string, string, string, OpcoesConfirmacao?]> = [
     ["Excluir transação", "Excluir transação?", "Tem certeza de que deseja excluir esta transação?"],
-    ["Excluir transação parcelada", "Excluir transação?", "Tem certeza de que deseja excluir esta transação? As parcelas futuras desta compra também serão excluídas; as já pagas continuam."],
+    ["Excluir transação parcelada", "Excluir transação?", "Tem certeza de que deseja excluir esta transação? As parcelas futuras desta compra também serão excluídas. As parcelas já pagas continuam."],
     ["Excluir várias transações", "Excluir transações?", "Tem certeza de que deseja excluir estas 3 transações?"],
     ["Remover recorrência (da transação)", "Remover recorrência?", "As parcelas e ocorrências futuras desta série serão excluídas. As transações já lançadas continuam, sem recorrência. Essa ação não pode ser desfeita.", { confirmar: "Remover" }],
     ["Excluir recorrência", "Excluir recorrência?", "Isso removerá a recorrência e o vínculo com as transações. Não é possível desfazer essa ação.", { cancelar: "Manter recorrência", confirmar: "Excluir recorrência" }],

@@ -10,7 +10,7 @@
    • Só caracteres ASCII entram no código (a chave é validada pelo
      formato do DICT): tamanho dos campos e CRC ficam corretos.
    • A chave e o nome ficam no documento CIFRADO do usuário
-     (Configurações › Geral › Pix), nunca no código do site.
+     (Configurações › Geral › PIX), nunca no código do site.
    TypeScript: tipos da API em src/globais.d.ts (ZoZoPix).
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {

@@ -1,5 +1,5 @@
 /* =============================================================
-   ZoZo — portfólio: formulário de contato (#contato)
+   ZoZo — portfólio: carrossel dos prompts e formulário de contato (#contato)
    ------------------------------------------------------------
    Campos nome, e-mail, título e mensagem + CAPTCHA (Turnstile, ação "contato") → POST /portfolio/contato
    (api/portfolio/src/contato.ts). As regras daqui só ajudam quem preenche: o servidor confere tudo de
@@ -124,6 +124,24 @@ function iniciar(form: HTMLFormElement): void {
     }
   });
 }
+
+/** Carrossel dos prompts: os botões andam um cartão por vez e se apagam nas pontas (o dedo também rola no celular) */
+function carrossel(g: HTMLElement, ant: HTMLButtonElement, prox: HTMLButtonElement): void {
+  const passo = () => { const c = g.querySelector(".cartao"); return c ? c.getBoundingClientRect().width + 16 : g.clientWidth * 0.8; };
+  const atualiza = () => {
+    ant.disabled = g.scrollLeft <= 4;
+    prox.disabled = g.scrollLeft + g.clientWidth >= g.scrollWidth - 4;
+  };
+  ant.addEventListener("click", () => g.scrollBy({ left: -passo(), behavior: "smooth" }));
+  prox.addEventListener("click", () => g.scrollBy({ left: passo(), behavior: "smooth" }));
+  g.addEventListener("scroll", atualiza, { passive: true });
+  window.addEventListener("resize", atualiza);
+  atualiza();
+}
+
+const galeria = document.getElementById("galeria-prompts");
+const anterior = document.getElementById("anterior"), proximo = document.getElementById("proximo");
+if (galeria && anterior instanceof HTMLButtonElement && proximo instanceof HTMLButtonElement) carrossel(galeria, anterior, proximo);
 
 const form = document.querySelector<HTMLFormElement>("#form-contato");
 if (form) iniciar(form);

@@ -388,7 +388,7 @@
           check.hidden = false;                                     // ✓ ao lado de "Insira o código de seis dígitos."
           store.set({ session: { user: r.user || null } });
           if (aoAtivar) aoAtivar();
-          setTimeout(() => { fechar(); ctx.toast("Autenticação de dois fatores ativada."); if (r.codigosBackup && r.codigosBackup.length) mostrarCodigosBackup(ctx, r.codigosBackup); }, 700);
+          setTimeout(() => { fechar(); ctx.toast("Verificação em duas etapas ativada."); if (r.codigosBackup && r.codigosBackup.length) mostrarCodigosBackup(ctx, r.codigosBackup); }, 700);
         }).catch((e: ErroPonte) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
@@ -401,12 +401,12 @@
       h("span", { class: P2.numero, "aria-hidden": "true" }, String(n)),
       h("div", null, h("p", { class: P2.passoTitulo }, titulo, n === 4 ? check : null), extra || null));
 
-    const painel = h("div", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Autenticação de Dois Fatores" },
+    const painel = h("div", { class: P2.painel, role: "dialog", "aria-modal": "false", "aria-label": "Verificação em duas etapas" },
       h("header", { class: P2.topo },
-        h("h3", { class: P2.titulo }, "Autenticação de Dois Fatores"),
+        h("h3", { class: P2.titulo }, "Verificação em duas etapas"),
         h("button", { type: "button", class: ZoZo.pecasFn.botaoIcone(), "aria-label": "Fechar", onClick: fechar }, icon("fechar"))),
       h("ol", { class: P2.passos },
-        passo(1, PASSOS_2FA[0], h("p", { class: P2.dica }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator, Authy ou o do seu gerenciador de senhas.")),
+        passo(1, PASSOS_2FA[0], h("p", { class: P2.dica }, "Não tem um? Use o Google Authenticator, Microsoft Authenticator ou outro de sua preferência.")),
         passo(2, PASSOS_2FA[1]),
         passo(3, PASSOS_2FA[2], h("div", null, qrArea, h("div", { class: P2.chaveLinha }, chaveTexto, copiar))),
         passo(4, PASSOS_2FA[3], h("div", null, campo.el, erro))));
@@ -491,7 +491,7 @@
    */
   function linhaBiometria(ctx: ContextoApp, u: UsuarioSessao) {
     const P = ZoZo.pecas;
-    const sub = h("span", { class: P.cfgSub }, "Confirme ações sem volta com a digital, o rosto ou o PIN do aparelho.");
+    const sub = h("span", { class: P.cfgSub }, "Utilize biometria ou PIN para executar ações de acesso restrito.");
     const lista = h("ul", { class: "tw:m-0 tw:mt-2 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-1.5 tw:empty:hidden", "aria-label": "Biometrias cadastradas" });
     // o servidor grava em UTC: a data mostrada é a do aparelho (no fim da noite, UTC já é o dia seguinte)
     const dataBr = (iso: string | null) => { const d = iso ? new Date(iso) : null; return d && !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : ""; };
@@ -537,7 +537,7 @@
         ctx.bridge.request(A.desativar2FA, { codigo }).then((r) => {
           janela.fechar(true);
           store.set({ session: { user: r.user || null } });
-          ctx.toast("Autenticação de dois fatores desativada.");
+          ctx.toast("Verificação em duas etapas desativada.");
         }).catch((e: ErroPonte) => {
           erros += 1;
           erro.textContent = e.code === "TOO_MANY_ATTEMPTS" || e.espera ? FR.TOO_MANY_ATTEMPTS : e.code === "CODE_INVALID" ? (erros === 1 ? FR.CODE_INVALID : FR.CODE_INVALID_AGAIN) : e.friendly;
@@ -546,7 +546,7 @@
       },
     });
     const janela = ZoZo.feedback.modal({
-      title: "Desativar 2FA?", class: "modal--confirm",
+      title: "Desativar verificação em duas etapas?", class: "modal--confirm",
       body: h("div", null,
         h("p", { class: ZoZo.estrutura.modalTextoConfirmacao }, "Você não precisará mais de um código para entrar, mas a conta perde a camada extra de segurança. Para confirmar, digite o código atual do seu aplicativo 2FA ou um código de backup."),
         campo.el, erro),
@@ -636,7 +636,7 @@
       erro);
   }
 
-  /* ---------------- Configurações: Geral | Conta ---------------- */
+  /* ---------------- Configurações: Geral | Conta | Segurança | Sobre ---------------- */
   const FRASE_EXCLUIR = "EXCLUIR CONTA";        // o servidor exige exatamente esta frase para excluir a conta
   let abaConfig = "geral";
 
@@ -666,7 +666,7 @@
       entrada.disabled = true;
       ZoZo.modais.confirmarSeguro(ligar
         ? { titulo: "Ativar proteção avançada?", botao: "Ativar", senha: true,
-          mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados: a conta recomeça vazia. Digite sua senha para confirmar.",
+          mensagem: "Só você conseguirá abrir seus dados. Se esquecer a senha, eles não poderão ser recuperados. Digite sua senha para confirmar.",
           executar: ({ senha }) => ctx.bridge.request(A.setProtecao, { avancada: true, senha }, { timeout: 120000 }).then(mostrar) }
         : { titulo: "Desativar proteção avançada?", botao: "Desativar", senha: true, codigo2FA: com2FA,
           mensagem: "Se esquecer a senha, você poderá recuperar seus dados pelo link enviado ao seu e-mail. Digite sua senha"
@@ -678,7 +678,7 @@
     const entrada = interruptor.querySelector("input") as HTMLInputElement;
     entrada.disabled = true;                            // até saber o estado atual
     ctx.bridge.request(A.getProtecao).then((r) => { mostrar(r); entrada.disabled = false; }).catch(() => null);
-    return [linhaConfig("Proteção avançada", "Só você abre seus dados. Se esquecer a senha, a conta recomeça vazia (sem recuperação pelo e-mail).", interruptor), pendente];
+    return [linhaConfig("Proteção avançada", "Aumente a privacidade dos seus dados.", interruptor), pendente];
   }
 
   function linhaConfig(titulo: string, sub: string | null, direita: FilhoDom) {
@@ -702,7 +702,7 @@
       const P = ZoZo.pecas;
       const nav = h("nav", { class: CF.nav, "aria-label": "Seções das configurações" },
         h("p", { class: CF.navTitulo }, "Configurações"),
-        [["geral", "configuracoes", "Geral"], ["conta", "perfil", "Conta"], ["sobre", "info", "Sobre"]].map(([id, ic, rot]) => h("button", {
+        [["geral", "configuracoes", "Geral"], ["conta", "perfil", "Conta"], ["seguranca", "escudo", "Segurança"], ["sobre", "info", "Sobre"]].map(([id, ic, rot]) => h("button", {
           type: "button", class: abaConfig === id ? CF.navItemAtivo : CF.navItem, "aria-current": abaConfig === id ? "page" : undefined,
           onClick: () => { abaConfig = id; redesenhar(); },
         }, icon(ic, { size: 16 }), h("span", null, rot))));
@@ -715,11 +715,23 @@
         conteudo = [
           h("h3", { class: "tw:m-0 tw:mb-(--space-2) tw:pb-(--space-2) tw:border-b tw:border-zz-border tw:text-(length:--t-15) tw:font-[550]" }, "Sobre"),
           linha("Versão", "ZoZo v" + ZoZo.sobre.versao),
+          linha("Autor", ZoZo.sobre.autor),
           linha("Novidades", h("button", { type: "button", class: "tw:[border:0] tw:bg-transparent tw:p-0 tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline",
             onClick: () => ZoZo.novidades.abrir() }, "O que há de novo")),
-          linha("Autor", ZoZo.sobre.autor),
           linha("Termos", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/termos-uso", target: "_blank", rel: "noopener" }, "Termos de uso")),
           linha("Privacidade", h("a", { class: "tw:text-zz-primary tw:underline-offset-2 tw:hover:underline", href: "/politica-privacidade", target: "_blank", rel: "noopener" }, "Política de privacidade")),
+        ];
+      } else if (abaConfig === "seguranca") {
+        // Segurança: verificação em duas etapas, códigos de backup, biometria e proteção avançada
+        conteudo = [
+          h("h3", { class: P.cfgSecao }, "Proteção"),
+          demo && ZoZo.demonstracao.avisos() ? h("p", { class: CF.nota }, "Conta de demonstração: a verificação em duas etapas, a biometria e a proteção avançada ficam disponíveis na sua própria conta.") : null,
+          demo ? null : linhaConfig("Verificação em duas etapas", null, u.doisFatores
+            ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
+            : UI.Button("Ativar 2FA", { size: "sm", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
+          demo || !u.doisFatores ? null : linhaCodigosBackup(ctx),
+          demo ? null : linhaBiometria(ctx, u),
+          demo ? null : linhaProtecao(ctx),
         ];
       } else if (abaConfig === "geral") {
         conteudo = [
@@ -727,11 +739,11 @@
           linhaConfig("Ativar orçamento", "Definir orçamentos mensais para as categorias",
             ZoZo.modais.Interruptor("", cfg.orcamentoAtivo !== false, (v) => ctx.bridge.request(A.updateConfig, { orcamentoAtivo: v })
               .then(() => { ctx.toast(v ? "Orçamento ativado." : "Orçamento desativado."); return ctx.loadData("config", A.getConfig, null, { force: true }); }).then(() => ctx.recarregarTudo()).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })), "Ativar orçamento")),
-          // Pix das faturas: só contas com o recurso
-          ZoZo.recursos.pix() ? h("h3", { class: P.cfgSecao }, "Pix das faturas") : null,
-          ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
           h("h3", { class: P.cfgSecao }, "Multicâmbio"),
           ZoZo.cambio.SecaoConfig(ctx, cfg),
+          // PIX das faturas: só contas com o recurso
+          ZoZo.recursos.pix() ? h("h3", { class: P.cfgSecao }, "PIX") : null,
+          ZoZo.recursos.pix() ? SecaoPix(ctx, cfg, u) : null,
           h("h3", { class: P.cfgSecao }, "Armazenamento"),
           linhaConfig(
             demo ? "Conta de demonstração: os dados são fictícios, gerados neste navegador a cada acesso, e nada é salvo."
@@ -764,7 +776,7 @@
             senhaAtual.value = ""; novaSenha.value = "";
             ctx.toast("Senha alterada.", { tone: "success", importante: true });
             // a cópia nova da chave não foi guardada: a linha "Recuperação pendente" aparece ao redesenhar
-            if (r && typeof r === "object" && r.recuperacaoPendente) { ctx.toast("Guarde a cópia de recuperação em Configurações › Conta.", { tone: "aviso" }); redesenhar(); }
+            if (r && typeof r === "object" && r.recuperacaoPendente) { ctx.toast("Guarde a cópia de recuperação em Configurações › Segurança.", { tone: "aviso" }); redesenhar(); }
           };
           let resposta: RespostaDe<"changePassword"> | undefined;
           if (u.doisFatores) {
@@ -819,12 +831,6 @@
           demo ? null : h("div", { class: P.cfgLinhaBloco },
             h("div", { class: P.cfgTexto }, h("span", { class: P.cfgTitulo }, "Alterar senha")),
             h("div", { class: CF.senha }, senhaAtualCampo, novaSenhaCampo, UI.Button("Alterar", { size: "sm", onClick: (e) => alterarSenha(e.currentTarget as HTMLButtonElement) }))),
-          demo ? null : linhaConfig("Autenticação de Dois Fatores", null, u.doisFatores
-            ? UI.Button("Desativar 2FA", { size: "sm", onClick: () => desativar2FA(ctx) })
-            : UI.Button("Ativar 2FA", { size: "sm", variant: "primary", onClick: (e) => abrirPainel2FA(ctx, (e.currentTarget as HTMLElement).closest(".modal")) })),
-          demo || !u.doisFatores ? null : linhaCodigosBackup(ctx),
-          demo ? null : linhaBiometria(ctx, u),
-          demo ? null : linhaProtecao(ctx),
           h("h3", { class: P.cfgSecao }, "Ações"),
           linhaConfig(cfg.multicambio ? "Exportar as transações em " + (({ BRL: "Real", EUR: "Euro", USD: "Dólar" } as Record<string, string>)[cfg.moeda || "BRL"] || "Real") : "Exportar todas as transações",
             "Baixe seus dados em um arquivo CSV" + (cfg.multicambio ? " (só a moeda escolhida no menu)" : "") + ". O arquivo não é cifrado: guarde-o em local seguro.", UI.Button("Baixar", { size: "sm", icon: "baixar", onClick: (e) => exportarCsv(ctx, e.currentTarget as HTMLButtonElement) })),
@@ -878,7 +884,7 @@
       const ativo = document.activeElement;
       if (!ativo || !area.contains(ativo) || ativo.tagName !== "INPUT") principal();
     });
-    abaConfig = aba === "conta" || aba === "sobre" ? aba : "geral";
+    abaConfig = aba === "conta" || aba === "seguranca" || aba === "sobre" ? aba : "geral";
     principal();
     ctx.loadData("config", A.getConfig, null, { force: true }).catch(() => null);
   }

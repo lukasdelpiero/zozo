@@ -183,7 +183,7 @@ test("Zo: configurações com confirmação; Pix e ações seguras só pela tela
   const leitura = JSON.parse((await zo.executar("ler_configuracoes", "{}")).resultado);
   assert.deepEqual([leitura.orcamento_ligado, leitura.dois_fatores, leitura.protecao_avancada, leitura.pix_cadastrado], [false, true, false, false]);
   // senha, 2FA, apagar e excluir: abre a tela segura (nada passa pelo chat)
-  for (const [assunto, aba] of [["senha", "conta"], ["dois_fatores", "conta"], ["excluir_conta", "conta"], ["apagar_dados", "conta"], ["pix", "geral"]]) {
+  for (const [assunto, aba] of [["senha", "conta"], ["dois_fatores", "seguranca"], ["excluir_conta", "conta"], ["apagar_dados", "conta"], ["pix", "geral"]]) {
     const r = JSON.parse((await zo.executar("abrir_configuracoes", args({ assunto }))).resultado);
     assert.equal(r.aberta, true, assunto);
     assert.deepEqual(chamadas.at(-1), ["configuracoes", aba], assunto);

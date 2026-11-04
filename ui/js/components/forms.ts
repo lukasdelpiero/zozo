@@ -35,7 +35,7 @@
       const opcoes = (campo.opcoes || []).map((o) => (typeof o === "string" ? { value: o, label: o } : o));
       const sel: HTMLSelectElement = UI.Select(opcoes, { name: campo.nome, value: valor === undefined || valor === null ? "" : String(valor) });
       sel.addEventListener("change", aoMudar);
-      return { el: sel, ler: () => sel.value, foco: sel };
+      return { el: sel, ler: () => sel.value, foco: sel, input: sel };      // input: recebe aria-invalid como os outros
     }
     if (t === "cor") {
       let atual = F.cor(valor, ZoZo.regras.paleta[9]);
@@ -131,14 +131,20 @@
 
         form.addEventListener("submit", (e) => {
           e.preventDefault();
-          itens.forEach(({ c }) => { if (c.input) { c.input.removeAttribute("aria-invalid"); c.input.removeAttribute("aria-describedby"); } });
+          // o erro vai junto da dica do campo (aria-describedby original guardado em data-descr), nunca no lugar dela
+          const descrever = (el: HTMLElement, comErro: boolean) => {
+            if (el.dataset.descr === undefined) el.dataset.descr = el.getAttribute("aria-describedby") || "";
+            const ids = (el.dataset.descr + (comErro ? " " + erroId : "")).trim();
+            if (ids) el.setAttribute("aria-describedby", ids); else el.removeAttribute("aria-describedby");
+          };
+          itens.forEach(({ c }) => { if (c.input) { c.input.removeAttribute("aria-invalid"); descrever(c.input, false); } });
           const faltando = itens.filter(({ campo, c, wrap }) => {
             if (wrap.hidden || !campo.obrigatorio) return false;
             const v = c.ler();
             return v === "" || v === null || (typeof v === "number" && !Number.isFinite(v));
           });
           if (faltando.length) {
-            faltando.forEach(({ c }) => { if (c.input) { c.input.setAttribute("aria-invalid", "true"); c.input.setAttribute("aria-describedby", erroId); } });
+            faltando.forEach(({ c }) => { if (c.input) { c.input.setAttribute("aria-invalid", "true"); descrever(c.input, true); } });
             erroEl.textContent = "Preencha os campos obrigatórios: " + faltando.map((x) => x.campo.rotulo).join(", ") + ".";
             if (faltando[0].c.foco) faltando[0].c.foco.focus();
             return;

@@ -1,0 +1,54 @@
+/* =============================================================
+   ZoZo — tema compartilhado do Tailwind: cores e medidas dos tokens (css/tokens.css) e as variantes de tela.
+   Importado pela entrada do app (estilos.css) e pela do portfólio (estilos-portfolio.css).
+   ============================================================= */
+@theme inline {
+  --color-zz-primary: var(--color-primary);
+  --color-zz-surface: var(--color-surface);
+  --color-zz-surface-hover: var(--color-surface-hover);
+  --color-zz-border: var(--color-border);
+  --color-zz-text: var(--color-text-primary);
+  --color-zz-secondary: var(--color-text-secondary);
+  --color-zz-muted: var(--color-text-muted);
+  --color-zz-cinza: var(--color-text-cinza);
+  --color-zz-positive: var(--color-positive);
+  --color-zz-primary-soft: var(--color-primary-soft);
+  --color-zz-primary-softer: var(--color-primary-softer);
+  --color-zz-border-strong: var(--color-border-strong);
+  --color-zz-warning-soft: var(--color-warning-soft);
+  --color-zz-warning-text: var(--color-warning-text);
+  --radius-zz-sm: var(--radius-small);
+  --radius-zz-md: var(--radius-medium);
+  --font-zz: var(--font-family, inherit);
+}
+
+/* Base dos componentes (components/pecas.ts): :where(&) tem especificidade zero, então qualquer classe
+   passada por quem usa o componente — ou um ajuste por contexto no contêiner — vence a base sem "!" */
+@custom-variant base (:where(&));
+/* Telas do ZoZo: celular (≤ 640 px) e janela baixa no computador — mesmos cortes do CSS legado */
+@custom-variant celular (@media (max-width: 640px));
+@custom-variant tela-baixa (@media (max-height: 640px) and (min-width: 641px));
+/* Estrutura (menu lateral, barra superior e painel; components/estrutura.ts). Declaradas ANTES de "gaveta":
+   assim as regras do celular vêm depois no CSS gerado e vencem as das larguras maiores */
+@custom-variant computador (@media (min-width: 601px));
+@custom-variant largo (@media (min-width: 901px));
+@custom-variant painel-gaveta (@media (max-width: 1180px));   /* painel de informações vira gaveta sobreposta */
+@custom-variant estreito (@media (max-width: 900px));         /* menu lateral só com ícones */
+@custom-variant ate700 (@media (max-width: 700px));       /* Configurações: abas em cima */
+@custom-variant ate520 (@media (max-width: 520px));
+/* Menu lateral vira gaveta (≤ 600 px) */
+@custom-variant gaveta (@media (max-width: 600px));
+/* Largura da ÁREA (não da tela): .main, .detail__body e .dash-area são containers. Ex.: com o painel
+   aberto a lista fica estreita mesmo num monitor grande — as colunas saem conforme o espaço real. */
+@custom-variant area620 (@container (max-width: 620px));
+@custom-variant area560 (@container (max-width: 560px));
+@custom-variant area480 (@container (max-width: 480px));
+@custom-variant area460 (@container (max-width: 460px));
+@custom-variant area420 (@container (max-width: 420px));
+@custom-variant area340 (@container (max-width: 340px));
+/* Orçamento desligado nas Configurações (#app.sem-orcamento): barras e valores de orçamento somem */
+@custom-variant sem-orcamento (&:where(#app.sem-orcamento *));
+/* Dashboard "cabe na tela" (classe .dash--na-tela posta por pages/dashboard.ts): vale para a página e o que está dentro */
+@custom-variant na-tela (&:where(.dash--na-tela, .dash--na-tela *));
+/* Janela até 860 px de altura (notebooks): menos respiro no Dashboard que cabe na tela */
+@custom-variant baixa860 (@media (max-height: 860px));

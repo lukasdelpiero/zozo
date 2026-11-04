@@ -3,7 +3,7 @@
    LaunchRow · AccountRow · CategoryRow · CategoryGroupRow
    RecurrenceRow · AllocationRow · SidebarAccountGroup
    TypeScript: as opções de cada linha estão tipadas abaixo; os itens (lançamento, conta…) vêm do
-   documento do usuário (serviço de dados, ainda em JS) e ficam como `any` até ele ser convertido.
+   serviço de dados (data/servico.ts), com os tipos de src/dados.d.ts.
    ============================================================= */
 (function (ZoZo: ZoZoGlobal) {
   "use strict";

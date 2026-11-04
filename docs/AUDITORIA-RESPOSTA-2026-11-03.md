@@ -57,3 +57,63 @@ Os 12 achados corrigidos continuam no código (conferidos um a um). Pendências:
 | WAF e limites da zona | Continuam a conferir no painel da Cloudflare |
 
 Achado novo na conferência: o segredo `GEMINI_API_KEY` continua no Worker de produção, sem uso desde a troca de provedor.
+
+
+---
+
+# Segunda rodada — `AUDITORIA-SEGURANCA-2026-11-03.md` e `AUDITORIA-UI-UX-2026-11-03.md`
+
+As duas foram feitas sobre o commit `c84d64f` (antes das correções da primeira rodada); cada item foi conferido de novo
+no código atual. Os scripts de reprodução do Codex (`ui/tests/auditoria-protecao.mjs`, `api/tests/auditoria_20261103.py`,
+`scripts/auditoria-*.py`) afirmam o comportamento vulnerável; viraram testes que afirmam o comportamento seguro
+(abaixo) e ficam fora do repositório, como os logs `audit-*`.
+
+Verificação: `npm test` 207/207 · `npm run typecheck` sem erros · `npm run build` e `build:portfolio` ok · API
+`unittest` 176/176 · `mypy` sem erros · `uv lock` em dia. Navegador (Edge sem janela, teclado de verdade, servidor local):
+rotas `#/pagina` com Voltar/Avançar e link direto, interruptores de Investimentos, borda de foco, foco devolvido pelo
+painel (desktop e celular), "Pular para o conteúdo" e, de ponta a ponta, ligar a proteção avançada → sair → entrar com a
+mesma senha → dados abrem.
+
+## Segurança
+
+| Item | Conferido | O que foi feito |
+|---|---|---|
+| A1 proteção avançada não troca a chave | Confirmado | Ligar agora troca a chave (mesma senha, sal novo): documento e histórico recifrados, sal/prova novos, proteção ligada, custódia e links apagados e outros aparelhos fora, numa transação (`PUT /api/conta/protecao`). O servidor recusa ligar sem a troca (cliente antigo) ou "trocando" para a mesma chave. Histórico grande vai em etapas (`/api/conta/chave/historico`). Falha de rede depois da troca: o sal novo confirma e a sessão segue. Política e aviso dizem que backups anteriores abrem só os dados até aquele dia. Testes: `host-web.test.mjs` (a chave do backup não abre documento nem histórico; conexão caída) e `TesteTrocaDeChave` |
+| A2 biometria não vinculada à ação | Parcialmente procedente | A interface nunca pediu biometria nas ações sem volta (só nas ferramentas protegidas do Zo, uma trava local), então não há um pedido a contornar; sem 2FA, a sessão e a prova da senha bastam, por desenho. Exigir biometria no servidor é decisão de produto: quem perde o aparelho sem 2FA ficaria sem como remover a chave ou excluir a conta. Comentário enganoso em `host-web.ts` corrigido. Fica para decidir |
+| A3 troca de senha apaga o histórico | Confirmado | A troca recifra o histórico com a chave nova (junto ou em etapas) na mesma transação; cópia que não abria fica de fora. Cliente antigo (sem o histórico) continua apagando, como antes. Testes nos dois lados |
+| A4 máscara não cobre formatos comuns | Confirmado (o telefone fixo já tinha sido corrigido) | CPF e CNPJ com espaços, `(11)23456789` e `+55 (11) 9 8765-4321`; valores em reais continuam visíveis. A política já dizia que a detecção não é perfeita |
+| A5 parâmetros revelam conta PBKDF2 | Confirmado, mantido | Some sozinho conforme as contas antigas entram (migração automática); mudar sal/KDF de conta real sem a senha trancaria os dados |
+| A6 cadeia de publicação | Confirmado | Wrangler fixado no `package.json` (4.157.0, lockfile com hash); scripts usam `npx --no-install wrangler` (o `pywrangler` acha o mesmo). Produção sempre `npm ci` do zero. O comentário do `deps-em-dia.mjs` diz o que ele confere (metadados, não o conteúdo). Proteção de branch, tokens e procedência: painel do GitHub/Cloudflare |
+| Turnstile sem hostname | Confirmado | O núcleo confere o `hostname` do Siteverify (o desafio tem de ter sido resolvido no mesmo site). Testes com outro domínio e sem hostname |
+| Revogação concorrente | Confirmado | `PUT /api/documento` confere a sessão e o verificador da senha no próprio comando de gravação: sair ou trocar a senha no meio do pedido não deixa gravar (teste invertido do Codex) |
+| Histórico "10 últimas gravações" | Confirmado | Política: até 10 versões, no máximo uma a cada 10 minutos |
+| Custódia padrão, verdade financeira, rollback, criptografia própria | Decisões de arquitetura | Mantidas. A divergência apontada em `docs/SEGURANCA.md` (7.1, servidor como autoridade dos cálculos) ganhou a exceção explícita da criptografia de ponta a ponta e o que o servidor garante |
+| Timeouts das chamadas externas (`entry.py`) | Não alterado | Destinos fixos; mudar exige ensaio no runtime Pyodide |
+| Etapas operacionais (E2E na prévia, Pyodide, painel, restauração, carga) | Com o responsável | Ver o fim desta seção |
+
+## UI/UX
+
+| Item | Conferido | O que foi feito |
+|---|---|---|
+| F01 `stale` nunca limpa | Confirmado | `loadData` grava `stale: { [chave]: false }` (o set mescla o 2º nível); `invalidate` manda só as chaves novas. Teste `estado.test.mjs` |
+| F02 interruptores sem nome | Confirmado | Cada interruptor tem o nome da conta (`Toggle` ganhou `ariaLabel`); o painel é `role="dialog"` com nome; o foco volta ao mesmo interruptor depois de redesenhar. Conferido no navegador |
+| F03 foco invisível no nome/valor | Confirmado | Borda de foco (`--color-focus`) no espaço já reservado, sem mexer no layout. A edição no lugar (`noLugar`) tem a mesma ausência de foco, mas o comentário dela diz que é de propósito: fica para decidir |
+| F04 ciclo de foco do painel | Confirmado | Quem abriu recebe o foco ao fechar (pelo elemento ou pelo `data-fk`/`data-id`); no celular (tela cheia) o foco entra no painel e a página coberta fica `inert`. Na gaveta parcial e no desktop a lista continua clicável ao lado. Conferido nos dois tamanhos |
+| F05 contrastes | Exceção do produto | Já registrada no `CLAUDE.md` (cinza, pílulas, vermelhos); nada alterado |
+| F06 navegação fora do histórico | Confirmado | Endereço `#/pagina`, Voltar/Avançar, link direto (vale depois do login), título da aba. Testes no `router.test.mjs` e no navegador |
+| F07 pacote inicial grande | Não alterado | Pede medição antes (o próprio relatório); dividir exige tirar a dependência do registro global (F10) |
+| F08 portfólio com o CSS do app | Confirmado | Entrada própria (`estilos-portfolio.css`): 157 kB → 25 kB (depois, com o visual novo sem Tailwind, 35 kB), sem classe faltando; tema e variantes em `tema.css`; a entrada do app passou a listar as fontes (`source(none)`) e perdeu só as 95 classes que eram do portfólio |
+| F09 mapas de estilo abertos | Confirmado | `ZoZo.estrutura` e `ZoZo.pecas` com os nomes fechados (tipo vindo dos próprios arquivos); nome errado não compila. Nenhum erro escondido apareceu |
+| F10 arquitetura global | Não alterado | Migração gradual; F09 é o primeiro passo |
+| F11 suíte em navegador real | Parcial | Conferências por CDP feitas nesta rodada; uma suíte no repositório (Playwright ou CDP) fica como próximo passo |
+| F12 animação dos gráficos sem cancelamento | Confirmado | Os quadros param quando o gráfico sai da tela, e o `destroy` cancela |
+| F13 dica e erro sem ligação | Confirmado | Dica com `aria-describedby`; o erro entra junto da dica (não no lugar); o select recebe `aria-invalid` como os outros |
+| F14 resíduos de migração | Confirmado | Comentários de `globais.d.ts`, `list.ts`, `index.html`, `tema.css` e `tokens.css` atualizados; `.money` documentado como algarismos proporcionais (o que está em uso desde a 2.0); `api/pyproject.toml` alinhado em 3.20.0 (e o `CLAUDE.md` lembra de subir os dois) |
+| "Pular para o conteúdo" no app | Aplicado | Botão no primeiro Tab (não link `#main`, para não estragar o endereço da página) |
+
+## Com o responsável
+
+- Decidir A2 (biometria obrigatória no servidor) e o foco da edição no lugar (F03).
+- E2E na prévia com contas descartáveis (Turnstile, Google, e-mail, WebAuthn no aparelho, Workers AI) e o empacotamento Pyodide.
+- Painel: WAF e limites de borda, TLS mínimo, domínios do Turnstile (produção e prévia), escopo dos tokens, MFA administrativa, proteção do branch `main`.
+- Ensaio de restauração do backup num D1 isolado (os backups diários estão chegando ao Google Drive de novo: a tarefa agendada estava apontando para a pasta antiga e tinha um bug de leitura da lista no Windows PowerShell 5.1, ambos corrigidos).

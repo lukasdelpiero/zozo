@@ -27,17 +27,22 @@
   /**
    * Anima de 0 a 1 em "dur" ms chamando passo(p), contando a partir de "inicio" (performance.now()).
    * Começa na hora — como antes da 2.8: o gráfico se desenha enquanto a página entra.
+   * el: o gráfico; se ele sair da tela (troca de página no meio da animação), os quadros param. Devolve quem cancela
+   * (destroy do gráfico). Auditoria de UI/UX 03/11, F12.
    */
-  function animar(dur: number, passo: (p: number) => void, inicio?: number | null) {
-    if (reduzir()) { passo(1); return; }
+  function animar(dur: number, passo: (p: number) => void, inicio?: number | null, el?: Element): () => void {
+    if (reduzir()) { passo(1); return () => {}; }
     const ini = inicio || performance.now();
     ZoZo.charts.ultimoInicio = ini;
+    let id = 0, parado = false;
     const frame = (agora: number) => {
+      if (parado || (el && !el.isConnected)) return;
       const t = Math.max(0, Math.min(1, (agora - ini) / dur));
       passo(easeOut(t));
-      if (t < 1) requestAnimationFrame(frame);
+      if (t < 1) id = requestAnimationFrame(frame);
     };
-    requestAnimationFrame(frame);
+    id = requestAnimationFrame(frame);
+    return () => { parado = true; cancelAnimationFrame(id); };
   }
 
   /**
@@ -335,17 +340,18 @@
 
       if (!iniciada && holder.isConnected && holder.clientWidth) {
         iniciada = true;
-        animar(duracao(), (p) => { progresso = p; if (clipAtual) clipAtual.rect.setAttribute("width", String(clipAtual.W * p + 8)); }, inicio);
+        cancelar = animar(duracao(), (p) => { progresso = p; if (clipAtual) clipAtual.rect.setAttribute("width", String(clipAtual.W * p + 8)); }, inicio, holder);
       }
     }
 
+    let cancelar = () => {};
     draw();
     let conectado = false;
     const ro = new ResizeObserver(() => {
-      if (holder.isConnected) { conectado = true; draw(); } else if (conectado) ro.disconnect();
+      if (holder.isConnected) { conectado = true; draw(); } else if (conectado) { ro.disconnect(); cancelar(); }
     });
     ro.observe(holder);
-    return { destroy() { ro.disconnect(); } };
+    return { destroy() { ro.disconnect(); cancelar(); } };
   }
 
   /* ================= Donut =================
@@ -410,7 +416,7 @@
       });
     };
     if (ZoZo.charts.permitirAnimacao === false) pintar(1);
-    else { const inicio = inicioAnimacao(); pintar(progressoInicial(inicio)); quandoVisivel(container, () => animar(duracao(), pintar, inicio)); }
+    else { const inicio = inicioAnimacao(); pintar(progressoInicial(inicio)); quandoVisivel(container, () => { animar(duracao(), pintar, inicio, container); }); }
     return svg;
   }
 
@@ -477,24 +483,24 @@
       pintarAtual(progresso);
       if (!iniciada) {
         iniciada = true;
-        animar(duracao(), (p) => { progresso = p; pintarAtual(p); }, inicio);
+        cancelar = animar(duracao(), (p) => { progresso = p; pintarAtual(p); }, inicio, holder);
       }
     }
 
     // Mesmo cuidado do gráfico de linha: um redesenho no meio da animação continua de onde parou
-    let iniciada = ZoZo.charts.permitirAnimacao === false, pintarAtual = (_p: number): void => {};
+    let iniciada = ZoZo.charts.permitirAnimacao === false, pintarAtual = (_p: number): void => {}, cancelar = () => {};
     const inicio = iniciada ? 0 : inicioAnimacao();
     let progresso = iniciada ? 1 : progressoInicial(inicio);
     let conectado = false;
     const ro = new ResizeObserver(() => {
       // saiu da tela depois de ter aparecido (troca de página/painel): para de observar
-      if (!holder.isConnected) { if (conectado) ro.disconnect(); return; }
+      if (!holder.isConnected) { if (conectado) { ro.disconnect(); cancelar(); } return; }
       conectado = true;
       if (!holder.clientWidth) return;
       draw();
     });
     ro.observe(holder);
-    return { destroy() { ro.disconnect(); } };
+    return { destroy() { ro.disconnect(); cancelar(); } };
   }
 
   const api: ZoZoCharts = { renderLineChart, renderDonutChart, renderBarChart, permitirAnimacao: true, continuarDe: null, ultimoInicio: null };

@@ -24,6 +24,30 @@
     let atual: { onClose?: () => void } | null = null;
     let chaveAtual: string | null = null;   // item exibido (para não repetir a animação ao reabrir o mesmo)
 
+    /* Ciclo de foco (auditoria de UI/UX 03/11, F04). Quem abriu o painel (a linha, o botão) recebe o foco de volta ao
+       fechar: pelo próprio elemento ou, se a lista foi redesenhada, pelo data-fk/data-id dele. No celular (≤ 600 px) o
+       painel cobre a tela inteira: o foco entra nele e a área coberta (barra e página) fica inert enquanto ele estiver
+       aberto (Tab não chega a controles escondidos). Na gaveta parcial (≤ 1180 px) e no desktop a lista continua
+       clicável ao lado, então nada fica inert. */
+    const comoGaveta = window.matchMedia("(max-width: 600px)");
+    let acionador: { el: HTMLElement; fk?: string; id?: string } | null = null;
+    tituloEl.tabIndex = -1;                  // foco inicial da gaveta quando o conteúdo não pede outro (anuncia o título)
+    function isolar() {
+      const sim = !!atual && comoGaveta.matches;
+      Array.from(workspaceEl.children).forEach((x) => { if (x !== panelEl) (x as HTMLElement).inert = sim; });
+    }
+    comoGaveta.addEventListener("change", isolar);
+    function devolverFoco() {
+      const a = acionador;
+      acionador = null;
+      if (!a) return;
+      requestAnimationFrame(() => {          // depois do redesenho que o fechamento provoca
+        const sel = (attr: string, v?: string) => (v ? workspaceEl.querySelector<HTMLElement>(`[${attr}="${CSS.escape(v)}"]`) : null);
+        const alvo = a.el.isConnected ? a.el : sel("data-fk", a.fk) || sel("data-id", a.id);
+        if (alvo && !panelEl.contains(document.activeElement)) alvo.focus();
+      });
+    }
+
     function vazio() {
       chaveAtual = null;
       tituloEl.textContent = "";
@@ -39,10 +63,15 @@
     /** Limpa o conteúdo (o painel continua aberto, com o texto de orientação) */
     function close(opts?: { silencioso?: boolean }) {
       const anterior = atual;
+      // o foco estava no painel (ou já caiu no body): volta para quem abriu
+      const ativo = document.activeElement;
+      const tinhaFoco = !!anterior && (panelEl.contains(ativo) || ativo === document.body || !ativo);
       atual = null;
+      isolar();
       vazio();
       ZoZo.store.set({ detailPanelOpen: false, selectedItem: null });
       if (anterior && anterior.onClose && !(opts && opts.silencioso)) anterior.onClose();
+      if (tinhaFoco) devolverFoco(); else acionador = null;
     }
 
     /**
@@ -51,7 +80,12 @@
      *   botoes → botões de texto ao lado do "⋯" (ex.: "Editar orçamento")
      */
     function open(cfg: ConfigPainel): ApiPainel {
+      const quem = document.activeElement;
+      if (quem instanceof HTMLElement && quem !== document.body && !panelEl.contains(quem)) {
+        acionador = { el: quem, fk: quem.dataset.fk, id: quem.dataset.id };
+      }
       atual = { onClose: cfg.onClose };
+      isolar();
       workspaceEl.dataset.conteudo = "sim";
       tituloEl.hidden = false;
       // Título: texto ou elemento (ex.: seletor do tipo de lançamento)
@@ -89,8 +123,11 @@
       if (mesmo) body.scrollTop = rolagemAnterior;   // salvar no lugar não leva o painel de volta ao topo
       ZoZo.store.set({ detailPanelOpen: true, selectedItem: cfg.selected || null });
       requestAnimationFrame(() => {
+        if (cfg.focus === false) return;
         const alvo = body.querySelector<HTMLElement>("[data-autofocus]");
-        if (alvo && cfg.focus !== false) alvo.focus();
+        if (alvo) alvo.focus();
+        // painel em tela cheia: o foco entra nele (senão ficaria na linha coberta, agora inert)
+        else if (comoGaveta.matches && atual && !panelEl.contains(document.activeElement)) tituloEl.focus({ preventScroll: true });
       });
       return api;
     }

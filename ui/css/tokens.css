@@ -1,7 +1,8 @@
 /* =============================================================
    ZoZo — Tokens visuais
    Único lugar onde cores, tamanhos, espaçamentos e tipografia
-   são definidos. Os demais arquivos usam apenas estas variáveis.
+   são definidos. As decisões que se repetem usam estas variáveis; há valores
+   literais pontuais (ex.: a janela do Zo, as páginas públicas), de propósito.
    ============================================================= */
 :root {
   /* Identidade */

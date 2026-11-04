@@ -83,7 +83,8 @@
     };
 
     // Visual em Tailwind (components/estrutura.ts). O tipo vem das classes modal--x (que ficam como ganchos)
-    const E = ZoZo.estrutura;
+    // nomes montados aqui (modalTopo + tipo): leitura por texto, que pode não existir (o tipo fechado de estrutura não deixa)
+    const E = ZoZo.estrutura as Readonly<Record<string, string | undefined>>;
     const tem = (c: string) => String(o.class || "").split(/\s+/).includes(c);
     const tipo = tem("modal--confirm") ? "Confirmacao" : tem("modal--settings") ? "Config" : tem("modal--dividir") ? "Dividir" : tem("modal--zm") ? "Janela"
       : tem("modal--novidades") ? "Novidades" : "";

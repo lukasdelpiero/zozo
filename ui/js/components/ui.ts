@@ -66,10 +66,13 @@
     let controlId: string | undefined;
     if (alvo) { controlId = alvo.id || uid("campo"); alvo.id = controlId; }
     else { control.setAttribute("role", "group"); control.setAttribute("aria-labelledby", rotuloId); }
+    // a dica é lida junto com o campo (aria-describedby), não só quando o leitor passa por ela
+    const dicaId = o.hint ? uid("dica") : undefined;
+    if (dicaId) { const quem = alvo || control; quem.setAttribute("aria-describedby", ((quem.getAttribute("aria-describedby") || "") + " " + dicaId).trim()); }
     return h("div", { class: [P.campo, o.class] },
       h("label", { class: P.campoRotulo, for: controlId, id: rotuloId }, label),
       o.prefix ? h("div", { class: P.afixo }, h("span", { class: P.prefixo, "aria-hidden": "true" }, o.prefix), control) : control,
-      o.hint ? h("p", { class: P.campoDica }, o.hint) : null);
+      o.hint ? h("p", { class: P.campoDica, id: dicaId }, o.hint) : null);
   }
 
   function Input(opts?: OpcoesEntrada): HTMLInputElement {
@@ -118,9 +121,10 @@
     return t;
   }
 
-  function Toggle(label: string, opts?: { checked?: boolean; onChange?: (ligado: boolean) => void }): HTMLElement {
+  /** ariaLabel: nome do interruptor quando o texto visível fica fora dele (ex.: o nome da conta numa linha) */
+  function Toggle(label: string, opts?: { checked?: boolean; ariaLabel?: string; onChange?: (ligado: boolean) => void }): HTMLElement {
     const o = opts || {};
-    const input = h("input", { type: "checkbox", class: P.interruptorEntrada, role: "switch",
+    const input = h("input", { type: "checkbox", class: P.interruptorEntrada, role: "switch", "aria-label": o.ariaLabel,
       onChange: (e: Event) => o.onChange && o.onChange((e.target as HTMLInputElement).checked) }) as HTMLInputElement;
     input.checked = !!o.checked;
     return h("label", { class: P.interruptor }, input, h("span", { class: P.interruptorTrilho, "aria-hidden": "true" }, h("span", { class: P.interruptorBolinha })),

@@ -15,10 +15,17 @@ function elemento(dataset = {}) {
 }
 let doc;
 
-function montar(pagina) {
+function montar(pagina, extras = {}, hash = "") {
   const ouvintes = [];
   let estado = { session: { authenticated: true }, dados: 1, sel: null };
-  doc = { activeElement: null, getElementById: () => ({ dataset: {} }) };
+  doc = { activeElement: null, getElementById: () => ({ dataset: {} }), title: "ZoZo" };
+  // endereço simulado: o que foi empilhado/substituído fica registrado
+  const location = { pathname: "/", search: "", hash };
+  const historico = [];
+  const history = {
+    pushState: (_, __, url) => { historico.push(["push", url]); location.hash = url.slice(url.indexOf("#")); },
+    replaceState: (_, __, url) => { historico.push(["replace", url]); location.hash = url.includes("#") ? url.slice(url.indexOf("#")) : ""; },
+  };
   const encontraveis = new Map();          // seletor → elemento (o que existe na página depois do redesenho)
   const mainEl = {
     scrollTop: 0, filhos: [],
@@ -29,9 +36,9 @@ function montar(pagina) {
     dom: { mount: (el, filho) => { el.filhos = [filho]; } },
     store: { subscribe: (fn) => { ouvintes.push(fn); }, set: () => {}, get: () => estado },
     charts: {}, menu: { fechar: () => {} }, recursos: {},
-    pages: { p: pagina },
+    pages: { p: pagina, ...extras },
   };
-  const ctx = { ZoZo, document: doc, CSS: { escape: (s) => s }, Date, Promise };
+  const ctx = { ZoZo, document: doc, CSS: { escape: (s) => s }, Date, Promise, location, history };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fonte, ctx, { filename: "router.ts" });
@@ -39,8 +46,39 @@ function montar(pagina) {
   const roteador = ZoZo.router.create(app, { setPage: () => {} }, mainEl);
   roteador.navigate("p");
   const mudar = (novo) => { estado = { ...estado, ...novo }; ouvintes.forEach((fn) => fn(estado)); };
-  return { mudar, encontraveis, mainEl };
+  return { mudar, encontraveis, mainEl, roteador, historico, location, ZoZo };
 }
+
+test("endereço: cada página vira #/pagina no histórico; título da aba acompanha", () => {
+  // auditoria de UI/UX 03/11 (F06): Voltar/Avançar, atualizar e link direto
+  const { p } = pagina(), { p: q } = pagina();
+  q.titulo = "Contas";
+  const { roteador, historico, location } = montar(p, { contas: q });
+  assert.deepEqual(historico, [["replace", "/#/p"]]);                 // a primeira não empilha (Voltar sairia do app)
+  roteador.navigate("contas");
+  assert.deepEqual(historico.at(-1), ["push", "/#/contas"]);
+  assert.equal(location.hash, "#/contas");
+  assert.equal(doc.title, "Contas · ZoZo");
+  location.hash = "#/p";                                               // Voltar: o navegador já mudou o endereço
+  roteador.navigate("p", { historico: "nao" });
+  assert.equal(historico.length, 2);
+  assert.equal(doc.title, "P · ZoZo");
+  roteador.navigate("contas", { historico: "substituir" });
+  assert.deepEqual(historico.at(-1), ["replace", "/#/contas"]);
+  roteador.navigate("contas");                                         // já está nela: não empilha de novo
+  assert.equal(historico.length, 3);
+  roteador.navigate("inexistente");
+  assert.equal(location.hash, "#/contas");
+});
+
+test("endereço: só #/pagina de uma página que existe é rota (os links do e-mail e #design/ não)", () => {
+  const { p } = pagina();
+  for (const [hash, esperado] of [["#/p", "p"], ["#/constructor", null], ["#/nada", null], ["#recuperar=abc", null], ["#design/cores", null], ["", null], ["#/P", null]]) {
+    const { ZoZo, location } = montar(p);
+    location.hash = hash;
+    assert.equal(ZoZo.router.rotaDoEndereco(), esperado, hash);
+  }
+});
 
 function pagina({ trocaNoLugar = true } = {}) {
   const conta = { render: 0, linhas: 0 };

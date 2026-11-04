@@ -21,7 +21,7 @@ const PASTA_PACOTES = "static";            // JS, CSS e fontes com hash no nome 
 // Portfólio: tudo o que ele carrega fica sob /portfolio/, que é o que a rota do Worker separado atende
 // (o resto do domínio continua no app). As imagens vão junto, para a página não depender do app publicado.
 const PASTA_PORTFOLIO = "portfolio/static";
-const IMAGENS_PORTFOLIO = ["zozo-logo.svg", "favicon.svg", "favicon.png"];
+const IMAGENS_PORTFOLIO = ["zozo-logo.svg", "favicon.svg", "favicon.png", "portfolio-dashboard.png", "portfolio-celular.png"];
 
 function cabecalhosSeguranca(): Record<string, string> {
   const json = JSON.parse(readFileSync(raiz("./api/cabecalhos_ui.json"), "utf8")) as Record<string, string>;
@@ -40,8 +40,10 @@ function zozo(portfolio: boolean): Plugin {
         // Servidor de desenvolvimento: o Vite injeta o CSS com <style> (recarga instantânea).
         // Só aqui o CSP aceita estilo embutido; o site publicado continua com style-src 'self'.
         if (!ctx.bundle) return html.replace("style-src 'self'", "style-src 'self' 'unsafe-inline'");
-        // Publicado: pré-carrega as duas fontes usadas no primeiro desenho da tela
-        const fontes = Object.keys(ctx.bundle).filter((f) => /Matter-(Regular|Medium)-[\w-]+\.woff$/.test(f)).sort();
+        // Publicado: pré-carrega as fontes usadas no primeiro desenho da tela. O portfólio abre com o título em negrito
+        // (Bold) e o subtítulo em SemiBold: sem pré-carregar, eles apareciam de repente depois do resto (flicker)
+        const pesos = portfolio ? /Matter-(Regular|Medium|SemiBold|Bold)-[\w-]+\.woff$/ : /Matter-(Regular|Medium)-[\w-]+\.woff$/;
+        const fontes = Object.keys(ctx.bundle).filter((f) => pesos.test(f)).sort();
         let saida = html.replace(/[ \t]*<!--[\s\S]*?-->\n?/g, "");      // comentários não vão para o site
         if (portfolio) saida = saida.replaceAll("/assets/img/", "/portfolio/img/");
         return {

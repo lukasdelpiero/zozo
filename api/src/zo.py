@@ -268,12 +268,16 @@ _MASCARAS = [
     (re.compile(r"(?i)\b(senha|password|passwd|pin)(\s*(?:é|e|:|=|-)?\s*)\S+"), r"\1\2[oculto]"),
     (re.compile(r"(?i)\b(c[oó]digo|code|2fa|otp|token)(\D{0,24}?)(?<!\d)\d{6,8}(?!\d)"), r"\1\2[código oculto]"),
     (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), "[e-mail oculto]"),
-    (re.compile(r"(?<![\w.,/-])\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}(?![\w/]|,\d)"), "[CNPJ oculto]"),
-    (re.compile(r"(?<![\w.,/-])(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9\d{4}[\s-]?\d{4}(?![\w/]|,\d)"), "[telefone oculto]"),
-    # telefone fixo: (11) 3456-7890, 11 3456 7890; sem DDD, só com hífen (3456-7890), para "2026 3456" não virar telefone
-    (re.compile(r"(?<![\w.,/-])(?:(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?[2-5]\d{3}[\s-]\d{4}|[2-5]\d{3}-\d{4})(?![\w/]|,\d)"), "[telefone oculto]"),
+    # CNPJ e CPF também com espaços no lugar de ponto, barra e hífen ("123 456 789 01")
+    (re.compile(r"(?<![\w.,/-])\d{2}[.\s]?\d{3}[.\s]?\d{3}[/\s]?\d{4}[-\s]?\d{2}(?![\w/]|,\d)"), "[CNPJ oculto]"),
+    # celular: (11) 98765-4321, +55 (11) 9 8765-4321
+    (re.compile(r"(?<![\w.,/-])(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?9[\s-]?\d{4}[\s-]?\d{4}(?![\w/]|,\d)"), "[telefone oculto]"),
+    # telefone fixo: (11) 3456-7890, (11)34567890, 11 3456 7890; sem DDD, só com hífen (3456-7890), para "2026 3456"
+    # não virar telefone
+    (re.compile(r"(?<![\w.,/-])(?:(?:\+?55[\s-]?)?\(?\d{2}\)?[\s-]?[2-5]\d{3}[\s-]\d{4}|(?:\+?55[\s-]?)?\(\d{2}\)\s?[2-5]\d{3}-?\d{4}"
+                r"|[2-5]\d{3}-\d{4})(?![\w/]|,\d)"), "[telefone oculto]"),
+    (re.compile(r"(?<![\w.,/-])\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2}(?![\w/]|,\d)"), "[CPF oculto]"),
     (re.compile(r"(?<![\w.,/-])(?:\d[ .-]?){12,18}\d(?![\w/]|,\d)"), "[cartão oculto]"),
-    (re.compile(r"(?<![\w.,/-])\d{3}\.\d{3}\.\d{3}-\d{2}(?![\w/]|,\d)"), "[CPF oculto]"),
     (re.compile(r"(?<![\w.,/-])\d{11}(?![\w/]|,\d)"), "[número oculto]"),
 ]
 

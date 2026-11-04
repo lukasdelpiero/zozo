@@ -76,6 +76,8 @@
     "baixar-circulo": [["circle", { cx: 12, cy: 12, r: 9.5 }], P("M12 7.5v8.5"), P("m8.5 12.5 3.5 3.5 3.5-3.5")],
     dividir: [P("M16 3h5v5"), P("M8 3H3v5"), P("M12 22v-8.3a4 4 0 0 0-1.17-2.83L3 3"), P("m15 9 6-6")],   // seta de divisão
     info: [["circle", { cx: 12, cy: 12, r: 9.5 }], P("M12 11v5.5"), P("M12 7.6v.2")],
+    // Configurações › Segurança
+    escudo: [P("M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z")],
     painel: [["rect", { x: 3, y: 4, width: 18, height: 16, rx: 3 }], P("M9 4v16"), P("M5.5 8h1.5"), P("M5.5 11h1.5")],
     selecionar: [["rect", { x: 3, y: 3, width: 18, height: 18, rx: 4 }], P("m8 12 3 3 5-6")],
     camera: [P("M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"), ["circle", { cx: 12, cy: 13, r: 3 }]],

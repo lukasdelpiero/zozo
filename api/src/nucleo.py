@@ -452,7 +452,10 @@ async def _captcha_ok(ctx: Contexto, token: object) -> bool:
     if status != 200:
         raise Falha(503, "UNAVAILABLE")
     try:
-        return json.loads(texto).get("success") is True
+        d = json.loads(texto)
+        # o desafio tem de ter sido resolvido NESTE site: a mesma chave pública vale em produção e na prévia
+        # (auditoria de segurança 03/11), e um token de outro domínio que use a chave não serve aqui
+        return d.get("success") is True and d.get("hostname") == ctx.pedido.host.split(":")[0]
     except (ValueError, AttributeError):
         return False
 
@@ -849,7 +852,8 @@ async def _historico_recifrado(ctx: Contexto, email: str, b: Json, sal: str, com
     Confere o histórico recifrado (o que veio junto + o das etapas com este sal) e devolve os comandos da
     transação: (antes da gravação do documento, depois dela). Só versões que existem, sem repetir.
     completo=True: tem de cobrir TODAS as versões (migração automática nunca descarta backup).
-    completo=False: recuperação de senha — uma cópia que já não abria fica de fora (as datas das outras ficam).
+    completo=False: recuperação, troca de senha e proteção avançada — uma cópia que já não abria fica de fora (as datas
+    das outras ficam).
     """
     hist = b.get("historico", [])
     if not isinstance(hist, list) or len(hist) > 10:
@@ -1508,7 +1512,8 @@ async def _zo(ctx: Contexto, email: str, b: Json) -> Resposta:
 
 # ---------------- rotas ----------------
 _PROTEGIDAS = {
-    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/kdf"), ("PUT", "/api/conta/kdf/historico"), ("DELETE", "/api/conta"),
+    ("PUT", "/api/conta/nome"), ("PUT", "/api/conta/senha"), ("PUT", "/api/conta/chave/historico"), ("PUT", "/api/conta/kdf"),
+    ("PUT", "/api/conta/kdf/historico"), ("DELETE", "/api/conta"),
     ("GET", "/api/documento"), ("GET", "/api/documento/versao"), ("PUT", "/api/documento"), ("POST", "/api/documento/apagar"), ("GET", "/api/historico"),
     ("POST", "/api/2fa/iniciar"), ("POST", "/api/2fa/confirmar"), ("POST", "/api/2fa/desativar"),
     ("GET", "/api/2fa/codigos"), ("POST", "/api/2fa/codigos"),
@@ -1607,19 +1612,21 @@ async def _rota(ctx: Contexto) -> Resposta:
         return Resposta(200, {"ok": True})
 
     if c == "/api/conta/senha":
-        # Novo sal + nova prova + documento recifrado, tudo na mesma transação
+        # Novo sal + nova prova + documento E histórico recifrados, tudo na mesma transação. O histórico recifrado
+        # (junto ou em etapas, /api/conta/chave/historico) substitui o antigo; cópia que não veio (não abria, ou
+        # cliente antigo) some, porque estava cifrada com a chave anterior.
         sal, it, kdf = _sal(b.get("sal")), _iteracoes(b.get("iteracoes")), _kdf(b.get("kdf"))
         nova_prova, conteudo, va = _prova(b.get("prova")), _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
         await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
+        antes, depois = await _historico_recifrado(ctx, email, b, sal, completo=False)
         await _lote_atomico(ctx.banco, [
+            *antes,
             _gravar_documento(email, va, conteudo), _GUARDA,
             ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ? WHERE email = ? AND verificador = ?",
              (sal, it, _verificador(nova_prova), kdf, email, conta["verificador"])), _GUARDA,
             _LIMPA_GUARDA,
-            # o histórico estava cifrado com a senha anterior: é descartado (e uma migração em etapas pela metade);
+            *depois,
             # a cópia da chave (recuperação) era da chave antiga: o navegador guarda a nova logo depois
-            ("DELETE FROM historico WHERE email = ?", (email,)),
-            ("DELETE FROM kdf_etapas WHERE email = ?", (email,)),
             ("DELETE FROM custodia WHERE email = ?", (email,)),
             ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,)),
             # as outras sessões (outros dispositivos) terminam
@@ -1629,6 +1636,12 @@ async def _rota(ctx: Contexto) -> Resposta:
         ctx.evento("senha_alterada", email)
         await _avisar(ctx, email, emails.senha_alterada(conta["nome"], ctx.agora), "email_aviso_senha")
         return Resposta(200, {"versao": va + 1})
+
+    if c == "/api/conta/chave/historico":
+        # Troca de chave em etapas (senha nova ou proteção avançada): UMA cópia do histórico, já recifrada com a chave
+        # nova, fica à parte até o fechamento (PUT /api/conta/senha ou /api/conta/protecao), que a usa só se o sal bater.
+        await _guardar_etapa(ctx, email, b, {"sal", "versao", "conteudo"})
+        return Resposta(200, {"ok": True})
 
     if c == "/api/conta/kdf/historico":
         # Migração em etapas: UMA cópia do histórico, já recifrada com a chave nova, fica guardada à parte até o
@@ -1642,7 +1655,7 @@ async def _rota(ctx: Contexto) -> Resposta:
     if c == "/api/conta/kdf":
         # Conta antiga (PBKDF2) passa para Argon2id com a MESMA senha: o navegador faz logo depois de um login que deu certo.
         # Numa transação só: novo sal + nova prova + documento E histórico recifrados com a chave nova (as cópias
-        # anteriores continuam abrindo — diferente da troca de senha, que descarta o histórico). Só PBKDF2 → Argon2id.
+        # anteriores continuam abrindo, e TODAS têm de vir). Só PBKDF2 → Argon2id.
         # Histórico grande: as cópias chegam antes, uma por pedido (kdf/historico), e aqui só fecham a migração.
         atual = await ctx.banco.primeiro("SELECT kdf FROM contas WHERE email = ?", email)
         if not atual or (atual["kdf"] or KDF_PBKDF2) != KDF_PBKDF2:
@@ -1705,7 +1718,10 @@ async def _rota(ctx: Contexto) -> Resposta:
     if m == "PUT" and c == "/api/documento":
         conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
         sql, params = _gravar_documento(email, va, conteudo)
-        n = await ctx.banco.executar(sql, *params)
+        # a sessão e a senha conferidas acima ainda valem NO MOMENTO da gravação: saída ou senha trocada em outro
+        # aparelho no meio do pedido não deixam gravar (auditoria de segurança 03/11, revogação concorrente)
+        sql += " AND EXISTS (SELECT 1 FROM sessoes WHERE id = ?) AND EXISTS (SELECT 1 FROM contas WHERE email = ? AND verificador = ?)"
+        n = await ctx.banco.executar(sql, *params, s["id"], email, conta["verificador"])
         return Resposta(200, {"versao": va + 1}) if n else Resposta(409, {"erro": "DATA_CHANGED"})
 
     if c == "/api/custodia" and m == "GET":
@@ -1741,17 +1757,40 @@ async def _rota(ctx: Contexto) -> Resposta:
 
     if c == "/api/conta/protecao":
         avancada = b.get("avancada")
-        if set(b) - {"codigo"} != {"avancada"} or not isinstance(avancada, bool):
+        if not isinstance(avancada, bool):
             raise Falha(400, "INVALID_REQUEST")
         if not avancada:                    # desligar volta a guardar a cópia da chave no servidor: código atual
+            if set(b) - {"codigo"} != {"avancada"}:
+                raise Falha(400, "INVALID_REQUEST")
             await _exigir_codigo_atual(ctx, email, conta, b.get("codigo"))
-        await ctx.banco.lote([
-            ("UPDATE contas SET protecao_avancada = ? WHERE email = ?", (1 if avancada else 0, email)),
-            *([("DELETE FROM custodia WHERE email = ?", (email,)), ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,))]
-              if avancada else []),
+            await ctx.banco.executar("UPDATE contas SET protecao_avancada = 0 WHERE email = ?", email)
+            ctx.evento("protecao_avancada_desligada", email)
+            return Resposta(200, {"avancada": False})
+        # Ligar TROCA a chave dos dados (mesma senha, sal novo): apagar a cópia de recuperação não basta, porque uma
+        # cópia antiga dela (num backup do banco) com o SEGREDO abriria também o que for gravado depois. Numa transação:
+        # documento e histórico recifrados com a chave nova, sal e prova novos, proteção ligada, cópia e links de
+        # recuperação apagados e os outros aparelhos fora. Cópia do histórico que não veio recifrada some.
+        if set(b) - {"historico"} != {"avancada", "sal", "kdf", "prova", "conteudo", "versaoAnterior"} or b.get("kdf") != KDF_ARGON2:
+            raise Falha(400, "INVALID_REQUEST")
+        sal, nova_prova = _sal(b.get("sal")), _prova(b.get("prova"))
+        conteudo, va = _conteudo(b.get("conteudo")), _versao(b.get("versaoAnterior"))
+        if hmac.compare_digest(_verificador(nova_prova), str(conta["verificador"])):
+            raise Falha(400, "INVALID_REQUEST")             # a mesma chave de antes: não houve troca
+        antes, depois = await _historico_recifrado(ctx, email, b, sal, completo=False)
+        await _lote_atomico(ctx.banco, [
+            *antes,
+            _gravar_documento(email, va, conteudo), _GUARDA,
+            ("UPDATE contas SET sal = ?, iteracoes = ?, verificador = ?, kdf = ?, protecao_avancada = 1 WHERE email = ? AND verificador = ?",
+             (sal, ITERACOES_MIN, _verificador(nova_prova), KDF_ARGON2, email, conta["verificador"])), _GUARDA,
+            _LIMPA_GUARDA,
+            *depois,
+            ("DELETE FROM custodia WHERE email = ?", (email,)),
+            ("DELETE FROM tokens_recuperacao WHERE email = ?", (email,)),
+            ("DELETE FROM sessoes WHERE email = ? AND id != ?", (email, s["id"])),
         ])
-        ctx.evento("protecao_avancada_ligada" if avancada else "protecao_avancada_desligada", email)
-        return Resposta(200, {"avancada": avancada})
+        await _limpar_login(ctx, email)
+        ctx.evento("protecao_avancada_ligada", email)
+        return Resposta(200, {"avancada": True, "versao": va + 1})
 
     if c == "/api/documento/apagar":
         # "Apagar todos os dados": grava o documento vazio (a versão continua subindo,

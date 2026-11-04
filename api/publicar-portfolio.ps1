@@ -1,4 +1,4 @@
-# ZoZo — publicar SÓ o portfólio (usezozo.com.br/portfolio), sem publicar o app
+﻿# ZoZo — publicar SÓ o portfólio (usezozo.com.br/portfolio), sem publicar o app
 #
 #   .\api\publicar-portfolio.ps1 previa     → https://zozo-portfolio-previa.zozo-finance-app.workers.dev/portfolio
 #   .\api\publicar-portfolio.ps1 producao   → https://usezozo.com.br/portfolio
@@ -21,9 +21,12 @@ function Parar($mensagem) { Write-Host ""; Write-Host $mensagem -ForegroundColor
 
 Write-Host "1/2 Montando o portfólio..." -ForegroundColor Cyan
 Push-Location ..
-node scripts/deps-em-dia.mjs
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "   Dependências diferentes do package-lock.json: reinstalando (npm ci)..." -ForegroundColor Gray
+# Produção: sempre do zero (npm ci confere o hash de cada pacote baixado). Prévia: só reinstala se o node_modules
+# não bate com o package-lock.json (o deps-em-dia compara versão e integridade REGISTRADAS, não o conteúdo dos arquivos)
+$reinstalar = $Ambiente -eq "producao"
+if (-not $reinstalar) { node scripts/deps-em-dia.mjs; $reinstalar = $LASTEXITCODE -ne 0 }
+if ($reinstalar) {
+  Write-Host "   Instalando as dependências do package-lock.json (npm ci)..." -ForegroundColor Gray
   npm ci
   if ($LASTEXITCODE -ne 0) { Pop-Location; Parar "Falha ao instalar as dependências (npm ci): nada foi publicado." }
 }
@@ -39,7 +42,7 @@ if ($Ambiente -eq "producao") {
 }
 
 Write-Host "2/2 Publicando..." -ForegroundColor Cyan
-npx wrangler deploy --config portfolio/wrangler.toml @extra
+npx --no-install wrangler deploy --config portfolio/wrangler.toml @extra
 if ($LASTEXITCODE -ne 0) { Parar "Falha ao publicar o portfólio." }
 Write-Host ""
 Write-Host "Pronto: $endereco" -ForegroundColor Green

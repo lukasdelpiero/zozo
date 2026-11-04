@@ -146,7 +146,7 @@
     UNDO_UNAVAILABLE: "Essa alteração não pode mais ser desfeita.",
     WEBAUTHN_INVALID: "Não deu para confirmar com a biometria. Tente de novo.",
     WEBAUTHN_CANCELLED: "A biometria foi cancelada ou demorou demais. Tente de novo.",
-    WEBAUTHN_NONE: "Nenhuma biometria cadastrada. Cadastre em Configurações › Conta.",
+    WEBAUTHN_NONE: "Nenhuma biometria cadastrada. Cadastre em Configurações › Segurança.",
     WEBAUTHN_LIMIT: "Você chegou ao limite de 10 biometrias. Remova uma para cadastrar outra.",
     WEBAUTHN_EXISTS: "Este aparelho já está cadastrado.",
     WEBAUTHN_UNSUPPORTED: "Este navegador ou aparelho não oferece biometria nem chave de acesso.",

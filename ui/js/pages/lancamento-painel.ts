@@ -455,7 +455,7 @@
     const excluir = () => {
       const origemParcelada = gravada.recorrencia === "parcelada" && (!gravada.serieId || gravada.serieId === gravada.id);
       ZoZo.feedback.confirmarExclusao("Excluir transação?", "Tem certeza de que deseja excluir esta transação?" +
-        (origemParcelada ? " As parcelas futuras desta compra também serão excluídas; as já pagas continuam." : ""))
+        (origemParcelada ? " As parcelas futuras desta compra também serão excluídas. As parcelas já pagas continuam." : ""))
         .then((ok) => ok && ctx.bridge.request(A.deleteLancamento, { id: gravada.id }).then(() => {
           ctx.detail.close({ silencioso: true }); ctx.toast("Transação excluída."); return ctx.recarregarTudo();
         }).catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" })));

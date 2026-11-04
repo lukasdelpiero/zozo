@@ -2,396 +2,563 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Portfólio · Lukas Del Piero Barros · ZoZo</title>
   <meta name="description" content="Como o ZoZo e o Zo foram construídos orientando o Claude Code e o Codex: números, processo com vários agentes e os prompts que fizeram a diferença.">
   <link rel="icon" type="image/svg+xml" href="/assets/img/favicon.svg">
   <link rel="alternate icon" type="image/png" href="/assets/img/favicon.png">
-  <link rel="stylesheet" href="/src/estilos.css">
+  <link rel="stylesheet" href="/src/estilos-portfolio.css">
 </head>
-<!-- Página pública e estática (o único JavaScript é o do formulário de contato, src/portfolio.ts), no visual da apresentação (/sobre): fundo #f8f9fb, cartões brancos,
-     logo e fonte Matter. Portfólio do autor: como o ZoZo e o Zo foram feitos com agentes de IA. Números levantados
-     dos registros das sessões (Claude Code e Codex) e do repositório em 03/11/2026; ao atualizar, mude a data. -->
-<body class="tw:overflow-y-auto tw:bg-[#f8f9fb] tw:text-zz-text">
-  <a href="#conteudo" class="tw:sr-only tw:focus:not-sr-only tw:focus:fixed tw:focus:top-3 tw:focus:left-3 tw:focus:z-10 tw:focus:px-3 tw:focus:py-2 tw:focus:rounded-lg tw:focus:bg-zz-surface tw:focus:text-zz-text">Pular para o conteúdo</a>
+<!-- Página pública e estática no visual do case "ZoZo Case" (src/portfolio.css). JavaScript só o de src/portfolio.ts:
+     carrossel dos prompts e formulário de contato. Nada embutido (CSP: sem <style>, <script> nem style="…").
+     Números levantados dos registros das sessões (Claude Code e Codex) e do repositório em 03/11/2026; ao atualizar,
+     mude a data. Imagens: telas do app com dados de exemplo (ui/public/assets/img/portfolio-*.png). -->
+<body>
+<a class="pular" href="#topo">Pular para o conteúdo</a>
 
-  <header class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:pt-7 tw:pb-5">
-    <a href="/sobre" class="tw:inline-flex tw:items-center tw:gap-2.5 tw:rounded-[10px] tw:text-zz-text tw:no-underline tw:text-[17px] tw:font-[620] tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-4">
-      <img src="/assets/img/zozo-logo.svg" alt="" width="32" height="32" class="tw:size-8 tw:rounded-lg tw:shadow-[0_4px_10px_rgba(15,39,66,0.12),0_1px_2px_rgba(15,39,66,0.10)]">
-      ZoZo
-    </a>
-    <nav aria-label="Atalhos" class="tw:flex tw:items-center tw:gap-5">
-      <a href="#contato" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Contatos</a>
-      <a href="/" class="tw:text-[15px] tw:font-[550] tw:text-zz-secondary tw:no-underline tw:hover:text-zz-text tw:hover:underline tw:hover:underline-offset-2 tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2 tw:rounded">Entrar no ZoZo</a>
+<!-- ícones (traço 2, 24 × 24) -->
+<svg class="sprite" aria-hidden="true">
+  <defs>
+    <linearGradient id="gz" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7141DE"/><stop offset="1" stop-color="#602BD9"/></linearGradient>
+    <symbol id="i-z" viewBox="0 0 1024 1024"><path d="M 320 320 H 704 L 320 704 H 704" fill="none" stroke="url(#gz)" stroke-width="160" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-clipe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+    <symbol id="i-sorriso" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></symbol>
+    <symbol id="i-sobe-seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+    <symbol id="i-expandir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></symbol>
+    <symbol id="i-mais" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-volta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-avanca" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-camadas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+    <symbol id="i-cartao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></symbol>
+    <symbol id="i-pizza" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></symbol>
+    <symbol id="i-sobe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></symbol>
+    <symbol id="i-repete" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="i-pessoas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></symbol>
+    <symbol id="i-fatura" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3"/><path d="M21 21h-4"/><path d="M21 14v.01"/></symbol>
+    <symbol id="i-globo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+    <symbol id="i-envia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+    <symbol id="i-baixa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-busca" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-grafico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+    <symbol id="i-cadeado" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-chave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></symbol>
+    <symbol id="i-digital" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-brilho" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+    <symbol id="i-balao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-oculto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/></symbol>
+    <symbol id="i-desfaz" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+    <symbol id="i-bloqueia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></symbol>
+    <symbol id="i-banco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></symbol>
+    <symbol id="i-nuvem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+    <symbol id="i-codigo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></symbol>
+    <symbol id="i-frasco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6.5L3.5 19a2 2 0 0 0 1.8 3h13.4a2 2 0 0 0 1.8-3L15 8.5V2"/><path d="M8 2h8"/><path d="M6.5 15h11"/></symbol>
+    <symbol id="i-pessoa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+    <symbol id="i-raio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-celular" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+    <symbol id="i-acesso" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="4" r="1"/><path d="m18 19 1-7-6 1"/><path d="m5 8 3-3 5.5 3-2.36 3.5"/><path d="M4.24 14.5a5 5 0 0 0 6.88 6"/><path d="M13.76 17.5a5 5 0 0 0-6.88-6"/></symbol>
+    <symbol id="i-email" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></symbol>
+    <symbol id="i-lupa-alvo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+    <symbol id="i-documento" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></symbol>
+    <symbol id="i-linkedin" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0z"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8 0 3.2.9.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1 .9 2.2v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3"/></symbol>
+  </defs>
+</svg>
+
+<header class="barra faixa">
+  <div class="miolo">
+    <a class="marca" href="#topo"><span class="logo">Z</span>ZoZo</a>
+    <nav aria-label="Seções">
+      <a href="#funcoes">Funções</a>
+      <a href="#zo">Zo</a>
+      <a href="#agentes">Agentes</a>
+      <a href="#prompts">Prompts</a>
+      <a href="#tecnologias">Tecnologias</a>
+      <a href="#contato">Contatos</a>
     </nav>
-  </header>
+    <div class="redes">
+      <a class="so-celular" href="#contato" aria-label="Contatos"><svg class="ico"><use href="#i-email"/></svg></a>
+      <a href="https://www.linkedin.com/in/lukasdelpiero/" aria-label="LinkedIn de Lukas Del Piero Barros"><svg class="ico"><use href="#i-linkedin"/></svg></a>
+      <a href="https://github.com/lukasdelpiero" aria-label="GitHub de Lukas Del Piero Barros"><svg class="ico"><use href="#i-github"/></svg></a>
+      <a class="abrir" href="https://usezozo.com.br">Abrir o ZoZo</a>
+    </div>
+  </div>
+</header>
 
-  <main id="conteudo" class="tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:mb-10 tw:flex tw:flex-col tw:gap-10">
-
-    <!-- Abertura -->
-    <section aria-labelledby="titulo" class="tw:flex tw:flex-col tw:items-start tw:pt-10 tw:pb-2 tw:celular:pt-4">
-      <p class="tw:m-0 tw:mb-4 tw:text-[13px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Portfólio · AI Builder</p>
-      <h1 id="titulo" class="tw:m-0 tw:max-w-[760px] tw:text-[44px] tw:leading-[1.12] tw:font-[550] tw:tracking-[-0.02em] tw:text-[#1b2a4a] tw:text-balance tw:celular:text-[31px]">Como construí o ZoZo e o Zo orientando agentes de IA</h1>
-      <p class="tw:mt-5 tw:mb-0 tw:max-w-[680px] tw:text-[18px] tw:leading-[1.6] tw:text-zz-secondary tw:celular:text-[16px]">Sou Lukas Del Piero Barros. Em quatro semanas, conduzi o Claude Code e o Codex na construção de um app de finanças pessoais com criptografia de ponta a ponta e de um assistente de IA com 36 ferramentas. Aqui estão os números, o processo com vários agentes e os prompts que fizeram a diferença.</p>
-      <div class="tw:flex tw:flex-wrap tw:gap-3 tw:mt-8">
-        <a href="/sobre" class="tw:inline-flex tw:items-center tw:justify-center tw:h-[46px] tw:px-6 tw:rounded-xl tw:text-[15px] tw:font-[650] tw:text-white tw:no-underline tw:bg-[#6948D8] tw:bg-(image:--botao-roxo) tw:shadow-[0_1px_2px_rgba(15,39,66,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] tw:hover:bg-(image:--botao-roxo-hover) tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2">Conhecer o ZoZo</a>
-        <a href="https://github.com/lukasdelpiero/zozo" rel="noopener" class="tw:inline-flex tw:items-center tw:justify-center tw:h-[46px] tw:px-6 tw:rounded-xl tw:text-[15px] tw:font-[620] tw:text-zz-text tw:no-underline tw:bg-zz-surface tw:border tw:border-[#e3e6eb] tw:shadow-[0_1px_2px_rgba(15,39,66,0.08)] tw:hover:shadow-[0_2px_6px_rgba(15,39,66,0.12)] tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2">Ver o código no GitHub</a>
+<main id="topo">
+  <!-- ===== abertura ===== -->
+  <section class="abertura faixa" aria-labelledby="titulo">
+    <div class="nuvem a" aria-hidden="true"></div><div class="nuvem b" aria-hidden="true"></div><div class="nuvem c" aria-hidden="true"></div>
+    <div class="miolo">
+      <span class="pilula entra"><svg class="ico"><use href="#i-brilho"/></svg>Lukas Del Piero Barros</span>
+      <h1 id="titulo" class="entra d1"><span>ZoZo.</span></h1>
+      <p class="sub entra d2">Um app de finanças pessoais com <b>criptografia de ponta a ponta</b> e o <b>Zo</b>, um assistente de IA com 36 ferramentas. Construído em quatro semanas <b>orientando agentes de IA</b>.</p>
+      <div class="botoes entra d3">
+        <a class="botao cheio" href="https://usezozo.com.br"><span class="logo pequeno">Z</span>Abrir o ZoZo</a>
+        <a class="botao vazio" href="https://www.linkedin.com/in/lukasdelpiero/"><svg class="ico linkedin-cor"><use href="#i-linkedin"/></svg>LinkedIn</a>
+        <a class="botao vazio" href="https://github.com/lukasdelpiero"><svg class="ico"><use href="#i-github"/></svg>GitHub</a>
       </div>
-    </section>
+      <div class="vitrine entra d4">
+        <figure class="notebook">
+          <div class="tela"><img src="/assets/img/portfolio-dashboard.png" alt="Dashboard do ZoZo com gasto mensal, patrimônio total, transações recentes e categorias" width="2880" height="1800"></div>
+          <div class="base" aria-hidden="true"></div>
+        </figure>
+        <figure class="celular"><div class="moldura"><div class="status" aria-hidden="true"><span>9:41</span><span class="status-dir"><i><b></b><b></b><b></b><b></b></i><u></u></span></div><img src="/assets/img/portfolio-celular.png" alt="Dashboard do ZoZo no celular" width="1170" height="2532"></div></figure>
+      </div>
+    </div>
+  </section>
 
-    <!-- Números -->
-    <section aria-labelledby="numeros">
-      <h2 id="numeros" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">O projeto em números</h2>
-      <p class="tw:m-0 tw:mb-5 tw:text-[15px] tw:text-zz-secondary">De 6 de outubro a 3 de novembro de 2026, contados nos registros das sessões e no repositório.</p>
-      <ul class="tw:grid tw:grid-cols-2 tw:computador:grid-cols-3 tw:largo:grid-cols-4 tw:gap-3 tw:m-0 tw:p-0 tw:list-none
-        tw:[&>li]:flex tw:[&>li]:flex-col tw:[&>li]:gap-1 tw:[&>li]:p-5 tw:[&>li]:bg-zz-surface tw:[&>li]:border tw:[&>li]:border-[#e6e8ec] tw:[&>li]:rounded-2xl
-        tw:[&_strong]:text-[30px] tw:[&_strong]:leading-[1.1] tw:[&_strong]:font-[620] tw:[&_strong]:tracking-[-0.02em] tw:[&_strong]:text-[#1b2a4a] tw:[&_strong]:[font-variant-numeric:proportional-nums]
-        tw:[&_span]:text-[14px] tw:[&_span]:leading-[1.45] tw:[&_span]:text-zz-secondary">
-        <li><strong>213</strong><span>prompts enviados (176 ao Claude Code e 37 ao Codex)</span></li>
-        <li><strong>10,5 mil</strong><span>linhas de prompts, entre pedidos, especificações e auditorias</span></li>
-        <li><strong>3,6 mil</strong><span>comandos executados pelos agentes no terminal</span></li>
-        <li><strong>30 mil</strong><span>linhas de código em TypeScript, Python, SQL, CSS e HTML</span></li>
-        <li><strong>325</strong><span>testes automatizados (161 da interface e 164 da API)</span></li>
-        <li><strong>123</strong><span>commits em 35 versões publicadas</span></li>
-        <li><strong>12</strong><span>relatórios de auditoria escritos pelo Codex para o Claude Code</span></li>
-        <li><strong>36</strong><span>ferramentas do Zo, numa lista fechada no servidor</span></li>
-      </ul>
-    </section>
+  <!-- ===== números ===== -->
+  <section class="faixa faixa-numeros" aria-label="O projeto em números">
+    <div class="miolo numeros">
+      <div class="numero revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-balao"/></svg></span><b>213</b><span>prompts, 176 ao Claude Code e 37 ao Codex</span></div>
+      <div class="numero revela"><span class="chip c-azul"><svg class="ico"><use href="#i-documento"/></svg></span><b>10,5 mil</b><span>linhas de prompts, especificações e auditorias</span></div>
+      <div class="numero revela"><span class="chip c-teal"><svg class="ico"><use href="#i-terminal"/></svg></span><b>3,6 mil</b><span>comandos executados pelos agentes</span></div>
+      <div class="numero revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-codigo"/></svg></span><b>30 mil</b><span>linhas de código em TypeScript, Python e SQL</span></div>
+      <div class="numero revela"><span class="chip c-verde"><svg class="ico"><use href="#i-frasco"/></svg></span><b>325</b><span>testes automatizados</span></div>
+      <div class="numero revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-repete"/></svg></span><b>123</b><span>commits em 35 versões publicadas</span></div>
+      <div class="numero revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-brilho"/></svg></span><b>36</b><span>ferramentas do Zo</span></div>
+      <div class="numero revela"><span class="chip c-azul"><svg class="ico"><use href="#i-raio"/></svg></span><b>4</b><span>semanas, de 6/10 a 3/11/2026</span></div>
+    </div>
+  </section>
 
-    <!-- Processo -->
-    <section aria-labelledby="processo" class="tw:px-14 tw:py-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-8">
-      <h2 id="processo" class="tw:m-0 tw:mb-3 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Um processo com vários agentes</h2>
-      <p class="tw:m-0 tw:max-w-[680px] tw:text-[15px] tw:leading-[1.65]">Cada agente tem um papel e nenhum revisa o próprio trabalho. Eu decido o produto e as regras, o Claude Code constrói e o Codex audita de fora, em sessões separadas, sem ver o raciocínio de quem construiu.</p>
+  <!-- ===== funções ===== -->
+  <section class="secao lilas faixa" id="funcoes" aria-labelledby="funcoes-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-camadas"/></svg>O que é o ZoZo</span>
+        <h2 id="funcoes-t">Todo o seu dinheiro. <em>Num só lugar.</em></h2>
+        <p>Um gerenciador de finanças pessoais que abre no navegador do computador e do celular. Os dados são cifrados no seu aparelho antes de chegar ao servidor.</p>
+      </div>
+      <div class="grade tres">
+        <article class="funcao revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-camadas"/></svg></span><h3>Transações</h3><p>Receitas, despesas, transferências, estornos, compras parceladas e recorrentes, agrupadas por dia.</p><div class="marca-d"><span class="tag">parcelas</span><span class="tag">recorrência</span></div></article>
+        <article class="funcao revela"><span class="chip c-azul"><svg class="ico"><use href="#i-cartao"/></svg></span><h3>Contas e cartões</h3><p>Saldos, limites e o ciclo de cada cartão, do dia seguinte ao fechamento até o fechamento.</p><div class="marca-d"><span class="tag">ciclo da fatura</span></div></article>
+        <article class="funcao revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-pizza"/></svg></span><h3>Orçamento por categoria</h3><p>Quanto foi gasto e quanto sobra em cada categoria, com grupos e orçamento fixo ou do mês.</p></article>
+        <article class="funcao revela"><span class="chip c-verde"><svg class="ico"><use href="#i-sobe"/></svg></span><h3>Investimentos</h3><p>A evolução da carteira e a alocação entre as contas, com filtro de contas incluídas.</p></article>
+        <article class="funcao revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-pessoas"/></svg></span><h3>Perfis e divisão</h3><p>Cada gasto pode ser de uma pessoa ou dividido entre várias, para saber quem deve quanto.</p></article>
+        <article class="funcao revela"><span class="chip c-teal"><svg class="ico"><use href="#i-fatura"/></svg></span><h3>Fatura de perfis</h3><p>A cobrança do mês para cada pessoa, com ajustes, pagamentos recebidos e exportação em PDF ou imagem.</p><div class="marca-d"><span class="tag">PDF</span><span class="tag">PNG</span></div></article>
+        <article class="funcao revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-qr"/></svg></span><h3>Pix na fatura</h3><p>QR Code do Pix gerado no aparelho com o valor que falta pagar.</p></article>
+        <article class="funcao revela"><span class="chip c-azul"><svg class="ico"><use href="#i-globo"/></svg></span><h3>Multicâmbio</h3><p>Contas e transações em real, euro e dólar, cada moeda com o seu espaço.</p><div class="marca-d"><span class="tag">BRL</span><span class="tag">EUR</span><span class="tag">USD</span></div></article>
+        <article class="funcao revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-envia"/></svg></span><h3>Importar extrato</h3><p>Arquivos CSV e OFX do banco lidos no próprio aparelho, conferidos linha a linha, sem repetir o que já existe.</p></article>
+        <article class="funcao revela"><span class="chip c-verde"><svg class="ico"><use href="#i-grafico"/></svg></span><h3>Dashboard e gráficos</h3><p>Gasto do mês contra o orçamento, patrimônio e próximas contas, com gráficos navegáveis pelo teclado.</p></article>
+        <article class="funcao revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-busca"/></svg></span><h3>Busca local</h3><p>A pesquisa roda no navegador, porque um servidor de busca exigiria os dados legíveis.</p></article>
+        <article class="funcao revela"><span class="chip c-teal"><svg class="ico"><use href="#i-baixa"/></svg></span><h3>Exportar e apagar</h3><p>Exportação em CSV, histórico das últimas versões e exclusão da conta a qualquer momento.</p></article>
+      </div>
+    </div>
+  </section>
 
-      <ul class="tw:grid tw:grid-cols-1 tw:computador:grid-cols-3 tw:gap-3 tw:mt-7 tw:mb-0 tw:p-0 tw:list-none
-        tw:[&>li]:flex tw:[&>li]:flex-col tw:[&>li]:gap-2 tw:[&>li]:p-5 tw:[&>li]:rounded-xl tw:[&>li]:bg-[#f8f9fb] tw:[&>li]:border tw:[&>li]:border-[#e6e8ec]
-        tw:[&_h3]:m-0 tw:[&_h3]:text-[16px] tw:[&_h3]:font-[550] tw:[&_small]:text-[12px] tw:[&_small]:font-[620] tw:[&_small]:tracking-[0.08em] tw:[&_small]:uppercase tw:[&_small]:text-zz-primary
-        tw:[&_p]:m-0 tw:[&_p]:text-[14px] tw:[&_p]:leading-[1.6] tw:[&_p]:text-zz-secondary">
-        <li><small>Produto e orquestração</small><h3>Eu</h3><p>Escrevo as especificações (telas medidas em pixels, regras de negócio, LGPD), escolho entre as alternativas que os agentes trazem, testo na prévia e decido o que vai para produção.</p></li>
-        <li><small>Construção</small><h3>Claude Code</h3><p>Lê o contexto do projeto, implementa, roda testes e tipos, confere o app no navegador, lê os logs da Cloudflare e publica na prévia. Foram cerca de 6,5 mil ações em 5 sessões longas.</p></li>
-        <li><small>Auditoria independente</small><h3>Codex</h3><p>Revisa o código como engenheiro sênior de segurança ou de interface e escreve relatórios e pacotes de correção endereçados ao Claude Code. Foram 37 prompts e 12 relatórios.</p></li>
-      </ul>
+  <!-- ===== segurança ===== -->
+  <section class="secao faixa" aria-labelledby="seguranca-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-escudo"/></svg>Destaque</span>
+        <h2 id="seguranca-t">Segurança que <em>não depende de confiança.</em></h2>
+        <p>Auditada contra o OWASP ASVS 5.0 nível 2, com um teste negativo para cada controle.</p>
+      </div>
+      <div class="grade quatro">
+        <article class="funcao revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-cadeado"/></svg></span><h3>Ponta a ponta</h3><p>AES-256-GCM pela Web Crypto. O servidor só guarda o documento cifrado.</p></article>
+        <article class="funcao revela"><span class="chip c-azul"><svg class="ico"><use href="#i-chave"/></svg></span><h3>Argon2id</h3><p>A chave nasce da senha no aparelho. Contas antigas migram sozinhas do PBKDF2.</p></article>
+        <article class="funcao revela"><span class="chip c-verde"><svg class="ico"><use href="#i-escudo"/></svg></span><h3>Duas etapas</h3><p>Código de aplicativo que nunca vale duas vezes e dez códigos de backup de uso único.</p></article>
+        <article class="funcao revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-digital"/></svg></span><h3>Biometria</h3><p>WebAuthn com digital ou rosto, desafio de uso único e contador de assinaturas.</p></article>
+      </div>
+    </div>
+  </section>
 
-      <h3 class="tw:mt-9 tw:mb-3 tw:text-[18px] tw:font-[550] tw:text-[#1b2a4a]">O ciclo de cada entrega</h3>
-      <ol class="tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-3 tw:[counter-reset:passo]
-        tw:[&>li]:relative tw:[&>li]:pl-11 tw:[&>li]:text-[15px] tw:[&>li]:leading-[1.6] tw:[&>li]:[counter-increment:passo]
-        tw:[&>li]:before:absolute tw:[&>li]:before:left-0 tw:[&>li]:before:top-0 tw:[&>li]:before:grid tw:[&>li]:before:place-items-center tw:[&>li]:before:size-7 tw:[&>li]:before:rounded-full tw:[&>li]:before:bg-zz-primary-softer tw:[&>li]:before:text-zz-primary tw:[&>li]:before:text-[13px] tw:[&>li]:before:font-[650] tw:[&>li]:before:[content:counter(passo)]
-        tw:[&_strong]:font-[550]">
-        <li><strong>Especificar.</strong> Um pedido ou documento com critérios que dá para conferir, como medidas, estados, exemplos e o que nunca pode acontecer.</li>
-        <li><strong>Construir.</strong> O Claude Code implementa com um teste negativo para cada controle de segurança novo e cada regra de dinheiro.</li>
-        <li><strong>Auditar.</strong> O Codex revisa o mesmo código em outra sessão e escreve um relatório para o Claude Code.</li>
-        <li><strong>Triar.</strong> O Claude Code confere cada achado no código e separa o que é pertinente, o que já estava corrigido e o que é decisão de produto.</li>
-        <li><strong>Validar.</strong> Testes, verificação de tipos, build e o app real no navegador, no computador e no celular. Depois, publicação na prévia.</li>
-        <li><strong>Decidir.</strong> Eu testo na prévia e publico em produção. Segredos, cobranças e o que é público ficam comigo.</li>
+  <!-- ===== Zo ===== -->
+  <section class="secao zo faixa" id="zo" aria-labelledby="zo-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-brilho"/></svg>O assistente</span>
+        <h2 id="zo-t">Conheça o <em>Zo.</em></h2>
+        <p>Peça em português e o Zo consulta, lança e resume. O modelo só escolhe a ferramenta. Quem grava é o app, e só depois do seu Confirmar.</p>
+      </div>
+      <div class="palco revela" role="img" aria-label="Demonstração do Zo: a pessoa pede para lançar 45,90 no mercado, o Zo mostra um resumo para confirmar, a pessoa confirma e o Zo oferece desfazer">
+        <div class="janela-zo" aria-hidden="true">
+          <header>
+            <span class="av"><svg viewBox="0 0 1024 1024"><use href="#i-z"/></svg></span>
+            <div><b>Zo</b><small>Assistente virtual</small></div>
+            <div class="acoes"><span>···</span><span>✕</span></div>
+          </header>
+          <div class="conversa">
+            <p class="fala zo">Oi, eu sou o Zo. Posso criar, consultar e resumir as suas finanças. Como posso ajudar?</p>
+            <span class="autor">Zo • 1m</span>
+            <p class="fala eu p1">Lança 45,90 no mercado hoje no Nubank</p>
+            <div class="troca"><div class="digitando p2"><i></i><i></i><i></i></div>
+            <div class="confirma p3">
+              <b>Nova transação</b>
+              <dl><dt>Descrição</dt><dd>Mercado</dd><dt>Valor</dt><dd>R$ 45,90</dd><dt>Conta</dt><dd>Nubank 1234</dd><dt>Categoria</dt><dd>🛒 Mercado</dd><dt>Data</dt><dd>03/11/2026</dd></dl>
+              <div class="bts"><span class="ok">Confirmar</span><span>Cancelar</span></div>
+            </div></div>
+            <span class="nota p4"><svg class="ico"><use href="#i-ok"/></svg>Confirmado</span>
+            <p class="fala zo p5">Pronto. Lancei R$ 45,90 em Mercado, no Nubank. Precisa de mais alguma coisa?</p>
+            <span class="desfazer p5"><svg class="ico"><use href="#i-desfaz"/></svg>Desfazer</span>
+          </div>
+          <div class="compor">
+            <p>Quanto gastei este mês?</p>
+            <div><svg class="ico"><use href="#i-clipe"/></svg><svg class="ico"><use href="#i-sorriso"/></svg><span class="envia"><svg class="ico"><use href="#i-sobe-seta"/></svg></span></div>
+          </div>
+        </div>
+        <div class="lado" aria-hidden="true">
+          <div class="menu-zo">
+            <span><svg class="ico"><use href="#i-expandir"/></svg>Expandir janela</span>
+            <span><svg class="ico"><use href="#i-busca"/></svg>Pesquisar na conversa</span>
+            <span><svg class="ico"><use href="#i-baixa"/></svg>Baixar conversa</span>
+            <span><svg class="ico"><use href="#i-mais"/></svg>Nova conversa</span>
+            <span><svg class="ico"><use href="#i-desfaz"/></svg>Lixeira temporal</span>
+          </div>
+          <div class="fab-area">
+            <span class="fab"><svg viewBox="0 0 1024 1024"><use href="#i-z"/></svg></span>
+            <small><b>Sempre à mão</b>No canto da tela, em todas as páginas</small>
+          </div>
+        </div>
+      </div>
+
+      <ol class="fluxo" aria-label="Como uma mensagem do Zo percorre o sistema">
+        <li class="revela"><b>Você pede</b><span>"Lança 45,90 no mercado hoje"</span></li>
+        <li class="revela"><b>API do ZoZo</b><span>Confere sessão e consentimento e esconde CPF, cartão e e-mail</span></li>
+        <li class="revela"><b>Workers AI</b><span>O modelo escolhe as ferramentas e preenche os argumentos</span></li>
+        <li class="revela"><b>Navegador</b><span>Executa as leituras com as mesmas regras da tela</span></li>
+        <li class="revela"><b>Você confirma</b><span>Um resumo com os dados reais. Só então grava</span></li>
       </ol>
 
-      <h3 class="tw:mt-9 tw:mb-2 tw:text-[18px] tw:font-[550] tw:text-[#1b2a4a]">Contexto que não se perde entre sessões</h3>
-      <ul class="tw:m-0 tw:pl-5 tw:list-disc tw:flex tw:flex-col tw:gap-1.5 tw:[&>li]:text-[15px] tw:[&>li]:leading-[1.6] tw:[&>li]:pl-1 tw:[&_li::marker]:text-zz-primary tw:[&_code]:text-[13px] tw:[&_code]:px-1.5 tw:[&_code]:py-px tw:[&_code]:rounded tw:[&_code]:bg-zz-primary-softer">
-        <li>Um <code>CLAUDE.md</code> com as regras que valem sempre: dados cifrados no navegador, SQL só parametrizado, nada de <code>innerHTML</code>, logs sem dados pessoais.</li>
-        <li>Um padrão de segurança próprio (OWASP, ASVS e LGPD) que o agente lê antes de mexer em login, API, banco ou criptografia.</li>
-        <li>Um script de publicação que roda testes, tipos e migrações e não publica nada se algo falhar.</li>
-      </ul>
-    </section>
-
-    <!-- Prompts -->
-    <section aria-labelledby="prompts" class="tw:flex tw:flex-col tw:gap-4">
-      <div>
-        <h2 id="prompts" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Prompts em destaque</h2>
-        <p class="tw:m-0 tw:max-w-[680px] tw:text-[15px] tw:leading-[1.6] tw:text-zz-secondary">Trechos reais, só encurtados e com a formatação ajustada para caber na página. Cada um mostra uma forma de trabalhar com agentes que eu repetiria em qualquer projeto.</p>
+      <div class="grade tres">
+        <article class="funcao revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-chip"/></svg></span><h3>36 ferramentas</h3><p>Function calling com uma lista fechada no servidor, que o navegador não pode alterar.</p></article>
+        <article class="funcao revela"><span class="chip c-verde"><svg class="ico"><use href="#i-ok"/></svg></span><h3>Nada sem você</h3><p>Toda gravação passa por um cartão de confirmação com os dados reais.</p></article>
+        <article class="funcao revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-digital"/></svg></span><h3>Biometria nas ações sem volta</h3><p>Excluir, exportar e mudar de moeda pedem digital ou rosto em contas sem 2FA.</p></article>
+        <article class="funcao revela"><span class="chip c-azul"><svg class="ico"><use href="#i-oculto"/></svg></span><h3>Dados escondidos</h3><p>CPF, CNPJ, cartão, telefone e e-mail viram marcas antes de chegar ao modelo.</p></article>
+        <article class="funcao revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-bloqueia"/></svg></span><h3>Bloqueio por categoria</h3><p>Ofensas, política e assuntos fora do tema recebem respostas fixas, sem opinião.</p></article>
+        <article class="funcao revela"><span class="chip c-teal"><svg class="ico"><use href="#i-desfaz"/></svg></span><h3>Lixeira temporal</h3><p>Cada gravação do Zo pode ser desfeita, revertendo só o que ninguém mudou depois.</p></article>
       </div>
+    </div>
+  </section>
 
-      <!-- 1. Especificação do Zo -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Especificação · Claude Code · 1.268 linhas</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">O Zo inteiro escrito como documento de produto antes de qualquer código</h3>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">Cada botão com medida, cor e estado, cada função com campos, formatos e exemplos. Quando o agente recebe um alvo verificável, o resultado deixa de ser uma interpretação.</p>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">1. Como acessar?
-   1. O Zo ficará disponível como um Botão de Ação Flutuante no canto inferior
-      direito da tela, com border-radius de 50%, fundo branco semi-transparente
-      e com efeito glass, e a logo do Zo centralizada.
-   2. Uma vez que o usuário clicar no Botão de Ação Flutuante, ele dará lugar
-      a uma janela modal com fundo branco com aparência de um chat.
+  <!-- ===== agentes ===== -->
+  <section class="secao lilas faixa" id="agentes" aria-labelledby="agentes-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-pessoas"/></svg>Como foi feito</span>
+        <h2 id="agentes-t">Um time de três. <em>Dois são agentes.</em></h2>
+        <p>Cada um tem um papel definido, e nenhum revisa o próprio trabalho.</p>
+      </div>
+      <div class="agentes">
+        <article class="agente voce revela">
+          <div class="topo"><span class="chip c-laranja"><svg class="ico"><use href="#i-pessoa"/></svg></span><div><small>Produto e orquestração</small><h3>Eu</h3></div></div>
+          <ul>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Escrevo especificações com medidas, estados e exemplos</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Decido entre as alternativas que os agentes trazem</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Testo na prévia e publico em produção</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Cuido de segredos, custos e do que é público</li>
+          </ul>
+          <p class="medida"><b>213</b>prompts escritos</p>
+        </article>
+        <article class="agente claude revela">
+          <div class="topo"><span class="chip c-roxo"><svg class="ico"><use href="#i-terminal"/></svg></span><div><small>Construção</small><h3>Claude Code</h3></div></div>
+          <ul>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Implementa com teste negativo em cada controle</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Confere o app real no navegador e no celular</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Lê os logs da Cloudflare para achar a causa</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Faz a triagem dos laudos do Codex</li>
+          </ul>
+          <p class="medida"><b>3,6 mil</b>comandos executados</p>
+        </article>
+        <article class="agente codex revela">
+          <div class="topo"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><div><small>Auditoria independente</small><h3>Codex</h3></div></div>
+          <ul>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Audita segurança, backend e interface em outra sessão</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Escreve laudos endereçados ao Claude Code</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Declara o que não conseguiu provar</li>
+            <li><svg class="ico"><use href="#i-ok"/></svg>Entrega pacotes de correção para revisão</li>
+          </ul>
+          <p class="medida"><b>12</b>relatórios de auditoria</p>
+        </article>
+      </div>
+      <div class="regras revela" aria-label="Regras compartilhadas entre as sessões">
+        <span class="regra"><svg class="ico"><use href="#i-documento"/></svg><code>CLAUDE.md</code> regras do projeto</span>
+        <span class="regra"><svg class="ico"><use href="#i-escudo"/></svg><code>SEGURANCA.md</code> OWASP e LGPD</span>
+        <span class="regra"><svg class="ico"><use href="#i-frasco"/></svg>teste negativo obrigatório</span>
+        <span class="regra"><svg class="ico"><use href="#i-terminal"/></svg><code>publicar.ps1</code> não publica se algo falhar</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ciclo ===== -->
+  <section class="secao faixa" aria-labelledby="ciclo-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-repete"/></svg>Os passos</span>
+        <h2 id="ciclo-t">O ciclo de <em>cada entrega.</em></h2>
+      </div>
+      <ol class="ciclo">
+        <li class="passo revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-documento"/></svg></span><div class="corpo"><b>1. Especificar</b><p>Um pedido com critérios que dá para conferir: medidas, estados, exemplos e o que nunca pode acontecer.</p><span class="quem c-laranja">Eu</span></div></li>
+        <li class="passo revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-codigo"/></svg></span><div class="corpo"><b>2. Construir</b><p>Implementação com teste negativo para cada controle de segurança e cada regra de dinheiro.</p><span class="quem c-roxo">Claude Code</span></div></li>
+        <li class="passo revela"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><div class="corpo"><b>3. Auditar</b><p>Outro agente revisa o mesmo código em outra sessão e escreve um laudo.</p><span class="quem c-azul">Codex</span></div></li>
+        <li class="passo revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-busca"/></svg></span><div class="corpo"><b>4. Triar</b><p>Cada achado é conferido no código: pertinente, já corrigido ou decisão de produto.</p><span class="quem c-roxo">Claude Code</span></div></li>
+        <li class="passo revela"><span class="chip c-verde"><svg class="ico"><use href="#i-celular"/></svg></span><div class="corpo"><b>5. Validar</b><p>Testes, tipos, build e o app real no navegador, no computador e no celular.</p><span class="quem c-roxo">Claude Code</span></div></li>
+        <li class="passo revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-raio"/></svg></span><div class="corpo"><b>6. Decidir</b><p>Teste na prévia e publicação em produção, com confirmação manual.</p><span class="quem c-laranja">Eu</span></div></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===== prompts ===== -->
+  <section class="secao lilas faixa" id="prompts" aria-labelledby="prompts-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-balao"/></svg>Prompts em destaque</span>
+        <h2 id="prompts-t">O trabalho está <em>nos detalhes.</em></h2>
+        <p>Trechos reais, encurtados para caber.</p>
+      </div>
+      <div class="galeria" id="galeria-prompts" role="region" aria-roledescription="carrossel" aria-label="Prompts em destaque">
+        <article class="cartao">
+          <div class="topo"><span class="chip c-roxo"><svg class="ico"><use href="#i-documento"/></svg></span><small>Especificação · Zo · 1.268 linhas</small></div>
+          <h3>Um assistente inteiro descrito antes de qualquer código.</h3>
+          <pre>1. Como acessar?
+   1. Botão de Ação Flutuante no canto inferior
+      direito, border-radius de 50%, fundo branco
+      semi-transparente e com efeito glass.
       1. A parte superior do chat
-         1. Border bottom 1px solid rgba(9, 14, 21, 0.06)
-         …
+         1. Border bottom 1px solid rgba(9,14,21,0.06)
             1. Botão 1
-               1. Alinhado ao canto direito
                2. Ícone de X (16x16)
                3. Cor rgb(108, 111, 116)
                4. Padding 10px
                6. Hover
-                  1. Cor de fundo rgba(9, 14, 21, 0.1)
-                  2. Border radius 10px
-               7. Função de fechar o chat
-2. Funções?
-   1. Criar
-      1. Transações
-         …
-            5. Valor
-               2. É formatado automaticamente em ponto separando milhar e
-                  vírgula separando os centavos. Ex.: 1000,00 = 1.000,00</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> 36 ferramentas numa lista fechada, o cartão de confirmação antes de qualquer gravação e a janela do Zo nas medidas do documento, com pesquisa, download da conversa e emojis.</p>
-      </article>
+                  1. Cor de fundo rgba(9,14,21,0.1)
+                  2. Border radius 10px</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> 36 ferramentas e a janela nas medidas do documento.</span></p>
+        </article>
+        <article class="cartao">
+          <div class="topo"><span class="chip c-verde"><svg class="ico"><use href="#i-escudo"/></svg></span><small>Especificação · ZoZo · 122 linhas</small></div>
+          <h3>O 2FA estado por estado, com a defesa contra força bruta.</h3>
+          <pre>4. Insira o código de seis dígitos.
+   1. Se errado:
+      1. Esse código não funcionou. Tente o código
+         mais recente do seu aplicativo 2FA.
+         1. font size 0.8125rem
+         2. font weight 450
+         3. Se errar de novo
+            1. Algo deu errado. Por favor, tente
+               novamente ou entre em contato...
+   2. Se certo:
+      1. Check cor branca com fundo circular verde
 
-      <!-- 2. Especificação do ZoZo -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Especificação · Claude Code · 122 linhas</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">O 2FA do ZoZo descrito estado por estado, com a defesa contra força bruta anexada</h3>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">A mesma disciplina do Zo aplicada a um fluxo de segurança: onde fica cada elemento, a animação do painel, cada etapa, a mensagem do primeiro erro e a do segundo, com tamanho e peso de fonte, o que muda depois do acerto e o novo passo do login. Junto foi uma estratégia de bloqueio progressivo para o login.</p>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Adicionar opção de método 2FA:
-1. Abaixo de alterar senha
-   1. Esquerda: Autenticação de Dois Fatores
-   2. Direita: Botão Ativar 2FA
-      1. Clicou
-         1. Abre uma sidebar do lado direito da janela modal de configurações
-            1. Animação da direita para esquerda
-               1. Etapas
-                  1. Abra seu aplicativo 2FA
-                  2. Clique em + ou Adicionar
-                  3. Escaneie o QR code ou insira a chave de configuração
-                     1. Gera um QR Code dinâmico e uma chave de configuração
-                  4. Insira o código de seis dígitos.
-                     1. Se errado:
-                        1. Esse código não funcionou. Tente o código mais recente
-                           do seu aplicativo 2FA.
-                           1. font size 0.8125rem
-                           2. font weight 450
-                           3. Se errar de novo
-                              1. Algo deu errado. Por favor, tente novamente ou entre em
-                                 contato com o suporte se o problema persistir.
-                     2. Se certo:
-                        1. Check cor branca com fundo circular verde
-                        2. Painel lateral que havia sido aberto fecha, esquerda pra direita
-                        3. Texto do botão Ativar 2FA muda para Desativar 2FA
-                           1. Se clicar: janela modal "Desativar 2FA?"
-                     3. Quando o usuário logar novamente e estiver com 2FA ativado
-                        1. Logo após a tela de inserir senha irá para uma outra
-                           1. Mesmo conceito, mesmas posições: "Autentique sua conta"
-                              1. font size 1.5rem
-                              2. font weight 550
+Bloqueio progressivo
+Até 3 tentativas      Permitir login normal
+4ª e 5ª tentativa     Exigir CAPTCHA
+10ª tentativa errada  Bloqueio total + e-mail</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> Código que nunca vale duas vezes, dez códigos de backup e testes negativos.</span></p>
+        </article>
+        <article class="cartao">
+          <div class="topo"><span class="chip c-azul"><svg class="ico"><use href="#i-lupa-alvo"/></svg></span><small>Auditoria · OWASP ASVS 5.0</small></div>
+          <h3>Da lista de temas ao método com evidência.</h3>
+          <pre>Atue como engenheiro sênior de backend e
+segurança de aplicações. Audite o ZoZo, corrija
+problemas confirmados e valide as correções com
+evidências. Use o OWASP ASVS 5.0 como referência,
+priorizando os requisitos aplicáveis do nível 2.
 
-Lógica para erro de login · Bloqueio progressivo
-Até 3 tentativas       Permitir login normal
-4ª e 5ª tentativa      Exigir CAPTCHA (v3 ou Turnstile)
-5ª tentativa errada    Bloqueio temporário por 15 minutos
-10ª tentativa errada   Bloqueio preventivo total + disparo de e-mail
-• Vincule o bloqueio ao IP + usuário
-• Mensagens de erro genéricas: "Usuário ou senha incorretos"</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Autenticação em duas etapas com código de aplicativo que nunca vale duas vezes, dez códigos de backup de uso único, bloqueio por tentativas erradas, CAPTCHA no login e respostas que não revelam se uma conta existe. Cada controle tem um teste negativo na API.</p>
-      </article>
+* Identifique as fronteiras de confiança.
+* Diferencie problema confirmado, suspeita e
+  melhoria opcional.
+* Se faltar acesso, registre a limitação;
+  não invente resultados.</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Antes</b>, quatro semanas atrás, era uma lista de "Verifique por bugs".</span></p>
+        </article>
+        <article class="cartao">
+          <div class="topo"><span class="chip c-rosa"><svg class="ico"><use href="#i-seta"/></svg></span><small>Passagem de tarefa · agente para agente</small></div>
+          <h3>Um agente escreve o brief que outro executa.</h3>
+          <pre>Read CLAUDE.md and docs/SEGURANCA.md first.
 
-      <!-- 2. Auditoria: antes e depois -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Auditoria · Codex e Claude Code · 4 semanas de diferença</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Da lista de verificações à auditoria com método</h3>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O primeiro pedido de auditoria era uma lista de temas. O de quatro semanas depois define a referência, o método, os limites e o formato da evidência, e proíbe o agente de declarar algo seguro sem verificar.</p>
-        <div class="tw:grid tw:grid-cols-1 tw:largo:grid-cols-2 tw:gap-3">
-          <figure class="tw:m-0 tw:flex tw:flex-col tw:gap-2 tw:min-w-0">
-            <figcaption class="tw:text-[13px] tw:font-[620] tw:text-zz-secondary">Antes · 8 de outubro, ao Codex</figcaption>
-            <pre class="tw:m-0 tw:p-5 tw:h-full tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Você é um programador sênior com 20 anos de
-experiência em backend e segurança de dados,
-banco de dados, e bugs.
-Faça uma verificação completa do código,
-sem pular etapas.
-Verifique o funcionamento do Vite
-Verifique a integração do Python com o Cloudflare
-Verifique se o funcionamento da criptografia funciona
-Verifique por bugs
-Verifique por falhas de segurança
-Verifique a segurança contra XSS
-…</pre>
-          </figure>
-          <figure class="tw:m-0 tw:flex tw:flex-col tw:gap-2 tw:min-w-0">
-            <figcaption class="tw:text-[13px] tw:font-[620] tw:text-zz-secondary">Depois · 1º de novembro, ao Claude Code</figcaption>
-            <pre class="tw:m-0 tw:p-5 tw:h-full tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Atue como engenheiro sênior de backend e segurança
-de aplicações. Audite o ZoZo, corrija problemas
-confirmados e valide as correções com evidências.
-Use o OWASP ASVS 5.0 como referência, priorizando
-os requisitos aplicáveis do nível 2. Não declare
-conformidade completa sem verificar todos os
-requisitos pertinentes.
+Bug seen in a browser test: (...) If the session
+ends while that dialog is open, the app goes back
+to the login screen, but the dialog stays in the
+DOM. Clicking "Salvar" would then send the rename
+for the NEW session.
 
-* Identifique as fronteiras de confiança:
-  navegador, API, Cloudflare, banco de dados
-  e terceiros.
-* Diferencie problema confirmado, suspeita que
-  precisa de validação e melhoria opcional.
-* Se faltar acesso, configuração ou ambiente,
-  registre a limitação; não invente resultados.</pre>
-          </figure>
+Task: when the session ends, close every open
+modal, dialog and side panel, and drop their
+pending callbacks. (...) Run npm run typecheck
+and npm test. Do not deploy.</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>O mesmo brief</b> rodou no Claude Code e, no dia seguinte, no Codex.</span></p>
+        </article>
+        <article class="cartao">
+          <div class="topo"><span class="chip c-teal"><svg class="ico"><use href="#i-busca"/></svg></span><small>Diagnóstico · laudo do Codex</small></div>
+          <h3>Investigar sem tocar no código. Confirmar no ambiente real.</h3>
+          <pre>Escopo: investigar por que o Zo não conversa
+adequadamente. Auditoria somente de leitura;
+nenhuma correção ou publicação realizada.
+
+Não foram acessados logs do Worker, valores de
+segredos, cota do projeto Google ou banco em
+produção.
+
+Uma consulta aos dados depende de pelo menos duas
+chamadas ao modelo. A primeira funcionar não
+comprova que a integração inteira funciona.</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> Os logs mostraram a segunda chamada barrada pelo limite de 8 mil tokens por minuto.</span></p>
+        </article>
+        <article class="cartao">
+          <div class="topo"><span class="chip c-laranja"><svg class="ico"><use href="#i-bloqueia"/></svg></span><small>Red teaming</small></div>
+          <h3>Pedir ao agente que ataque o próprio assistente.</h3>
+          <pre>Gere 10 exemplos de prompts que permitam
+explorar o Zo e buscar falhas nele.</pre>
+          <p class="resultado"><svg class="ico"><use href="#i-ok"/></svg><span><b>Resultado.</b> Um teste achou o modelo escrevendo o próprio raciocínio na tela. Correção e teste de regressão no mesmo dia.</span></p>
+        </article>
+      </div>
+      <div class="setas">
+        <button type="button" id="anterior" aria-label="Prompt anterior" aria-controls="galeria-prompts"><svg class="ico"><use href="#i-volta"/></svg></button>
+        <button type="button" id="proximo" aria-label="Próximo prompt" aria-controls="galeria-prompts"><svg class="ico"><use href="#i-avanca"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== modelos ===== -->
+  <section class="secao faixa" aria-labelledby="modelos-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-chip"/></svg>Avaliação de modelos</span>
+        <h2 id="modelos-t">Escolhido no teste. <em>Não no palpite.</em></h2>
+        <p>As instruções e as 36 ferramentas reais do Zo, em quatro cenários, em cada modelo do Cloudflare Workers AI.</p>
+      </div>
+      <div class="tabela revela" tabindex="0" aria-label="Comparação de modelos">
+        <table>
+          <thead><tr><th scope="col">Modelo</th><th scope="col">Cumprimento</th><th scope="col">Resumo do mês</th><th scope="col">Lançar com 4 ferramentas</th><th scope="col">Bloquear política</th></tr></thead>
+          <tbody>
+            <tr class="vence"><td>gpt-oss-120b<span class="selo p">Principal</span></td><td class="sim">✓</td><td class="sim">✓</td><td class="sim">✓</td><td class="sim">✓</td></tr>
+            <tr><td>qwen3.8-27b<span class="selo r">Reserva</span></td><td class="sim">✓</td><td class="sim">✓</td><td class="sim">✓</td><td class="sim">✓</td></tr>
+            <tr><td>gemma-4-26b</td><td class="sim">✓</td><td class="nao">1 centavo</td><td class="sim">✓</td><td class="sim">✓</td></tr>
+            <tr><td>qwen3-30b</td><td class="sim">✓</td><td class="sim">✓</td><td class="nao">sem categoria</td><td class="sim">✓</td></tr>
+            <tr><td>glm-4.7-flash</td><td class="sim">✓</td><td class="nao">formato</td><td class="sim">✓</td><td class="nao">não barrou</td></tr>
+            <tr><td>gpt-oss-20b</td><td class="sim">✓</td><td class="nao">mês errado</td><td class="nao">quebrou</td><td class="nao">vazio</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== tecnologias e APIs ===== -->
+  <section class="secao lilas faixa" id="tecnologias" aria-labelledby="tec-t">
+    <div class="miolo">
+      <div class="cabeca revela">
+        <span class="pilula"><svg class="ico"><use href="#i-raio"/></svg>Tecnologias</span>
+        <h2 id="tec-t">Do navegador à borda. <em>Tudo escolhido a dedo.</em></h2>
+      </div>
+    </div>
+    <div class="esteira" aria-label="Tecnologias usadas">
+      <div class="trilho">
+        <span class="selo-tec"><i class="t-ts"></i>TypeScript</span>
+        <span class="selo-tec"><i class="t-py"></i>Python</span>
+        <span class="selo-tec"><i class="t-vite"></i>Vite</span>
+        <span class="selo-tec"><i class="t-tw"></i>Tailwind CSS</span>
+        <span class="selo-tec"><i class="t-cf"></i>Cloudflare Workers</span>
+        <span class="selo-tec"><i class="t-cf"></i>Cloudflare D1</span>
+        <span class="selo-tec"><i class="t-cf"></i>Workers AI</span>
+        <span class="selo-tec"><i class="t-fastapi"></i>FastAPI</span>
+        <span class="selo-tec"><i class="t-pyd"></i>Pydantic</span>
+        <span class="selo-tec"><i class="t-roxo"></i>Web Crypto</span>
+        <span class="selo-tec"><i class="t-roxo"></i>WebAuthn</span>
+        <span class="selo-tec"><i class="t-gh"></i>GitHub Actions</span>
+        <span class="selo-tec"><i class="t-axe"></i>axe-core</span>
+        <span class="selo-tec"><i class="t-claude"></i>Claude Code</span>
+        <span class="selo-tec"><i class="t-codex"></i>Codex</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-ts"></i>TypeScript</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-py"></i>Python</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-vite"></i>Vite</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-tw"></i>Tailwind CSS</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-cf"></i>Cloudflare Workers</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-cf"></i>Cloudflare D1</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-cf"></i>Workers AI</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-fastapi"></i>FastAPI</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-pyd"></i>Pydantic</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-roxo"></i>Web Crypto</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-roxo"></i>WebAuthn</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-gh"></i>GitHub Actions</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-axe"></i>axe-core</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-claude"></i>Claude Code</span>
+        <span class="selo-tec" aria-hidden="true"><i class="t-codex"></i>Codex</span>
+      </div>
+    </div>
+    <div class="miolo">
+      <div class="pilha">
+        <article class="camada revela"><div class="topo"><span class="chip c-azul"><svg class="ico"><use href="#i-celular"/></svg></span><h3>Interface</h3></div><ul><li><b>TypeScript 7</b> estrito</li><li>Vite 8</li><li>Tailwind CSS 4</li><li>DOM próprio, sem innerHTML</li><li>Gráficos em SVG</li><li>Mobile first</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-laranja"><svg class="ico"><use href="#i-nuvem"/></svg></span><h3>Servidor</h3></div><ul><li><b>Python</b> no Cloudflare Workers</li><li>Pyodide</li><li>FastAPI + Pydantic</li><li>mypy estrito</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-teal"><svg class="ico"><use href="#i-banco"/></svg></span><h3>Dados</h3></div><ul><li><b>Cloudflare D1</b> (SQLite)</li><li>SQL só parametrizado</li><li>13 migrações</li><li>Backup diário cifrado com age</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-roxo"><svg class="ico"><use href="#i-cadeado"/></svg></span><h3>Criptografia</h3></div><ul><li><b>AES-256-GCM</b></li><li>Argon2id</li><li>HMAC</li><li>TOTP</li><li>WebAuthn ES256 e RS256</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-rosa"><svg class="ico"><use href="#i-brilho"/></svg></span><h3>Inteligência artificial</h3></div><ul><li><b>Workers AI</b></li><li>gpt-oss-120b</li><li>qwen3.8-27b (reserva)</li><li>Function calling</li><li>Retenção zero</li></ul></article>
+        <article class="camada revela"><div class="topo"><span class="chip c-verde"><svg class="ico"><use href="#i-acesso"/></svg></span><h3>Qualidade</h3></div><ul><li><b>325 testes</b></li><li>node:test e unittest</li><li>WCAG 2.2 AA com axe-core</li><li>OWASP ASVS 5.0</li><li>LGPD</li></ul></article>
+      </div>
+
+      <div class="apis">
+        <h3 class="titulo revela">APIs</h3>
+        <div class="grade tres">
+          <div class="api revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-codigo"/></svg></span><div><b>API REST própria</b><span>Rotas <code>/api/*</code> com identidade sempre pela sessão, nunca pelo corpo do pedido.</span></div></div>
+          <div class="api revela"><span class="chip c-rosa"><svg class="ico"><use href="#i-brilho"/></svg></span><div><b>Cloudflare Workers AI</b><span>Binding <code>env.AI</code> no Worker, sem chave, no formato de chat completions.</span></div></div>
+          <div class="api revela"><span class="chip c-azul"><svg class="ico"><use href="#i-cadeado"/></svg></span><div><b>Web Crypto</b><span>Cifrar no navegador e conferir assinaturas da biometria no servidor.</span></div></div>
+          <div class="api revela"><span class="chip c-verde"><svg class="ico"><use href="#i-digital"/></svg></span><div><b>WebAuthn</b><span>Digital, rosto e chaves de acesso, com desafio de uso único.</span></div></div>
+          <div class="api revela"><span class="chip c-laranja"><svg class="ico"><use href="#i-pessoa"/></svg></span><div><b>Google OAuth e OpenID</b><span>"Continuar com Google" com state, nonce e PKCE.</span></div></div>
+          <div class="api revela"><span class="chip c-teal"><svg class="ico"><use href="#i-escudo"/></svg></span><div><b>Turnstile</b><span>CAPTCHA da Cloudflare no cadastro e no login.</span></div></div>
+          <div class="api revela"><span class="chip c-roxo"><svg class="ico"><use href="#i-oculto"/></svg></span><div><b>Pwned Passwords</b><span>Recusa senhas vazadas por k-anonimato: só o começo do hash sai do aparelho.</span></div></div>
+          <div class="api revela"><span class="chip c-azul"><svg class="ico"><use href="#i-email"/></svg></span><div><b>Resend</b><span>E-mails de confirmação, recuperação de senha e avisos de segurança.</span></div></div>
+          <div class="api revela"><span class="chip c-verde"><svg class="ico"><use href="#i-repete"/></svg></span><div><b>GitHub Actions</b><span>Backup diário do banco, cifrado antes de sair do servidor.</span></div></div>
         </div>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Achados rastreáveis e uma regra que ficou no projeto. Todo controle de segurança novo ganha um teste negativo, e cada relatório do Codex passa por uma triagem antes de virar código.</p>
-      </article>
+      </div>
+    </div>
+  </section>
 
-      <!-- Passagem de tarefa entre agentes -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Passagem de tarefa · do Claude Code para outra sessão e para o Codex</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Um agente escreve o brief que outro agente executa</h3>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">Num teste no navegador, o Claude Code achou um bug fora do escopo do que estava fazendo. Em vez de desviar, escreveu uma tarefa completa para outra sessão, com contexto, reprodução, risco, onde procurar, como provar e o que não fazer. Eu abri a tarefa numa sessão nova e, no dia seguinte, levei o mesmo brief ao Codex.</p>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">ZoZo project (…). Read CLAUDE.md and docs/SEGURANCA.md first.
-
-Bug seen in a browser test: in Configurações › Conta (pages/perfil.ts), changing
-the user name opens the "Confirmar alteração" dialog, which asks for the password.
-If the session ends while that dialog is open (sign-out triggered elsewhere, e.g.
-another tab or an expired session, or "Sair" triggered programmatically), the app
-goes back to the login screen, but the dialog stays in the DOM, visible on top. It
-is still there after a NEW account signs in. Clicking "Salvar" would then send the
-rename for the NEW session.
-
-Task: when the session ends (logout, 401 / expired session, account switch), close
-every open modal, dialog and side panel, and drop their pending callbacks. Find
-where the app returns to the login screen (ui/js/app.ts, components/auth.ts, the
-modal helpers in components/estrutura.ts or similar) and add a single place that
-clears the modals. Add a test in ui/tests if a suitable harness exists; otherwise
-verify in the browser. Run npm run typecheck and npm test. Do not deploy.
-Report in Portuguese.</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Por que funciona.</strong> O brief se sustenta sozinho. Diz o que ler antes, descreve o defeito com o impacto real (uma ação de uma conta indo para outra), aponta onde procurar sem impor a solução, define como provar que terminou e o que não fazer. Qualquer agente, de qualquer fornecedor, consegue executar.</p>
-      </article>
-
-      <!-- Diagnóstico entre agentes -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Diagnóstico · o laudo do Codex vira o ponto de partida do Claude Code</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Investigar sem tocar no código, entregar um laudo e confirmar no ambiente real</h3>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O Zo não conversava. Pedi ao Codex uma investigação só de leitura, com um laudo escrito para o Claude Code. O laudo veio com o commit examinado, o escopo, a evidência com arquivo e linha e, principalmente, o que ele não tinha como provar.</p>
-        <figure class="tw:m-0 tw:flex tw:flex-col tw:gap-2">
-          <figcaption class="tw:text-[13px] tw:font-[620] tw:text-zz-secondary">Laudo do Codex · 1º de novembro</figcaption>
-          <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words"># Diagnóstico do assistente Zo — entrega para Claude Code
-
-Referência examinada: main, commit c7519d9 (29/10/2026).
-Escopo: investigar por que o Zo não conversa adequadamente, não responde consultas
-ou não conclui funções. Auditoria somente de leitura; nenhuma correção ou publicação
-realizada.
-
-Esses defeitos estão identificados no código examinado. Não foi comprovado que esse
-commit está publicado no ambiente usado pelo usuário. Não foram acessados logs do
-Worker, valores de segredos, cota do projeto Google ou banco em produção.
-
-Uma consulta aos dados depende de pelo menos duas chamadas ao modelo. A primeira
-funcionar não comprova que a integração inteira funciona.
-
-### ZO-01 — P1: assinatura obrigatória do Gemini perdida no ciclo de ferramentas
-Evidência
-- api/src/zo.py:345–356: a resposta é reduzida a texto e chamadas com id, nome e
-  argumentos. O campo thoughtSignature da parte original é descartado.</pre>
-        </figure>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O Claude Code fez a triagem do laudo, corrigiu os defeitos confirmados (o travamento ao fechar com uma confirmação aberta e a perda do que já tinha sido gravado) e foi atrás do que o Codex declarou não ter visto. Nos logs da Cloudflare, a primeira chamada ao modelo respondia em 0,7 s e a segunda, um segundo depois, voltava <code class="tw:text-[13px] tw:px-1.5 tw:py-px tw:rounded tw:bg-zz-primary-softer">429 rate_limit_exceeded</code>. Cada chamada leva uns 6,6 mil tokens, e o plano gratuito do provedor aceitava 8 mil por minuto. Exatamente a segunda chamada que o laudo apontava como ponto cego.</p>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Dois agentes, duas camadas de evidência. O código explicou parte do problema, os registros do ambiente explicaram o resto, e a causa foi medida em tokens antes de qualquer troca de provedor.</p>
-      </article>
-
-      <!-- 4. Avaliação de modelos -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Avaliação de modelos · Claude Code</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Escolher o modelo pelo comportamento com as ferramentas reais</h3>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Teste se as ferramentas do Zo funcionam no Cloudflare Workers AI,
-pois eles têm vários agentes</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">O agente rodou as mesmas instruções e as 36 ferramentas do Zo em 10 modelos, com dados de exemplo, em quatro cenários: um cumprimento, o resumo do mês, um lançamento que exige quatro ferramentas seguidas e uma pergunta que deve ser bloqueada.</p>
-        <div class="tw:overflow-x-auto tw:rounded-xl tw:border tw:border-[#e6e8ec]">
-          <table class="tw:w-full tw:min-w-[560px] tw:border-collapse tw:text-[14px] tw:[&_th]:text-left tw:[&_th]:px-4 tw:[&_th]:py-2.5 tw:[&_th]:bg-[#f8f9fb] tw:[&_th]:text-[12px] tw:[&_th]:font-[620] tw:[&_th]:tracking-[0.05em] tw:[&_th]:uppercase tw:[&_th]:text-zz-secondary tw:[&_td]:px-4 tw:[&_td]:py-2.5 tw:[&_td]:border-t tw:[&_td]:border-[#e6e8ec] tw:[&_td]:align-top">
-            <thead><tr><th scope="col">Modelo</th><th scope="col">Acertos</th><th scope="col">O que falhou</th></tr></thead>
-            <tbody>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">gpt-oss-120b</td><td class="tw:tabular-nums">4 de 4</td><td>Nada. Virou o modelo principal.</td></tr>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">qwen3.8-27b</td><td class="tw:tabular-nums">4 de 4</td><td>Nada, com mais custo por chamada. Virou a reserva.</td></tr>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">gemma-4-26b</td><td class="tw:tabular-nums">3 de 4</td><td>Errou um centavo no resumo.</td></tr>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">qwen3-30b</td><td class="tw:tabular-nums">3 de 4</td><td>Criou a transação sem categoria.</td></tr>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">glm-4.7-flash</td><td class="tw:tabular-nums">2 de 4</td><td>Respondeu em texto em vez de bloquear e fugiu do formato de moeda.</td></tr>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">gpt-oss-20b</td><td class="tw:tabular-nums">1 de 4</td><td>Nome de ferramenta quebrado, mês errado e resposta vazia.</td></tr>
-              <tr><td class="tw:font-[550] tw:whitespace-nowrap">llama-4-scout e mistral-small</td><td>0 a 1</td><td>Escreveram as chamadas como texto.</td></tr>
-            </tbody>
-          </table>
+  <!-- ===== fim ===== -->
+  <section class="secao fim faixa" aria-labelledby="fim-t">
+    <div class="nuvem a" aria-hidden="true"></div><div class="nuvem b" aria-hidden="true"></div>
+    <div class="miolo">
+      <span class="pilula revela"><svg class="ico"><use href="#i-balao"/></svg>Contato</span>
+      <h2 id="fim-t" class="revela">Vamos conversar.</h2>
+      <p class="revela">Escreva direto para mim. Todos os campos são obrigatórios. Respondo no e-mail que você deixar.</p>
+      <form id="form-contato" class="form-contato revela" action="/portfolio/contato" method="post" novalidate data-sitekey="0x4AAAAAAFQjiDFKjsHDDIAe">
+        <div class="campo">
+          <label for="c-nome">Nome</label>
+          <input id="c-nome" name="nome" type="text" required minlength="2" maxlength="80" autocomplete="name" aria-describedby="erro-nome">
+          <p class="erro" id="erro-nome" data-erro="nome" aria-live="polite"></p>
         </div>
-        <p class="tw:m-0 tw:text-[14px] tw:leading-[1.6] tw:text-zz-secondary">Dois modelos não rodaram no plano gratuito. No caminho, o teste também achou uma diferença de formato que travava a segunda chamada.</p>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> O Zo passou a rodar no Workers AI, na mesma conta do app, com modelo reserva automático. O aviso de consentimento, a política de privacidade e os termos foram atualizados no mesmo dia.</p>
-      </article>
-
-      <!-- 5. Red teaming -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Red teaming · Claude Code</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Pedir ao agente que ataque o próprio assistente</h3>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Gere 10 exemplos de prompts que permitam explorar o Zo e buscar falhas nele.</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]">Vieram dez testes com o resultado esperado de cada um: instrução escondida na descrição de uma transação, CPF e cartão no chat, exclusão em massa, troca de senha pelo chat, pergunta política e um pedido incompleto. Num deles, o modelo escreveu na tela o próprio raciocínio, com ids de transações, no formato interno dele.</p>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Correção no mesmo dia. Uma resposta assim é descartada antes de chegar à tela, o modelo reserva responde e o log guarda só o tipo da falha, nunca o conteúdo. Um teste de regressão impede que volte.</p>
-      </article>
-
-      <!-- 6. Humano no circuito -->
-      <article class="tw:px-10 tw:py-9 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-7 tw:flex tw:flex-col tw:gap-4">
-        <p class="tw:m-0 tw:text-[12px] tw:font-[620] tw:tracking-[0.08em] tw:uppercase tw:text-zz-primary">Humano no circuito · Claude Code</p>
-        <h3 class="tw:m-0 tw:text-[20px] tw:leading-[1.3] tw:font-[550] tw:text-[#1b2a4a]">Separar o que o agente faz do que é decisão minha</h3>
-        <pre class="tw:m-0 tw:p-5 tw:rounded-xl tw:bg-[#f8f9fb] tw:border tw:border-[#e6e8ec] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:text-[#33405c] tw:whitespace-pre-wrap tw:break-words">Me informe o que necessita de minha decisão, revisão ou ação. O que
-preciso configurar, se há algo a ser migrado e testado. Me dê passo a
-passo detalhados. Verifique 2x se os passos fornecidos estão
-atualizados e então me retorne.</pre>
-        <p class="tw:m-0 tw:text-[15px] tw:leading-[1.65]"><strong class="tw:font-[550]">Resultado.</strong> Uma lista curta do que só eu posso fazer: cadastrar segredos, aceitar custos, fechar pull requests e publicar em produção. O agente faz o resto e para nos pontos sem volta.</p>
-      </article>
-    </section>
-
-    <!-- Aprendizados -->
-    <section aria-labelledby="aprendi" class="tw:px-14 tw:py-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-8">
-      <h2 id="aprendi" class="tw:m-0 tw:mb-4 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">O que aprendi construindo com agentes</h2>
-      <ul class="tw:m-0 tw:pl-5 tw:list-disc tw:flex tw:flex-col tw:gap-2.5 tw:[&>li]:text-[15px] tw:[&>li]:leading-[1.65] tw:[&>li]:pl-1 tw:[&_li::marker]:text-zz-primary tw:[&_strong]:font-[550]">
-        <li><strong>Um teste pelo caminho errado não prova nada.</strong> O modelo funcionou pela API REST e falhou dentro do Worker, onde a resposta chegava em outro formato. Só os logs do ambiente real mostraram isso.</li>
-        <li><strong>Limite do provedor é requisito de arquitetura.</strong> 36 ferramentas custam uns 6,6 mil tokens por chamada, e isso decide qual plano e qual modelo cabem no produto.</li>
-        <li><strong>Dois agentes com papéis diferentes acham mais problemas.</strong> O auditor não tem o viés de quem construiu, e o construtor confere cada achado antes de mexer no código.</li>
-        <li><strong>Regras escritas valem mais que lembranças.</strong> O que fica no arquivo de contexto do projeto continua valendo na sessão seguinte. O que fica só na conversa se perde.</li>
-        <li><strong>Especificação boa é a que dá para conferir.</strong> Medidas, estados, exemplos e proibições explícitas reduzem as idas e vindas.</li>
-      </ul>
-    </section>
-
-    <!-- Tecnologias -->
-    <section aria-labelledby="stack">
-      <h2 id="stack" class="tw:m-0 tw:mb-4 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Tecnologias</h2>
-      <ul class="tw:flex tw:flex-wrap tw:gap-2 tw:m-0 tw:p-0 tw:list-none tw:[&>li]:px-3 tw:[&>li]:py-1.5 tw:[&>li]:rounded-full tw:[&>li]:bg-zz-surface tw:[&>li]:border tw:[&>li]:border-[#e6e8ec] tw:[&>li]:text-[14px] tw:[&>li]:font-[550]">
-        <li>Claude Code</li><li>Codex</li><li>Cloudflare Workers AI</li><li>Function calling</li>
-        <li>TypeScript</li><li>Python</li><li>Vite</li><li>Tailwind CSS</li>
-        <li>Cloudflare Workers</li><li>Cloudflare D1</li><li>FastAPI e Pydantic</li>
-        <li>Web Crypto (AES-256-GCM)</li><li>Argon2id</li><li>WebAuthn</li><li>TOTP</li>
-        <li>OWASP ASVS</li><li>WCAG 2.2 AA</li><li>LGPD</li><li>GitHub Actions</li>
-      </ul>
-      <p class="tw:mt-6 tw:mb-0 tw:text-[15px] tw:leading-[1.65] tw:text-zz-secondary">Quer ver como os dados ficam protegidos? A <a href="/sobre" class="tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline">apresentação do ZoZo</a> e a <a href="/politica-privacidade" class="tw:text-zz-primary tw:font-[550] tw:underline-offset-2 tw:hover:underline">política de privacidade</a> explicam em linguagem simples.</p>
-    </section>
-
-    <!-- Contato: o envio e todas as conferências que valem ficam em api/portfolio/src/contato.ts -->
-    <section id="contato" aria-labelledby="contato-t" class="tw:scroll-mt-6 tw:px-14 tw:py-12 tw:bg-zz-surface tw:border tw:border-[#e6e8ec] tw:rounded-2xl tw:celular:px-5 tw:celular:py-8">
-      <h2 id="contato-t" class="tw:m-0 tw:mb-1 tw:text-[24px] tw:leading-[1.3] tw:font-[550] tw:tracking-[-0.01em] tw:text-[#1b2a4a]">Vamos conversar</h2>
-      <p class="tw:m-0 tw:mb-7 tw:max-w-[620px] tw:text-[15px] tw:leading-[1.6] tw:text-zz-secondary">Escreva direto para mim. Todos os campos são obrigatórios; respondo no e-mail que você deixar.</p>
-      <form id="form-contato" action="/portfolio/contato" method="post" novalidate data-sitekey="0x4AAAAAAFQjiDFKjsHDDIAe" class="tw:flex tw:flex-col tw:gap-5 tw:max-w-[620px]">
-        <div class="tw:flex tw:flex-col tw:gap-1.5">
-          <label for="c-nome" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">Nome</label>
-          <input id="c-nome" name="nome" type="text" required minlength="2" maxlength="80" autocomplete="name" aria-describedby="erro-nome" class="tw:w-full tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]">
-          <p data-erro="nome" id="erro-nome" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        <div class="campo">
+          <label for="c-email">E-mail</label>
+          <input id="c-email" name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="off" aria-describedby="erro-email">
+          <p class="erro" id="erro-email" data-erro="email" aria-live="polite"></p>
         </div>
-        <div class="tw:flex tw:flex-col tw:gap-1.5">
-          <label for="c-email" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">E-mail</label>
-          <input id="c-email" name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="off" aria-describedby="erro-email" class="tw:w-full tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]">
-          <p data-erro="email" id="erro-email" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        <div class="campo">
+          <label for="c-titulo">Título</label>
+          <input id="c-titulo" name="titulo" type="text" required minlength="3" maxlength="120" autocomplete="off" aria-describedby="erro-titulo">
+          <p class="erro" id="erro-titulo" data-erro="titulo" aria-live="polite"></p>
         </div>
-        <div class="tw:flex tw:flex-col tw:gap-1.5">
-          <label for="c-titulo" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">Título</label>
-          <input id="c-titulo" name="titulo" type="text" required minlength="3" maxlength="120" autocomplete="off" aria-describedby="erro-titulo" class="tw:w-full tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]">
-          <p data-erro="titulo" id="erro-titulo" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
-        </div>
-        <div class="tw:flex tw:flex-col tw:gap-1.5">
-          <label for="c-mensagem" class="tw:text-[14px] tw:font-[550] tw:text-[#1b2a4a]">Mensagem</label>
-          <textarea id="c-mensagem" name="mensagem" required minlength="10" maxlength="4000" rows="6" aria-describedby="erro-mensagem" class="tw:w-full tw:resize-y tw:min-h-[140px] tw:leading-[1.55] tw:px-3.5 tw:py-2.5 tw:rounded-xl tw:bg-zz-surface tw:border tw:border-[#d9dde3] tw:text-[15px] tw:text-zz-text tw:outline-none tw:focus:border-zz-primary tw:focus:shadow-[0_0_0_3px_var(--color-primary-soft)] tw:aria-invalid:border-[#c81e1e]"></textarea>
-          <p data-erro="mensagem" id="erro-mensagem" class="tw:m-0 tw:text-[13px] tw:text-[#c81e1e] tw:empty:hidden" aria-live="polite"></p>
+        <div class="campo">
+          <label for="c-mensagem">Mensagem</label>
+          <textarea id="c-mensagem" name="mensagem" required minlength="10" maxlength="4000" rows="6" aria-describedby="erro-mensagem"></textarea>
+          <p class="erro" id="erro-mensagem" data-erro="mensagem" aria-live="polite"></p>
         </div>
         <!-- armadilha para robôs: invisível para pessoas; preenchida, o servidor finge que enviou -->
-        <div class="tw:absolute tw:-left-[10000px] tw:w-px tw:h-px tw:overflow-hidden" aria-hidden="true">
+        <div class="armadilha" aria-hidden="true">
           <label for="c-site">Site (deixe em branco)</label>
           <input id="c-site" name="site" type="text" tabindex="-1" autocomplete="off">
         </div>
-        <div data-captcha class="tw:min-h-[65px]"></div>
-        <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-4">
-          <button type="submit" class="tw:inline-flex tw:items-center tw:justify-center tw:h-[46px] tw:px-6 tw:rounded-xl tw:border-0 tw:cursor-pointer tw:text-[15px] tw:font-[650] tw:text-white tw:bg-[#6948D8] tw:bg-(image:--botao-roxo) tw:shadow-[0_1px_2px_rgba(15,39,66,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] tw:hover:bg-(image:--botao-roxo-hover) tw:disabled:opacity-60 tw:disabled:cursor-wait tw:focus-visible:outline-2 tw:focus-visible:outline-zz-primary tw:focus-visible:outline-offset-2">Enviar mensagem</button>
-          <p data-aviso role="status" class="tw:m-0 tw:text-[14px] tw:text-zz-secondary tw:data-[tipo=erro]:text-[#c81e1e] tw:data-[tipo=ok]:text-[#0f7b3f] tw:data-[tipo=ok]:font-[550]"></p>
+        <div class="captcha-caixa" data-captcha></div>
+        <div class="enviar">
+          <button type="submit" class="botao cheio"><svg class="ico"><use href="#i-envia"/></svg>Enviar mensagem</button>
+          <p class="aviso" data-aviso role="status"></p>
         </div>
       </form>
-    </section>
-  </main>
+    </div>
+  </section>
+</main>
 
-  <footer class="tw:w-[min(960px,calc(100%-32px))] tw:mx-auto tw:pb-8 tw:text-center tw:text-[13px] tw:text-zz-secondary">
-    © 2026 ZoZo · Lukas Del Piero Barros · <a href="https://github.com/lukasdelpiero/zozo" rel="noopener" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">GitHub</a> · <a href="/sobre" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Sobre o ZoZo</a> · <a href="/termos-uso" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Termos de uso</a> · <a href="/politica-privacidade" class="tw:text-zz-secondary tw:underline-offset-2 tw:hover:text-zz-text tw:hover:underline">Política de privacidade</a>
-  </footer>
-  <script type="module" src="/src/portfolio.ts"></script>
+<footer class="rodape faixa">
+  <div class="miolo">
+    <span>© 2026 ZoZo · Lukas Del Piero Barros</span>
+    <span>Telas do app real, com dados de exemplo · <a href="https://github.com/lukasdelpiero/zozo" rel="noopener">GitHub</a> · <a href="/sobre">Sobre o ZoZo</a> · <a href="/termos-uso">Termos de uso</a> · <a href="/politica-privacidade">Política de privacidade</a></span>
+  </div>
+</footer>
+<script type="module" src="/src/portfolio.ts"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@
    por contexto ([&_.cat-pill]:… nas linhas) se apoiam nelas.
    Classes sempre escritas por inteiro (o Tailwind só gera o que lê).
    ============================================================= */
-(function (ZoZo: ZoZoGlobal) {
+const classes = (function (ZoZo: ZoZoGlobal) {
   "use strict";
 
   // Etiqueta de perfil e pílula de categoria: fundo na cor (14%/12%), texto no mesmo tom mais escuro
@@ -72,7 +72,9 @@
   const LP_BOTAO_CINZA = "tw:inline-flex tw:items-center tw:gap-1.5 tw:px-1.5 tw:py-0 tw:[border:0] tw:rounded-lg tw:bg-transparent tw:text-zz-cinza "
     + "tw:text-[.8125rem] tw:font-[550] tw:hover:bg-zz-surface-hover tw:hover:text-zz-text";
   const LP_CAMPO = "tw:border tw:border-transparent tw:rounded-lg tw:bg-transparent tw:text-[20px] tw:font-[550] tw:tracking-[-0.01em] tw:text-zz-text tw:py-0.5 tw:px-1.5 "
-    + "tw:min-w-0 tw:outline-none tw:focus:[box-shadow:none]";
+    + "tw:min-w-0 tw:outline-none tw:focus:[box-shadow:none] "
+    // sem outline, o foco precisa aparecer: a borda (já reservada, transparente) ganha a cor de foco, sem mexer no layout
+    + "tw:focus-visible:border-[color:var(--color-focus)]";
 
   const P = {
     /* Etiqueta de perfil (UI.Tag) — tag--upper: maiúsculas (listas e painéis) */
@@ -496,4 +498,8 @@
 
   ZoZo.pecas = P;
   ZoZo.pecasFn = { botao, botaoIcone };
+  return P;
 })(window.ZoZo);
+
+/** Nomes FECHADOS do mapa (globais.d.ts): ZoZo.pecas.nomeErrado não compila (auditoria de UI/UX 03/11, F09) */
+export type ClassesPecas = typeof classes;

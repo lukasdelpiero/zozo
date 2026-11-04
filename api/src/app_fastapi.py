@@ -112,17 +112,18 @@ class Documento(Modelo):
     conteudo: Conteudo
 
 
+class VersaoCifrada(Modelo):
+    versao: Versao
+    conteudo: Conteudo
+
+
 class NovaSenha(Documento):
     sal: Sal
     iteracoes: Iteracoes
     prova: Prova
     kdf: Kdf | None = None
     codigo: Codigo | None = None                  # conta com 2FA: código atual
-
-
-class VersaoCifrada(Modelo):
-    versao: Versao
-    conteudo: Conteudo
+    historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []   # recifrado com a chave nova
 
 
 class NovoKdf(Documento):
@@ -149,6 +150,13 @@ class Custodia(Modelo):
 class Protecao(Modelo):
     avancada: bool
     codigo: Codigo | None = None                  # desligar, com 2FA: código atual
+    # ligar: troca de chave (mesma senha, sal novo), documento e histórico recifrados
+    sal: Sal | None = None
+    kdf: Literal["argon2id-1"] | None = None
+    prova: Prova | None = None
+    versaoAnterior: Versao | None = None
+    conteudo: Conteudo | None = None
+    historico: Annotated[list[VersaoCifrada], Field(max_length=10)] = []
 
 
 class ExcluirConta(Modelo):
@@ -222,6 +230,7 @@ MODELOS: dict[tuple[str, str], type[Modelo]] = {
     ("PUT", "/api/conta/senha"): NovaSenha,
     ("PUT", "/api/conta/kdf"): NovoKdf,
     ("PUT", "/api/conta/kdf/historico"): KdfEtapa,
+    ("PUT", "/api/conta/chave/historico"): KdfEtapa,
     ("PUT", "/api/custodia"): Custodia,
     ("PUT", "/api/conta/protecao"): Protecao,
     ("DELETE", "/api/conta"): ExcluirConta,

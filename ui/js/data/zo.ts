@@ -505,14 +505,14 @@
       },
     };
 
-    const SEM_VERIFICACAO = { erro: "VERIFICACAO_NECESSARIA", mensagem: "Sem a verificação em duas etapas, excluir, exportar, mudar de moeda e as ações de conta pelo Zo pedem a biometria. Cadastre em Configurações › Conta ou ative o 2FA." };
+    const SEM_VERIFICACAO = { erro: "VERIFICACAO_NECESSARIA", mensagem: "Sem a verificação em duas etapas, excluir, exportar, mudar de moeda e as ações de conta pelo Zo pedem a biometria. Cadastre em Configurações › Segurança ou ative o 2FA." };
     const VERIFICACAO_NEGADA = { erro: "VERIFICACAO_NEGADA", mensagem: "A biometria não foi confirmada. Nada foi feito." };
     /** Telas das Configurações que o Zo só abre depois de confirmar a identidade (conta sem 2FA) */
     const TELAS_PROTEGIDAS: ReadonlySet<string> = new Set(["senha", "apagar_dados", "excluir_conta", "pix"]);
-    const ASSUNTOS: Record<string, { aba: "geral" | "conta"; onde: string }> = {
-      senha: { aba: "conta", onde: "Alterar senha" }, dois_fatores: { aba: "conta", onde: "Autenticação de Dois Fatores" },
-      protecao_avancada: { aba: "conta", onde: "Proteção avançada" }, apagar_dados: { aba: "conta", onde: "Apagar todos os dados" },
-      excluir_conta: { aba: "conta", onde: "Excluir conta" }, pix: { aba: "geral", onde: "Pix" }, geral: { aba: "geral", onde: "Geral" },
+    const ASSUNTOS: Record<string, { aba: "geral" | "conta" | "seguranca"; onde: string }> = {
+      senha: { aba: "conta", onde: "Alterar senha" }, dois_fatores: { aba: "seguranca", onde: "Verificação em duas etapas" },
+      protecao_avancada: { aba: "seguranca", onde: "Proteção avançada" }, apagar_dados: { aba: "conta", onde: "Apagar todos os dados" },
+      excluir_conta: { aba: "conta", onde: "Excluir conta" }, pix: { aba: "geral", onde: "PIX" }, geral: { aba: "geral", onde: "Geral" },
     };
     const TELA: Record<string, (a: Args) => Promise<unknown>> = {
       abrir_fatura: async (a) => {

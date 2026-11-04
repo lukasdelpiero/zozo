@@ -269,7 +269,7 @@
   const aadCustodia = (email: string, nonce: string) => enc.encode("zozo|custodia|v1|" + email + "|" + nonce);
   /**
    * Guarda a cópia da chave. true = guardada (ou já estava, ou proteção avançada: nada a guardar); false = falhou
-   * (sem cópia, "Esqueci minha senha" não recupera os dados até o próximo login ou o reparo em Configurações › Conta).
+   * (sem cópia, "Esqueci minha senha" não recupera os dados até o próximo login ou o reparo em Configurações › Segurança).
    */
   async function guardarCustodia(s: Sessao | null, bits: Bytes): Promise<boolean> {
     if (!s || s.demo) return true;
@@ -438,6 +438,64 @@
       m.chaves.bits.fill(0);
       bitsAntigos.fill(0);
     }
+  }
+
+  /* ---------------- troca da chave dos dados: senha nova ou proteção avançada ----------------
+     Documento e histórico são lidos com a chave atual e recifrados com a nova; o fechamento (PUT /conta/senha ou
+     /conta/protecao) troca tudo numa transação. Cópia do histórico que já não abria fica de fora (o servidor a apaga:
+     estava cifrada com a chave anterior). Histórico grande: uma cópia por pedido antes (/conta/chave/historico). */
+  type LidoParaTroca = { versao: number; documento: unknown; historico: Array<{ versao: number; claro: unknown }> };
+  async function lerParaTrocarChave(email: string, atual: Chaves): Promise<LidoParaTroca> {
+    const doc = await api("GET", "/documento", undefined, atual.prova);     // senha errada → WRONG_PASSWORD
+    let documento: unknown = null;
+    if (doc) { try { documento = await decifrar(atual.chave, email, doc.versao, doc.conteudo); } catch (e) { throw erro("LOAD_FAILED"); } }
+    const h = await api("GET", "/historico", undefined, atual.prova);
+    const historico: LidoParaTroca["historico"] = [];
+    for (const v of (h && Array.isArray(h.versoes) ? h.versoes : [])) {
+      try { historico.push({ versao: v.versao, claro: await decifrar(atual.chave, email, v.versao, v.conteudo) }); } catch (e) { /* já não abria */ }
+    }
+    return { versao: doc ? doc.versao : 0, documento, historico };
+  }
+  async function recifrarParaChave(email: string, lido: LidoParaTroca, nova: Chaves, sal: Bytes, provaAtual: string) {
+    const conteudo = await cifrar(nova.chave, email, lido.versao + 1, lido.documento);
+    let historico: Array<{ versao: number; conteudo: string }> = [];
+    let tamanho = conteudo.length + 1000;
+    for (const v of lido.historico) {
+      const c = await cifrar(nova.chave, email, v.versao, v.claro);
+      tamanho += c.length + 40;
+      historico.push({ versao: v.versao, conteudo: c });
+    }
+    if (tamanho > LIMITE_PEDIDO) {
+      for (const r of historico) await api("PUT", "/conta/chave/historico", { sal: b64(sal), versao: r.versao, conteudo: r.conteudo }, provaAtual);
+      historico = [];
+    }
+    return { conteudo, historico };
+  }
+
+  /**
+   * Proteção avançada: além de apagar a cópia de recuperação, troca a chave dos dados (mesma senha, sal novo). Sem a
+   * troca, uma cópia antiga da custódia guardada num backup do banco abriria também o que fosse gravado depois.
+   */
+  async function ligarProtecao(s: Sessao, atual: Chaves, senha: unknown): Promise<void> {
+    const lido = await lerParaTrocarChave(s.email, atual);
+    const sal = aleatorio(16);
+    const nova = await derivar(senha, sal, ITERACOES, KDF_ARGON2);
+    try {
+      const corpo = await recifrarParaChave(s.email, lido, nova, sal, atual.prova);
+      try {
+        await api("PUT", "/conta/protecao", { avancada: true, sal: b64(sal), kdf: KDF_ARGON2, prova: nova.prova, versaoAnterior: lido.versao, ...corpo }, atual.prova);
+      } catch (e) {
+        // sem resposta: a troca pode ter acontecido. O sal novo no servidor é a prova (nunca repete às cegas)
+        if (!incerto(e)) throw e;
+        const par = await parametros(s.email).catch(() => null);
+        if (!par || par.sal !== b64(sal)) throw e;
+      }
+      if (sessao === s) {
+        Object.assign(s, { chave: nova.chave, prova: nova.prova, versao: lido.versao + 1 });
+        await guardarChaveLocal(s.email, s.envelope, nova.bits, nova.prova);
+      }
+      await lembrarVersao(s.email, lido.versao + 1);
+    } finally { nova.bits.fill(0); }
   }
 
   /* ---------------- última versão vista neste navegador ---------------- */
@@ -653,17 +711,17 @@
       if (simulada(s)) { if (s.doisFatores && !/^\d{6}$/.test(codigo || "")) throw erro(codigo ? "CODE_INVALID" : "CODE_REQUIRED"); return { alterada: true }; }
       const atual = await derivarConta(d.senhaAtual, await parametros(s.email));
       atual.bits.fill(0);
-      const doc = await api("GET", "/documento", undefined, atual.prova);     // senha errada → WRONG_PASSWORD
+      const lido = await lerParaTrocarChave(s.email, atual);                  // senha errada → WRONG_PASSWORD
       if (await senhaVazada(d.novaSenha)) throw erro("PASSWORD_BREACHED");
-      let documento: unknown = null;
-      if (doc) { try { documento = await decifrar(atual.chave, s.email, doc.versao, doc.conteudo); } catch (e) { throw erro("LOAD_FAILED"); } }
-      const va: number = doc ? doc.versao : 0;
       const sal = aleatorio(16);
       const nova = await derivar(d.novaSenha, sal, ITERACOES, KDF_ARGON2);           // senha nova já em Argon2id
-      const conteudo = await cifrar(nova.chave, s.email, va + 1, documento);
-      // troca atômica no servidor: novo sal + nova prova + documento recifrado (e os outros dispositivos saem)
+      const va = lido.versao;
+      let corpo: { conteudo: string; historico: Array<{ versao: number; conteudo: string }> };
+      try { corpo = await recifrarParaChave(s.email, lido, nova, sal, atual.prova); }
+      catch (e) { nova.bits.fill(0); throw e; }
+      // troca atômica no servidor: novo sal + nova prova + documento e histórico recifrados (e os outros dispositivos saem)
       try {
-        await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, conteudo, versaoAnterior: va, codigo }, atual.prova);
+        await api("PUT", "/conta/senha", { sal: b64(sal), iteracoes: ITERACOES, kdf: KDF_ARGON2, prova: nova.prova, versaoAnterior: va, codigo, ...corpo }, atual.prova);
       } catch (e) { nova.bits.fill(0); throw incerto(e) ? erro("PASSWORD_UNCONFIRMED") : e; }   // trocou ou não: a tela orienta
       let recuperacaoPendente = false;
       if (sessao === s) {
@@ -833,8 +891,11 @@
       }
       const k = await derivarConta(d.senha, await parametros(s.email));
       try {
-        await api("PUT", "/conta/protecao", { avancada: d.avancada === true, codigo }, k.prova);   // senha errada → WRONG_PASSWORD
-        if (d.avancada !== true) await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
+        if (d.avancada === true) await ligarProtecao(s, k, d.senha);
+        else {
+          await api("PUT", "/conta/protecao", { avancada: false, codigo }, k.prova);   // senha errada → WRONG_PASSWORD
+          await guardarCustodia(Object.assign({}, s, { prova: k.prova }), k.bits);
+        }
       } finally { k.bits.fill(0); }
       return ACOES.getProtecao({});
     },
@@ -915,7 +976,11 @@
       await comProvaDaSessao(() => api("DELETE", "/webauthn/chaves", d && d.codigo ? { id, codigo: String(d.codigo) } : { id }, s.prova));
       return { removida: true };
     },
-    /** Confirmar com biometria (ações sem volta e relatórios do Zo, para quem não usa 2FA): o servidor confere a assinatura */
+    /**
+     * Confirmar com biometria (relatórios do Zo): o servidor confere a assinatura. É uma trava DESTA tela, não uma
+     * autorização no servidor: as ações sem volta não pedem biometria (com 2FA, pedem o código atual; sem 2FA, bastam a
+     * sessão e a prova da senha). Auditoria de segurança 03/11, A2.
+     */
     async confirmarBiometria() {
       const s = exigirConta();
       if (simulada(s)) { if (!(s.biometrias || []).length) throw erro("WEBAUTHN_NONE"); return { confirmado: true }; }

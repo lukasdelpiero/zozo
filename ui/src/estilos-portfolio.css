@@ -1,0 +1,11 @@
+/* =============================================================
+   ZoZo — estilos do portfólio (ui/portfolio.html)
+   ------------------------------------------------------------
+   O visual é o do case "ZoZo Case" (src/portfolio.css, CSS comum). Daqui vêm só os tokens e o base.css do ZoZo
+   (fonte Matter, reset), na camada "legado"; o portfolio.css entra fora das camadas e vence. Sem Tailwind: a
+   página não usa classes tw:. Antes ele levava quase todo o CSS do app (~157 kB). Auditoria de UI/UX 03/11, F08.
+   ============================================================= */
+@layer legado;
+@import "../css/tokens.css" layer(legado);
+@import "../css/base.css" layer(legado);
+@import "./portfolio.css";

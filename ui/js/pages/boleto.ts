@@ -65,7 +65,7 @@
     periodosCartao: "tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:gap-0.5 tw:text-[13px] tw:text-zz-secondary tw:empty:hidden",
     // pagamentos recebidos do perfil
     recebidos: "tw:m-0 tw:p-0 tw:list-none tw:flex tw:flex-col tw:empty:hidden",
-    recebido: "tw:grid tw:grid-cols-[46px_minmax(0,1fr)_auto] tw:gap-3 tw:items-center tw:min-h-8 tw:px-2 tw:text-[13px] tw:-mx-2 tw:odd:bg-(--color-background) tw:odd:rounded-md",
+    recebido: "tw:grid tw:grid-cols-[46px_minmax(0,1fr)_auto_auto] tw:gap-3 tw:items-center tw:min-h-8 tw:px-2 tw:text-[13px] tw:-mx-2 tw:odd:bg-(--color-background) tw:odd:rounded-md",
     selo: "tw:self-start tw:inline-flex tw:items-center tw:gap-1.5 tw:h-6 tw:px-2.5 tw:rounded-(--radius-pill) tw:text-[12px] tw:font-[620] tw:empty:hidden",
     seloPago: "tw:bg-(--color-aviso-sucesso-fundo) tw:text-(--color-aviso-sucesso)",
     seloFalta: "tw:bg-zz-warning-soft tw:text-zz-warning-text",
@@ -374,7 +374,7 @@
       imprimirBtn.disabled = !pronto(st);
       pngBtn.disabled = !pronto(st);
       avisoPix.textContent = invalido(st) ? "Corrija o valor marcado em vermelho para imprimir a fatura."
-        : pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › Pix." : "";
+        : pronto(st) && !st.pix ? "Para incluir o QR code Pix, cadastre sua chave em Configurações › Geral › PIX." : "";
     }
     function atualizarLista() {
       contadorEl.textContent = st.lancamentos && !st.carregando ? String(st.lancamentos.length) : "";
@@ -384,7 +384,9 @@
       mount(recebidosEl, ok ? st.recebimentos.map((l) => h("li", { class: T.recebido },
         h("span", { class: T.itemData }, diaMes(l.data)),
         h("span", { class: T.itemNome }, l.nomeConta || "Conta"),
-        h("span", { class: "money money--income" }, F.moeda(l.valor)))) : null);
+        h("span", { class: "money money--income" }, F.moeda(l.valor)),
+        UI.IconButton("excluir", "Excluir pagamento recebido de " + F.moeda(l.valor) + " em " + F.dataCurta(l.data),
+          { class: "icon-btn--danger", size: 14, onClick: () => excluirPagamento(l) }))) : null);
       receberBtn.disabled = !ok;
       // consulta (Todos ou um cartão): sem ajustes, recebidos e Pix, que são guardados por perfil e mês
       secoesDoPerfil.forEach((s) => s.classList.toggle("tw:hidden", st.consulta));   // as seções são flex: o atributo hidden não basta
@@ -517,6 +519,19 @@
     function registrarPagamento() {
       if (!pronto(st) || !st.perfil) return;
       ZoZo.modais.receberFatura(ctx, { perfil: st.perfil, mes: st.mes, ano: st.ano, aPagar: calcular(st).aPagar, aoReceber: () => carregar() });
+    }
+    /* Excluir um pagamento registrado por engano: a Receita sai da conta (o saldo volta) e a fatura volta a cobrar o valor */
+    function excluirPagamento(l: LancamentoTela) {
+      ZoZo.feedback.confirmarExclusao("Excluir pagamento recebido?",
+        "O pagamento de " + F.moeda(l.valor) + " recebido em " + F.dataCurta(l.data) + " sai desta fatura, e a receita é excluída da conta "
+          + (l.nomeConta || "") + ". Essa ação não pode ser desfeita.")
+        .then((ok) => {
+          if (!ok) return;
+          return ctx.bridge.request(A.deleteLancamento, { id: l.id })
+            .then(() => { ctx.toast("Pagamento excluído."); return ctx.recarregarTudo(); })
+            .then(() => carregar())
+            .catch((e: ErroPonte) => ctx.toast(e.friendly, { tone: "error" }));
+        });
     }
     const receberBtn = UI.Button("Registrar pagamento recebido", { variant: "secondary", size: "sm", icon: "mais", class: "btn--block", onClick: () => registrarPagamento() });
     const recebidosEl = h("ul", { class: T.recebidos, "aria-label": "Pagamentos recebidos" });

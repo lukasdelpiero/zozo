@@ -102,6 +102,7 @@ class FakeServicos:
     def __init__(self, captcha_ok=True):
         self.chamadas = []
         self.captcha_ok = captcha_ok
+        self.captcha_host = "zozo.exemplo.com"         # onde o desafio foi resolvido (o Siteverify devolve)
 
     async def http_get(self, url, cabecalhos):
         self.chamadas.append((url, dict(cabecalhos)))
@@ -114,7 +115,7 @@ class FakeServicos:
     async def http_post(self, url, campos):
         self.chamadas.append((url, dict(campos)))
         if url == nucleo.TURNSTILE_URL:
-            return 200, json.dumps({"success": self.captcha_ok and campos.get("response") == "ok"})
+            return 200, json.dumps({"success": self.captcha_ok and campos.get("response") == "ok", "hostname": self.captcha_host})
         if url == google.TOKEN:
             return (200, json.dumps({"id_token": self.google_token})) if self.google_token else (400, "{}")
         return 404, ""
@@ -282,6 +283,14 @@ class Base(unittest.TestCase):
     def gravar(self, va, c=None, p=None):
         return self.api("PUT", "/api/documento", {"versaoAnterior": va, "conteudo": c or conteudo()}, prova=p or self.prova)
 
+    def ligar_protecao(self, cli=None, pv=None, **extra):
+        """Liga a proteção avançada como o navegador: troca a chave (sal e prova novos, documento recifrado). ((status, corpo), prova nova)"""
+        linha = self.con.execute("SELECT versao FROM documentos WHERE email = ?", (EMAIL,)).fetchone()
+        nova = prova()
+        corpo = dict({"avancada": True, "sal": b64(os.urandom(16)), "kdf": "argon2id-1", "prova": nova,
+                      "conteudo": conteudo(), "versaoAnterior": linha[0] if linha else 0}, **extra)
+        return (cli or self.api)("PUT", "/api/conta/protecao", corpo, prova=pv or self.prova), nova
+
 
 class TesteContaESessao(Base):
     def test_cadastro_abre_sessao_e_cookie_seguro(self):
@@ -345,6 +354,11 @@ class TesteContaESessao(Base):
         cli = Cliente(self.banco, config=cfg, ip="198.51.100.10")
         self.assertEqual(self.cadastrar(cli, OUTRO, prova())[1], {"erro": "CAPTCHA_REQUIRED"})
         self.assertEqual(self.cadastrar(cli, OUTRO, prova(), turnstile="errado")[0], 428)
+        # token válido, mas resolvido em outro site que usa a mesma chave pública (ou sem o hostname): recusado
+        for i, host in enumerate(("outro.exemplo.com", None, "zozo.exemplo.com.evil.example")):
+            outro_ip = Cliente(self.banco, config=cfg, ip=f"198.51.100.{20 + i}")            # há limite de cadastros por IP
+            outro_ip.servicos.captcha_host = host
+            self.assertEqual(self.cadastrar(outro_ip, OUTRO, prova(), turnstile="ok")[0], 428, host)
         self.assertEqual(self.cadastrar(cli, OUTRO, prova(), turnstile="ok")[0], 201)
         url, campos = cli.servicos.chamadas[-1]
         self.assertEqual((url, campos["remoteip"]), (nucleo.TURNSTILE_URL, "198.51.100.10"))
@@ -493,6 +507,25 @@ class TesteBloqueio(Base):
 
 
 class TesteDocumento(Base):
+    def test_saida_ou_senha_trocada_no_meio_do_pedido_nao_grava(self):
+        # auditoria de segurança 03/11: a sessão e a prova eram conferidas antes e a gravação valia mesmo se, entre uma
+        # coisa e outra, a sessão acabasse ou a senha mudasse em outro aparelho
+        self.assertEqual(self.gravar(0)[0], 200)
+        for revogar in ("DELETE FROM sessoes", "UPDATE contas SET verificador = '" + "0" * 64 + "'"):
+            original = self.banco.executar                                   # o banco desta volta (cada volta tem conta nova)
+
+            async def no_meio(sql, *params, revogar=revogar, original=original):
+                if sql.startswith("UPDATE documentos SET"):
+                    self.con.execute(revogar)
+                return await original(sql, *params)
+            self.banco.executar = no_meio
+            self.assertEqual(self.gravar(1), (409, {"erro": "DATA_CHANGED"}), revogar)
+            self.banco.executar = original
+            self.assertEqual(self.con.execute("SELECT versao FROM documentos").fetchone()[0], 1)     # nada gravado
+            self.tearDown()
+            self.setUp()                                                                           # conta nova
+            self.assertEqual(self.gravar(0)[0], 200)
+
     def test_exige_sessao_e_prova(self):
         anonimo = Cliente(self.banco, ip="198.51.100.20")
         for m, c, corpo in (("GET", "/api/documento", None), ("DELETE", "/api/conta", {"confirmacao": "EXCLUIR CONTA"}), ("GET", "/api/historico", None),
@@ -664,7 +697,7 @@ class Teste2FA(Base):
         # o código de backup de outra conta (mesmo texto) não serve: o HMAC leva o e-mail
         outro = totp.hash_backup(totp.normalizar_backup(self.codigos_backup[0]), OUTRO, SEGREDO)
         self.assertNotEqual(outro, totp.hash_backup(totp.normalizar_backup(self.codigos_backup[0]), EMAIL, SEGREDO))
-        st, r = self.api("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova)
+        (st, r), self.prova = self.ligar_protecao()
         self.assertEqual(st, 200)
         st, r = self.api("PUT", "/api/conta/protecao", {"avancada": False, "codigo": self.codigos_backup[0]}, prova=self.prova)
         self.assertEqual((st, r), (200, {"avancada": False}))
@@ -799,7 +832,8 @@ class Teste2FA(Base):
         self.assertNotEqual(verificador(), antes)
         self.prova = nova
         # o mesmo código não serve para outra ação
-        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova)[0], 200)    # ligar: sem código
+        (st, _), self.prova = self.ligar_protecao()
+        self.assertEqual(st, 200)                                                # ligar: sem código
         st, r = self.api("PUT", "/api/conta/protecao", {"avancada": False, "codigo": codigo}, prova=self.prova)
         self.assertEqual((st, r["erro"]), (401, "CODE_INVALID"))
         self.api.agora += 30
@@ -1554,22 +1588,23 @@ class TesteRecuperacao(Base):
     def test_protecao_avancada_recomeca_vazia(self):
         self.historico()
         self.guardar_custodia()
-        self.assertEqual(self.api("PUT", "/api/conta/protecao", {"avancada": True}, prova=self.prova), (200, {"avancada": True}))
+        r, self.prova = self.ligar_protecao()
+        self.assertEqual(r, (200, {"avancada": True, "versao": 5}))             # a troca de chave grava o documento recifrado
         self.assertEqual(self.api("GET", "/api/custodia", prova=self.prova)[1], {"avancada": True, "ativa": False})
         self.assertEqual(self.api("POST", "/api/custodia/chave", prova=self.prova)[1], {"avancada": True})
         self.assertEqual(self.api("PUT", "/api/custodia", {"nonce": b64(os.urandom(16)), "chave": b64(os.urandom(60))}, prova=self.prova)[0], 409)
         self.pedir()
         token = self.token()
         st, a = self.rec("POST", "/api/recuperacao/abrir", {"token": token})
-        self.assertEqual((st, a["custodia"], a["documento"], a["historico"], a["versao"]), (200, None, None, [], 4))   # nada cifrado sai
+        self.assertEqual((st, a["custodia"], a["documento"], a["historico"], a["versao"]), (200, None, None, [], 5))   # nada cifrado sai
         self.assertTrue(a["avancada"])                                                          # a tela diz o motivo certo
         passe = a["passe"]
-        self.assertEqual(self.concluir(token, passe=passe)[0], (409, {"erro": "DATA_CHANGED"}))  # sem cópia não há "manter"
-        self.assertEqual(self.concluir(token, modo="recomecar", historico=[{"versao": 3, "conteudo": conteudo()}], passe=passe)[0][0], 400)
-        self.assertEqual(self.concluir(token, modo="tudo", passe=passe)[0][0], 400)
-        (st, _), corpo = self.concluir(token, modo="recomecar", passe=passe)
+        self.assertEqual(self.concluir(token, passe=passe, va=5)[0], (409, {"erro": "DATA_CHANGED"}))  # sem cópia não há "manter"
+        self.assertEqual(self.concluir(token, modo="recomecar", historico=[{"versao": 3, "conteudo": conteudo()}], passe=passe, va=5)[0][0], 400)
+        self.assertEqual(self.concluir(token, modo="tudo", passe=passe, va=5)[0][0], 400)
+        (st, _), corpo = self.concluir(token, modo="recomecar", passe=passe, va=5)
         self.assertEqual(st, 200)
-        self.assertEqual(tuple(self.con.execute("SELECT versao, conteudo FROM documentos").fetchone()), (5, corpo["conteudo"]))
+        self.assertEqual(tuple(self.con.execute("SELECT versao, conteudo FROM documentos").fetchone()), (6, corpo["conteudo"]))
         self.assertEqual(self.con.execute("SELECT count(*) FROM historico").fetchone()[0], 0)
         self.assertIn("proteção avançada", self.serv.emails[-1]["text"])
         nova = Cliente(self.banco, ip="198.51.100.150")
@@ -1825,11 +1860,16 @@ class TesteZo(Base):
     def test_mascara_telefone_fixo_invisiveis_senha_e_codigo(self):
         casos = {"Contato (11) 3456-7890": "Contato [telefone oculto]", "fixo 3456-7890": "fixo [telefone oculto]",
                  "CPF 123\u200b.456.789-09": "CPF [CPF oculto]", "minha senha é Abc!123 ok": "minha senha é [oculto] ok",
-                 "código do 2fa: 482913": "código do 2fa: [código oculto]"}
+                 "código do 2fa: 482913": "código do 2fa: [código oculto]",
+                 # auditoria de segurança 03/11 (A4): separados por espaço e sem espaço depois do DDD
+                 "CPF 123 456 789 01; telefone (11) 2345-6789": "CPF [CPF oculto]; telefone [telefone oculto]",
+                 "tel (11)23456789": "tel [telefone oculto]", "celular +55 (11) 9 8765-4321": "celular [telefone oculto]",
+                 "CNPJ 12 345 678 0001 90": "CNPJ [CNPJ oculto]"}
         for entrada, saida in casos.items():
             self.assertEqual(zo.mascarar(entrada), saida, entrada)
         # valores, datas e anos continuam como estão
-        for igual in ["Gastei 1.234,56 em 2026-11-03", "pague 2026 3456", "R$ 3456,78", "parcela 3/10"]:
+        for igual in ["Gastei 1.234,56 em 2026-11-03", "pague 2026 3456", "R$ 3456,78", "parcela 3/10", "R$ 123 456,78",
+                      "ano 2026, dia 15, 3 parcelas de 150"]:
             self.assertEqual(zo.mascarar(igual), igual)
 
     def test_uso_de_tokens_vai_para_o_log_sem_conteudo(self):
@@ -2533,6 +2573,82 @@ class TesteMigracaoKdf(Base):
         self.assertEqual(self.api("PUT", "/api/conta/kdf", corpo, prova=self.prova)[0], 200)
         st, b = self.api("PUT", "/api/conta/kdf", self.pedido(1), prova=corpo["prova"])
         self.assertEqual((st, b), (409, {"erro": "KDF_CURRENT"}))
+
+
+class TesteTrocaDeChave(Base):
+    """Auditoria de segurança 03/11: A1 (proteção avançada troca a chave) e A3 (troca de senha mantém o histórico)."""
+
+    def setUp(self):
+        super().setUp()
+        for va in range(0, 4):                     # documento na versão 4 e 3 versões no histórico
+            self.con.execute("UPDATE historico SET criado_em = '2000-01-01T00:00:00.000Z'")
+            self.assertEqual(self.gravar(va)[0], 200)
+        self.outro = Cliente(self.banco, ip="198.51.100.170")         # outro aparelho da mesma conta
+        self.assertEqual(self.entrar(self.outro)[0], 200)
+
+    def conta(self):
+        return self.con.execute("SELECT sal, verificador, protecao_avancada FROM contas WHERE email = ?", (EMAIL,)).fetchone()
+
+    def historico_(self):
+        return dict(self.con.execute("SELECT versao, conteudo FROM historico WHERE email = ? ORDER BY versao", (EMAIL,)).fetchall())
+
+    def test_ligar_sem_trocar_a_chave_e_recusado(self):
+        antes = tuple(self.conta())
+        for corpo in ({"avancada": True}, {"avancada": True, "codigo": "123456"}):         # cliente antigo: só apagaria a cópia
+            self.assertEqual(self.api("PUT", "/api/conta/protecao", corpo, prova=self.prova)[0], 400)
+        self.assertEqual(self.ligar_protecao(prova=self.prova)[0][0], 400)                   # "troca" para a mesma chave
+        self.assertEqual(self.ligar_protecao(kdf="pbkdf2")[0][0], 400)
+        self.assertEqual(self.ligar_protecao(extra=1)[0][0], 400)
+        self.assertEqual(self.ligar_protecao(versaoAnterior=3)[0], (409, {"erro": "DATA_CHANGED"}))   # outro aparelho gravou
+        self.assertEqual(self.ligar_protecao(historico=[{"versao": 9, "conteudo": conteudo()}])[0][0], 400)  # cópia inventada
+        self.assertEqual(self.ligar_protecao(pv=prova())[0][1]["erro"], "WRONG_PASSWORD")
+        self.assertEqual(tuple(self.conta()), antes)                                         # nada mudou
+
+    def test_ligar_troca_chave_documento_e_historico_numa_transacao(self):
+        r, chave = self.api("POST", "/api/custodia/chave", prova=self.prova)[1], b64(os.urandom(60))
+        self.assertEqual(self.api("PUT", "/api/custodia", {"nonce": r["nonce"], "chave": chave}, prova=self.prova)[0], 200)
+        sal_antes, verif_antes, _ = self.conta()
+        recifradas = [{"versao": v, "conteudo": conteudo()} for v in (2, 3)]               # a versão 1 "não abria": fica de fora
+        (st, b), nova = self.ligar_protecao(historico=recifradas)
+        self.assertEqual((st, b), (200, {"avancada": True, "versao": 5}))
+        sal, verif, avancada = self.conta()
+        self.assertNotEqual(sal, sal_antes)
+        self.assertNotEqual(verif, verif_antes)
+        self.assertEqual(avancada, 1)
+        self.assertEqual(self.historico_(), {x["versao"]: x["conteudo"] for x in recifradas})   # nada cifrado com a chave antiga
+        for tabela in ("custodia", "tokens_recuperacao", "kdf_etapas"):
+            self.assertEqual(self.con.execute(f"SELECT count(*) FROM {tabela}").fetchone()[0], 0, tabela)
+        self.assertEqual(self.api("GET", "/api/documento", prova=self.prova)[1]["erro"], "WRONG_PASSWORD")   # a prova antiga não vale
+        self.assertEqual(self.api("GET", "/api/documento", prova=nova)[1]["versao"], 5)                   # esta sessão segue
+        self.assertEqual(self.outro("GET", "/api/documento", prova=nova)[0], 401)                         # o outro aparelho sai
+        self.assertEqual(self.entrar(self.outro, pv=nova)[0], 200)                                         # e entra com a mesma senha
+
+    def test_ligar_com_historico_grande_em_etapas(self):
+        nova_sal = b64(os.urandom(16))
+        etapa = lambda v, sal=nova_sal: self.api("PUT", "/api/conta/chave/historico", {"sal": sal, "versao": v, "conteudo": conteudo()}, prova=self.prova)
+        self.assertEqual(etapa(9)[0], 400)                                                  # versão que não existe
+        self.assertEqual(self.api("PUT", "/api/conta/chave/historico", {"sal": nova_sal, "versao": 1}, prova=self.prova)[0], 400)
+        for v in (1, 2, 3):
+            self.assertEqual(etapa(v)[0], 200)
+        self.assertEqual(self.ligar_protecao(sal=nova_sal, historico=[{"versao": 1, "conteudo": conteudo()}])[0][0], 400)  # dois caminhos
+        (st, _), _ = self.ligar_protecao(sal=nova_sal)
+        self.assertEqual(st, 200)
+        self.assertEqual(sorted(self.historico_()), [1, 2, 3])
+        self.assertEqual(self.con.execute("SELECT count(*) FROM kdf_etapas").fetchone()[0], 0)
+
+    def test_troca_de_senha_mantem_o_historico_recifrado(self):
+        recifradas = [{"versao": v, "conteudo": conteudo()} for v in (1, 2, 3)]
+        nova = prova()
+        corpo = {"sal": b64(os.urandom(16)), "iteracoes": 600000, "prova": nova, "kdf": "argon2id-1", "conteudo": conteudo(),
+                 "versaoAnterior": 4, "historico": recifradas}
+        self.assertEqual(self.api("PUT", "/api/conta/senha", dict(corpo, historico=[{"versao": 7, "conteudo": conteudo()}]), prova=self.prova)[0], 400)
+        self.assertEqual(self.api("PUT", "/api/conta/senha", corpo, prova=self.prova), (200, {"versao": 5}))
+        self.assertEqual(self.historico_(), {x["versao"]: x["conteudo"] for x in recifradas})
+        # cliente antigo (sem o histórico recifrado): as cópias antigas somem, como antes; nada fica com a chave anterior
+        corpo2 = dict(corpo, sal=b64(os.urandom(16)), prova=prova(), versaoAnterior=5)
+        del corpo2["historico"]
+        self.assertEqual(self.api("PUT", "/api/conta/senha", corpo2, prova=nova)[0], 200)
+        self.assertEqual(self.historico_(), {})
 
 
 class TestePedidoInvalido(Base):

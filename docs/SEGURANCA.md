@@ -431,6 +431,8 @@ The server should be authoritative for:
 
 The client may calculate for display, but server-side calculations and validation determine authoritative state.
 
+**ZoZo exception (end-to-end encryption, decided by the product owner).** The financial document is encrypted in the browser and the server never sees amounts, so it cannot recalculate them. For ZoZo, the authority over the *content* of a user's own document is the user's browser holding the key (`ui/js/data/servico.ts`, covered by `ui/tests`); the server is authoritative for everything it can check: identity from the session, ownership, the password proof, optimistic versioning (`versaoAnterior`), size and format limits, atomic key rotation and history. AES-GCM proves the document was written with the owner's key, not that a transaction is true: the key owner, malware in the session or a malicious bundle can write well-formed false data. ZoZo is not an immutable ledger and does not carry bank-signed evidence. Any future feature that needs server-verified amounts (shared accounts, payments, reports for third parties) must either keep that data outside the encrypted document or add a design that lets the server verify it.
+
 ## 7.2 Atomic operations
 
 Operations that affect multiple records MUST be atomic where the datastore supports transactions.
